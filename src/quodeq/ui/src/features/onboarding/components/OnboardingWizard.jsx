@@ -66,6 +66,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepos
           handleSkipWelcome={handleSkipWelcome}
           handleImport={handleImport}
           handleLaunch={handleLaunch}
+          handleClose={handleClose}
           onGoToRepositories={onGoToRepositories}
         />
       </div>

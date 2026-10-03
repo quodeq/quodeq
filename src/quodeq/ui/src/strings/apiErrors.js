@@ -40,6 +40,8 @@ const CODE_KEYS = {
   MISSING_REPO: 'apiError.missingRepo',
   PROJECT_EXISTS: 'apiError.projectExists',
   FOREIGN_REPO: 'apiError.foreignRepo',
+  // A file:// evaluations repository whose folder is not a git repository.
+  NOT_A_GIT_REPO: 'apiError.notAGitRepo',
   NOT_LOCAL: 'apiError.notLocal',
   PATH_MISSING: 'apiError.pathMissing',
   MISSING_PATH: 'apiError.pathMissing',

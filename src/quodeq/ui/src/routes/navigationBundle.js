@@ -1,5 +1,5 @@
 import { t } from '../strings/index.js';
-import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER } from '../features/onboarding/wizardSteps.js';
+import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_CONNECT } from '../features/onboarding/wizardSteps.js';
 import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 
@@ -41,6 +41,14 @@ function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onI
       startStep: STEP_WELCOME, isFirstProject: projects.length === 0, source, onImportProject,
     }),
   );
+}
+
+// The Repositories tab's "connect evaluations repository" and the strip's
+// "change repository": the wizard opened on its connect step alone. Not
+// guarded: connecting an evaluations repository never touches a running
+// evaluation. onImportProject rides along like the welcome's entries.
+function makeOnConnectEvaluations({ setWizardEntry, onImportProject }) {
+  return () => setWizardEntry({ startStep: STEP_CONNECT, source: WIZARD_SOURCE.CONNECT, onImportProject });
 }
 
 function makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }) {
@@ -91,6 +99,7 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     onAddProject: makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects }),
     onImportProject,
     onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }),
+    onConnectEvaluations: makeOnConnectEvaluations({ setWizardEntry, onImportProject }),
     onResumeSetup: makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }),
     // null when the shared repo has no content — consumers use the nullness
     // to hide their "browse remote repositories" affordance.

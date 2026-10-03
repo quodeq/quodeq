@@ -113,7 +113,7 @@ describe('ProjectsPage — group-aware filtering and the empty-filter trap', () 
     );
 
     await waitFor(() => expect(screen.getByText('no projects match your filters.')).toBeInTheDocument());
-    expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    expect(screen.queryByText('An evaluations repository')).not.toBeInTheDocument();
     // The toolbar (search input included) must stay mounted so the filter
     // that caused this can actually be cleared.
     expect(screen.getByLabelText('filter projects by name')).toBeInTheDocument();

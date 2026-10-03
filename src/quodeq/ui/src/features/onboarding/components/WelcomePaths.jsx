@@ -1,4 +1,7 @@
 import { t } from '../../../strings/index.js';
+// The cards' styles; imported here too because the empty Repositories page
+// renders the cards without the welcome step.
+import '../../../styles/onboarding-welcome.css';
 
 /**
  * The two ways in: score a repository, or connect an evaluations repository
@@ -8,7 +11,8 @@ import { t } from '../../../strings/index.js';
  *
  * Adapts to what already exists: with local projects the first card's action
  * reads "add another"; with an evaluations repository connected the second
- * card names it and goes to repositories instead of connecting. Importing one
+ * card names it and goes to repositories instead of connecting (no button when
+ * `onGoToRepositories` is absent: the Repositories tab is already there). Importing one
  * exported archive is the rescue path of "existing evaluations", so it lives
  * on the second card as a link, shown only when `onImport` is wired.
  *
@@ -17,7 +21,7 @@ import { t } from '../../../strings/index.js';
  * @param {Function} props.onStart
  * @param {Function} props.onConnect
  * @param {Function} [props.onImport]
- * @param {Function} props.onGoToRepositories
+ * @param {Function} [props.onGoToRepositories]
  * @param {{ connected: boolean, host: string|null, hasLocalProjects: boolean }} props.adaptation
  */
 export default function WelcomePaths({ compact = false, onStart, onConnect, onImport, onGoToRepositories, adaptation }) {
@@ -63,9 +67,11 @@ function EvalsPathCard({ connected, host, onConnect, onImport, onGoToRepositorie
       )}
       <div className="onboarding-path-card__actions">
         {connected ? (
-          <button type="button" className="term-btn term-btn--secondary" onClick={onGoToRepositories}>
-            {t('onboarding.pathEvalsGo')}
-          </button>
+          onGoToRepositories && (
+            <button type="button" className="term-btn term-btn--secondary" onClick={onGoToRepositories}>
+              {t('onboarding.pathEvalsGo')}
+            </button>
+          )
         ) : (
           <button type="button" className="term-btn term-btn--secondary" onClick={onConnect}>
             {t('onboarding.pathEvalsConnect')}

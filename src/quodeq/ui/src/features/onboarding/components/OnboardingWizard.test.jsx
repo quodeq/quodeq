@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import OnboardingWizard from './OnboardingWizard.jsx';
-import { STEP_REPO_SCAN } from '../wizardSteps.js';
+import { STEP_REPO_SCAN, STEP_CONNECT } from '../wizardSteps.js';
 import { WIZARD_SOURCE } from '../onboardingVocab.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 
@@ -18,6 +18,7 @@ vi.mock('../../../api/index.js', () => ({
   getProjectInfo: vi.fn().mockResolvedValue({ id: 'uuid-9', runsCount: 0 }),
   getProjectScan: vi.fn().mockResolvedValue({ total_files: 7, languages: { py: 7 }, branches: ['main'], modules: [] }),
   probeGit: vi.fn().mockResolvedValue({ reachable: true, kind: 'ok' }),
+  connectShared: vi.fn(async (url) => ({ started: true, url })),
   getSharedStatus: vi.fn(async () => shared.status),
   sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
 }));
@@ -90,6 +91,21 @@ describe('OnboardingWizard', () => {
     await waitFor(() => expect(onImportProject).toHaveBeenCalledTimes(1));
     expect(onClose).toHaveBeenCalledWith({ saved: false });
     expect(localStorage.getItem(SKIP_FLAG)).toBeNull();
+  });
+
+  it('opened on the connect step from the Repositories tab: cancel instead of back', () => {
+    const { onClose } = renderWizard({ startStep: STEP_CONNECT, isFirstProject: false, source: WIZARD_SOURCE.CONNECT });
+    expect(screen.getByText('evaluations repository')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'back' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledWith({ saved: false });
+  });
+
+  it('a started connect lands on the Repositories tab', async () => {
+    const { onGoToRepositories } = renderWizard({ startStep: STEP_CONNECT, isFirstProject: false, source: WIZARD_SOURCE.CONNECT });
+    fireEvent.change(screen.getByRole('textbox', { name: /evaluations repository url/i }), { target: { value: 'https://github.com/team/evals.git' } });
+    fireEvent.click(screen.getByRole('button', { name: 'connect' }));
+    await waitFor(() => expect(onGoToRepositories).toHaveBeenCalledTimes(1));
   });
 
   it('skipping welcome via startStep="repo-scan" mounts the RepoScan step directly', () => {

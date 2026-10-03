@@ -221,6 +221,7 @@ export const ROUTE_RENDERERS = {
         onRelocate: props.navigation.handleRelocateProject,
         onAddProject: props.navigation.onAddProject,
         onImportProject: props.navigation.onImportProject,
+        onConnectEvaluations: props.navigation.onConnectEvaluations,
         onResumeSetup: props.navigation.onResumeSetup,
         onFiltersChange: (filters) => props.navigation.handleNavigateReplace(NAV_TAB.PROJECTS, { filters }),
         onSharedDisconnected: () => reselectAfterSharedDisconnect(props.navigation),

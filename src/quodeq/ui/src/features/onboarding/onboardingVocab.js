@@ -16,3 +16,12 @@ export const WIZARD_SOURCE = Object.freeze({
   SETTINGS: 'settings',
   CONNECT: 'connect',
 });
+
+// Where a repository comes from in the url-or-folder forms (the connect
+// step's evaluations repository, and the wizard state's `repo.source`): a
+// pasted git url, or a local folder picked in the folder browser.
+export const REPO_SOURCE = Object.freeze({ URL: 'url', FOLDER: 'folder' });
+
+// A local folder travels to the API as a file url: this prefix plus the
+// absolute path (the server rejects relative paths and dot segments).
+export const FILE_URL_PREFIX = 'file://';

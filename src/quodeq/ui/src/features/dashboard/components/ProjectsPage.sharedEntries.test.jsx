@@ -80,8 +80,8 @@ describe('ProjectsPage — shared entries (configured)', () => {
   // Regression: the header actions used to be gated on `projects.length > 0`,
   // so a user with zero local projects but a shared-only project had no way
   // to add or import from this page (allEntries is non-empty here, so the
-  // EmptyProjectsCTA doesn't render either). Gate on `isEmpty` instead.
-  it('shows the add/import header buttons with zero local projects but a shared project present', async () => {
+  // empty page's two paths don't render either). Gate on `isEmpty` instead.
+  it('shows the add project header button with zero local projects but a shared project present', async () => {
     const onAddProject = vi.fn();
     const onImportProject = vi.fn();
     const fakeApi = configuredApi();
@@ -92,7 +92,7 @@ describe('ProjectsPage — shared entries (configured)', () => {
 
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Add project' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Import evaluations' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Import evaluations' })).not.toBeInTheDocument();
   });
 
   it('clicking a shared-only card calls onSelect(id, "shared")', async () => {

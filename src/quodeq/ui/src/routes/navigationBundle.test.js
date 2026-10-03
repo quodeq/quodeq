@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildNavigationBundle } from './navigationBundle.js';
-import { STEP_REPO_SCAN, STEP_WELCOME } from '../features/onboarding/wizardSteps.js';
+import { STEP_REPO_SCAN, STEP_WELCOME, STEP_CONNECT } from '../features/onboarding/wizardSteps.js';
 import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 
 function args(state, extra = {}) {
@@ -99,4 +99,16 @@ test('buildNavigationBundle opens the welcome as a first project when there are 
   const bundle = buildNavigationBundle(args({ projects: [] }, { setWizardEntry: (e) => entries.push(e) }));
   bundle.onTakeTour();
   assert.equal(entries[0].isFirstProject, true);
+});
+
+test('onConnectEvaluations opens the wizard on the connect step', () => {
+  const entries = [];
+  const bundle = buildNavigationBundle(args({ projects: [{ id: 'a' }], handleImportProject: () => {} }, {
+    setWizardEntry: (e) => entries.push(e),
+  }));
+  bundle.onConnectEvaluations();
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].startStep, STEP_CONNECT);
+  assert.equal(entries[0].source, WIZARD_SOURCE.CONNECT);
+  assert.equal(entries[0].onImportProject, bundle.onImportProject);
 });

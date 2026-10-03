@@ -34,13 +34,30 @@ function WelcomeRoute({ wizard, entry, handleSkipWelcome, handleImport, onGoToRe
 }
 
 /**
+ * The connect step. Reached from the welcome, back returns to it; opened on
+ * its own from the Repositories tab (source CONNECT) there is no welcome
+ * behind it, so it offers cancel. A started connect lands on the
+ * Repositories tab, where the strip shows the download.
+ */
+function ConnectRoute({ wizard, entry, handleClose, onGoToRepositories }) {
+  const fromRepositories = entry.source === WIZARD_SOURCE.CONNECT;
+  return (
+    <ConnectStep
+      onBack={fromRepositories ? undefined : () => wizard.goToStep(STEP_WELCOME)}
+      onCancel={handleClose}
+      onConnectStarted={onGoToRepositories}
+    />
+  );
+}
+
+/**
  * OnboardingWizard.jsx's step-switch JSX (which step component renders for
  * the wizard's current step).
  */
 export function OnboardingStepSwitch({
   wizard, entry, standards, currentIndex, visibleCount,
   createProject, getProjectInfo,
-  nextStep, prevStep, handleSkipWelcome, handleImport, handleLaunch, onGoToRepositories,
+  nextStep, prevStep, handleSkipWelcome, handleImport, handleLaunch, handleClose, onGoToRepositories,
 }) {
   return (
     <>
@@ -55,7 +72,7 @@ export function OnboardingStepSwitch({
       )}
 
       {wizard.state.step === STEP_CONNECT && (
-        <ConnectStep onBack={() => wizard.goToStep(STEP_WELCOME)} />
+        <ConnectRoute wizard={wizard} entry={entry} handleClose={handleClose} onGoToRepositories={onGoToRepositories} />
       )}
 
       {wizard.state.step === STEP_REPO_SCAN && (

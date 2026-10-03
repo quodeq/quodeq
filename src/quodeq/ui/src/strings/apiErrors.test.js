@@ -134,3 +134,8 @@ test('apiErrorDetail reads the envelope detail or empty', () => {
   assert.equal(isAccessCode('ACCESS_NOT_FOUND'), true);
   assert.equal(isAccessCode('REPO_NOT_FOUND'), false);
 });
+
+test('a file:// folder that is not a git repository gets its own copy', () => {
+  assert.equal(apiErrorKey('NOT_A_GIT_REPO'), 'apiError.notAGitRepo');
+  assert.equal(apiErrorMessage({ code: 'NOT_A_GIT_REPO', message: 'not a git repository' }, 'x.y'), catalog['apiError.notAGitRepo']);
+});

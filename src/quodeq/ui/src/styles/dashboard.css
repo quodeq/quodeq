@@ -2905,7 +2905,7 @@
   flex-shrink: 0;
 }
 
-/* Secondary header actions (import project, connect team results): the same
+/* Secondary header actions (connect evaluations repository, the strip buttons): the same
    size and shape as the filled "add project" term-btn beside them (mono 13px,
    term-btn padding and radius), muted colours so only the primary one
    carries the accent. */
@@ -2970,48 +2970,115 @@
   }
 }
 
-/* ── Empty-projects centered CTA ── */
+/* ── Empty Repositories page: the welcome's two paths, side by side ── */
 
-.projects-empty--cta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: var(--space-12) var(--space-6);
-  gap: var(--space-3);
+.projects-empty--paths {
+  padding: var(--space-6) 0;
 }
 
-.projects-empty__title {
-  margin: 0;
-  font-size: 1.4rem;
+/* ── Evaluations repository form (url or folder) ──
+   Shared by the welcome's connect step and the failure card below. */
+
+.repo-source-switch {
+  display: inline-flex;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  overflow: hidden;
+}
+
+.repo-source-switch__option {
+  appearance: none;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--term-font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.repo-source-switch__option + .repo-source-switch__option {
+  border-left: 1px solid var(--color-border);
+}
+.repo-source-switch__option:hover {
   color: var(--color-text);
-  font-weight: 600;
+  background: var(--color-surface-alt);
+}
+.repo-source-switch__option--active,
+.repo-source-switch__option--active:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.repo-source-switch__option:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
 }
 
-.projects-empty__hint {
-  margin: 0;
-  max-width: 420px;
+.evals-repo-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.evals-repo-form__field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.evals-repo-form__field > .term-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.evals-repo-form__field .term-input__field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.evals-repo-form__path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--term-font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+}
+.evals-repo-form__path--empty {
   color: var(--color-text-muted);
 }
 
-/* Small layout-only adjustments on top of the term-btn--filled visual. */
-.projects-empty__cta-btn {
-  margin-top: var(--space-3);
+.evals-repo-form__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.projects-empty__cta-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+.evals-repo-form__hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.evals-repo-form__error {
+  margin-bottom: 0;
+}
+
+@media (max-width: 600px) {
+  .evals-repo-form__submit {
+    flex: 1 1 100%;
+  }
 }
 
 /* ── Team results: sync strip and connect card ──
    The strip sits under the header while a team repository is configured
    (one state at a time, see SyncStrip.jsx); the connect card is the inline
-   form that the header's "connect team results" opens. Both reuse the
+   card a failed connect comes back in. Both reuse the
    header's pill buttons and the card surface tokens. */
 
 .sync-strip {
@@ -3213,12 +3280,6 @@
   color: var(--color-text-muted);
 }
 
-.connect-team-card__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
 .connect-team-card__input {
   flex: 1 1 300px;
   min-width: 0;
@@ -3240,15 +3301,6 @@
   opacity: 0.6;
 }
 
-.connect-team-card__btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.connect-team-card__error {
-  margin-bottom: 0;
-}
-
 .connect-team-card__access {
   margin-top: var(--space-3);
 }
@@ -3256,9 +3308,6 @@
 @media (max-width: 600px) {
   .sync-strip__grow {
     display: none;
-  }
-  .connect-team-card__btn {
-    flex: 1 1 100%;
   }
 }
 
@@ -3369,7 +3418,7 @@
    colored. `aria-disabled` (not the native attribute) keeps the click
    firing while a job is running, matching this codebase's is-disabled
    convention -- see connectingRef/refreshingRef/pullingRef in
-   useSharedProjects.js and the EmptyProjectsCTA comment. */
+   useSharedProjects.js and evalBlocked.js. */
 .project-delete-btn--accent {
   color: var(--color-accent);
   border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);

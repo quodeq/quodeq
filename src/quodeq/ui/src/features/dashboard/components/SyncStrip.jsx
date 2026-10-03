@@ -14,8 +14,9 @@ function StripButton({ onClick, label, children }) {
   );
 }
 
-// The `⋯` menu: change repository and disconnect (both also in Settings).
-function StripMenu({ onChange, onDisconnect }) {
+// The `⋯` menu: change repository and disconnect (both also in Settings),
+// plus importing an exported archive when the page wires it.
+function StripMenu({ onChange, onImport, onDisconnect }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const close = useCallback(() => setOpen(false), []);
@@ -36,6 +37,7 @@ function StripMenu({ onChange, onDisconnect }) {
       {open && (
         <div className="projects-filter-pill-menu sync-strip__menu-list" role="menu" aria-label={t('sync.moreAria')}>
           <button type="button" role="menuitem" onClick={pick(onChange)}>{t('sync.changeRepo')}</button>
+          {onImport && <button type="button" role="menuitem" onClick={pick(onImport)}>{t('sync.importArchive')}</button>}
           <button type="button" role="menuitem" onClick={pick(onDisconnect)}>{t('sync.disconnect')}</button>
         </div>
       )}
@@ -117,7 +119,7 @@ function StripAnnouncement({ state, status, children }) {
  */
 export default function SyncStrip({
   status, offline = false, updateFailed = false, loadFailed = false, lastSynced, projectsCount = 0, invite,
-  onUpdate, onCopyInvite, onChange, onDisconnect,
+  onUpdate, onCopyInvite, onChange, onImport, onDisconnect,
 }) {
   const state = pickStripState({ status, offline, updateFailed, loadFailed });
   if (state.kind === STRIP_STATE.HIDDEN) return null;
@@ -138,7 +140,7 @@ export default function SyncStrip({
             <StripButton onClick={onUpdate} label={t('sync.updateAria')}><span aria-hidden="true">⟳</span> {t('sync.update')}</StripButton>
           )}
           <InviteControl invite={invite} onCopyInvite={onCopyInvite} />
-          <StripMenu onChange={onChange} onDisconnect={onDisconnect} />
+          <StripMenu onChange={onChange} onImport={onImport} onDisconnect={onDisconnect} />
         </span>
       )}
     </div>
