@@ -55,7 +55,7 @@ export function ProjectsPageHeader({ counts, isEmpty, configured, connectOpen, o
               aria-label={t('projects.addAria')}
               {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE)}
             >
-              <span aria-hidden="true">▸</span> {t('projects.addProject')}
+              {t('projects.addProject')}
             </button>
           )}
         </div>
