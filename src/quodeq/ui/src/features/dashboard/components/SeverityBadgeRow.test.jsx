@@ -21,6 +21,14 @@ describe('SeverityBadgeRow deltas', () => {
     expect(badge(container, 'minor').querySelector('.term-sev-badge__delta')).toBeNull();
   });
 
+  it('the arrow follows the number: more findings points up, fewer points down', () => {
+    const { container } = render(<SeverityBadgeRow severity={severity} deltas={{ critical: 1, major: -83 }} />);
+    const critArrow = badge(container, 'critical').querySelector('.trend-arrow');
+    const majArrow = badge(container, 'major').querySelector('.trend-arrow');
+    expect(critArrow.style.transform).toBe('rotate(38deg)');
+    expect(majArrow.style.transform).toBe('rotate(142deg)');
+  });
+
   it('no deltas: chips as today', () => {
     const { container } = render(<SeverityBadgeRow severity={severity} />);
     expect(container.querySelectorAll('.term-sev-badge__delta')).toHaveLength(0);
