@@ -24,6 +24,8 @@ The **Projects** tab is your home base. Every codebase you evaluate becomes a pr
 | Publish / update | Send completed runs to the connected evaluations repository. |
 | Pull local copy | Import a teammate's shared project into your local list. |
 
+While a repository is cloning in the background, a tile with a progress bar (percentage and size) sits at the top of the list. It becomes the project card when the clone finishes, or turns into an error card if it fails. Closing the panel never cancels a clone, and a clone you closed early only adds the project; it does not start an evaluation.
+
 The header offers **connect evaluations repository** (until one is connected) and **add project**. With nothing here yet, the page shows the welcome's two paths instead: a repository to score (start opens the analyze screen), or an evaluations repository to connect. With an evaluations repository connected, a sync strip above the list shows its state, with **update**, **copy invite**, and a **⋯** menu for *change repository*, *import evaluations archive* and *disconnect*. A connect that fails comes back as a card under the header, with the address kept so connect retries it. Every card also carries a *LOCAL*, *PUBLISHED*, or *REMOTE* badge, and a location filter appears above the list. The **Shared Repository** help section covers the whole workflow.
 
 ### Sub-projects and monorepos
