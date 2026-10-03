@@ -120,17 +120,18 @@ export default function CloneTargetStep({
       {accessFailure && (
         <AccessPanel failure={accessFailure} url={repoUrl} onResolved={onAccessResolved} onRetry={onRetry} />
       )}
+      <EphemeralEscapeHatch onClick={handleEphemeral} disabled={submitting} />
+    </div>
+  );
+}
 
-      <div className="onboarding-clone-target__escape-hatch">
-        <button
-          type="button"
-          className="onboarding-edit-link"
-          onClick={handleEphemeral}
-          disabled={submitting}
-        >
-          {t('onboarding.ephemeral')}
-        </button>
-      </div>
+// "Just run one evaluation, don't keep a copy": clones to a temporary place instead.
+function EphemeralEscapeHatch({ onClick, disabled }) {
+  return (
+    <div className="onboarding-clone-target__escape-hatch">
+      <button type="button" className="onboarding-edit-link" onClick={onClick} disabled={disabled}>
+        {t('onboarding.ephemeral')}
+      </button>
     </div>
   );
 }
