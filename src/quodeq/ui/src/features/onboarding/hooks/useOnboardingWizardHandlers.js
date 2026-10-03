@@ -37,14 +37,14 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToR
     }
   }
 
-  // The analyze screen passes the project it just registered; the resume
-  // walk's standard step passes only the standards (its project is in state).
-  function handleLaunch({ projectId = wizard.state.projectId, standardIds }) {
+  // The analyze screen passes the project and the repo that landed (not the
+  // editable field); the resume walk passes only the standards.
+  function handleLaunch({ projectId = wizard.state.projectId, repo = wizard.state.repo.value, standardIds }) {
     wizard.startLaunch();
     clearDraft();
     onLaunch({
       projectId,
-      repo: wizard.state.repo.value,
+      repo,
       scopePath: wizard.state.repo.scopePath || null,
       branch: wizard.state.repo.branch || null,
       provider: wizard.state.provider,

@@ -4,6 +4,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { useCloneStatus } from '../../../hooks/useCloneStatus.js';
 import { HTTP_STATUS } from '../../../constants.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { t } from '../../../strings/index.js';
 import { REPO_SOURCE } from '../onboardingVocab.js';
 import { makeTryResumeExisting, resumedExisting } from './resumeExisting.js';
 import { startFolder, startUrl } from './analyzeLaunchStart.js';
@@ -14,15 +15,18 @@ const CODE_PROJECT_EXISTS = 'PROJECT_EXISTS';
 // A clone that failed: resume and run the existing project on PROJECT_EXISTS
 // (when it has no evaluations yet), otherwise the mapped message and git's output.
 async function landFailure(slot, latest, setters) {
-  const { tryResume, form, onLaunch } = latest.current;
-  if (slot.code === CODE_PROJECT_EXISTS && slot.detail) {
+  const { tryResume, form, launch } = latest.current;
+  const exists = slot.code === CODE_PROJECT_EXISTS;
+  if (exists && slot.detail) {
     const conflict = { status: HTTP_STATUS.CONFLICT, existingProjectId: slot.detail };
     if (await resumedExisting(conflict, tryResume)) {
-      onLaunch({ projectId: slot.detail, standardIds: form.request().standardIds });
+      launch({ projectId: slot.detail, repo: slot.repo, standardIds: form.request().standardIds });
       return;
     }
   }
-  setters.setCloneError({ message: apiErrorMessage({ code: slot.code, message: slot.error }, 'onboarding.cloneFailed'), detail: slot.detail || '' });
+  // PROJECT_EXISTS carries a project id in `detail`, not git output: never shown.
+  const detail = exists ? '' : (slot.detail || '');
+  setters.setCloneError({ message: apiErrorMessage({ code: slot.code, message: slot.error }, 'onboarding.cloneFailed'), detail });
 }
 
 /**
@@ -44,9 +48,10 @@ function useCloneLanding({ clone, pending, setPending, latest, setters }) {
       return;
     }
     if (clone.done) {
-      const { wizard, form, onLaunch } = latest.current;
+      const { wizard, form, launch } = latest.current;
       wizard.succeedScan(slot.projectId, slot.scanData ?? null);
-      onLaunch({ projectId: slot.projectId, standardIds: form.request().standardIds });
+      // The repo that landed, not the field (which a reopened panel may hold differently).
+      launch({ projectId: slot.projectId, repo: slot.repo, standardIds: form.request().standardIds });
       return;
     }
     setPending(null);
@@ -67,6 +72,25 @@ function useAttachToActive({ clone, pending, setPending, startingRef, latest }) 
     if (!form.request().repo) wizard.setRepo({ source: REPO_SOURCE.URL, value: clone.slot.repo });
     // The refs are read current; the slot and pending decide.
   }, [clone.active, clone.slot, pending]);
+}
+
+/**
+ * A followed clone that vanished (seen running for pending.repo, now idle or
+ * another repo's, e.g. the server restarted mid-clone) ends the follow with
+ * an error instead of leaving the panel busy forever.
+ */
+function useLostFollow({ clone, pending, setters }) {
+  const seen = useRef(null);
+  useEffect(() => {
+    const { slot } = clone;
+    if (!pending) { seen.current = null; return; }
+    const ours = slot?.repo === pending.repo;
+    if (clone.active && ours) { seen.current = pending; return; }
+    if (seen.current !== pending || (ours && (clone.done || clone.failed))) return;
+    seen.current = null;
+    setters.setPending(null);
+    setters.setStartError({ message: t('onboarding.cloneFailed'), detail: '' });
+  }, [pending, clone.slot]);
 }
 
 function useLaunchState() {
@@ -91,7 +115,8 @@ function useLaunchState() {
  * Closing the panel (unmount) drops `pending`: nothing is
  * cancelled and nothing launches later.
  *
- * `onLaunch({ projectId, standardIds })` starts the evaluation.
+ * `onLaunch({ projectId, repo, standardIds })` starts the evaluation; never
+ * after the panel unmounted.
  *
  * @param {{ wizard: object, form: { request: () => object }, onLaunch: Function }} args
  */
@@ -103,6 +128,14 @@ export function useAnalyzeLaunch({ wizard, form, onLaunch }) {
   const { setters } = s;
   const startingRef = useRef(false);
   const latest = useRef(null);
+  // Closing the panel unmounts it: a launch that resolves after that (a slow
+  // registration or resume) must not open the evaluation.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const launch = (args) => { if (mounted.current) latest.current.onLaunch(args); };
 
   async function run() {
     if (startingRef.current) return;
@@ -111,7 +144,7 @@ export function useAnalyzeLaunch({ wizard, form, onLaunch }) {
     setters.setStarting(true);
     setters.setAccessFailure(null); setters.setStartError(null); setters.setCloneError(null);
     const ctx = {
-      api, queryClient, wizard, set: setters, slot: () => latest.current.clone.slot, tryResume: latest.current.tryResume, launch: onLaunch,
+      api, queryClient, wizard, set: setters, slot: () => latest.current.clone.slot, tryResume: latest.current.tryResume, launch,
     };
     try {
       await (request.source === REPO_SOURCE.FOLDER ? startFolder(ctx, request) : startUrl(ctx, request));
@@ -122,9 +155,10 @@ export function useAnalyzeLaunch({ wizard, form, onLaunch }) {
   }
 
   const tryResume = makeTryResumeExisting({ getProjectInfo: api.getProjectInfo, getProjectScan: api.getProjectScan, actions: wizard });
-  latest.current = { wizard, form, onLaunch, run, tryResume, clone };
+  latest.current = { wizard, form, onLaunch, launch, run, tryResume, clone };
   useCloneLanding({ clone, pending: s.pending, setPending: setters.setPending, latest, setters });
   useAttachToActive({ clone, pending: s.pending, setPending: setters.setPending, startingRef, latest });
+  useLostFollow({ clone, pending: s.pending, setters });
 
   const followed = s.pending && clone.active && clone.slot.repo === s.pending.repo ? clone.slot : null;
   const withRetry = (error) => (error ? { ...error, retry: run } : null);

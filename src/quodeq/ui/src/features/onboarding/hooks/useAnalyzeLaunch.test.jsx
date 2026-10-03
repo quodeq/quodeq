@@ -122,7 +122,7 @@ describe('useAnalyzeLaunch', () => {
     await poll(failed('PROJECT_EXISTS', 'existing-id'));
     await waitFor(() => expect(wizard.succeedScan).toHaveBeenCalledWith('existing-id', { files: 9 }));
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
-    expect(onLaunch).toHaveBeenCalledWith({ projectId: 'existing-id', standardIds: ['default'] });
+    expect(onLaunch).toHaveBeenCalledWith({ projectId: 'existing-id', repo: URL, standardIds: ['default'] });
     expect(result.current.cloneError).toBeNull();
   });
 
@@ -133,7 +133,7 @@ describe('useAnalyzeLaunch', () => {
     await act(async () => { await result.current.run(); });
     expect(wizard.succeedScan).toHaveBeenCalledWith('existing-id', {});
     expect(onLaunch).toHaveBeenCalledTimes(1);
-    expect(onLaunch).toHaveBeenCalledWith({ projectId: 'existing-id', standardIds: ['default'] });
+    expect(onLaunch).toHaveBeenCalledWith({ projectId: 'existing-id', repo: URL, standardIds: ['default'] });
     expect(result.current.startError).toBeNull();
   });
 
@@ -159,6 +159,10 @@ describe('useAnalyzeLaunch', () => {
     await poll(done(OTHER, 1700000005000, 'other'));
     await waitFor(() => expect(registerProject).toHaveBeenCalledTimes(2));
     expect(onLaunch).not.toHaveBeenCalled();
+    await poll(running());
+    await poll(done(URL, 1700000006000, 'mine'));
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
+    expect(onLaunch.mock.calls[0][0]).toMatchObject({ projectId: 'mine', repo: URL });
   });
 
   it('a folder registers synchronously and launches at once', async () => {
@@ -195,8 +199,8 @@ describe('useAnalyzeLaunch', () => {
 
   // Review Focus 2: the DONE edge is keyed by repo and by a new finishedAt.
   it('a stale done, of another repo or from before the post, never launches', async () => {
-    const { result, onLaunch, poll } = setup({ registerProject: accepted(), slot: done(URL, 1600000000000, 'old') });
-    await waitFor(() => expect(result.current).not.toBeNull());
+    const { result, api, onLaunch, poll } = setup({ registerProject: accepted(), slot: done(URL, 1600000000000, 'old') });
+    await waitFor(() => expect(api.getCloneStatus).toHaveBeenCalled());
     await poll(done(URL, 1600000000000, 'old'));
     await act(async () => { await result.current.run(); });
     await poll({ ...done(URL, 1600000000000, 'old') });
@@ -215,5 +219,75 @@ describe('useAnalyzeLaunch', () => {
     await poll(done());
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
     expect(api.registerProject).not.toHaveBeenCalled();
+  });
+  // Fix round 1: an unmounted panel never launches, even after a slow await.
+  it('a folder registration that resolves after the panel closed never launches', async () => {
+    let resolve;
+    const registerProject = vi.fn(() => new Promise((r) => { resolve = r; }));
+    const form = fakeForm({ repo: '/Users/me/app', source: 'folder', standardIds: ['default'] });
+    const { result, onLaunch, unmount } = setup({ registerProject, form });
+    let pendingRun;
+    act(() => { pendingRun = result.current.run(); });
+    unmount();
+    await act(async () => { resolve({ projectId: 'p2', scanData: {} }); await pendingRun; });
+    expect(onLaunch).not.toHaveBeenCalled();
+  });
+
+  it('a PROJECT_EXISTS resume that finishes after the panel closed never launches', async () => {
+    let resolveScan;
+    const api = { getProjectInfo: vi.fn(async () => ({ runsCount: 0 })), getProjectScan: vi.fn(() => new Promise((r) => { resolveScan = r; })) };
+    const { result, onLaunch, unmount, poll } = setup({ registerProject: accepted(), api });
+    await act(async () => { await result.current.run(); });
+    await poll(failed('PROJECT_EXISTS', 'existing-id'));
+    await waitFor(() => expect(api.getProjectScan).toHaveBeenCalled());
+    unmount();
+    await act(async () => { resolveScan({}); });
+    expect(onLaunch).not.toHaveBeenCalled();
+  });
+
+  // Fix round 1: an attached launch sends the repo that landed, not the field.
+  it('an attached launch sends the slot repo even if the field was edited', async () => {
+    const request = { repo: URL, source: 'url', standardIds: ['default'] };
+    const { result, onLaunch, poll } = setup({ registerProject: accepted(), slot: running(), form: { request: () => request } });
+    await waitFor(() => expect(result.current.busy).toBe(true));
+    request.repo = OTHER;
+    await poll(done());
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
+    expect(onLaunch.mock.calls[0][0]).toMatchObject({ projectId: 'p1', repo: URL });
+  });
+
+  it('a followed clone that vanishes (slot back to idle) ends with an error', async () => {
+    const { result, onLaunch, poll } = setup({ registerProject: accepted() });
+    await act(async () => { await result.current.run(); });
+    await poll(running());
+    await waitFor(() => expect(result.current.slot).not.toBeNull());
+    await poll({ ...IDLE });
+    await waitFor(() => expect(result.current.startError?.message).toBe('could not clone the repository'));
+    expect(result.current.busy).toBe(false);
+    expect(onLaunch).not.toHaveBeenCalled();
+  });
+
+  it('a failed status read after a 409 follows this repo, not the cached one', async () => {
+    const registerProject = vi.fn(async () => { throw conflict('CLONE_IN_PROGRESS'); });
+    const { result, api, onLaunch, poll } = setup({ registerProject, slot: done(OTHER, 1600000000000, 'old') });
+    await waitFor(() => expect(api.getCloneStatus).toHaveBeenCalled());
+    api.getCloneStatus.mockRejectedValueOnce(new Error('down'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await act(async () => { await result.current.run(); });
+    expect(result.current.attachedElsewhere).toBe(true);
+    await poll(running());
+    await poll(done());
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
+    expect(onLaunch.mock.calls[0][0]).toMatchObject({ projectId: 'p1', repo: URL });
+    warn.mockRestore();
+  });
+
+  it('a PROJECT_EXISTS that cannot be resumed shows no project id as git output', async () => {
+    const api = { getProjectInfo: vi.fn(async () => ({ runsCount: 3 })), getProjectScan: vi.fn() };
+    const { result, poll } = setup({ registerProject: accepted(), api });
+    await act(async () => { await result.current.run(); });
+    await poll(failed('PROJECT_EXISTS', 'existing-id'));
+    await waitFor(() => expect(result.current.cloneError).not.toBeNull());
+    expect(result.current.cloneError.detail).toBe('');
   });
 });

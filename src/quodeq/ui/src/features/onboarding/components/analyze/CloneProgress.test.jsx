@@ -19,11 +19,15 @@ describe('CloneProgress', () => {
     render(<CloneProgress launch={following({ phase: SYNC_PHASE.DOWNLOADING, percent: 45, bytes: 12582912 })} url={URL} />);
     expect(screen.getByText('cloning · 45% · 12.0 MB')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'clone progress' })).toHaveAttribute('aria-valuenow', '45');
+    // The live region announces the phase only, never each percent tick.
+    const live = document.querySelector('[aria-live]');
+    expect(live).toHaveTextContent('cloning…');
+    expect(live).not.toHaveTextContent('45%');
   });
 
   it('reads "cloning…" with an indeterminate bar until a percent comes', () => {
     render(<CloneProgress launch={following({ phase: SYNC_PHASE.DOWNLOADING, percent: null, bytes: 0 })} url={URL} />);
-    expect(screen.getByText('cloning…')).toBeInTheDocument();
+    expect(screen.getAllByText('cloning…').length).toBeGreaterThan(0);
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-busy', 'true');
   });
 
@@ -34,7 +38,8 @@ describe('CloneProgress', () => {
 
   it('shows the file walk once the download is done', () => {
     render(<CloneProgress launch={following({ phase: SYNC_PHASE.READING })} url={URL} />);
-    expect(screen.getByText('walking files · detecting languages…')).toBeInTheDocument();
+    expect(screen.getAllByText('walking files · detecting languages…').length).toBeGreaterThan(0);
+    expect(document.querySelector('[aria-live]')).toHaveTextContent('walking files · detecting languages…');
   });
 
   it('a clone already running elsewhere says so', () => {

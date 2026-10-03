@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
@@ -32,12 +32,15 @@ function writeActiveProviderState({ id, model }) {
 const IDLE_SLOT = { state: 'idle', kind: 'clone', phase: null, repo: '', finishedAt: null };
 
 // The api the launch talks to: a url probes reachable and clones as a job
-// (202), a folder registers at once; the clone slot starts idle.
+// (202), a folder registers at once; the clone slot reads `clone.slot`
+// (idle until a test polls another one in).
 function fakeApi(extra = {}) {
+  const clone = { slot: IDLE_SLOT };
   return {
+    clone,
     probeGit: vi.fn(async () => ({ reachable: true })),
     registerProject: vi.fn(async ({ repo }) => (repo.startsWith('/') ? { projectId: 'p-folder', scanData: {} } : { started: true, repo, dest: '' })),
-    getCloneStatus: vi.fn(async () => IDLE_SLOT),
+    getCloneStatus: vi.fn(async () => clone.slot),
     getProjectInfo: vi.fn(),
     getProjectScan: vi.fn(),
     ...extra,
@@ -53,7 +56,9 @@ function Step({ standardsList, ...props }) {
 function renderAnalyze({ api = fakeApi(), standardsList = standards, ...props } = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={qc}><ApiProvider value={api}><Step standardsList={standardsList} {...props} /></ApiProvider></QueryClientProvider>);
-  return { api, qc };
+  // Plays the app-level poll: the next fetch and the cache both read `slot`.
+  const poll = (slot) => act(() => { api.clone.slot = slot; qc.setQueryData(projectsKeys.clone(), slot); });
+  return { api, poll };
 }
 
 describe('AnalyzeStep', () => {
@@ -106,11 +111,11 @@ describe('AnalyzeStep', () => {
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
     expect(api.registerProject).toHaveBeenCalledWith({ repo: '/Users/me/code/app' });
     expect(api.probeGit).not.toHaveBeenCalled();
-    expect(onLaunch.mock.calls[0][0]).toEqual({ projectId: 'p-folder', standardIds: ['default'] });
+    expect(onLaunch.mock.calls[0][0]).toEqual({ projectId: 'p-folder', repo: '/Users/me/code/app', standardIds: ['default'] });
   });
 
   it('a changed working-copy root is sent as cloneDest; the default is not', async () => {
-    const { api, qc } = renderAnalyze({ detect: claudeDetected });
+    const { api, poll } = renderAnalyze({ detect: claudeDetected });
     await screen.findByText('found · recommended');
     await user.type(screen.getByRole('textbox', { name: 'repository' }), 'https://github.com/acme/billing.git');
     await user.click(screen.getByRole('button', { name: 'scan and run' }));
@@ -118,7 +123,7 @@ describe('AnalyzeStep', () => {
     expect(api.registerProject).toHaveBeenLastCalledWith({ repo: 'https://github.com/acme/billing.git' });
 
     // The clone failed: the error row's retry posts again, with the new root.
-    qc.setQueryData(projectsKeys.clone(), { ...IDLE_SLOT, state: 'error', phase: SYNC_PHASE.ERROR, repo: 'https://github.com/acme/billing.git', code: 'DEST_EXISTS', finishedAt: 1700000000000 });
+    await poll({ ...IDLE_SLOT, state: 'error', phase: SYNC_PHASE.ERROR, repo: 'https://github.com/acme/billing.git', code: 'DEST_EXISTS', finishedAt: 1700000000000 });
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     picks.next = '/Volumes/work';
     await user.click(screen.getByRole('button', { name: 'change where the working copy goes' }));
@@ -130,13 +135,16 @@ describe('AnalyzeStep', () => {
   });
 
   it('a url shows the clone in the panel and scan and run waits for it', async () => {
-    const { qc } = renderAnalyze({ detect: claudeDetected });
+    const { poll } = renderAnalyze({ detect: claudeDetected });
     await screen.findByText('found · recommended');
     await user.type(screen.getByRole('textbox', { name: 'repository' }), 'https://github.com/acme/billing.git');
     await user.click(screen.getByRole('button', { name: 'scan and run' }));
-    qc.setQueryData(projectsKeys.clone(), { ...IDLE_SLOT, state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 45, bytes: 12582912, repo: 'https://github.com/acme/billing.git' });
+    await poll({ ...IDLE_SLOT, state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 45, bytes: 12582912, repo: 'https://github.com/acme/billing.git' });
     expect(await screen.findByText('cloning · 45% · 12.0 MB')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'scan and run' })).toBeDisabled();
+    // The repository cannot change under a running clone.
+    expect(screen.getByRole('textbox', { name: 'repository' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'choose a local folder' })).toBeDisabled();
   });
 
   it('after set one up and done, the summary reads the configured provider and run is enabled', async () => {

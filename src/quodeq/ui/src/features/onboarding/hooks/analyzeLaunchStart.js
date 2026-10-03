@@ -16,14 +16,15 @@ const CODE_CLONE_IN_PROGRESS = 'CLONE_IN_PROGRESS';
  *   ctx.set          setPending, setAccessFailure, setStartError
  *   ctx.slot()       the clone slot as last polled
  *   ctx.tryResume    makeTryResumeExisting's resume of a registered repo
- *   ctx.launch       ({ projectId, standardIds }) => void
+ *   ctx.launch       ({ projectId, repo, standardIds }) => void, a no-op once
+ *                    the panel closed (it may run after a slow await)
  */
 
 // A repo the server already holds (409 + existingProjectId) is resumed and
 // run at once, not failed; true when it was.
-async function resumed(ctx, err, standardIds) {
+async function resumed(ctx, err, { repo, standardIds }) {
   if (!(await resumedExisting(err, ctx.tryResume))) return false;
-  ctx.launch({ projectId: err.existingProjectId, standardIds });
+  ctx.launch({ projectId: err.existingProjectId, repo, standardIds });
   return true;
 }
 
@@ -36,9 +37,9 @@ export async function startFolder(ctx, { repo, standardIds }) {
   try {
     const { projectId, scanData } = await ctx.api.registerProject({ repo });
     ctx.wizard.succeedScan(projectId, scanData);
-    ctx.launch({ projectId, standardIds });
+    ctx.launch({ projectId, repo, standardIds });
   } catch (err) {
-    if (await resumed(ctx, err, standardIds)) return;
+    if (await resumed(ctx, err, { repo, standardIds })) return;
     const message = apiErrorMessage(err, 'onboarding.scanFailed');
     ctx.wizard.failScan({ message, status: err.status, code: err.code });
     ctx.set.setStartError({ message, detail: apiErrorDetail(err) });
@@ -47,11 +48,17 @@ export async function startFolder(ctx, { repo, standardIds }) {
 
 // A 409 CLONE_IN_PROGRESS: read the running slot now (the cached one may be
 // a poll old) and follow it instead of failing. A slot that already finished
-// is still followed: its terminal state is the edge the hook acts on.
+// is still followed: its terminal state is the edge the hook acts on. When
+// the read fails, follow this repo (never the cached slot's, maybe an old one).
 async function attachToRunning(ctx, repo) {
-  const slot = await ctx.queryClient
-    .fetchQuery({ queryKey: projectsKeys.clone(), queryFn: ctx.api.getCloneStatus, staleTime: 0 })
-    .catch(() => ctx.slot());
+  let slot;
+  try {
+    slot = await ctx.queryClient.fetchQuery({ queryKey: projectsKeys.clone(), queryFn: ctx.api.getCloneStatus, staleTime: 0 });
+  } catch (err) {
+    console.warn('[analyzeLaunchStart] clone status read after a 409 failed:', err);
+    ctx.set.setPending({ repo, requested: repo, stale: ctx.slot()?.finishedAt ?? null, conflict: true });
+    return;
+  }
   ctx.set.setPending({
     repo: slot?.repo || repo,
     requested: repo,
@@ -73,7 +80,7 @@ async function postClone(ctx, { repo, cloneDest, standardIds }) {
     return;
   }
   ctx.wizard.succeedScan(res.projectId, res.scanData);
-  ctx.launch({ projectId: res.projectId, standardIds });
+  ctx.launch({ projectId: res.projectId, repo, standardIds });
 }
 
 /**
@@ -92,7 +99,7 @@ export async function startUrl(ctx, request) {
     await postClone(ctx, request);
   } catch (err) {
     if (err?.code === CODE_CLONE_IN_PROGRESS) { await attachToRunning(ctx, repo); return; }
-    if (await resumed(ctx, err, request.standardIds)) return;
+    if (await resumed(ctx, err, request)) return;
     const access = accessFailureFrom(err);
     if (access) { ctx.set.setAccessFailure(access); return; }
     ctx.set.setStartError({ message: apiErrorMessage(err, 'onboarding.cloneFailed'), detail: apiErrorDetail(err) });

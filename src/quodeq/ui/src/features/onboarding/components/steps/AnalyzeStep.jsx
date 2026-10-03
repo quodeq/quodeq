@@ -10,20 +10,22 @@ import ReviewedByRow from '../analyze/ReviewedByRow.jsx';
 import AgainstRow from '../analyze/AgainstRow.jsx';
 import CloneProgress from '../analyze/CloneProgress.jsx';
 
-function RepositoryBlock({ form }) {
+// `locked` while a clone or registration runs: the repository being cloned
+// must not change under it.
+function RepositoryBlock({ form, locked }) {
   const { workingCopy } = form;
   return (
     <section className="analyze-block">
       <h3 className="analyze-block__title">{t('onboarding.yourRepository')}</h3>
       <p className="analyze-block__hint">{t('onboarding.repoHint')}</p>
-      <RepoSourceSwitch value={form.source} onChange={form.setSource} />
+      <RepoSourceSwitch value={form.source} onChange={form.setSource} disabled={locked} />
       <div className="analyze-block__row">
         {form.source === REPO_SOURCE.URL ? (
           <span className="repo-form__field">
-            <TermInput command="repo" value={form.repo} onChange={form.setRepo} ariaLabel={t('onboarding.repoAria')} placeholder={t('onboarding.repoPlaceholder')} />
+            <TermInput command="repo" value={form.repo} onChange={form.setRepo} ariaLabel={t('onboarding.repoAria')} placeholder={t('onboarding.repoPlaceholder')} disabled={locked} />
           </span>
         ) : (
-          <FolderField folderPath={form.repo} onPick={form.browseRepoFolder} />
+          <FolderField folderPath={form.repo} onPick={form.browseRepoFolder} disabled={locked} />
         )}
       </div>
       {form.source === REPO_SOURCE.URL && form.repo.trim() && (
@@ -65,7 +67,7 @@ export default function AnalyzeStep({ state, actions, standards, detect, onLaunc
   return (
     <div className="onboarding-step onboarding-step--analyze">
       <TermHeader name={t('onboarding.termAnalyze')} sub={t('onboarding.subAnalyze')} />
-      <RepositoryBlock form={form} />
+      <RepositoryBlock form={form} locked={launch.busy} />
       {form.collapsed
         // The summary names the standard: it waits for the list to load.
         ? form.standard.ready && <ReviewSummary form={form} />

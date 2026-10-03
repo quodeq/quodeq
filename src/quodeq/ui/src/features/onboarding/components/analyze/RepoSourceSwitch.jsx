@@ -16,8 +16,9 @@ const STEP_BY_KEY = { [KEY.ARROW_LEFT]: -1, [KEY.ARROW_UP]: -1, [KEY.ARROW_RIGHT
  * @param {'url'|'folder'} props.value - the picked source (REPO_SOURCE)
  * @param {(source: string) => void} props.onChange
  * @param {{ url?: string, folder?: string }} [props.labels] - overrides the default copy
+ * @param {boolean} [props.disabled] - locks the pick (e.g. while a clone runs)
  */
-export default function RepoSourceSwitch({ value, onChange, labels }) {
+export default function RepoSourceSwitch({ value, onChange, labels, disabled = false }) {
   const refs = useRef({});
   const text = {
     [REPO_SOURCE.URL]: labels?.url ?? t('onboarding.sourceUrl'),
@@ -25,7 +26,7 @@ export default function RepoSourceSwitch({ value, onChange, labels }) {
   };
   const onKeyDown = (e) => {
     const step = STEP_BY_KEY[e.key];
-    if (!step) return;
+    if (!step || disabled) return;
     e.preventDefault();
     const next = ORDER[(ORDER.indexOf(value) + step + ORDER.length) % ORDER.length];
     onChange(next);
@@ -42,6 +43,7 @@ export default function RepoSourceSwitch({ value, onChange, labels }) {
           aria-checked={value === source}
           tabIndex={value === source ? 0 : -1}
           className={`repo-source-switch__option${value === source ? ' repo-source-switch__option--active' : ''}`}
+          disabled={disabled}
           onClick={() => onChange(source)}
           onKeyDown={onKeyDown}
         >

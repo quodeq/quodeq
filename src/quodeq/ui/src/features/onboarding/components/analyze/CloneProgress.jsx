@@ -15,6 +15,12 @@ function progressLabel(slot) {
   return size ? t('onboarding.cloning', { percent, size }) : t('onboarding.cloningPercent', { percent });
 }
 
+// The phase alone, for screen readers: announced when it changes, never on
+// each percent tick (the progressbar's aria-valuenow carries the number).
+function phaseAnnouncement(slot) {
+  return slot?.phase === SYNC_PHASE.READING ? t('onboarding.readingFiles') : t('onboarding.cloningNoPercent');
+}
+
 function ErrorRow({ error }) {
   return (
     <div className="analyze-clone__error" role="alert">
@@ -47,7 +53,8 @@ export default function CloneProgress({ launch, url }) {
       {launch.attachedElsewhere && <p className="analyze-clone__note">{t('onboarding.cloneRunningElsewhere')}</p>}
       <div className="analyze-clone__progress">
         <SyncBar percent={percent} label={t('onboarding.cloneProgressAria')} />
-        <span className="analyze-clone__label" aria-live="polite">{progressLabel(slot)}</span>
+        <span className="analyze-clone__label" aria-hidden="true">{progressLabel(slot)}</span>
+        <span className="sr-only" aria-live="polite">{phaseAnnouncement(slot)}</span>
       </div>
     </div>
   );

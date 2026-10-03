@@ -60,6 +60,12 @@ describe('useOnboardingWizardHandlers handleLaunch', () => {
     });
   });
 
+  it('a repo passed in (the one that landed) wins over the editable field', () => {
+    const { result, opts } = setup({ wizard: { state, startLaunch: vi.fn() } });
+    result.current.handleLaunch({ projectId: 'p1', repo: 'https://github.com/acme/ledger.git', standardIds: ['default'] });
+    expect(opts.onLaunch.mock.calls[0][0]).toMatchObject({ projectId: 'p1', repo: 'https://github.com/acme/ledger.git' });
+  });
+
   it('without a project id (the resume walk) it launches the one in state', () => {
     const { result, opts } = setup({ wizard: { state, startLaunch: vi.fn() } });
     result.current.handleLaunch({ standardIds: ['default'] });
