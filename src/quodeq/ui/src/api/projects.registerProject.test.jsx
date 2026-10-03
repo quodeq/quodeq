@@ -40,4 +40,18 @@ describe('registerProject', () => {
     await registerProject({ repo: 'https://example.com/repo.git' });
     expect(fetchCalls[0]).toBe('/custom-api/projects');
   });
+
+  it('returns the 202 clone job body without throwing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      status: 202,
+      json: async () => ({ started: true, repo: 'https://example.com/r.git', dest: '/u/r' }),
+    })));
+    const { registerProject } = await import('./projects.js');
+
+    const result = await registerProject({ repo: 'https://example.com/r.git' });
+    expect(result.started).toBe(true);
+    expect(result.dest).toBe('/u/r');
+    expect(result.projectId).toBeUndefined();
+  });
 });

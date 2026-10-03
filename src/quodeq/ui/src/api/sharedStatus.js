@@ -34,7 +34,7 @@ export function epochSecondsToMs(seconds) {
  * @param {Object|null|undefined} raw
  * @returns {Object}
  */
-function normalizeSlot(raw) {
+export function normalizeSlot(raw) {
   const s = raw || {};
   return { ...s, finishedAt: epochSecondsToMs(s.finishedAt) };
 }

@@ -192,7 +192,10 @@ export async function importProject(file, opts = {}) {
  * Used by the onboarding wizard's Repo & Scan step.
  *
  * @param {{ repo: string, cloneDest?: string, ephemeral?: boolean, branch?: string, scopePath?: string, discipline?: string }} payload
- * @returns {Promise<{ projectId: string, scanData: object }>}
+ * A git URL answers 202 `{ started, repo, dest }` (the clone runs as a job,
+ * see api/projectClone.js); a local path answers 200 `{ projectId, scanData }`.
+ * Callers check `result.started === true` for the first shape.
+ * @returns {Promise<{ projectId: string, scanData: object } | { started: boolean, repo: string, dest: string }>}
  * @throws {Error & { status: number, code?: string, existingProjectId?: string }} on non-2xx
  */
 export async function registerProject(payload) {
