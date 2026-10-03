@@ -28,7 +28,7 @@ from quodeq.services import compare as compare_service
 from quodeq.services.warmup import engine as warmup_engine, warm_project
 from tests.perf._budget_fixture import PROJECT, count_io, seed_project
 from tests.perf._scenario_fixture import (
-    AS_OF, FLEET, RUNNING_DIMENSIONS, RUNNING_JOB, RUNNING_RUN,
+    AS_OF, FLEET, RUNNING_JOB, RUNNING_RUN,
     PEAK_HEADROOM, check_budgets, freeze_progress_clock, get_ok, peak_kib, seed_fleet, seed_running_run,
 )
 
@@ -168,11 +168,9 @@ def _run_page(client, url):
 
 
 def _eval_poll_tick(client):
-    dims = ",".join(RUNNING_DIMENSIONS)
     return sum(get_ok(client, url) for url in (
         f"/api/evaluations/{RUNNING_JOB}",
         f"/api/evaluations/{RUNNING_JOB}/progress",
-        f"/api/projects/{PROJECT}/runs/{RUNNING_RUN}/live-findings?dimensions={dims}",
     ))
 
 

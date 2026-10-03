@@ -7,11 +7,9 @@
 import { ACTIVE_PROVIDER_KEY, providerKey, isSseEnabled } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 import { t } from "../../../strings/index.js";
-import { JOB_STATUS } from "../../../vocab/jobStatus.js";
 import { STREAM_STATE } from "./runEventSourceRegistry.js";
 
 export const SSE_ENABLED = isSseEnabled();
-const DIM_POLL_MS = 2000;
 export const JOB_POLL_MS = 1500;
 // Under SSE the status query still refetches, slowly, as a safety net
 // against a frame the stream dropped or a server that never sent one.
@@ -29,19 +27,6 @@ export function statusRefetchInterval(streamState, sseEnabled = SSE_ENABLED) {
   if (!sseEnabled) return JOB_POLL_MS;
   if (streamState === STREAM_STATE.ERROR) return JOB_POLL_MS;
   return SSE_STATUS_SAFETY_NET_MS;
-}
-
-/**
- * Poll interval for the live findings query. Exported for tests.
- *
- * Polling must stop once the job is terminal: without the gate a finished
- * run kept re-fetching every full evaluation/<dim>.json payload every 2s
- * for as long as the Evaluate card stayed mounted.
- */
-export function findingsRefetchInterval(job, sseEnabled = SSE_ENABLED) {
-  if (sseEnabled) return false;
-  if (job?.status && job.status !== JOB_STATUS.RUNNING) return false;
-  return DIM_POLL_MS;
 }
 
 /**
