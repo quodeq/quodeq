@@ -6,6 +6,15 @@
  * - gcTime: 5min (library default) — kept long enough for screen-back navigation.
  * - retry: 1 — fail fast on real errors.
  * - refetchOnWindowFocus / refetchOnReconnect: true — natural recovery.
+ * - networkMode: 'always' — the API is on 127.0.0.1, so the browser's online
+ *   signal (its route to the internet) says nothing about whether a fetch
+ *   can succeed. The library default gates every fetch on that signal: once
+ *   the webview fires `offline` (Wi-Fi drop, sleep, VPN flip) each refetch
+ *   parks as fetchStatus 'paused' until an `online` event that WebKit does
+ *   not always deliver. A query that had already failed then keeps its
+ *   error, and the Overview's "Failed to load dashboard data" line stays up
+ *   for as long as the window lives, with the server answering the whole
+ *   time (pinned by queryClient.localhost.test.jsx).
  *
  * Per-query overrides live at each useQuery call site (refetchInterval
  * for polling-driven sources; staleTime: Infinity when SSE owns updates).
@@ -36,6 +45,10 @@ export const queryClient = new QueryClient({
       retry: 1,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
+      networkMode: "always",
+    },
+    mutations: {
+      networkMode: "always",
     },
   },
 });
