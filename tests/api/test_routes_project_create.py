@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.api.app import create_app
+from quodeq.services.base import CreateProjectResult, CreateProjectStatus
 from quodeq.services.github_access import AccessMethod, AccessResult
 from quodeq.shared.git_errors import GitFailureKind
 
@@ -26,16 +27,23 @@ def client(tmp_path, monkeypatch):
         yield c
 
 
-def test_post_projects_url_requires_clone_dest_or_ephemeral(client):
-    resp = client.post(
-        "/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN
-    )
-    assert resp.status_code == 400
-    body = resp.get_json()
-    assert body["code"] == "MISSING_CLONE_DEST"
+def test_post_projects_url_without_clone_dest_uses_the_default_root(client, tmp_path, monkeypatch, inline_clone_job):
+    root = tmp_path / "repos"
+    monkeypatch.setattr("quodeq.api.routes_project_create.default_clone_root", lambda env=None: root)
+    result = CreateProjectResult(status=CreateProjectStatus.CREATED, project_id="p", scan_data={})
+    with patch("quodeq.services.filesystem.FilesystemActionProvider.create_project", return_value=result) as create:
+        resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN)
+    assert resp.status_code == 202 and resp.get_json()["dest"] == str(root / "y")
+    assert root.is_dir() and create.call_args.args[1].clone_dest == str(root)
 
 
-def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path):
+def test_post_projects_default_root_outside_home_is_rejected(client, tmp_path, monkeypatch):
+    monkeypatch.setattr("quodeq.api.routes_project_create.default_clone_root", lambda env=None: tmp_path.parent / "elsewhere")
+    resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN)
+    assert resp.status_code == 400 and resp.get_json()["code"] == "INVALID_CLONE_DEST"
+
+
+def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path, inline_clone_job):
     # cloneDest must be under home (the fixture sets home to tmp_path).
     parent = tmp_path / "code"
     parent.mkdir()
@@ -55,16 +63,13 @@ def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path):
     ):
         resp = client.post(
             "/api/projects",
-            json={
-                "repo": "https://github.com/x/y.git",
-                "cloneDest": str(parent),
-            },
+            json={"repo": "https://github.com/x/y.git", "cloneDest": str(parent)},
             headers=_ORIGIN,
         )
-    assert resp.status_code == 200, resp.get_json()
-    body = resp.get_json()
-    assert body["projectId"] == "test-uuid"
-    assert body["scanData"]["total_files"] == 5
+    assert resp.status_code == 202, resp.get_json()
+    snap = client.get("/api/projects/clone-status").get_json()
+    assert snap["state"] == "done" and snap["projectId"] == "test-uuid"
+    assert snap["scanData"]["total_files"] == 5
 
 
 def test_post_projects_url_ephemeral_skips_clone_dest(client, tmp_path):

@@ -1,7 +1,7 @@
 from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.data.fs.git_progress import ProgressUpdate
 from quodeq.services.project_clone_job import (
-    CloneOutcome, CloneState, CloneStartResult, CloneStatus, get_clone_status, is_clone_running, start_clone,
+    CloneHooks, CloneOutcome, CloneState, CloneStartResult, CloneStatus, get_clone_status, is_clone_running, start_clone,
 )
 
 
@@ -20,7 +20,7 @@ def test_start_clone_reports_phases_percent_and_the_created_project():
         on_phase(SyncPhase.READING)
         seen.append(get_clone_status(status)["phase"])
         return CloneOutcome(True, project_id="p1", project_name="repo", scan_data={"files": 3})
-    result = start_clone("https://github.com/o/repo.git", "/tmp/x/repo", create=create, status=status, spawn=inline)
+    result = start_clone("https://github.com/o/repo.git", "/tmp/x/repo", hooks=CloneHooks(create, spawn=inline), status=status)
     assert result is CloneStartResult.STARTED
     assert seen == [SyncPhase.CONNECTING, (SyncPhase.DOWNLOADING, 45), SyncPhase.READING]
     snap = get_clone_status(status)
@@ -31,8 +31,7 @@ def test_start_clone_reports_phases_percent_and_the_created_project():
 
 def test_failed_outcome_lands_as_error_with_code_and_detail():
     status = CloneStatus()
-    start_clone("u", "d", create=lambda p, ph: CloneOutcome(False, error="Repository not found", code="REPO_NOT_FOUND", detail="fatal: not found"),
-                status=status, spawn=inline)
+    start_clone("u", "d", hooks=CloneHooks(lambda p, ph: CloneOutcome(False, error="Repository not found", code="REPO_NOT_FOUND", detail="fatal: not found"), spawn=inline), status=status)
     snap = get_clone_status(status)
     assert snap["state"] == CloneState.ERROR and snap["phase"] == SyncPhase.ERROR
     assert snap["code"] == "REPO_NOT_FOUND" and snap["detail"] == "fatal: not found"
@@ -41,7 +40,7 @@ def test_failed_outcome_lands_as_error_with_code_and_detail():
 def test_second_start_while_running_is_refused():
     status = CloneStatus()
     assert status.claim("u", "d") is True
-    assert start_clone("u2", "d2", create=lambda p, ph: CloneOutcome(True), status=status, spawn=inline) is CloneStartResult.ALREADY_RUNNING
+    assert start_clone("u2", "d2", hooks=CloneHooks(lambda p, ph: CloneOutcome(True), spawn=inline), status=status) is CloneStartResult.ALREADY_RUNNING
 
 
 def test_raising_create_becomes_an_error_slot_not_an_exception():
@@ -49,7 +48,7 @@ def test_raising_create_becomes_an_error_slot_not_an_exception():
 
     def boom(p, ph):
         raise OSError("disk")
-    start_clone("u", "d", create=boom, status=status, spawn=inline)
+    start_clone("u", "d", hooks=CloneHooks(boom, spawn=inline), status=status)
     assert get_clone_status(status)["code"] == "CLONE_UNEXPECTED"
 
 
@@ -58,5 +57,5 @@ def test_on_done_runs_after_done_and_cannot_downgrade_it():
 
     def on_done():
         raise RuntimeError("cache")
-    start_clone("u", "d", create=lambda p, ph: CloneOutcome(True, project_id="p"), status=status, spawn=inline, on_done=on_done)
+    start_clone("u", "d", hooks=CloneHooks(lambda p, ph: CloneOutcome(True, project_id="p"), on_done, inline), status=status)
     assert get_clone_status(status)["state"] == CloneState.DONE

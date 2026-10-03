@@ -25,6 +25,8 @@ from quodeq.api.helpers import (
     scan_target_error as _scan_target_error,
 )
 from quodeq.api.routes_github_access import access_failure_response
+from quodeq.api.routes_project_clone import start_clone_job
+from quodeq.config.clone_env import default_clone_root
 from quodeq.services.base import ActionProvider, CreateProjectStatus, NewProjectSpec
 from quodeq.services.clone_codes import clone_code_for
 from quodeq.services.github_access import forget_url, resolve_access
@@ -40,7 +42,9 @@ def _reports_dir() -> str:
 
 
 @dataclass
-class _CreateProjectRequest:
+class CreateProjectRequest:
+    """A validated POST /api/projects body, parsed once at the request boundary."""
+
     repo: str
     discipline: str | None
     scope_path: str | None
@@ -52,7 +56,7 @@ class _CreateProjectRequest:
 
 def _parse_create_project_request(
     data: dict,
-) -> tuple[_CreateProjectRequest | None, tuple[Response, int] | None]:
+) -> tuple[CreateProjectRequest | None, tuple[Response, int] | None]:
     """Parse and validate the create_project request body. Returns
     (parsed, error): parsed is None on failure, error is None on success."""
     raw_repo = data.get("repo")
@@ -86,7 +90,7 @@ def _parse_create_project_request(
     except ValueError:
         return None, json_error("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
 
-    return _CreateProjectRequest(
+    return CreateProjectRequest(
         repo=repo, discipline=discipline, scope_path=scope_path,
         clone_dest=clone_dest, ephemeral=ephemeral,
         reports_root=reports_root, is_url=is_url,
@@ -96,39 +100,37 @@ def _parse_create_project_request(
 def _resolve_create_project_clone_dest(
     ephemeral: bool, clone_dest: str | None,
 ) -> tuple[str | None, tuple[Response, int] | None]:
-    """For a URL repo, resolve/validate cloneDest. Returns (resolved_clone_dest, error)."""
-    if not ephemeral and not clone_dest:
+    """For a URL repo, resolve/validate cloneDest. Returns (resolved_clone_dest, error).
+
+    An absent cloneDest means the default working-copy root, created on demand.
+    """
+    if ephemeral:
+        return clone_dest, None
+    try:
+        # Containment and the directory check both live in the try
+        # so every rejection exits here. Falling through past a
+        # failed containment check on a sentinel would leave the
+        # unguarded value live on one path.
+        dest = contained_path(clone_dest or str(default_clone_root()), Path.home())
+        if not clone_dest:
+            os.makedirs(dest, exist_ok=True)
+        if not os.path.isdir(dest):
+            raise ValueError("cloneDest is not an existing directory")
+    except OSError:
         return None, json_error(
-            "cloneDest is required for URL repos when ephemeral is false",
+            "Invalid cloneDest path",
             HTTPStatus.BAD_REQUEST,
-            "MISSING_CLONE_DEST",
+            CODE_INVALID_CLONE_DEST,
         )
-    if not ephemeral and clone_dest:
-        try:
-            # Containment and the directory check both live in the try
-            # so every rejection exits here. Falling through past a
-            # failed containment check on a sentinel would leave the
-            # unguarded value live on one path.
-            dest = contained_path(clone_dest, Path.home())
-            if not os.path.isdir(dest):
-                raise ValueError("cloneDest is not an existing directory")
-        except OSError:
-            return None, json_error(
-                "Invalid cloneDest path",
-                HTTPStatus.BAD_REQUEST,
-                CODE_INVALID_CLONE_DEST,
-            )
-        except ValueError:
-            return None, json_error(
-                "cloneDest must be an existing directory under your home folder",
-                HTTPStatus.BAD_REQUEST,
-                CODE_INVALID_CLONE_DEST,
-            )
-        # Hand the *contained* path to the cloner. The previous code
-        # resolved into a local and then passed the raw request string
-        # on, so the check guarded a value nothing downstream used.
-        return dest, None
-    return clone_dest, None
+    except ValueError:
+        return None, json_error(
+            "cloneDest must be an existing directory under your home folder",
+            HTTPStatus.BAD_REQUEST,
+            CODE_INVALID_CLONE_DEST,
+        )
+    # Hand the *contained* path to the cloner, not the raw request string,
+    # so the check guards the value everything downstream uses.
+    return dest, None
 
 
 def _validate_local_create_project_repo(repo: str, reports_root: str) -> tuple[Response, int] | None:
@@ -191,8 +193,7 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
 
     Body: ``{ repo, cloneDest?, ephemeral?, branch?, scopePath?, discipline? }``
 
-    For URL repos: requires either ``cloneDest`` (existing dir under home)
-    or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
+    For URL repos: requires either ``cloneDest`` (existing dir under home). For local-path repos: ``cloneDest`` and
     ``ephemeral`` are ignored.
     """
     body = optional_json_object_or_response(CODE_INVALID_INPUT)
@@ -206,16 +207,17 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     if error is not None:
         return error
 
-    git_env, clone_url = None, None
+    access = None
     if parsed.is_url:
         access = resolve_access(parsed.repo)
         if not access.reachable:
             return access_failure_response(access)
-        git_env, clone_url = access.env, access.clone_url
+        if not parsed.ephemeral:
+            return start_clone_job(provider, parsed, clone_dest, access)
 
     spec = NewProjectSpec(
         repo=parsed.repo, discipline=parsed.discipline, scope_path=parsed.scope_path,
-        clone_dest=clone_dest, ephemeral=parsed.ephemeral, git_env=git_env, clone_url=clone_url,
+        clone_dest=clone_dest, ephemeral=parsed.ephemeral, git_env=access.env if access else None, clone_url=access.clone_url if access else None,
     )
     result = provider.create_project(parsed.reports_root, spec)
     if result.status == CreateProjectStatus.CLONE_FAILED:

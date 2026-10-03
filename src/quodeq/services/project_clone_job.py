@@ -21,7 +21,6 @@ from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.sync_progress import SYNC_IDLE_FIELDS
 from quodeq.services.wiring_sync import ProgressUpdate
 from quodeq.shared.fault_isolation import run_isolated
-from quodeq.shared.log_sink import SHARED_LOG
 
 # Wire ``code`` values owned by the job itself; API contract.
 CODE_CLONE_IN_PROGRESS = "CLONE_IN_PROGRESS"
@@ -33,7 +32,6 @@ MESSAGE_CLONE_UNEXPECTED = "An unexpected error occurred while adding the projec
 MESSAGE_CLONE_START_FAILED = "Failed to start the add-project background job."
 
 _PERCENT_DONE = 100
-_LOG: LogSink = SHARED_LOG  # start_clone is at the 6-parameter cap, so no log argument
 
 
 class CloneState(StrEnum):
@@ -153,18 +151,29 @@ class CloneStartResult(StrEnum):
     FAILED = "failed"  # the worker thread could not be started; the status carries the error
 
 
+@dataclass(frozen=True)
+class CloneHooks:
+    """The clone job's collaborators: the create call, the done hook and the thread spawner.
+
+    ``spawn=None`` means ``spawn_daemon``, looked up when the job starts so a test can swap it.
+    """
+
+    create: Callable[[ProgressCallback, PhaseCallback], CloneOutcome]
+    on_done: Callable[[], None] | None = None
+    spawn: Callable[[Callable[[], None]], None] | None = None
+
+
 def start_clone(
-    repo: str, dest: str | None, *, create: Callable[[ProgressCallback, PhaseCallback], CloneOutcome],
-    status: CloneStatus | None = None,
-    spawn: Callable[[Callable[[], None]], None] = spawn_daemon,
-    on_done: Callable[[], None] | None = None,
+    repo: str, dest: str | None, *, hooks: CloneHooks,
+    status: CloneStatus | None = None, log: LogSink = NULL_LOG,
 ) -> CloneStartResult:
     """Kick off a background create of *repo*; ``FAILED`` means it could not start."""
     status = status or _default_status
     outcome = start_claimed_job(
         status.claim(repo, dest),
-        lambda: run_clone_job(status, create=create, on_done=on_done, log=_LOG),
-        spawn=spawn, on_start_failed=lambda: _fail(status, MESSAGE_CLONE_START_FAILED, CODE_CLONE_START_FAILED),
-        log=_LOG, label="clone",
+        lambda: run_clone_job(status, create=hooks.create, on_done=hooks.on_done, log=log),
+        spawn=hooks.spawn or spawn_daemon,
+        on_start_failed=lambda: _fail(status, MESSAGE_CLONE_START_FAILED, CODE_CLONE_START_FAILED),
+        log=log, label="clone",
     )
     return CloneStartResult(outcome.value)
