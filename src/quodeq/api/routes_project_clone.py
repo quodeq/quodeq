@@ -20,7 +20,7 @@ from quodeq.services.base import ActionProvider, CreateProjectResult, CreateProj
 from quodeq.services.clone_codes import clone_code_for
 from quodeq.services.github_access import AccessResult, forget_url
 from quodeq.services.project_clone_job import (
-    CODE_CLONE_IN_PROGRESS, CODE_CLONE_START_FAILED, CloneHooks, CloneOutcome, CloneStartResult,
+    CODE_CLONE_IN_PROGRESS, CODE_CLONE_START_FAILED, MESSAGE_CLONE_START_FAILED, CloneHooks, CloneOutcome, CloneStartResult,
     get_clone_status, start_clone,
 )
 from quodeq.shared.git_errors import output_tail
@@ -31,7 +31,6 @@ if TYPE_CHECKING:
     from quodeq.api.routes_project_create import CreateProjectRequest
 
 MESSAGE_CLONE_IN_PROGRESS = "a clone is already running"
-MESSAGE_CLONE_START_FAILED = "could not start the clone job, see server logs"
 
 
 def _outcome_from_result(repo: str, result: CreateProjectResult) -> CloneOutcome:
@@ -54,10 +53,10 @@ def _outcome_from_result(repo: str, result: CreateProjectResult) -> CloneOutcome
 
 
 def start_clone_job(
-    provider: ActionProvider, parsed: CreateProjectRequest, clone_dest: str | None, access: AccessResult,
+    provider: ActionProvider, parsed: CreateProjectRequest, clone_dest: str, access: AccessResult,
 ) -> tuple[Response, int]:
     """Start the clone+scan as the background job; 202, or 409 / 500 when it cannot start."""
-    dest = str(Path(clone_dest or "") / project_name_from_repo(parsed.repo))
+    dest = str(Path(clone_dest) / project_name_from_repo(parsed.repo))
 
     def create(progress, on_phase) -> CloneOutcome:
         spec = NewProjectSpec(

@@ -193,8 +193,13 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
 
     Body: ``{ repo, cloneDest?, ephemeral?, branch?, scopePath?, discipline? }``
 
-    For URL repos: requires either ``cloneDest`` (existing dir under home). For local-path repos: ``cloneDest`` and
-    ``ephemeral`` are ignored.
+    A URL repo with ``ephemeral`` false answers 202 and runs the clone and scan
+    as the background job reported by ``GET /api/projects/clone-status``.
+    ``cloneDest`` is optional there: absent, it defaults to
+    ``default_clone_root()``, created on demand and contained under the home
+    folder. Local paths and ``ephemeral: true`` stay synchronous (200, or the
+    usual 4xx/409 codes); for a local path ``cloneDest`` and ``ephemeral`` are
+    ignored.
     """
     body = optional_json_object_or_response(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
@@ -207,17 +212,18 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     if error is not None:
         return error
 
-    access = None
+    git_env, clone_url = None, None
     if parsed.is_url:
         access = resolve_access(parsed.repo)
         if not access.reachable:
             return access_failure_response(access)
         if not parsed.ephemeral:
             return start_clone_job(provider, parsed, clone_dest, access)
+        git_env, clone_url = access.env, access.clone_url
 
     spec = NewProjectSpec(
         repo=parsed.repo, discipline=parsed.discipline, scope_path=parsed.scope_path,
-        clone_dest=clone_dest, ephemeral=parsed.ephemeral, git_env=access.env if access else None, clone_url=access.clone_url if access else None,
+        clone_dest=clone_dest, ephemeral=parsed.ephemeral, git_env=git_env, clone_url=clone_url,
     )
     result = provider.create_project(parsed.reports_root, spec)
     if result.status == CreateProjectStatus.CLONE_FAILED:

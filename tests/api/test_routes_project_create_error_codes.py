@@ -139,8 +139,8 @@ def test_post_projects_null_ephemeral_is_treated_as_absent(client, tmp_path, inl
 
 
 def test_post_projects_non_string_discipline_returns_400(client):
-    # ephemeral: True avoids the unrelated "cloneDest is required" branch, so
-    # this isolates the discipline-specific type check.
+    # ephemeral: True keeps the request synchronous, so this isolates the
+    # discipline-specific type check from the clone job.
     with patch(
         "quodeq.services.filesystem.FilesystemActionProvider.create_project",
         return_value=_created_result(),
