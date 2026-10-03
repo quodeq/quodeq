@@ -47,6 +47,17 @@ def test_post_projects_configured_default_root_outside_home_is_trusted(client, t
     assert resp.status_code == 202 and root.is_dir()
 
 
+def test_post_projects_default_root_that_cannot_be_created_names_no_clone_dest(client, tmp_path, monkeypatch):
+    # No cloneDest was sent, so the refusal must not blame one.
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file where the folder should be")
+    monkeypatch.setattr("quodeq.api.routes_project_create.default_clone_root", lambda env=None: blocker / "repos")
+    resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN)
+    body = resp.get_json()
+    assert resp.status_code == 400 and body["code"] == "INVALID_CLONE_DEST"
+    assert body["error"] == "The default working-copy folder could not be created"
+
+
 def test_post_projects_user_clone_dest_outside_home_is_still_rejected(client, tmp_path):
     outside = tmp_path.parent / f"{tmp_path.name}-outside"
     outside.mkdir()

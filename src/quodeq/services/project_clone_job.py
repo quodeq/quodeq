@@ -82,11 +82,6 @@ def get_clone_status(status: CloneStatus | None = None) -> dict:
     return (status or _default_status).copy()
 
 
-def is_clone_running(status: CloneStatus | None = None) -> bool:
-    """True while a clone job holds the slot."""
-    return get_clone_status(status)["state"] == CloneState.RUNNING
-
-
 def _fail(status: CloneStatus, message: str, code: str, detail: str = "") -> None:
     status.set(
         state=CloneState.ERROR, phase=SyncPhase.ERROR, code=code, error=message,

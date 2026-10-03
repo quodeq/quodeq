@@ -107,6 +107,25 @@ def _expand_home(clone_dest: str) -> str:
     return clone_dest
 
 
+def _ensure_default_clone_root() -> tuple[str | None, tuple[Response, int] | None]:
+    """No cloneDest sent: the configured root (QUODEQ_REPOS_DIR may sit
+    outside home) is the operator's choice, so it is trusted and created on
+    demand. A failure names the default folder, not a cloneDest nobody sent."""
+    dest = str(default_clone_root())
+    try:
+        os.makedirs(dest, exist_ok=True)
+        created = os.path.isdir(dest)
+    except OSError:
+        created = False
+    if created:
+        return dest, None
+    return None, json_error(
+        "The default working-copy folder could not be created",
+        HTTPStatus.BAD_REQUEST,
+        CODE_INVALID_CLONE_DEST,
+    )
+
+
 def _resolve_create_project_clone_dest(
     ephemeral: bool, clone_dest: str | None,
 ) -> tuple[str | None, tuple[Response, int] | None]:
@@ -116,22 +135,18 @@ def _resolve_create_project_clone_dest(
     """
     if ephemeral:
         return clone_dest, None
+    if not clone_dest:
+        return _ensure_default_clone_root()
     try:
         # Containment and the directory check both live in the try
         # so every rejection exits here. Falling through past a
         # failed containment check on a sentinel would leave the
-        # unguarded value live on one path.
-        if clone_dest:
-            # A leading "~" is the old wizard default and means the home
-            # folder; a missing folder under home is created, the way the
-            # default working copy root is.
-            dest = contained_path(_expand_home(clone_dest), Path.home())
-            if os.path.exists(dest) and not os.path.isdir(dest):
-                raise ValueError("cloneDest is not a directory")
-        else:
-            # No cloneDest sent: the configured root (QUODEQ_REPOS_DIR may
-            # sit outside home) is the operator's choice, so it is trusted.
-            dest = str(default_clone_root())
+        # unguarded value live on one path. A leading "~" is the old
+        # wizard default and means the home folder; a missing folder
+        # under home is created, the way the default root is.
+        dest = contained_path(_expand_home(clone_dest), Path.home())
+        if os.path.exists(dest) and not os.path.isdir(dest):
+            raise ValueError("cloneDest is not a directory")
         os.makedirs(dest, exist_ok=True)
         if not os.path.isdir(dest):
             raise ValueError("cloneDest is not an existing directory")
@@ -215,8 +230,9 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     A URL repo with ``ephemeral`` false answers 202 and runs the clone and scan
     as the background job reported by ``GET /api/projects/clone-status``.
     ``cloneDest`` is optional there: absent, it defaults to
-    ``default_clone_root()``, created on demand and contained under the home
-    folder. Local paths and ``ephemeral: true`` stay synchronous (200, or the
+    ``default_clone_root()``, created on demand and trusted wherever it is
+    configured (QUODEQ_REPOS_DIR may sit outside home); a cloneDest the
+    request sends must sit under the home folder. Local paths and ``ephemeral: true`` stay synchronous (200, or the
     usual 4xx/409 codes); for a local path ``cloneDest`` and ``ephemeral`` are
     ignored.
     """

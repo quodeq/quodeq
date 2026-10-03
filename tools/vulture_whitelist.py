@@ -316,11 +316,3 @@ _.load_standard_catalog  # data/fs/standard_index_loader.py: admission catalog l
 # pywebview window event. The toolkit fires it; we only subscribe.
 _.minimized  # dashboard/_webview_window_visibility.py: pywebview window event, fired by the toolkit.
 
-# Clone phase of a project-add job; the job runner that publishes it lands in a later task.
-_.CLONE  # core/types/sync_phase.py: SyncKind member, read once add-project runs as a background job.
-
-# Clone job entry points; the create route (next task) wires them in.
-_.start_clone  # services/project_clone_job.py: the route starts the create job through it.
-_.is_clone_running  # services/project_clone_job.py: the route's single-flight check.
-_.get_clone_status  # services/project_clone_job.py: the status endpoint reads the slot.
-_.CODE_CLONE_IN_PROGRESS  # services/project_clone_job.py: wire code for a second start while running.

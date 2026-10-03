@@ -1,7 +1,7 @@
 from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.data.fs.git_progress import ProgressUpdate
 from quodeq.services.project_clone_job import (
-    CloneHooks, CloneOutcome, CloneState, CloneStartResult, CloneStatus, get_clone_status, is_clone_running, start_clone,
+    CloneHooks, CloneOutcome, CloneState, CloneStartResult, CloneStatus, get_clone_status, start_clone,
 )
 
 
@@ -26,7 +26,7 @@ def test_start_clone_reports_phases_percent_and_the_created_project():
     snap = get_clone_status(status)
     assert snap["state"] == CloneState.DONE and snap["phase"] == SyncPhase.DONE
     assert snap["project_id"] == "p1" and snap["scan_data"] == {"files": 3} and snap["kind"] == SyncKind.CLONE
-    assert snap["finished_at"] is not None and not is_clone_running(status)
+    assert snap["finished_at"] is not None
 
 
 def test_failed_outcome_lands_as_error_with_code_and_detail():
