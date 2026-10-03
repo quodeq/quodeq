@@ -256,11 +256,7 @@ from quodeq.data.sqlite.score_cache_store import (  # noqa: F401
 )
 
 # Live evidence tally (heartbeat + scan-progress counters).
-from quodeq.data.fs.evidence_tally import (  # noqa: F401
-    FindingTally,
-    IncrementalTally,
-    tally_unique_findings,
-)
+from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally, classify_finding, tally_unique_findings  # noqa: F401
 from quodeq.services._process_owners import DEFAULT_LIVE_TALLY_MEMO, DEFAULT_SINGLE_FLIGHT, DEFAULT_WALK_CACHE, LiveTallyMemo, SingleFlight, WalkCache  # noqa: F401
 
 # Local git repo statistics.

@@ -29,12 +29,22 @@ def app(tmp_path: Path) -> Flask:
     return app
 
 
-def _write_finding(event_log: EventLogWriter, p: str, line: int = 1) -> None:
+def _write_finding(
+    event_log: EventLogWriter, p: str, line: int = 1, *, verdict: str = "violation",
+) -> None:
     payload = JudgmentPayload(
-        practice_id=p, verdict="violation", dimension="dim",
+        practice_id=p, verdict=verdict, dimension="dim",
         file="x.py", line=line, reason="r", severity="medium", snippet="s", title="t",
     )
     event_log.emit(JudgmentCreatedEvent(payload=payload))
+
+
+def _finding_frames(body: str) -> list[dict]:
+    blocks = [b for b in body.split("\n\n") if "event: finding" in b]
+    return [
+        json.loads(next(l for l in b.splitlines() if l.startswith("data: "))[len("data: "):])
+        for b in blocks
+    ]
 
 
 def test_route_returns_404_for_unknown_job(app: Flask):
@@ -112,6 +122,30 @@ def test_route_honors_last_event_id_header(app: Flask, monkeypatch: pytest.Monke
     assert len(finding_lines) == 1
     data = json.loads(next(l for l in finding_lines[0].splitlines() if l.startswith("data: "))[6:])
     assert data["practice_id"] == "P2"
+
+
+def test_route_does_not_emit_a_compliance_judgment_as_a_finding(app: Flask, monkeypatch: pytest.MonkeyPatch):
+    """events.jsonl holds every judgment, passing checks included. The feed
+    used to show them all as violations (42 in the report, 417 on screen)."""
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
+    run_dir: Path = app.config["_run_dir"]
+    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+    _write_finding(event_log, "P1", line=1, verdict="compliance")
+    _write_finding(event_log, "P2", line=2)
+    body = app.test_client().get("/api/evaluations/job-1/events").get_data(as_text=True)
+    assert [f["practice_id"] for f in _finding_frames(body)] == ["P2"]
+
+
+def test_route_emits_a_finding_reported_twice_once(app: Flask, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
+    run_dir: Path = app.config["_run_dir"]
+    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+    _write_finding(event_log, "P1", line=1)
+    _write_finding(event_log, "P1", line=1)
+    body = app.test_client().get("/api/evaluations/job-1/events").get_data(as_text=True)
+    assert len(_finding_frames(body)) == 1
 
 
 # ---------------------------------------------------------------------------
