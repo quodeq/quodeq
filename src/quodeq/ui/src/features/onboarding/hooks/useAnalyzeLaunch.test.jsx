@@ -47,8 +47,10 @@ function conflict(code, extra = {}) {
 }
 
 describe('useAnalyzeLaunch', () => {
+  // The launch sends the working copy's local path: the evaluation start refuses a url.
   it('a url clones as a job and starts the evaluation exactly once when the slot reaches done', async () => {
-    const { result, api, onLaunch, poll } = setup({ registerProject: accepted() });
+    const getProjectInfo = vi.fn(async () => ({ path: '/u/quodeq/repos/billing' }));
+    const { result, api, onLaunch, poll } = setup({ registerProject: accepted(), api: { getProjectInfo } });
     await waitFor(() => expect(api.getCloneStatus).toHaveBeenCalled());
     await act(async () => { await result.current.run(); });
     expect(api.registerProject).toHaveBeenCalledWith({ repo: URL });
@@ -57,7 +59,7 @@ describe('useAnalyzeLaunch', () => {
     expect(result.current.busy).toBe(true);
     await poll(done());
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
-    expect(onLaunch.mock.calls[0][0]).toMatchObject({ projectId: 'p1', standardIds: ['default'] });
+    expect(onLaunch.mock.calls[0][0]).toEqual({ projectId: 'p1', repo: '/u/quodeq/repos/billing', standardIds: ['default'] });
     await poll({ ...done() });
     expect(onLaunch).toHaveBeenCalledTimes(1);
     expect(api.registerProject).toHaveBeenCalledTimes(1);
@@ -128,12 +130,12 @@ describe('useAnalyzeLaunch', () => {
 
   it('a 409 PROJECT_EXISTS on the post resumes and launches the existing project at once', async () => {
     const registerProject = vi.fn(async () => { throw conflict('PROJECT_EXISTS', { existingProjectId: 'existing-id' }); });
-    const api = { getProjectInfo: vi.fn(async () => ({ runsCount: 0 })), getProjectScan: vi.fn(async () => ({})) };
+    const api = { getProjectInfo: vi.fn(async () => ({ runsCount: 0, path: '/u/quodeq/repos/billing' })), getProjectScan: vi.fn(async () => ({})) };
     const { result, onLaunch, wizard } = setup({ registerProject, api });
     await act(async () => { await result.current.run(); });
     expect(wizard.succeedScan).toHaveBeenCalledWith('existing-id', {});
     expect(onLaunch).toHaveBeenCalledTimes(1);
-    expect(onLaunch).toHaveBeenCalledWith({ projectId: 'existing-id', repo: URL, standardIds: ['default'] });
+    expect(onLaunch).toHaveBeenCalledWith({ projectId: 'existing-id', repo: '/u/quodeq/repos/billing', standardIds: ['default'] });
     expect(result.current.startError).toBeNull();
   });
 
@@ -162,6 +164,7 @@ describe('useAnalyzeLaunch', () => {
     await poll(running());
     await poll(done(URL, 1700000006000, 'mine'));
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
+    // No project to read here (getProjectInfo fails): the repo goes as it is.
     expect(onLaunch.mock.calls[0][0]).toMatchObject({ projectId: 'mine', repo: URL });
   });
 

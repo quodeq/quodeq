@@ -63,6 +63,9 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab, queryClient
         repo: repo || projectId,
         dimensions: standardIds,
       };
+      // The in-progress card names the project that landed, not the global
+      // selection, until the run's own project resolves.
+      if (projectId) payload.uiProject = projectId;
       if (scopePath) payload.scopePath = scopePath;
       if (branch) payload.branch = branch;
       if (provider?.id) payload.aiCmd = provider.id;

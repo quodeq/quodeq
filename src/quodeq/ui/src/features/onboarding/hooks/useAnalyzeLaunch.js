@@ -20,13 +20,27 @@ async function landFailure(slot, latest, setters) {
   if (exists && slot.detail) {
     const conflict = { status: HTTP_STATUS.CONFLICT, existingProjectId: slot.detail };
     if (await resumedExisting(conflict, tryResume)) {
-      launch({ projectId: slot.detail, repo: slot.repo, standardIds: form.request().standardIds });
+      await launch({ projectId: slot.detail, repo: slot.repo, standardIds: form.request().standardIds });
       return;
     }
   }
   // PROJECT_EXISTS carries a project id in `detail`, not git output: never shown.
   const detail = exists ? '' : (slot.detail || '');
   setters.setCloneError({ message: apiErrorMessage({ code: slot.code, message: slot.error }, 'onboarding.cloneFailed'), detail });
+}
+
+// POST /api/evaluations takes a local path, never a url: a cloned project
+// launches its working copy, the registered project's path. When the project
+// cannot be read the repo goes as it is and the start reports the refusal.
+async function localRepo(api, { projectId, repo }) {
+  if (!projectId) return repo;
+  try {
+    const info = await api.getProjectInfo(projectId);
+    return info?.path || repo;
+  } catch (err) {
+    console.warn('[useAnalyzeLaunch] could not read the launched project, sending its repo as is:', err);
+    return repo;
+  }
 }
 
 /**
@@ -51,7 +65,8 @@ function useCloneLanding({ clone, pending, setPending, latest, setters }) {
       const { wizard, form, launch } = latest.current;
       wizard.succeedScan(slot.projectId, slot.scanData ?? null);
       // The repo that landed, not the field (which a reopened panel may hold differently).
-      launch({ projectId: slot.projectId, repo: slot.repo, standardIds: form.request().standardIds });
+      launch({ projectId: slot.projectId, repo: slot.repo, standardIds: form.request().standardIds })
+        .catch((err) => console.warn('[useAnalyzeLaunch] launching the cloned project failed:', err));
       return;
     }
     setPending(null);
@@ -115,8 +130,8 @@ function useLaunchState() {
  * Closing the panel (unmount) drops `pending`: nothing is
  * cancelled and nothing launches later.
  *
- * `onLaunch({ projectId, repo, standardIds })` starts the evaluation; never
- * after the panel unmounted.
+ * `onLaunch({ projectId, repo, standardIds })` starts the evaluation with the
+ * project's local path as `repo`; never after the panel unmounted.
  *
  * @param {{ wizard: object, form: { request: () => object }, onLaunch: Function }} args
  */
@@ -135,7 +150,10 @@ export function useAnalyzeLaunch({ wizard, form, onLaunch }) {
     mounted.current = true;
     return () => { mounted.current = false; };
   }, []);
-  const launch = (args) => { if (mounted.current) latest.current.onLaunch(args); };
+  const launch = async (args) => {
+    const repo = await localRepo(api, args);
+    if (mounted.current) latest.current.onLaunch({ ...args, repo });
+  };
 
   async function run() {
     if (startingRef.current) return;

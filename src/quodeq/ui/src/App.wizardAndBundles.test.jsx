@@ -114,6 +114,8 @@ describe('buildWizardHandlers', () => {
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(PROJECTS_LIST);
     expect(state.liveEvaluation.actions.startEvaluation).toHaveBeenCalledWith(expect.objectContaining({
       repo: '/x/repo', dimensions: ['security'], aiCmd: 'claude', aiModel: 'sonnet', timeLimit: 60,
+      // The in-progress card names the project that landed, not the old selection.
+      uiProject: 'proj-1',
     }));
     expect(navTab).toHaveBeenCalledWith('evaluate');
   });

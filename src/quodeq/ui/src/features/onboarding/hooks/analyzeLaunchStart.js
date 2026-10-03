@@ -16,15 +16,16 @@ const CODE_CLONE_IN_PROGRESS = 'CLONE_IN_PROGRESS';
  *   ctx.set          setPending, setAccessFailure, setStartError
  *   ctx.slot()       the clone slot as last polled
  *   ctx.tryResume    makeTryResumeExisting's resume of a registered repo
- *   ctx.launch       ({ projectId, repo, standardIds }) => void, a no-op once
- *                    the panel closed (it may run after a slow await)
+ *   ctx.launch       ({ projectId, repo, standardIds }) => Promise, resolves
+ *                    the project's local path; a no-op once the panel closed
+ *                    (it may run after a slow await)
  */
 
 // A repo the server already holds (409 + existingProjectId) is resumed and
 // run at once, not failed; true when it was.
 async function resumed(ctx, err, { repo, standardIds }) {
   if (!(await resumedExisting(err, ctx.tryResume))) return false;
-  ctx.launch({ projectId: err.existingProjectId, repo, standardIds });
+  await ctx.launch({ projectId: err.existingProjectId, repo, standardIds });
   return true;
 }
 
@@ -37,7 +38,7 @@ export async function startFolder(ctx, { repo, standardIds }) {
   try {
     const { projectId, scanData } = await ctx.api.registerProject({ repo });
     ctx.wizard.succeedScan(projectId, scanData);
-    ctx.launch({ projectId, repo, standardIds });
+    await ctx.launch({ projectId, repo, standardIds });
   } catch (err) {
     if (await resumed(ctx, err, { repo, standardIds })) return;
     const message = apiErrorMessage(err, 'onboarding.scanFailed');
@@ -80,7 +81,7 @@ async function postClone(ctx, { repo, cloneDest, standardIds }) {
     return;
   }
   ctx.wizard.succeedScan(res.projectId, res.scanData);
-  ctx.launch({ projectId: res.projectId, repo, standardIds });
+  await ctx.launch({ projectId: res.projectId, repo, standardIds });
 }
 
 /**
