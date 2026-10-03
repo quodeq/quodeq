@@ -48,6 +48,12 @@ describe('WelcomeStep', () => {
     expect(onGoToRepositories).toHaveBeenCalledTimes(1);
   });
 
+  it('connected without a host never renders a null host', () => {
+    renderWelcome({ connected: true, host: null });
+    expect(screen.queryByText(/null/)).not.toBeInTheDocument();
+    expect(screen.getByText('your evaluations repository is connected')).toBeInTheDocument();
+  });
+
   it('adapts: local projects turn start into add another', () => {
     const { onStart } = renderWelcome({ hasLocalProjects: true });
     expect(screen.queryByRole('button', { name: 'start' })).not.toBeInTheDocument();

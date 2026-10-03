@@ -58,7 +58,7 @@ function EvalsPathCard({ connected, host, onConnect, onImport, onGoToRepositorie
       {connected && (
         <p className="onboarding-path-card__status">
           <span className="onboarding-path-card__marker" aria-hidden="true">▸</span>
-          <span>{t('onboarding.pathEvalsConnected', { host })}</span>
+          <span>{host ? t('onboarding.pathEvalsConnected', { host }) : t('onboarding.pathEvalsConnectedBare')}</span>
         </p>
       )}
       <div className="onboarding-path-card__actions">

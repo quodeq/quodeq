@@ -841,6 +841,7 @@
   "onboarding.noProjectsFirstRepo": "set up your first repository. quodeq scans it locally and runs an evaluation against the standards you pick.",
   "onboarding.pathEvalsConnect": "connect",
   "onboarding.pathEvalsConnected": "your evaluations repository is connected · {host}",
+  "onboarding.pathEvalsConnectedBare": "your evaluations repository is connected",
   "onboarding.pathEvalsDesc": "a git repository where evaluations are published, yours or your team's.",
   "onboarding.pathEvalsGo": "go to repositories",
   "onboarding.pathEvalsImport": "or import an exported archive",

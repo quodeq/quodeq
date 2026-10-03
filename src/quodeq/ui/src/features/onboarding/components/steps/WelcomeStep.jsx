@@ -5,11 +5,14 @@ import WelcomePaths from '../WelcomePaths.jsx';
 import '../../../../styles/onboarding-welcome.css';
 
 // The three things quodeq does, in order; `num` is the mono row marker.
-const HOW_ROWS = [
-  { num: '01', label: t('onboarding.how1Label'), text: t('onboarding.how1') },
-  { num: '02', label: t('onboarding.how2Label'), text: t('onboarding.how2') },
-  { num: '03', label: t('onboarding.how3Label'), text: t('onboarding.how3') },
-];
+// Built per render so the string catalog is read at render time.
+function howRows() {
+  return [
+    { num: '01', label: t('onboarding.how1Label'), text: t('onboarding.how1') },
+    { num: '02', label: t('onboarding.how2Label'), text: t('onboarding.how2') },
+    { num: '03', label: t('onboarding.how3Label'), text: t('onboarding.how3') },
+  ];
+}
 
 function HowItWorks() {
   const titleId = useId();
@@ -18,7 +21,7 @@ function HowItWorks() {
       <TermHeader name={t('onboarding.termWelcome')} />
       <h2 id={titleId} className="onboarding-how__title">{t('onboarding.howTitle')}</h2>
       <ol className="onboarding-how__list">
-        {HOW_ROWS.map((row) => (
+        {howRows().map((row) => (
           <li key={row.num} className="onboarding-how__row">
             <span className="onboarding-how__num" aria-hidden="true">{row.num}</span>
             <span className="onboarding-how__body">

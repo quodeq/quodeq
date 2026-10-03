@@ -41,11 +41,11 @@ describe('OnboardingWizard', () => {
     expect(screen.getByText('how quodeq works')).toBeInTheDocument();
   });
 
-  it('skip for now sets the skip flag and calls onClose', () => {
-    const { onClose } = renderWizard({ isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN });
+  it('skip for now sets the skip flag and lands on the repositories tab', () => {
+    const { onGoToRepositories } = renderWizard({ isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN });
     fireEvent.click(screen.getByRole('button', { name: 'skip for now' }));
     expect(localStorage.getItem(SKIP_FLAG)).toBe('true');
-    expect(onClose).toHaveBeenCalled();
+    expect(onGoToRepositories).toHaveBeenCalledTimes(1);
   });
 
   it('opened from Settings: no skip for now, and closing never writes the skip flag', () => {

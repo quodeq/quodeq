@@ -6,13 +6,13 @@ import { SCAN_SUB_STATE } from '../onboardingVocab.js';
  * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted
  * verbatim.
  */
-export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, providerConfigured, fromSettings = false }) {
+export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToRepositories, providerConfigured, fromSettings = false }) {
   // A welcome opened from Settings offers no skip; even if one fires, a user
-  // who went looking for the welcome has not opted out of the first run.
+  // who went looking for the welcome has not opted out. Skip lands on Repositories.
   function handleSkipWelcome() {
     if (!fromSettings) markWelcomeSkipped();
     clearDraft();
-    onClose({ saved: false });
+    onGoToRepositories();
   }
 
   // The welcome's "or import an exported archive": the import runs its own
