@@ -13,17 +13,17 @@ const CODE_CLONE_IN_PROGRESS = 'CLONE_IN_PROGRESS';
  *   ctx.api          registerProject, probeGit, getCloneStatus
  *   ctx.queryClient  the clone slot's cache (projectsKeys.clone())
  *   ctx.wizard       startScan, succeedScan, failScan
- *   ctx.set          setPending, setAccessFailure, setStartError, setResumed
+ *   ctx.set          setPending, setAccessFailure, setStartError
  *   ctx.slot()       the clone slot as last polled
  *   ctx.tryResume    makeTryResumeExisting's resume of a registered repo
  *   ctx.launch       ({ projectId, standardIds }) => void
  */
 
-// A repo the server already holds (409 + existingProjectId) is resumed, not
-// failed; true when it was.
-async function resumed(ctx, err, repo) {
+// A repo the server already holds (409 + existingProjectId) is resumed and
+// run at once, not failed; true when it was.
+async function resumed(ctx, err, standardIds) {
   if (!(await resumedExisting(err, ctx.tryResume))) return false;
-  ctx.set.setResumed({ repo, projectId: err.existingProjectId });
+  ctx.launch({ projectId: err.existingProjectId, standardIds });
   return true;
 }
 
@@ -38,7 +38,7 @@ export async function startFolder(ctx, { repo, standardIds }) {
     ctx.wizard.succeedScan(projectId, scanData);
     ctx.launch({ projectId, standardIds });
   } catch (err) {
-    if (await resumed(ctx, err, repo)) return;
+    if (await resumed(ctx, err, standardIds)) return;
     const message = apiErrorMessage(err, 'onboarding.scanFailed');
     ctx.wizard.failScan({ message, status: err.status, code: err.code });
     ctx.set.setStartError({ message, detail: apiErrorDetail(err) });
@@ -92,7 +92,7 @@ export async function startUrl(ctx, request) {
     await postClone(ctx, request);
   } catch (err) {
     if (err?.code === CODE_CLONE_IN_PROGRESS) { await attachToRunning(ctx, repo); return; }
-    if (await resumed(ctx, err, repo)) return;
+    if (await resumed(ctx, err, request.standardIds)) return;
     const access = accessFailureFrom(err);
     if (access) { ctx.set.setAccessFailure(access); return; }
     ctx.set.setStartError({ message: apiErrorMessage(err, 'onboarding.cloneFailed'), detail: apiErrorDetail(err) });

@@ -121,20 +121,20 @@ describe('useAnalyzeLaunch', () => {
     await act(async () => { await result.current.run(); });
     await poll(failed('PROJECT_EXISTS', 'existing-id'));
     await waitFor(() => expect(wizard.succeedScan).toHaveBeenCalledWith('existing-id', { files: 9 }));
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
+    expect(onLaunch).toHaveBeenCalledWith({ projectId: 'existing-id', standardIds: ['default'] });
     expect(result.current.cloneError).toBeNull();
-    expect(onLaunch).not.toHaveBeenCalled();
   });
 
-  it('after a resume, scan and run launches the resumed project without posting again', async () => {
+  it('a 409 PROJECT_EXISTS on the post resumes and launches the existing project at once', async () => {
     const registerProject = vi.fn(async () => { throw conflict('PROJECT_EXISTS', { existingProjectId: 'existing-id' }); });
     const api = { getProjectInfo: vi.fn(async () => ({ runsCount: 0 })), getProjectScan: vi.fn(async () => ({})) };
     const { result, onLaunch, wizard } = setup({ registerProject, api });
     await act(async () => { await result.current.run(); });
     expect(wizard.succeedScan).toHaveBeenCalledWith('existing-id', {});
-    expect(onLaunch).not.toHaveBeenCalled();
-    await act(async () => { await result.current.run(); });
+    expect(onLaunch).toHaveBeenCalledTimes(1);
     expect(onLaunch).toHaveBeenCalledWith({ projectId: 'existing-id', standardIds: ['default'] });
-    expect(registerProject).toHaveBeenCalledTimes(1);
+    expect(result.current.startError).toBeNull();
   });
 
   it('a 409 CLONE_IN_PROGRESS attaches to the running slot and shows no toast', async () => {

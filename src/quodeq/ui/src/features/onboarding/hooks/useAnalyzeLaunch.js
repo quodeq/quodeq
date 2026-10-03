@@ -11,14 +11,14 @@ import { startFolder, startUrl } from './analyzeLaunchStart.js';
 // The clone slot's code for a repo the server already holds; `detail` is its id.
 const CODE_PROJECT_EXISTS = 'PROJECT_EXISTS';
 
-// A clone that failed: resume the existing project on PROJECT_EXISTS (when it
-// has no evaluations yet), otherwise the mapped message and git's output.
+// A clone that failed: resume and run the existing project on PROJECT_EXISTS
+// (when it has no evaluations yet), otherwise the mapped message and git's output.
 async function landFailure(slot, latest, setters) {
-  const { tryResume } = latest.current;
+  const { tryResume, form, onLaunch } = latest.current;
   if (slot.code === CODE_PROJECT_EXISTS && slot.detail) {
     const conflict = { status: HTTP_STATUS.CONFLICT, existingProjectId: slot.detail };
     if (await resumedExisting(conflict, tryResume)) {
-      setters.setResumed({ repo: slot.repo, projectId: slot.detail });
+      onLaunch({ projectId: slot.detail, standardIds: form.request().standardIds });
       return;
     }
   }
@@ -74,11 +74,10 @@ function useLaunchState() {
   const [accessFailure, setAccessFailure] = useState(null);
   const [startError, setStartError] = useState(null);
   const [cloneError, setCloneError] = useState(null);
-  const [resumed, setResumed] = useState(null);
   const [starting, setStarting] = useState(false);
   return {
-    pending, accessFailure, startError, cloneError, resumed, starting,
-    setters: { setPending, setAccessFailure, setStartError, setCloneError, setResumed, setStarting },
+    pending, accessFailure, startError, cloneError, starting,
+    setters: { setPending, setAccessFailure, setStartError, setCloneError, setStarting },
   };
 }
 
@@ -88,8 +87,8 @@ function useLaunchState() {
  * (202), and followed through the shared clone slot: the evaluation starts
  * exactly once when that slot reaches DONE for this repo. A 409
  * CLONE_IN_PROGRESS follows the running clone instead of failing.
- * PROJECT_EXISTS resumes the registered project; the next `scan and run`
- * launches it. Closing the panel (unmount) drops `pending`: nothing is
+ * PROJECT_EXISTS resumes the registered project and launches it at once.
+ * Closing the panel (unmount) drops `pending`: nothing is
  * cancelled and nothing launches later.
  *
  * `onLaunch({ projectId, standardIds })` starts the evaluation.
@@ -108,10 +107,6 @@ export function useAnalyzeLaunch({ wizard, form, onLaunch }) {
   async function run() {
     if (startingRef.current) return;
     const request = form.request();
-    if (s.resumed && s.resumed.repo === request.repo) {
-      onLaunch({ projectId: s.resumed.projectId, standardIds: request.standardIds });
-      return;
-    }
     startingRef.current = true;
     setters.setStarting(true);
     setters.setAccessFailure(null); setters.setStartError(null); setters.setCloneError(null);
