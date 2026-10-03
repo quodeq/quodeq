@@ -28,6 +28,7 @@ function RepositoryBlock({ form, locked }) {
           <FolderField folderPath={form.repo} onPick={form.browseRepoFolder} disabled={locked} />
         )}
       </div>
+      {form.source === REPO_SOURCE.FOLDER && <p className="analyze-block__hint">{t('onboarding.folderHint')}</p>}
       {form.source === REPO_SOURCE.URL && form.repo.trim() && (
         <WorkingCopyNote
           path={workingCopy.path}

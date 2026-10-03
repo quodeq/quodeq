@@ -30,8 +30,9 @@ export function useCloneGhost() {
     const cloneDest = parentFolder(slot?.dest);
     try {
       await registerProject({ repo: slot.repo, ...(cloneDest ? { cloneDest } : {}) });
-    } catch {
-      // The slot shows the outcome.
+    } catch (err) {
+      // The slot shows the outcome; the log is for the console only.
+      console.warn('[useCloneGhost] retry was refused:', err);
     }
   }, [registerProject, slot]);
   const show = clone.active || (clone.failed && !dismissed);

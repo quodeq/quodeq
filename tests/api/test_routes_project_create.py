@@ -37,9 +37,20 @@ def test_post_projects_url_without_clone_dest_uses_the_default_root(client, tmp_
     assert root.is_dir() and create.call_args.args[1].clone_dest == str(root)
 
 
-def test_post_projects_default_root_outside_home_is_rejected(client, tmp_path, monkeypatch):
-    monkeypatch.setattr("quodeq.api.routes_project_create.default_clone_root", lambda env=None: tmp_path.parent / "elsewhere")
-    resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN)
+def test_post_projects_configured_default_root_outside_home_is_trusted(client, tmp_path, monkeypatch, inline_clone_job):
+    # An operator-set QUODEQ_REPOS_DIR is trusted when no cloneDest is sent.
+    root = tmp_path.parent / f"{tmp_path.name}-elsewhere" / "repos"
+    monkeypatch.setattr("quodeq.api.routes_project_create.default_clone_root", lambda env=None: root)
+    result = CreateProjectResult(status=CreateProjectStatus.CREATED, project_id="p", scan_data={})
+    with patch("quodeq.services.filesystem.FilesystemActionProvider.create_project", return_value=result):
+        resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN)
+    assert resp.status_code == 202 and root.is_dir()
+
+
+def test_post_projects_user_clone_dest_outside_home_is_still_rejected(client, tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git", "cloneDest": str(outside)}, headers=_ORIGIN)
     assert resp.status_code == 400 and resp.get_json()["code"] == "INVALID_CLONE_DEST"
 
 

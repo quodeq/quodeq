@@ -220,7 +220,7 @@ describe('useAnalyzeLaunch', () => {
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
     expect(api.registerProject).not.toHaveBeenCalled();
   });
-  // Fix round 1: an unmounted panel never launches, even after a slow await.
+  // An unmounted panel never launches, even after a slow await.
   it('a folder registration that resolves after the panel closed never launches', async () => {
     let resolve;
     const registerProject = vi.fn(() => new Promise((r) => { resolve = r; }));
@@ -245,7 +245,7 @@ describe('useAnalyzeLaunch', () => {
     expect(onLaunch).not.toHaveBeenCalled();
   });
 
-  // Fix round 1: an attached launch sends the repo that landed, not the field.
+  // An attached launch sends the repo that landed, not the field.
   it('an attached launch sends the slot repo even if the field was edited', async () => {
     const request = { repo: URL, source: 'url', standardIds: ['default'] };
     const { result, onLaunch, poll } = setup({ registerProject: accepted(), slot: running(), form: { request: () => request } });

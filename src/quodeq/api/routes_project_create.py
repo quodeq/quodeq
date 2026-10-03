@@ -111,8 +111,12 @@ def _resolve_create_project_clone_dest(
         # so every rejection exits here. Falling through past a
         # failed containment check on a sentinel would leave the
         # unguarded value live on one path.
-        dest = contained_path(clone_dest or str(default_clone_root()), Path.home())
-        if not clone_dest:
+        if clone_dest:
+            dest = contained_path(clone_dest, Path.home())
+        else:
+            # No cloneDest sent: the configured root (QUODEQ_REPOS_DIR may
+            # sit outside home) is the operator's choice, so it is trusted.
+            dest = str(default_clone_root())
             os.makedirs(dest, exist_ok=True)
         if not os.path.isdir(dest):
             raise ValueError("cloneDest is not an existing directory")

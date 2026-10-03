@@ -842,6 +842,7 @@
   "onboarding.done": "done",
   "onboarding.ephemeral": "Just run one evaluation, don't keep a copy",
   "onboarding.folderBareHint": "prefer a bare repository (git init --bare). publishing into a checked-out branch is refused.",
+  "onboarding.folderHint": "local folder · paste a url instead",
   "onboarding.folderPickerTitle": "Choose the evaluations repository folder",
   "onboarding.foundRecommended": "found · recommended",
   "onboarding.how1": "reads your repository on your machine. no code leaves until you choose a model.",

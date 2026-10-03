@@ -107,6 +107,7 @@ describe('AnalyzeStep', () => {
     await user.click(screen.getByRole('button', { name: 'choose a folder' }));
     expect(await screen.findByText('/Users/me/code/app')).toBeInTheDocument();
     expect(screen.queryByText(/quodeq keeps a working copy/)).toBeNull();
+    expect(screen.getByText('local folder · paste a url instead')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'scan and run' }));
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
     expect(api.registerProject).toHaveBeenCalledWith({ repo: '/Users/me/code/app' });
