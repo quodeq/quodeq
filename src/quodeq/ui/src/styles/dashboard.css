@@ -2901,8 +2901,18 @@
   margin-bottom: var(--space-4);
 }
 
+/* Header actions are compact, the same height as the strip's buttons below
+   them (26 px, small mono), so the title row stays the loudest thing. */
 .projects-page__add-btn {
   flex-shrink: 0;
+  min-height: 26px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+}
+.projects-page__header-actions .projects-page__import-btn {
+  min-height: 26px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
 }
 
 /* Secondary header actions (import project, connect team results): the same
