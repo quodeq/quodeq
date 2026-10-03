@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import re
 import urllib.parse
+from pathlib import Path
 
+from quodeq.shared.git_errors import NotAGitRepoError
+from quodeq.shared.repo import FILE_URL_PREFIX
 from quodeq.shared.ssrf import is_private_address
+from quodeq.shared.validation import contained_path
 
 _REPO_URL_RE = re.compile(
     r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?"
@@ -53,6 +57,25 @@ def is_valid_repo_url(url: str) -> bool:
     return _REPO_URL_RE.match(url) is not None
 
 
+def validate_local_git_repo(file_url: str) -> None:
+    """Accept a ``file://`` URL only for a git repository inside the home folder.
+
+    The path is URL-decoded, resolved (symlinks followed) and must sit under
+    ``Path.home()``; it must be a worktree (``.git`` present) or a bare
+    repository (``HEAD`` file and ``objects`` directory). Messages are fixed:
+    the path is never echoed.
+    """
+    raw = urllib.parse.unquote(file_url[len(FILE_URL_PREFIX):])
+    try:
+        folder = Path(contained_path(raw, Path.home()))
+    except ValueError as exc:
+        raise ValueError("Local repositories must live under your home folder") from exc
+    is_worktree = (folder / ".git").exists()
+    is_bare = (folder / "HEAD").is_file() and (folder / "objects").is_dir()
+    if not folder.is_dir() or not (is_worktree or is_bare):
+        raise NotAGitRepoError()
+
+
 def validate_remote_url(repo_input: str) -> None:
     """Reject malformed / private / DNS-rebinding repository URLs.
 
@@ -62,6 +85,9 @@ def validate_remote_url(repo_input: str) -> None:
     so the two entry points cannot drift apart on what they consider safe.
     Raises ``ValueError`` for any rejected URL.
     """
+    if repo_input.startswith(FILE_URL_PREFIX):
+        validate_local_git_repo(repo_input)
+        return
     if not _REPO_URL_RE.match(repo_input):
         raise ValueError(f"Invalid repository URL format: {repo_input}. Expected: https://github.com/user/repo, ssh://git@github.com/user/repo.git or git@github.com:user/repo.git")
     if _PRIVATE_HOST_RE.match(repo_input):

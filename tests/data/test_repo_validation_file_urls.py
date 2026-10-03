@@ -1,0 +1,68 @@
+import subprocess
+
+import pytest
+
+from quodeq.data.fs.repo_validation import is_valid_repo_url, validate_remote_url
+from quodeq.shared.git_errors import NOT_A_GIT_REPO_MESSAGE, NotAGitRepoError
+
+
+def _bare(tmp_path):
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True, timeout=30)
+    return origin
+
+
+def test_file_url_to_a_bare_repo_under_home_is_accepted(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    validate_remote_url(f"file://{_bare(tmp_path)}")
+
+
+def test_file_url_to_a_worktree_repo_is_accepted(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    work = tmp_path / "work"
+    subprocess.run(["git", "init", str(work)], check=True, capture_output=True, timeout=30)
+    validate_remote_url(f"file://{work}")
+
+
+def test_file_url_is_url_decoded(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    spaced = tmp_path / "my repo.git"
+    subprocess.run(["git", "init", "--bare", str(spaced)], check=True, capture_output=True, timeout=30)
+    validate_remote_url(f"file://{tmp_path}/my%20repo.git")
+
+
+def test_file_url_to_a_plain_folder_is_refused_as_not_a_git_repo(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    (tmp_path / "plain").mkdir()
+    with pytest.raises(ValueError, match="not a git repository") as caught:
+        validate_remote_url(f"file://{tmp_path / 'plain'}")
+    assert isinstance(caught.value, NotAGitRepoError)
+    assert str(caught.value) == NOT_A_GIT_REPO_MESSAGE
+    assert str(tmp_path) not in str(caught.value)
+
+
+def test_file_url_to_a_missing_path_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    with pytest.raises(ValueError, match="not a git repository"):
+        validate_remote_url(f"file://{tmp_path / 'nope'}")
+
+
+def test_file_url_outside_home_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path / "home")
+    (tmp_path / "home").mkdir()
+    with pytest.raises(ValueError) as caught:
+        validate_remote_url(f"file://{_bare(tmp_path)}")
+    assert str(tmp_path) not in str(caught.value)
+
+
+def test_file_url_escaping_home_through_dotdot_is_refused(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr("pathlib.Path.home", lambda: home)
+    origin = _bare(tmp_path)
+    with pytest.raises(ValueError):
+        validate_remote_url(f"file://{home}/../{origin.name}")
+
+
+def test_file_urls_are_not_valid_for_the_project_relocate_check(tmp_path):
+    assert not is_valid_repo_url(f"file://{tmp_path}")

@@ -25,6 +25,7 @@ from quodeq.services.shared_repo import RepoFormat, shared_evaluations_root, val
 from quodeq.services.shared_listing import warm_shared_listing
 from quodeq.services.sync_progress import SYNC_IDLE_FIELDS, WarmListing, progress_writer, read_projects
 from quodeq.shared.fault_isolation import run_isolated
+from quodeq.shared.git_errors import NOT_A_GIT_REPO_CODE, NOT_A_GIT_REPO_MESSAGE, NotAGitRepoError
 
 # Wire ``code`` values for a failed connect. The UI maps each to a
 # translated message, so the strings are API contract.
@@ -58,6 +59,8 @@ def url_failure(url: str) -> ConnectFailure | None:
     """The failure for a *url* ``validate_remote_url`` rejects; None when it passes."""
     try:
         validate_remote_url(url)
+    except NotAGitRepoError:
+        return ConnectFailure(NOT_A_GIT_REPO_MESSAGE, NOT_A_GIT_REPO_CODE, HTTPStatus.BAD_REQUEST)
     except ValueError as exc:
         return invalid_url_failure(str(exc))
     return None

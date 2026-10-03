@@ -27,7 +27,7 @@ from quodeq.services.github_device_flow import (
 from quodeq.services.github_gh_cli import GhStatus, gh_status
 from quodeq.services.github_oauth_client import GitHubOAuthClient, GitHubRefused, GitHubUnreachable, TokenRejected
 from quodeq.services.shared_repo import validate_remote_url
-from quodeq.shared.git_errors import GitFailureKind
+from quodeq.shared.git_errors import NOT_A_GIT_REPO_CODE, NOT_A_GIT_REPO_MESSAGE, GitFailureKind, NotAGitRepoError
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.repo import is_repo_url
 
@@ -120,6 +120,8 @@ def _probe(deps: RouteDeps) -> Response | tuple[Response, int]:
         if not is_repo_url(url):
             return json_error("not a recognised remote repository URL", HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
         validate_remote_url(url)
+    except NotAGitRepoError:
+        return json_error(NOT_A_GIT_REPO_MESSAGE, HTTPStatus.BAD_REQUEST, NOT_A_GIT_REPO_CODE)
     except ValueError:
         return json_error(MESSAGE_INVALID_URL, HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
     r = deps.resolve(url)

@@ -30,7 +30,7 @@ from quodeq.services.github_gh_cli import GhStatus, gh_status
 from quodeq.services.wiring import ProbeResult, pinned_git_config, probe_remote, validate_remote_url
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.git_errors import SIGN_IN_KINDS, GitFailureKind
-from quodeq.shared.repo import is_repo_url
+from quodeq.shared.repo import FILE_URL_PREFIX, is_repo_url
 
 _HEADER_KEY = "http.https://github.com/.extraHeader"
 _TOKEN_USER = "x-access-token"
@@ -44,6 +44,7 @@ class AccessMethod(StrEnum):
     AMBIENT = "ambient"
     QUODEQ = "quodeq"
     GH = "gh"
+    LOCAL = "local"  # a file:// repository on this machine: nothing to reach
     NONE = "none"
 
 
@@ -230,6 +231,8 @@ def resolve_access(
     host = remote_host(url)
     if _url_rejected(url):
         return AccessResult(False, AccessMethod.NONE, GitFailureKind.INVALID_URL, "", host, False, None)
+    if url.startswith(FILE_URL_PREFIX):
+        return AccessResult(True, AccessMethod.LOCAL, GitFailureKind.OK, "", "", False, None, url)
     key = cache_key(url)
     cached = cache.get(key)
     if cached is not None:
