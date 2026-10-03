@@ -13,6 +13,7 @@ import pytest
 
 from quodeq.services.score_cache import cached_project_summary, open_score_cache
 from quodeq.services.wiring import SingleFlight
+from tests._timeouts import budget
 
 
 def _race(n: int, call):
@@ -120,7 +121,7 @@ class TestSingleFlightHold:
             with flight.hold(("k",)):
                 order.append("first-in")
                 entered.set()
-                assert release.wait(timeout=5), "first holder was never released"
+                assert release.wait(timeout=budget(5)), "first holder was never released"
                 # Appended before the `with` exits (and so before hold()
                 # releases the lock), so it happens-before the second caller
                 # can possibly enter -- the ordering is guaranteed by the
@@ -129,7 +130,7 @@ class TestSingleFlightHold:
 
         t1 = threading.Thread(target=first)
         t1.start()
-        assert entered.wait(timeout=5), "first holder never entered"
+        assert entered.wait(timeout=budget(5)), "first holder never entered"
 
         second_entered = threading.Event()
 
@@ -144,8 +145,8 @@ class TestSingleFlightHold:
         assert not second_entered.wait(timeout=0.2), "second caller did not wait"
 
         release.set()
-        t1.join(timeout=5)
-        t2.join(timeout=5)
+        t1.join(timeout=budget(5))
+        t2.join(timeout=budget(5))
         assert order == ["first-in", "first-out", "second-in"]
 
     def test_distinct_keys_never_block_each_other(self):
@@ -155,7 +156,7 @@ class TestSingleFlightHold:
 
         def holder():
             with flight.hold(("a",)):
-                release.wait(timeout=5)
+                release.wait(timeout=budget(5))
 
         t = threading.Thread(target=holder)
         t.start()
@@ -165,7 +166,7 @@ class TestSingleFlightHold:
             assert other_done.is_set(), "a different key must not wait on key 'a'"
         finally:
             release.set()
-            t.join(timeout=5)
+            t.join(timeout=budget(5))
 
     def test_a_released_key_leaves_no_lock_behind(self):
         """The per-key lock is dropped once no thread holds it, so the
@@ -190,7 +191,7 @@ def test_two_concurrent_misses_on_one_key_the_second_genuinely_waits(tmp_path, m
     def compute():
         calls.append(1)
         entered.set()
-        assert release.wait(timeout=5), "compute was never released"
+        assert release.wait(timeout=budget(5)), "compute was never released"
         return {"summary": {"x": 1}}
 
     results: list[dict] = [None, None]
@@ -200,7 +201,7 @@ def test_two_concurrent_misses_on_one_key_the_second_genuinely_waits(tmp_path, m
 
     t1 = threading.Thread(target=_first)
     t1.start()
-    assert entered.wait(timeout=5), "first compute never started"
+    assert entered.wait(timeout=budget(5)), "first compute never started"
 
     second_done = threading.Event()
 
@@ -213,8 +214,8 @@ def test_two_concurrent_misses_on_one_key_the_second_genuinely_waits(tmp_path, m
     assert not second_done.wait(timeout=0.2), "second caller did not wait for the in-flight compute"
 
     release.set()
-    t1.join(timeout=5)
-    t2.join(timeout=5)
+    t1.join(timeout=budget(5))
+    t2.join(timeout=budget(5))
 
     assert calls == [1]
     assert results == [{"summary": {"x": 1}}, {"summary": {"x": 1}}]
