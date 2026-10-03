@@ -63,6 +63,7 @@
   "apiError.tooLarge": "That file is too large to process.",
   "apiError.turnInProgress": "Another action is already in progress. Wait for it to finish.",
   "apiError.unauthorized": "Not authorized. Check your credentials and try again.",
+  "apiError.urlNotEvaluable": "A git url cannot be evaluated directly. Add the repository as a project first.",
   "apiError.urlRequired": "Enter a repository URL.",
   "apiError.workspaceApplyFailed": "Couldn't apply the workspace changes.",
   "apiError.workspaceDiffFailed": "Couldn't load the workspace diff.",

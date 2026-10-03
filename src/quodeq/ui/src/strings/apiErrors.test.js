@@ -13,6 +13,15 @@ test('every mapped code resolves to a key that exists in the catalog', () => {
   }
 });
 
+test('the evaluate route\'s repository problems each have their own copy', () => {
+  assert.equal(apiErrorMessage({ code: 'URL_NOT_EVALUABLE', message: 'server text' }, 'apiError.generic'),
+    catalog['apiError.urlNotEvaluable']);
+  assert.equal(apiErrorMessage({ code: 'PATH_MISSING', message: 'server text' }, 'apiError.generic'),
+    catalog['apiError.pathMissing']);
+  assert.equal(apiErrorMessage({ code: 'NOT_DIR', message: 'server text' }, 'apiError.generic'),
+    catalog['apiError.notDirectory']);
+});
+
 test('lookup is case-insensitive, because the backend emits both conventions', () => {
   assert.equal(apiErrorKey('forbidden'), apiErrorKey('FORBIDDEN'));
   assert.ok(apiErrorKey('forbidden'));

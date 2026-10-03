@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
@@ -18,7 +19,12 @@ from quodeq.api._evaluation_helpers import (
     clean_scan_conflict_error,
 )
 from quodeq.api._evaluation_options import build_evaluation_options
-from quodeq.api._constants import CODE_INVALID_INPUT
+from quodeq.api._constants import (
+    CODE_INVALID_INPUT,
+    CODE_NOT_DIR,
+    CODE_PATH_MISSING,
+    CODE_URL_NOT_EVALUABLE,
+)
 from quodeq.api.helpers import (
     json_error,
     jsonify_error,
@@ -199,9 +205,32 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             job = provider.start_evaluation(
                 repo=start_request.repo, reports_dir=reports_dir(), options=start_request.options,
             )
-        except (FileNotFoundError, ValueError):
-            return json_error(
-                "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
-                HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
-            )
+        except FileNotFoundError:
+            return _repo_folder_error(start_request.repo)
+        except ValueError:
+            return _repo_value_error(start_request.repo)
         return jsonify(to_camel_dict(job)), HTTPStatus.ACCEPTED
+
+
+def _repo_folder_error(repo: str) -> tuple[Response, int]:
+    """The service could not use *repo* as a folder: say which way (never the path)."""
+    if Path(repo).exists():
+        return json_error("Path is not a directory", HTTPStatus.BAD_REQUEST, CODE_NOT_DIR)
+    return json_error("Project path not found on disk", HTTPStatus.BAD_REQUEST, CODE_PATH_MISSING)
+
+
+def _repo_value_error(repo: str) -> tuple[Response, int]:
+    """A git url is not an evaluation target: the registered local copy is."""
+    try:
+        is_url = is_repo_url(repo)
+    except ValueError:
+        is_url = False
+    if is_url:
+        return json_error(
+            "A git url cannot be evaluated directly. Add the repository as a project first.",
+            HTTPStatus.BAD_REQUEST, CODE_URL_NOT_EVALUABLE,
+        )
+    return json_error(
+        "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
+        HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
+    )

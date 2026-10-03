@@ -31,6 +31,11 @@ CODE_URL_REQUIRED = "URL_REQUIRED"
 CODE_INVALID_PARAM = "INVALID_PARAM"
 CODE_MISSING_PARAM = "MISSING_PARAM"
 CODE_INVALID_REPO = "INVALID_REPO"
+# Starting an evaluation on a repository target that cannot be scanned: the
+# same codes the scan route answers, so the UI catalog's copy applies.
+CODE_PATH_MISSING = "PATH_MISSING"
+CODE_NOT_DIR = "NOT_DIR"
+CODE_URL_NOT_EVALUABLE = "URL_NOT_EVALUABLE"
 CODE_INVALID_CLONE_DEST = "INVALID_CLONE_DEST"
 # routes_project_create's discipline field type check.
 CODE_INVALID_DISCIPLINE = "INVALID_DISCIPLINE"
