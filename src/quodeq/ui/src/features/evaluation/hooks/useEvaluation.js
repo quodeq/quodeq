@@ -7,9 +7,9 @@
  * Data sources:
  *   - statusQuery: ['evaluation', jobId, 'status'] — fetched via api.getEvaluation
  *     and updated by useRunEventStream when VITE_USE_SSE_EVENTS=true.
- *   - findingsQuery: ['evaluation', jobId, 'findings'] — under SSE, populated
- *     entirely by useRunEventStream's setQueryData writes (queryFn is a no-op).
- *     Under polling, fetched via one getLiveFindings call per tick.
+ *   - findingsQuery: ['evaluation', jobId, 'findings'] — populated entirely
+ *     by useRunEventStream's setQueryData writes (queryFn is a no-op). The
+ *     server decides which judgments are findings, once, on the stream.
  *   (both live in ./useEvaluationQueries.js)
  *
  * Mutations (./useEvaluationMutations.js):
@@ -30,11 +30,9 @@ import { confirmCancelEvaluation, CANCEL_CHOICE } from "../cancelDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys } from "../../../api/queryKeys.js";
 import { LOCAL_API_PROVIDERS } from "../../../vocab/provider.js";
-import { findingsRefetchInterval } from "./useEvaluation.helpers.js";
 import { useEvaluationQueries } from "./useEvaluationQueries.js";
 import { useEvaluationMutations } from "./useEvaluationMutations.js";
 
-export { findingsRefetchInterval };
 // Re-exported for the existing importers; the set itself lives in vocab/provider.js
 // so the Evaluate header resolves unset limits exactly like the start payload.
 export { LOCAL_API_PROVIDERS };

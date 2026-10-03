@@ -21,11 +21,9 @@
     "standards_reads": 1
   },
   "eval_poll_tick": {
-    "eval_report_reads": 1,
-    "evaluation_db_opens": 5,
-    "peak_kib": 151,
-    "response_bytes": 2280,
-    "standards_reads": 3
+    "peak_kib": 147,
+    "response_bytes": 790,
+    "standards_reads": 2
   },
   "project_list_cold": {
     "eval_report_reads": 67,

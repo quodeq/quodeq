@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
@@ -149,13 +149,6 @@ class ReportActions(Protocol):
         self, reports_dir: str, project: str, run_id: str, dimension: str,
     ) -> ViolationResponse | dict | EvalPending | None:
         """Return parsed evaluation data for a single dimension in a run."""
-        ...
-
-    def get_live_findings(
-        self, reports_dir: str, project: str, run_id: str, dimensions: Sequence[str],
-    ) -> dict | None:
-        """Return the live-feed rows for *dimensions* of one run, or None
-        when the run does not exist."""
         ...
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:

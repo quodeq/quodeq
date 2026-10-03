@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// These tests exercise the polling path, which SSE_ENABLED (read once at
-// import) now turns off by default. Pin the flag before the hook is imported.
+// The status query's polling path, which SSE_ENABLED (read once at import)
+// turns off by default. Pin the flag before the hook is imported. Findings
+// never poll: the test writes them into the cache slot the stream fills.
 vi.hoisted(() => { import.meta.env.VITE_USE_SSE_EVENTS = 'false'; });
 
 import { render, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { evaluationKeys } from '../../api/queryKeys.js';
 
 vi.mock('../../api/index.js', () => ({
   getEvaluationProgress: vi.fn(),
@@ -34,19 +36,17 @@ const PROGRESS = {
 };
 
 function makeFakeApi() {
-  let served = 0;
   return {
     listEvaluations: vi.fn(async () => [RUNNING_JOB]),
     getEvaluation: vi.fn(async () => RUNNING_JOB),
-    // One more finding per tick, the way a live run reports them.
-    getLiveFindings: vi.fn(async () => {
-      served += 1;
-      const violations = Array.from({ length: served }, (unused, i) => ({
-        practiceId: 'Authenticity', file: `a${i}.py`, line: i + 1, severity: 'major',
-      }));
-      return { dimensions: { security: { violations } } };
-    }),
   };
+}
+
+// One more finding per tick, the way the stream appends them to the cache
+// slot (see useRunEventStream's finding handler).
+function streamOneFinding(client, n) {
+  const row = { principle: 'Authenticity', file: `a${n}.py`, line: n + 1, severity: 'major', dimension: 'security' };
+  client.setQueryData(evaluationKeys.findings(RUNNING_JOB.jobId), (prev = []) => [...prev, row]);
 }
 
 function makeEvaluationDeps() {
@@ -71,8 +71,7 @@ function LiveStrip() {
   return <div data-testid="strip">{`${job?.status || 'idle'}:${findings.length}`}</div>;
 }
 
-function renderShell(store, page, strip) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderShell(store, page, strip, client) {
   return render(
     <QueryClientProvider client={client}>
       <ApiProvider value={makeFakeApi()}>
@@ -99,13 +98,15 @@ describe('live evaluation render budget', () => {
     // Fake timers before the render: React Query's poll timers are armed on
     // mount, and a real timer armed first would never be advanced here.
     vi.useFakeTimers();
-    const view = renderShell(store, page, strip);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderShell(store, page, strip, client);
 
     // The run is adopted on mount, the way a CLI-started job is; the first
-    // findings land a tick later, once the job's project is known.
+    // findings land a tick later, once the job is known.
     for (let i = 0; i < 3; i += 1) {
       // eslint-disable-next-line no-await-in-loop -- ticks are sequential by design
       await act(async () => { await vi.advanceTimersByTimeAsync(POLL_TICK_MS); });
+      streamOneFinding(client, i);
     }
     expect(store.getState().job?.status).toBe('running');
     expect(view.getByTestId('strip').textContent).toMatch(/^running:[1-9]/);
@@ -114,7 +115,10 @@ describe('live evaluation render budget', () => {
     strip.reset();
     for (let i = 0; i < TICKS; i += 1) {
       // eslint-disable-next-line no-await-in-loop -- ticks are sequential by design
-      await act(async () => { await vi.advanceTimersByTimeAsync(POLL_TICK_MS); });
+      await act(async () => {
+        streamOneFinding(client, 3 + i);
+        await vi.advanceTimersByTimeAsync(POLL_TICK_MS);
+      });
     }
 
     expect(page.commits()).toBe(0);

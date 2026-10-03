@@ -10,7 +10,6 @@ from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
 from quodeq.api.dimension_eval_wire import dimension_eval_response
 from quodeq.api.helpers import json_error
 from quodeq.core.types.dashboard_view import DashboardView
-from quodeq.api.live_findings_wire import SINCE_PARAM, live_findings_response, parse_since
 from quodeq.api.routes_common import reports_dir
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
@@ -31,28 +30,6 @@ def _validate_params(**params: str) -> tuple[Response, int] | None:
                 HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
             )
     return None
-
-
-DIMENSIONS_PARAM = "dimensions"
-DIMENSIONS_SEP = ","
-
-
-def _parse_dimensions(raw: str | None) -> list[str] | tuple[Response, int]:
-    """The ``dimensions`` query list: trimmed, empties dropped, order kept,
-    duplicates dropped; a 400 when nothing is left or a name is not a plain
-    path segment."""
-    names = [s.strip() for s in (raw or "").split(DIMENSIONS_SEP)]
-    unique = list(dict.fromkeys(n for n in names if n))
-    if not unique:
-        return json_error(
-            f"{DIMENSIONS_PARAM} must list at least one dimension",
-            HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
-        )
-    for name in unique:
-        err = _validate_params(dimensions=name)
-        if err:
-            return err
-    return unique
 
 
 VIEW_PARAM = "view"
@@ -112,23 +89,6 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         if err:
             return err
         return dimension_eval_response(provider.get_dimension_eval(reports_dir(), project, run_id, dimension))
-
-    @app.get("/api/projects/<project>/runs/<run_id>/live-findings")
-    def live_findings(project: str, run_id: str) -> Response | tuple[Response, int]:
-        err = _validate_params(project=project, run_id=run_id)
-        if err:
-            return err
-        dimensions = _parse_dimensions(request.args.get(DIMENSIONS_PARAM))
-        if not isinstance(dimensions, list):
-            return dimensions
-        since = parse_since(request.args.get(SINCE_PARAM))
-        if since is None:
-            return json_error(
-                f"{SINCE_PARAM} must be dim:count pairs", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
-            )
-        return live_findings_response(
-            provider.get_live_findings(reports_dir(), project, run_id, dimensions), since,
-        )
 
     @app.get("/api/projects/<project>/runs/<run_id>/violations")
     def run_violations(project: str, run_id: str) -> Response | tuple[Response, int]:
