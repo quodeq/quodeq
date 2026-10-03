@@ -130,6 +130,15 @@ export function samePlaceholderScope(previousQuery, projectId, source = DEFAULT_
   return key[PROJECT_ID_INDEX] === projectId && key[PROJECT_SOURCE_INDEX] === source;
 }
 
+/**
+ * True for every project-scoped query that reads one specific run (its
+ * dashboard, scores, dimension evals, ...), whichever project or source it
+ * belongs to. Run ids are unique across projects.
+ */
+export function isRunQueryKey(queryKey, runId) {
+  return Array.isArray(queryKey) && queryKey[0] === PROJECT_SCOPE && queryKey.includes(runId);
+}
+
 const SYSTEM_SCOPE = "system"; // query-key prefix for the systemKeys.* subtree below
 
 export const systemKeys = {

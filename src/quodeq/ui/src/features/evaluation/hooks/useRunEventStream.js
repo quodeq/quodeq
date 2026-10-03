@@ -22,7 +22,7 @@
  */
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
+import { evaluationKeys, isRunQueryKey, projectKeys } from "../../../api/queryKeys.js";
 import { createViolation } from "../../../models/violation.js";
 import { applyStatusFrame } from "../../../models/job.js";
 import { JOB_FINISHED } from "../../../vocab/jobStatus.js";
@@ -37,14 +37,31 @@ import {
 // renders aggregated counts and the most-recent slice; older entries are still
 // reachable through the scored evaluation/<dim>.json artifacts on disk.
 const MAX_FINDINGS_IN_CACHE = 5000;
+// How far past the cap the array may run before it is cut back. Dropping one
+// row per event shifts every held row by one, and the cache's structural
+// sharing then deep-compares all of them against their neighbours: ~2 ms per
+// finding on a full cache, seconds of frozen UI for a replayed run. Cutting a
+// block at a time pays that once per block instead.
+const FINDINGS_TRIM_SLACK = 1000;
 
 function appendBoundedFinding(prev, data) {
-  if (prev.length >= MAX_FINDINGS_IN_CACHE) {
+  if (prev.length >= MAX_FINDINGS_IN_CACHE + FINDINGS_TRIM_SLACK) {
     const trimmed = prev.slice(prev.length - MAX_FINDINGS_IN_CACHE + 1);
     trimmed.push(data);
     return trimmed;
   }
   return [...prev, data];
+}
+
+// A dimension just scored. The run's own pages (opened from a running
+// History row) are not polled under SSE and stay fresh for a staleTime, so
+// it would not show up there. Mark them stale: a mounted run page refetches
+// now, an unmounted one on its next open.
+// The stream is opened either with a job id (Evaluate), whose cached job
+// names the run it writes, or with the run id itself (History rows).
+function invalidateRunQueries(queryClient, jobId) {
+  const runId = queryClient.getQueryData(evaluationKeys.status(jobId))?.outputRunId || jobId;
+  queryClient.invalidateQueries({ predicate: (query) => isRunQueryKey(query.queryKey, runId) });
 }
 
 function wireRunEventSource({ source, finish, jobId, writeCache, queryClient }) {
@@ -81,6 +98,7 @@ function wireRunEventSource({ source, finish, jobId, writeCache, queryClient }) 
         evaluationKeys.dimensions(jobId),
         (prev = {}) => ({ ...prev, [data.dimension]: data }),
       );
+      invalidateRunQueries(queryClient, jobId);
     } catch (err) {
       console.warn("[useRunEventStream] could not parse dimension-completed frame:", err);
     }
@@ -137,6 +155,11 @@ export function useRunEventStream(jobId) {
     };
 
     return acquireRunStream(queryClient, jobId, (source, finish) => {
+      // A new connection replays the run from its first event, so the
+      // findings list restarts with it. Appending the replay onto rows a
+      // previous connection left behind duplicated all of them (History
+      // opens a connection per visit).
+      queryClient.setQueryData(evaluationKeys.findings(jobId), (prev) => (prev?.length ? [] : prev));
       wireRunEventSource({ source, finish, jobId, writeCache, queryClient });
     });
   }, [jobId, queryClient]);
