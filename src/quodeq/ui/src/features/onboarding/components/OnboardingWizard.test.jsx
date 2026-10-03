@@ -18,6 +18,7 @@ vi.mock('../../../api/index.js', () => ({
   getProjectInfo: vi.fn().mockResolvedValue({ id: 'uuid-9', runsCount: 0 }),
   getProjectScan: vi.fn().mockResolvedValue({ total_files: 7, languages: { py: 7 }, branches: ['main'], modules: [] }),
   probeGit: vi.fn().mockResolvedValue({ reachable: true, kind: 'ok' }),
+  getCloneStatus: vi.fn(async () => ({ state: 'idle', kind: 'clone', phase: null, repo: '', finishedAt: null })),
   connectShared: vi.fn(async (url) => ({ started: true, url })),
   getSharedStatus: vi.fn(async () => shared.status),
   sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),

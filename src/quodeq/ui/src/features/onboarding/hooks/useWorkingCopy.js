@@ -10,6 +10,15 @@ export const DEFAULT_WORKING_COPY_ROOT = '~/quodeq/repos';
 
 // The folder a clone lands in: the url's last path segment without `.git`
 // (https://host/org/billing.git and git@host:org/billing both give billing).
+// The old clone step's default, saved as if picked: it means "untouched".
+const LEGACY_HOME_ROOT = '~';
+
+// The remembered root, unless it is empty or the legacy `~` default.
+function initialRoot() {
+  const saved = (readString(LAST_CLONE_ROOT_STORAGE_KEY) || '').trim();
+  return saved && saved !== LEGACY_HOME_ROOT ? saved : DEFAULT_WORKING_COPY_ROOT;
+}
+
 function repoName(url) {
   const trimmed = (url || '').trim().replace(/\/+$/, '').replace(/\.git$/i, '');
   return trimmed.split(/[/:]/).pop() || '';
@@ -24,7 +33,7 @@ function repoName(url) {
  * @param {string} repo - the pasted url
  */
 export function useWorkingCopy(repo) {
-  const [root, setRoot] = useState(() => readString(LAST_CLONE_ROOT_STORAGE_KEY) || DEFAULT_WORKING_COPY_ROOT);
+  const [root, setRoot] = useState(initialRoot);
   const { browseFolder, picker } = useFolderPicker({ title: t('onboarding.workingCopyPickerTitle') });
   const name = repoName(repo);
   const changed = root !== DEFAULT_WORKING_COPY_ROOT;

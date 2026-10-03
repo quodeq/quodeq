@@ -15,6 +15,8 @@ function useStandardPick({ wizard, standards }) {
   return {
     ids,
     ...describeStandards(standards, ids),
+    // False while the standards list is still loading (no name to show yet).
+    ready: standards.length > 0,
     pickerOpen,
     openPicker: () => setPickerOpen(true),
     closePicker: () => setPickerOpen(false),

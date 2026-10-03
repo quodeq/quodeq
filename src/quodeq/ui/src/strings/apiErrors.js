@@ -25,8 +25,8 @@
 import { t } from './index.js';
 
 const CODE_KEYS = {
-  // Clone / repository registration. This copy previously lived as a
-  // hardcoded English switch in RepoScanStep; it moved here unchanged.
+  // Clone / repository registration: the POST /api/projects refusal and the
+  // clone job's slot error both resolve through these.
   AUTH_REQUIRED: 'apiError.cloneAuthRequired',
   NETWORK_ERROR: 'apiError.cloneNetwork',
   REPO_NOT_FOUND: 'apiError.cloneRepoNotFound',
@@ -36,7 +36,6 @@ const CODE_KEYS = {
   INVALID_URL: 'apiError.invalidRepoUrl',
   INVALID_REPO: 'apiError.invalidRepoUrl',
   INVALID_CLONE_DEST: 'apiError.invalidCloneDest',
-  MISSING_CLONE_DEST: 'apiError.missingCloneDest',
   MISSING_REPO: 'apiError.missingRepo',
   PROJECT_EXISTS: 'apiError.projectExists',
   FOREIGN_REPO: 'apiError.foreignRepo',

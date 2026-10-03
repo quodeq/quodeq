@@ -2,11 +2,13 @@ import { TermHeader, TermInput } from '../../../../components/terminal/index.js'
 import { t } from '../../../../strings/index.js';
 import { REPO_SOURCE } from '../../onboardingVocab.js';
 import { useAnalyzeForm } from '../../hooks/useAnalyzeForm.js';
+import { useAnalyzeLaunch } from '../../hooks/useAnalyzeLaunch.js';
 import RepoSourceSwitch from '../analyze/RepoSourceSwitch.jsx';
 import FolderField from '../analyze/FolderField.jsx';
 import WorkingCopyNote from '../analyze/WorkingCopyNote.jsx';
 import ReviewedByRow from '../analyze/ReviewedByRow.jsx';
 import AgainstRow from '../analyze/AgainstRow.jsx';
+import CloneProgress from '../analyze/CloneProgress.jsx';
 
 function RepositoryBlock({ form }) {
   const { workingCopy } = form;
@@ -52,26 +54,28 @@ function ReviewSummary({ form }) {
  * A returning user (a provider configured) sees the last two as one summary
  * line with `change`. `detect` is injectable for tests.
  *
- * `scan and run` hands `onLaunch` the form's request ({ repo, source,
- * standardIds, cloneDest? }).
+ * `scan and run` registers the repository (useAnalyzeLaunch: a folder at
+ * once, a url as a clone job shown in CloneProgress) and hands `onLaunch`
+ * `{ projectId, standardIds }` when the project is there.
  */
 export default function AnalyzeStep({ state, actions, standards, detect, onLaunch }) {
-  const form = useAnalyzeForm({ wizard: { ...actions, state }, standards, detect });
-  // Task 10 replaces this stub with useAnalyzeLaunch (clone job, progress, errors).
-  const launch = { run: () => onLaunch(form.request()), busy: false };
+  const wizard = { ...actions, state };
+  const form = useAnalyzeForm({ wizard, standards, detect });
+  const launch = useAnalyzeLaunch({ wizard, form, onLaunch });
   return (
     <div className="onboarding-step onboarding-step--analyze">
       <TermHeader name={t('onboarding.termAnalyze')} sub={t('onboarding.subAnalyze')} />
       <RepositoryBlock form={form} />
       {form.collapsed
-        ? <ReviewSummary form={form} />
+        // The summary names the standard: it waits for the list to load.
+        ? form.standard.ready && <ReviewSummary form={form} />
         : (
           <>
             <ReviewedByRow provider={form.provider} />
             <AgainstRow standard={form.standard} standards={standards} />
           </>
         )}
-      {/* CloneProgress (Task 10) renders here while the clone runs or failed. */}
+      <CloneProgress launch={launch} url={form.repo.trim()} />
       <div className="onboarding-step__actions">
         <button type="button" className="term-btn term-btn--primary term-btn--filled" disabled={!form.canSubmit || launch.busy} onClick={launch.run}>
           {t('onboarding.scanAndRun')}

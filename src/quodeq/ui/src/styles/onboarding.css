@@ -187,6 +187,27 @@
 .analyze-working-copy > .onboarding-edit-link,
 .analyze-summary > .onboarding-edit-link { align-self: baseline; }
 
+/* The clone as it happens (CloneProgress): the bar and its words, the
+   "already running" note, or the error row with retry. */
+.analyze-clone,
+.analyze-clone__error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-2);
+  margin: 0;
+  font-size: 12px;
+}
+.analyze-clone__progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--term-space-3);
+}
+.analyze-clone__label { color: var(--color-text); min-width: 0; overflow-wrap: break-word; }
+.analyze-clone__note { margin: 0; color: var(--color-text-muted); }
+.analyze-clone__message { margin: 0; color: var(--color-danger); }
+.analyze-clone__error > .term-btn { align-self: flex-start; }
+
 /* ──────────────────────────────────────────────────────────────
    Clone-target step
    ────────────────────────────────────────────────────────────── */

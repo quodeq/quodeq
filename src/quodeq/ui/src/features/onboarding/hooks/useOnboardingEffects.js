@@ -28,7 +28,7 @@ export function useOnboardingEffects({ wizard, entry, setStandards }) {
         const visible = all.filter((s) => visibleSet.has((s.id || '').toLowerCase()));
         setStandards(visible);
         // The analyze screen opens on the default standard; a pick the user
-        // already made (a resumed draft) is kept.
+        // already made before the list arrived is kept.
         wizard.seedStandards(defaultStandardIds(visible));
       })
       .catch((err) => {

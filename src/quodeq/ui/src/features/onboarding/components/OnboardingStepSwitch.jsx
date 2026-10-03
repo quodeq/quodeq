@@ -76,9 +76,8 @@ export function OnboardingStepSwitch({
       )}
 
       {step === STEP_ANALYZE && (
-        // Until useAnalyzeLaunch (Task 10) registers the project first, the
-        // request's standards go straight to the launch.
-        <AnalyzeStep state={wizard.state} actions={wizard} standards={standards} onLaunch={(request) => handleLaunch(request.standardIds)} />
+        // useAnalyzeLaunch registers the project, then hands over its id and the standards.
+        <AnalyzeStep state={wizard.state} actions={wizard} standards={standards} onLaunch={handleLaunch} />
       )}
 
       {step === STEP_PROVIDER && (
@@ -96,7 +95,7 @@ export function OnboardingStepSwitch({
           state={wizard.state}
           actions={wizard}
           standards={standards}
-          onLaunch={handleLaunch}
+          onLaunch={(standardIds) => handleLaunch({ standardIds })}
           onBack={prevStep}
           stepIndex={currentIndex}
           stepTotal={visibleCount}

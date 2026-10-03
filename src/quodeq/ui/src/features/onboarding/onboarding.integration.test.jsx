@@ -2,15 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
+// The url clones as a job: the slot reads idle until the post, then done
+// with the new project (as the app-level poll would see it).
+const clone = vi.hoisted(() => ({ posted: false }));
+
 vi.mock('../../api/index.js', async () => {
   const actual = await vi.importActual('../../api/index.js');
   return {
     ...actual,
     listProjects: vi.fn().mockResolvedValue([]),
-    registerProject: vi.fn().mockResolvedValue({
-      projectId: 'uuid-9',
-      scanData: { total_files: 7, languages: { py: 7 }, branches: ['main'], modules: [] },
+    probeGit: vi.fn().mockResolvedValue({ reachable: true }),
+    registerProject: vi.fn(async ({ repo }) => {
+      clone.posted = true;
+      return { started: true, repo, dest: '/u/quodeq/repos/billing' };
     }),
+    getCloneStatus: vi.fn(async () => (clone.posted
+      ? {
+        state: 'done', kind: 'clone', phase: 'done', percent: 100, repo: 'https://github.com/acme/billing.git',
+        projectId: 'uuid-9', scanData: { total_files: 7 }, finishedAt: 1700000001000,
+      }
+      : { state: 'idle', kind: 'clone', phase: null, repo: '', finishedAt: null })),
     listStandards: vi.fn().mockResolvedValue([
       { id: 'std-a', name: 'Security 101', description: 'Common checks' },
       { id: 'std-b', name: 'Code style', description: 'Formatting' },
@@ -39,6 +50,7 @@ import { withQueryClient } from '../../test-utils/withQueryClient.jsx';
 describe('Onboarding integration — happy path', () => {
   beforeEach(() => {
     localStorage.clear();
+    clone.posted = false;
     // Seed an active provider so the Provider step's Continue is enabled
     // when the user reaches it (otherwise the wizard can't advance).
     localStorage.setItem('cc-active-provider', 'codex');
@@ -48,7 +60,7 @@ describe('Onboarding integration — happy path', () => {
     localStorage.setItem('quodeq-visible-standards', JSON.stringify(['std-a', 'std-b']));
   });
 
-  it('walks Welcome → Analyze and emits onLaunch with the configured provider and the default standard', async () => {
+  it('walks Welcome → Analyze, clones the url and emits onLaunch with the project, the configured provider and the default standard', async () => {
     const onLaunch = vi.fn();
     const onClose = vi.fn();
     render(<OnboardingWizard entry={{ isFirstProject: true }} onLaunch={onLaunch} onClose={onClose} />, { wrapper: withQueryClient() });
@@ -63,8 +75,9 @@ describe('Onboarding integration — happy path', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'repository' }), { target: { value: 'https://github.com/acme/billing.git' } });
     fireEvent.click(screen.getByRole('button', { name: 'scan and run' }));
 
-    // Task 10 registers the project (and so carries its id) before launching.
-    await waitFor(() => expect(onLaunch).toHaveBeenCalled());
+    // The clone lands as a project, and only then does the evaluation start.
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
+    expect(onLaunch.mock.calls[0][0].projectId).toBe('uuid-9');
     expect(onLaunch.mock.calls[0][0].standardIds).toEqual(['std-a', 'std-b']);
     expect(onLaunch.mock.calls[0][0].repo).toBe('https://github.com/acme/billing.git');
     expect(onLaunch.mock.calls[0][0].provider.id).toBe('codex');
