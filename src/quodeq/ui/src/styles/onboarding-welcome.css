@@ -1,0 +1,196 @@
+/* ──────────────────────────────────────────────────────────────
+   Welcome step: the split panel. "How quodeq works" on the left
+   (scan, review, score) on the alternate surface, the two ways in
+   on the right (WelcomePaths). Tokens only, so every theme and
+   dark mode follow. Imported by WelcomeStep.jsx.
+   ────────────────────────────────────────────────────────────── */
+.onboarding-wizard__panel-frame--wide {
+  max-width: 880px;
+}
+
+.onboarding-welcome--split {
+  /* The left column opens with the "▶ welcome" prompt; the right column
+     keeps the same band empty (the close button sits in it), so both
+     column titles start on one line. */
+  --welcome-prompt-h: 33px;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 0;
+  padding: 0;
+}
+
+/* ── Left column: how it works ─────────────────────────────── */
+.onboarding-how {
+  background: var(--color-surface-alt);
+  border-right: var(--term-border);
+  padding: var(--term-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-3);
+}
+.onboarding-how .term-header {
+  margin: 0;
+  min-height: var(--welcome-prompt-h);
+  display: flex;
+  align-items: center;
+}
+.onboarding-how__title,
+.onboarding-paths__title {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin: 0;
+  color: var(--color-text);
+}
+.onboarding-how__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.onboarding-how__row {
+  display: grid;
+  grid-template-columns: 3ch minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--term-space-3);
+  padding: var(--term-space-3) 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+.onboarding-how__row:first-child {
+  border-top: none;
+  padding-top: var(--term-space-1);
+}
+.onboarding-how__num {
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+.onboarding-how__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-1);
+}
+.onboarding-how__label {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.onboarding-how__text {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* ── Right column: the two paths ───────────────────────────── */
+.onboarding-paths {
+  padding: var(--term-space-4);
+  padding-top: calc(var(--term-space-4) + var(--welcome-prompt-h) + var(--term-space-3));
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-3);
+}
+.onboarding-paths__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-3);
+}
+.onboarding-paths__cards--compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.onboarding-path-card {
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  background: var(--color-surface);
+  padding: var(--term-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-2);
+  min-width: 0;
+}
+.onboarding-path-card--primary {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+.onboarding-path-card__title {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text);
+}
+.onboarding-path-card__desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.onboarding-path-card__status {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--term-space-2);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.onboarding-path-card__marker {
+  color: var(--color-accent);
+}
+.onboarding-path-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--term-space-2) var(--term-space-3);
+  margin-top: var(--term-space-1);
+}
+.onboarding-path-card__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.onboarding-path-card__link:hover {
+  color: var(--color-accent);
+}
+.onboarding-path-card__link:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.onboarding-welcome__footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Narrow windows: the columns stack, how it works on top. */
+@media (max-width: 720px) {
+  .onboarding-welcome--split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .onboarding-how {
+    border-right: none;
+    border-bottom: var(--term-border);
+  }
+  .onboarding-paths {
+    padding-top: var(--term-space-4);
+  }
+  .onboarding-path-card__actions > .term-btn--primary,
+  .onboarding-path-card__actions > .term-btn--secondary {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+}

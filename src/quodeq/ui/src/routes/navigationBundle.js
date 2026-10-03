@@ -1,5 +1,6 @@
 import { t } from '../strings/index.js';
 import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER } from '../features/onboarding/wizardSteps.js';
+import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 
 // Every navigation action is blocked while an evaluation runs: the guard
@@ -18,7 +19,7 @@ function guardedWhileEvaluating({ isEvaluating, showToast, busyKey }, action) {
 function makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects }) {
   return guardedWhileEvaluating(
     { isEvaluating, showToast, busyKey: 'evaluate.busyAddProject' },
-    () => setWizardEntry({ startStep: STEP_REPO_SCAN, isFirstProject: projects.length === 0 }),
+    () => setWizardEntry({ startStep: STEP_REPO_SCAN, isFirstProject: projects.length === 0, source: WIZARD_SOURCE.ADD }),
   );
 }
 
@@ -29,10 +30,16 @@ function makeOnImportProject({ isEvaluating, showToast, handleImportProject }) {
   );
 }
 
-function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry }) {
+// The welcome, opened by hand: "take the tour" (source ADD, the default) or
+// Settings' "show welcome" (source SETTINGS). isFirstProject=false tells the
+// welcome there are local projects already; onImportProject backs its
+// "or import an exported archive" link.
+function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }) {
   return guardedWhileEvaluating(
     { isEvaluating, showToast, busyKey: 'evaluate.busyStartTour' },
-    () => setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true }),
+    (source = WIZARD_SOURCE.ADD) => setWizardEntry({
+      startStep: STEP_WELCOME, isFirstProject: projects.length === 0, source, onImportProject,
+    }),
   );
 }
 
@@ -76,12 +83,14 @@ function makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }) {
  * @returns {object} the navigation bundle.
  */
 export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
+  const projects = state.projects ?? [];
+  const onImportProject = makeOnImportProject({ isEvaluating, showToast, handleImportProject: state.handleImportProject });
   return {
     ...state,
     navTab, navStackLength,
-    onAddProject: makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects: state.projects }),
-    onImportProject: makeOnImportProject({ isEvaluating, showToast, handleImportProject: state.handleImportProject }),
-    onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry }),
+    onAddProject: makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects }),
+    onImportProject,
+    onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }),
     onResumeSetup: makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }),
     // null when the shared repo has no content — consumers use the nullness
     // to hide their "browse remote repositories" affordance.

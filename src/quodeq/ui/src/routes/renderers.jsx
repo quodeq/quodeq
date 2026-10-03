@@ -17,6 +17,7 @@ import { compareRoute } from './compareRoute.jsx';
 import { buildDashboardDataBundle } from './dashboardDataBundle.js';
 import { buildNavigationBundle } from './navigationBundle.js';
 import { NAV_TAB } from '../vocab/navTab.js';
+import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 import {
   EvaluateCase, SettingsCase, renderEvalPrincipleDetail,
   resolveSelectionAfterSharedDisconnect,
@@ -194,7 +195,7 @@ export const ROUTE_RENDERERS = {
     settings={props.settings}
     onOpenGradeFormula={() => props.navigation.handleNavigate(NAV_TAB.GRADE_FORMULA)}
     onSharedDisconnected={() => reselectAfterSharedDisconnect(props.navigation)}
-    onShowWelcome={() => props.navigation.onTakeTour()}
+    onShowWelcome={() => props.navigation.onTakeTour(WIZARD_SOURCE.SETTINGS)}
   />,
   [NAV_TAB.GRADE_FORMULA]: (params, props) => (
     <GradeFormulaPage

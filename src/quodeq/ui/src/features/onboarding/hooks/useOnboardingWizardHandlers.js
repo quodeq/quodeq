@@ -1,16 +1,26 @@
 import { clearDraft, markWelcomeSkipped } from './useWizardDraft.js';
-import { STEP_ORDER, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
+import { SETUP_ORDER, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
 import { SCAN_SUB_STATE } from '../onboardingVocab.js';
 
 /**
  * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted
  * verbatim.
  */
-export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, providerConfigured }) {
+export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, providerConfigured, fromSettings = false }) {
+  // A welcome opened from Settings offers no skip; even if one fires, a user
+  // who went looking for the welcome has not opted out of the first run.
   function handleSkipWelcome() {
-    markWelcomeSkipped();
+    if (!fromSettings) markWelcomeSkipped();
     clearDraft();
     onClose({ saved: false });
+  }
+
+  // The welcome's "or import an exported archive": the import runs its own
+  // native dialog and toasts, so the wizard steps aside first (no skip flag).
+  function handleImport(onImportProject) {
+    clearDraft();
+    onClose({ saved: false });
+    onImportProject?.();
   }
 
   function handleSavedExit() {
@@ -42,17 +52,17 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, provide
   }
 
   function nextStep() {
-    const i = STEP_ORDER.indexOf(wizard.state.step);
-    let next = STEP_ORDER[i + 1] || wizard.state.step;
+    const i = SETUP_ORDER.indexOf(wizard.state.step);
+    let next = SETUP_ORDER[i + 1] || wizard.state.step;
     // Auto-skip Provider if already configured.
     if (next === STEP_PROVIDER && providerConfigured) next = STEP_STANDARD_LAUNCH;
     wizard.goToStep(next);
   }
 
   function prevStep() {
-    const i = STEP_ORDER.indexOf(wizard.state.step);
-    if (i > 0) wizard.goToStep(STEP_ORDER[i - 1]);
+    const i = SETUP_ORDER.indexOf(wizard.state.step);
+    if (i > 0) wizard.goToStep(SETUP_ORDER[i - 1]);
   }
 
-  return { handleSkipWelcome, handleSavedExit, handleClose, handleLaunch, nextStep, prevStep };
+  return { handleSkipWelcome, handleImport, handleSavedExit, handleClose, handleLaunch, nextStep, prevStep };
 }

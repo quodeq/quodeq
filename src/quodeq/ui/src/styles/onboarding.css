@@ -92,66 +92,7 @@
   }
 }
 
-/* ──────────────────────────────────────────────────────────────
-   Welcome step
-   ────────────────────────────────────────────────────────────── */
-.onboarding-step--welcome { gap: var(--term-space-3); }
-.onboarding-welcome__title {
-  font-family: var(--term-font-mono);
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: 0;
-  margin: 0;
-  color: var(--color-text);
-}
-.onboarding-welcome__title-accent { color: var(--color-accent); }
-.onboarding-welcome__preview {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--term-space-1);
-}
-.onboarding-welcome__preview li {
-  display: flex;
-  align-items: baseline;
-  gap: var(--term-space-2);
-  padding: var(--term-space-2) 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
-}
-.onboarding-welcome__preview li:last-child { border-bottom: none; }
-.onboarding-welcome__marker {
-  color: var(--color-accent);
-  font-family: var(--term-font-mono);
-  width: 1ch;
-}
-.onboarding-welcome__row-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.onboarding-welcome__row-label {
-  font-size: 13px;
-  color: var(--color-text);
-}
-.onboarding-welcome__row-sub {
-  font-size: 11px;
-  color: var(--color-text-muted);
-}
-.onboarding-welcome__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--term-space-2);
-  margin-top: var(--term-space-2);
-}
-@media (max-width: 600px) {
-  .onboarding-welcome__actions > .term-btn--primary,
-  .onboarding-welcome__actions > .term-btn--secondary {
-    flex: 1 1 140px;
-    min-width: 0;
-  }
-}
+/* The welcome step's split panel lives in onboarding-welcome.css. */
 
 /* ──────────────────────────────────────────────────────────────
    Repo & Scan step

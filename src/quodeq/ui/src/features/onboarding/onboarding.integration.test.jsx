@@ -17,6 +17,7 @@ vi.mock('../../api/index.js', async () => {
     ]),
     getProjectInfo: vi.fn().mockResolvedValue({ id: 'uuid-9', runsCount: 0 }),
     getProviderConfigs: vi.fn().mockResolvedValue({}),
+    getSharedStatus: vi.fn().mockResolvedValue({ configured: false }),
   };
 });
 
@@ -34,6 +35,7 @@ vi.mock('../settings/components/ProviderTabs.jsx', () => ({
 }));
 
 import OnboardingWizard from './components/OnboardingWizard.jsx';
+import { withQueryClient } from '../../test-utils/withQueryClient.jsx';
 
 describe('Onboarding integration — happy path', () => {
   beforeEach(() => {
@@ -50,11 +52,11 @@ describe('Onboarding integration — happy path', () => {
   it('walks Welcome → Repo & Scan → Provider → Standard & Launch and emits onLaunch', async () => {
     const onLaunch = vi.fn();
     const onClose = vi.fn();
-    render(<OnboardingWizard entry={{ isFirstProject: true }} onLaunch={onLaunch} onClose={onClose} />);
+    render(<OnboardingWizard entry={{ isFirstProject: true }} onLaunch={onLaunch} onClose={onClose} />, { wrapper: withQueryClient() });
 
     // Welcome
-    expect(screen.getByRole('heading', { name: /welcome to quodeq/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /get started/i }));
+    expect(screen.getByText('how quodeq works')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'start' }));
 
     // Repo & Scan — placeholder is the most stable on-screen identifier
     // for "we're on the repo step" after the terminal redesign.
