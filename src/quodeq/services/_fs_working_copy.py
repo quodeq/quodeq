@@ -10,7 +10,7 @@ from quodeq.core.types.project_source import ProjectLocation
 from quodeq.services.wiring import last_fetched_mtime
 
 
-def _derive_last_fetched_at(repo_path: str | None) -> str | None:
+def derive_last_fetched_at(repo_path: str | None) -> str | None:
     """Return ISO-8601 mtime of .git/FETCH_HEAD (or .git/HEAD as fallback), or None."""
     if not repo_path:
         return None
@@ -30,7 +30,7 @@ def _is_evaluable(repo_path: str | None) -> bool:
 def annotate_working_copy(info: dict[str, Any]) -> None:
     """Stamp *info* with the working-copy facts derived from its ``path``."""
     repo_path = info.get("path")
-    info["lastFetchedAt"] = _derive_last_fetched_at(repo_path)
+    info["lastFetchedAt"] = derive_last_fetched_at(repo_path)
     info["evaluable"] = _is_evaluable(repo_path)
     info.setdefault("ephemeral", False)
 
