@@ -83,7 +83,7 @@ class ApiTurnSession:
 # Placeholder the OpenAI SDK requires for local OpenAI-compatible servers
 # (Ollama, llama.cpp) that ignore the Authorization header; a configured
 # key always wins. Not a credential.
-_OLLAMA_DEFAULT_API_KEY = "ollama"
+_OLLAMA_PUBLIC_PLACEHOLDER_KEY = "ollama"
 
 
 def _default_client(config: ApiTurnConfig):
@@ -94,7 +94,7 @@ def _default_client(config: ApiTurnConfig):
     # partial output or double-call a tool.
     return openai.OpenAI(
         base_url=config.api_base,
-        api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
+        api_key=config.api_key or _OLLAMA_PUBLIC_PLACEHOLDER_KEY,
         timeout=_TIMEOUT,
         max_retries=2,
     )

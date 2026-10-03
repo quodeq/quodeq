@@ -87,6 +87,20 @@ jobs:
         # intentionally vulnerable fixtures; excluded via .snyk.
         run: snyk code test --severity-threshold=high --sarif-file-output=snyk-code.sarif
 
+      # Snyk Code models every Flask view return as an HTML sink, so every
+      # jsonify / json_error return reads as python/XSS to it: 71 such alerts
+      # so far, every reviewed one a false positive. The free plan has no
+      # .snyk ignore for Code findings and a GitHub dismissal re-opens as a
+      # new alert the moment the handler moves, so the rule is dropped from
+      # the SARIF before upload. CodeQL (py/reflective-xss) keeps XSS
+      # coverage and every other Snyk Code rule still uploads. Same treatment
+      # CodeQL's path-injection query got in #1028.
+      - name: Drop the python/XSS rule from the Snyk Code SARIF
+        if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-code.sarif') != ''
+        run: |
+          jq '(.runs[].results) |= map(select(.ruleId != "python/XSS"))' snyk-code.sarif > snyk-code.filtered.sarif
+          mv snyk-code.filtered.sarif snyk-code.sarif
+
       # Distinct categories keep the three analyses from overwriting each other
       # in the code scanning tab. hashFiles guards against a scan erroring out
       # before it writes SARIF.

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 _OLLAMA_DEFAULT_BASE = f"{OLLAMA_DEFAULT_BASE_URL}/v1"
-_OLLAMA_DEFAULT_API_KEY = "ollama"
+_OLLAMA_PUBLIC_PLACEHOLDER_KEY = "ollama"
 _OPENAI_API_HOST = "api.openai.com"
 _LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
 # Cloud calls get a finite timeout too: with max_retries=0 a stalled response
@@ -275,7 +275,7 @@ def call_api(
     start = time.monotonic()
     with (client_factory or openai.OpenAI)(
         base_url=config.api_base,
-        api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
+        api_key=config.api_key or _OLLAMA_PUBLIC_PLACEHOLDER_KEY,
         timeout=timeout,
         # Disable the SDK's internal timeout retries: each waits the full read
         # budget, compounding one timeout into minutes of dead wall time.
