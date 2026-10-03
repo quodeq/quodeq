@@ -128,18 +128,34 @@ def test_post_projects_rejects_metadata_endpoint_ssrf(client):
     assert clone_calls == [], "SSRF: git clone must never run for a metadata-endpoint URL"
 
 
-def test_post_projects_clone_dest_must_exist(client, tmp_path):
-    nonexistent = tmp_path / "no-such-dir"
+def test_post_projects_clone_dest_under_home_is_created_when_missing(client, tmp_path):
+    """A missing folder under home is created rather than refused: the wizard's
+    default destination (~/quodeq/repos) does not exist on a fresh machine."""
+    missing = tmp_path / "quodeq" / "repos"
     resp = client.post(
         "/api/projects",
         json={
             "repo": "https://github.com/x/y.git",
-            "cloneDest": str(nonexistent),
+            "cloneDest": str(missing),
         },
         headers=_ORIGIN,
     )
-    assert resp.status_code == 400
-    assert resp.get_json()["code"] == "INVALID_CLONE_DEST"
+    assert resp.status_code != 400 or resp.get_json()["code"] != "INVALID_CLONE_DEST", resp.get_json()
+    assert missing.is_dir()
+
+
+def test_post_projects_clone_dest_tilde_means_home(client, tmp_path):
+    """The wizard sends "~/quodeq/repos"; the server expands the tilde to the home folder."""
+    resp = client.post(
+        "/api/projects",
+        json={
+            "repo": "https://github.com/x/y.git",
+            "cloneDest": "~/quodeq/repos",
+        },
+        headers=_ORIGIN,
+    )
+    assert resp.status_code != 400 or resp.get_json()["code"] != "INVALID_CLONE_DEST", resp.get_json()
+    assert (tmp_path / "quodeq" / "repos").is_dir()
 
 
 def test_post_projects_clone_dest_must_be_directory_not_file(client, tmp_path):

@@ -19,6 +19,7 @@ import { LOG_STREAM_STATUS } from './logStreamStatus.js';
 import { STAGE_STATUS } from './stageStatus.js';
 import { KEY } from './keyboard.js';
 import { NAV_TAB } from './navTab.js';
+import { REFRESH_OUTCOME } from './refreshOutcome.js';
 
 test('vocab modules spell the wire values', () => {
   assert.deepEqual(RUN_STATE, {
@@ -49,11 +50,15 @@ test('vocab modules spell the wire values', () => {
   assert.equal(DEFAULT_PROJECT_SOURCE, 'local');
   assert.deepEqual(RESCORE_STATE, { IDLE: 'idle', RUNNING: 'running', ERROR: 'error' });
   assert.deepEqual(LOG_STREAM_STATUS, { IDLE: 'idle', STREAMING: 'streaming', DONE: 'done', ERROR: 'error' });
+  assert.deepEqual(REFRESH_OUTCOME, {
+    UPDATED: 'updated', UP_TO_DATE: 'up_to_date', NOT_REFRESHABLE: 'not_refreshable', BUSY: 'busy',
+    DIRTY: 'dirty', NO_UPSTREAM: 'no_upstream', DIVERGED: 'diverged', FETCH_FAILED: 'fetch_failed',
+  });
   assert.deepEqual(STAGE_STATUS, { IDLE: 'idle', LOADING: 'loading', READY: 'ready', UNAVAILABLE: 'unavailable', ERROR: 'error' });
 });
 
 test('vocab modules are frozen', () => {
-  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE, FINDING_TYPE, PROJECT_SOURCE, FRAME_TYPE, SCOPE_GATE_RULE, RESCORE_STATE, LOG_STREAM_STATUS, STAGE_STATUS]) {
+  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE, FINDING_TYPE, PROJECT_SOURCE, FRAME_TYPE, SCOPE_GATE_RULE, RESCORE_STATE, LOG_STREAM_STATUS, STAGE_STATUS, REFRESH_OUTCOME]) {
     assert.equal(Object.isFrozen(obj), true);
   }
 });

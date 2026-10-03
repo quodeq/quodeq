@@ -40,6 +40,10 @@ const REGISTER_PROJECT_TIMEOUT_MS = 600000; // 10 min
 // upload and unpack, but a hung backend must not leave the import pending.
 const IMPORT_PROJECT_TIMEOUT_MS = 600000; // 10 min
 
+// Generous: a fetch of a large repository can take minutes, but a hung
+// backend must not leave the card's button pending forever.
+const REFRESH_PROJECT_TIMEOUT_MS = 600000; // 10 min
+
 // request() aborts on its timeout; a caller-supplied signal aborts too.
 function isTimeoutOrAbort(e) {
   return e?.name === FETCH_ERROR_NAME.TIMEOUT || e?.name === FETCH_ERROR_NAME.ABORT;
@@ -213,4 +217,16 @@ export async function registerProject(payload) {
     restoreFallbackMessage(e, 'registerProject');
     throw e;
   }
+}
+
+/**
+ * Update a project's working copy from its git remote.
+ *
+ * @param {string} projectId
+ * @returns {Promise<{ outcome: string, newCommits: number, lastFetchedAt: string|null }>}
+ * @throws {Error & { status: number, code?: string, body?: { detail?: string } }} on non-2xx;
+ *   a refusal's `code` is a REFRESH_OUTCOME name, upper-cased
+ */
+export function refreshProject(projectId) {
+  return request(`/projects/${encodeURIComponent(projectId)}/refresh`, { method: 'POST', timeout: REFRESH_PROJECT_TIMEOUT_MS });
 }

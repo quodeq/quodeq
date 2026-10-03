@@ -2901,8 +2901,18 @@
   margin-bottom: var(--space-4);
 }
 
+/* Header actions are compact, the same height as the strip's buttons below
+   them (26 px, small mono), so the title row stays the loudest thing. */
 .projects-page__add-btn {
   flex-shrink: 0;
+  min-height: 26px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+}
+.projects-page__header-actions .projects-page__import-btn {
+  min-height: 26px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
 }
 
 /* Secondary header actions (connect evaluations repository, the strip buttons): the same
@@ -3329,6 +3339,7 @@
 .project-card:focus-within .project-card-footer,
 .project-card:has(.project-delete-btn--confirm) .project-card-footer,
 .project-card:has(.project-card-footer-error) .project-card-footer,
+.project-card:has(.project-card-footer-note) .project-card-footer,
 .project-card:has(.project-delete-btn--pending) .project-card-footer {
   opacity: 1;
   pointer-events: auto;
@@ -3418,6 +3429,41 @@
   flex-basis: 100%;
   margin: var(--space-1) 0 0;
   text-align: right;
+}
+
+/* Fetch-latest-code outcome, on its own line like the error above. */
+.project-card-footer-note {
+  flex-basis: 100%;
+  margin: var(--space-1) 0 0;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Fetch-latest-code button: the icon buttons' danger hover is for delete. */
+.project-delete-btn--neutral:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
+  border-color: var(--color-border);
+}
+
+.project-delete-btn--neutral[aria-disabled="true"] {
+  cursor: progress;
+}
+
+.project-delete-btn--spinning svg {
+  animation: project-refresh-spin 900ms linear infinite;
+}
+
+@keyframes project-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-delete-btn--spinning svg {
+    animation: none;
+    opacity: 0.5;
+  }
 }
 
 /* Resume-setup badge on project cards with onboardingCompletedAt === null.

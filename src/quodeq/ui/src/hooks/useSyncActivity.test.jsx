@@ -9,13 +9,18 @@ import { useSyncActivity } from './useSyncActivity.js';
 const idle = { state: 'idle', phase: null };
 const base = { configured: true, url: 'u', lastSynced: 1, syncing: false, connect: idle, refresh: idle, pull: idle };
 
+// `status` is one snapshot, or a list the polls walk through (the last one repeats).
 function setup(status, clone) {
+  const statuses = Array.isArray(status) ? status : [status];
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const api = { getSyncStatus: vi.fn(async () => status), getCloneStatus: vi.fn(async () => clone ?? { state: 'idle', phase: null }) };
+  const api = {
+    getSyncStatus: vi.fn(async () => (statuses.length > 1 ? statuses.shift() : statuses[0])),
+    getCloneStatus: vi.fn(async () => clone ?? { state: 'idle', phase: null }),
+  };
   const wrapper = ({ children }) => (
     <QueryClientProvider client={qc}><ApiProvider value={api}>{children}</ApiProvider></QueryClientProvider>
   );
-  return { qc, api, ...renderHook(() => useSyncActivity(), { wrapper }) };
+  return { qc, api, ...renderHook(() => useSyncActivity({ activeMs: 10 }), { wrapper }) };
 }
 
 describe('useSyncActivity', () => {
@@ -33,7 +38,7 @@ describe('useSyncActivity', () => {
     await waitFor(() => expect(result.current).toBe(true));
   });
 
-  it('does not poll on its own', async () => {
+  it('does not poll while nothing is running', async () => {
     const { api, result } = setup(base);
     await waitFor(() => expect(result.current).toBe(false));
     await new Promise((resolve) => setTimeout(resolve, 60));
@@ -45,5 +50,20 @@ describe('useSyncActivity', () => {
     await waitFor(() => expect(result.current).toBe(true));
     qc.setQueryData(projectsKeys.clone(), { state: 'done', phase: SYNC_PHASE.DONE, finishedAt: 1 });
     await waitFor(() => expect(result.current).toBe(false));
+  });
+
+  // The strip's poll lives on the Repositories tab only; away from it this
+  // observer must see the job end by itself, or the hairline never stops.
+  it('polls on its own while a job runs and stops once it is done', async () => {
+    const reading = { ...base, connect: { state: 'running', phase: SYNC_PHASE.READING, projectsFound: 3 } };
+    const done = { ...base, connect: { state: 'done', phase: SYNC_PHASE.DONE, projectsFound: 5 } };
+    // Enough "reading" polls that the first assertion catches the active state before "done" lands.
+    const { api, result } = setup([reading, reading, reading, reading, reading, reading, reading, reading, done]);
+    await waitFor(() => expect(result.current).toBe(true));
+    await waitFor(() => expect(result.current).toBe(false));
+    const callsWhenDone = api.getSyncStatus.mock.calls.length;
+    expect(callsWhenDone).toBeGreaterThanOrEqual(3);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(api.getSyncStatus).toHaveBeenCalledTimes(callsWhenDone);
   });
 });

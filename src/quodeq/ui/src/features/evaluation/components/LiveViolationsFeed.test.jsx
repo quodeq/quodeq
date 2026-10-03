@@ -100,6 +100,28 @@ describe('LiveViolationsFeed', () => {
     });
   });
 
+  it('shows the passing checks next to the violations while running', async () => {
+    // The console line prints "40 v · 1056 c"; the header says the same
+    // thing in words, so the feed never reads as "the run found 40 things".
+    getEvaluationProgress.mockResolvedValue({
+      currentDimension: 'reliability',
+      dimensions: [
+        { id: 'reliability', state: 'running', files: { taken: 30, total: 100 }, compliance: 1056 },
+        { id: 'security', state: 'done', files: { taken: 10, total: 10 }, compliance: 200 },
+      ],
+    });
+    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
+    expect(await screen.findByText(/1256 checks passed/)).toBeInTheDocument();
+  });
+
+  it('keeps the passing checks on a finished job', async () => {
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ id: 'reliability', state: 'done', files: { taken: 1, total: 1 }, compliance: 1 }],
+    });
+    renderFeed({ liveViolations: violations, job: { jobId: 'j3', status: 'done' } });
+    expect(await screen.findByText(/1 check passed/)).toBeInTheDocument();
+  });
+
   it('counts only what it renders', () => {
     renderFeed({ liveViolations: violations, hiddenCarriedCount: 5 });
     expect(screen.getByText('2 across 1 dimension')).toBeInTheDocument();

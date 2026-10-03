@@ -29,6 +29,11 @@ export function useRelocateDialog(onRelocate) {
 // entryLookup (local id/name -> merged entry) lets both this root card and
 // its nested subprojects (see ProjectChildren) show their own derived
 // chips/action instead of one blanket value for the whole group.
+// A project whose folder exists and has a git remote can fetch its latest code.
+function isRefreshable(p) {
+  return !!p?.originUrl && p.pathExists !== false;
+}
+
 export function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup, publishActions, action, chips, publishedAt, entryLookup }) {
   const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
@@ -38,7 +43,7 @@ export function ProjectCardGroup({ p, children: childProjects, selectedProject, 
   const childSelected = hasChildren && childProjects[id].some((c) => projectIdOrSelf(c) === selectedProject);
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
-      <ProjectCard project={p} isSelected={isSelected} chips={chips} publishedAt={publishedAt} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={action} /> }}>
+      <ProjectCard project={p} isSelected={isSelected} chips={chips} publishedAt={publishedAt} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={action} refreshable={isRefreshable(p)} /> }}>
         <ProjectPathContent id={id} p={p} relocateActions={relocateActions} subprojectCount={hasChildren ? childProjects[id].length : 0} />
       </ProjectCard>
       {hasChildren && (

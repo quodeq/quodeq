@@ -31,6 +31,7 @@ EXEMPT = {
     "put_standards_overrides": "stores per-project standard overrides read by the scoring routes, not the project list",
     "put_standards_visibility": "stores which standards a project shows, read by the scoring routes, not the project list",
     "shared_config_put": "starts the connect job, which fills the team listing (its own cache), not the local projects",
+    "refresh_project": "moves a project's working copy to a newer commit; the project set and its listing are unchanged",
     "shared_refresh": "starts the refresh job, which updates the team listing (its own cache), not the local projects",
 }
 

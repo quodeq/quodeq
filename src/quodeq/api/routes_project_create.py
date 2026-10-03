@@ -97,6 +97,16 @@ def _parse_create_project_request(
     ), None
 
 
+def _expand_home(clone_dest: str) -> str:
+    """``~`` and ``~/...`` mean the user's home folder, the same ``Path.home()``
+    the containment check uses (not ``$HOME`` via expanduser, which can differ)."""
+    if clone_dest == "~":
+        return str(Path.home())
+    if clone_dest.startswith("~/"):
+        return str(Path.home() / clone_dest[2:])
+    return clone_dest
+
+
 def _resolve_create_project_clone_dest(
     ephemeral: bool, clone_dest: str | None,
 ) -> tuple[str | None, tuple[Response, int] | None]:
@@ -112,12 +122,17 @@ def _resolve_create_project_clone_dest(
         # failed containment check on a sentinel would leave the
         # unguarded value live on one path.
         if clone_dest:
-            dest = contained_path(clone_dest, Path.home())
+            # A leading "~" is the old wizard default and means the home
+            # folder; a missing folder under home is created, the way the
+            # default working copy root is.
+            dest = contained_path(_expand_home(clone_dest), Path.home())
+            if os.path.exists(dest) and not os.path.isdir(dest):
+                raise ValueError("cloneDest is not a directory")
         else:
             # No cloneDest sent: the configured root (QUODEQ_REPOS_DIR may
             # sit outside home) is the operator's choice, so it is trusted.
             dest = str(default_clone_root())
-            os.makedirs(dest, exist_ok=True)
+        os.makedirs(dest, exist_ok=True)
         if not os.path.isdir(dest):
             raise ValueError("cloneDest is not an existing directory")
     except OSError:

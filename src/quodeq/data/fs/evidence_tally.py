@@ -22,7 +22,7 @@ from quodeq.shared.utils import open_text
 _logger = logging.getLogger(__name__)
 
 
-class _RowClass(StrEnum):
+class RowClass(StrEnum):
     """_classify_finding_row's non-finding-type outcomes (see its docstring).
 
     A finding row classifies as one of these, or as FindingType.VIOLATION /
@@ -38,7 +38,7 @@ class _RowClass(StrEnum):
 # The row classes a tally counts, one counter each.
 _COUNTED_KINDS = (
     FindingType.VIOLATION, FindingType.COMPLIANCE,
-    _RowClass.DUPLICATE, _RowClass.SUPPRESSED, _RowClass.QUARANTINED,
+    RowClass.DUPLICATE, RowClass.SUPPRESSED, RowClass.QUARANTINED,
 )
 
 
@@ -93,29 +93,49 @@ def _classify_finding_row(
     """
     stripped = raw.strip()
     if not stripped:
-        return _RowClass.SKIP
+        return RowClass.SKIP
     try:
         obj = json.loads(stripped)
     except json.JSONDecodeError:
-        return _RowClass.SKIP
+        return RowClass.SKIP
     if not isinstance(obj, dict):
-        return _RowClass.SKIP  # valid JSON but not an object (a bare list/number)
+        return RowClass.SKIP  # valid JSON but not an object (a bare list/number)
+    return classify_finding(obj, seen, suppressed=suppressed, resolver=resolver)
+
+
+def classify_finding(
+    obj: dict,
+    seen: "set[tuple]",
+    *,
+    suppressed: "Callable[[dict], bool] | None",
+    resolver: PrincipleResolver | None,
+) -> str:
+    """Classify one finding dict in evidence-row vocabulary, updating *seen* in place.
+
+    The one rule every live reader runs a finding through: the heartbeat
+    line and the scan-progress counters tally evidence rows with it, and the
+    run event stream admits ``finding`` frames with it, so the three never
+    disagree on what counts. *obj* carries ``t`` (the finding type), ``req``
+    and/or ``p``, ``file`` and ``line``; a caller holding a Judgment maps it
+    onto those keys first. See :func:`_classify_finding_row` for the
+    classes and the order the exclusions apply in.
+    """
     t = obj.get("t")
     key = (obj.get("req") or obj.get("p"), obj.get("file"), obj.get("line"), t)
     if key in seen:
-        return _RowClass.DUPLICATE
+        return RowClass.DUPLICATE
     seen.add(key)
     if t not in FINDING_TYPES:
         # Non-finding rows (e.g. the file_done markers the pool appends)
         # still occupy a dedup key but classify as neither.
-        return _RowClass.SKIP
+        return RowClass.SKIP
     # Placed the way every other reader places it: by the requirement, then
     # by the principle the row named.
     if resolver is not None and resolver.place(obj.get("req"), obj.get("p")) is None:
-        return _RowClass.QUARANTINED
+        return RowClass.QUARANTINED
     if t == FindingType.VIOLATION:
         if suppressed is not None and suppressed(obj):
-            return _RowClass.SUPPRESSED
+            return RowClass.SUPPRESSED
         return FindingType.VIOLATION
     return FindingType.COMPLIANCE
 
@@ -167,8 +187,8 @@ def _tally_of(counts: dict[str, int]) -> FindingTally:
     """The FindingTally for *counts* (see ``_zero_counts``)."""
     return FindingTally(
         violations=counts[FindingType.VIOLATION], compliance=counts[FindingType.COMPLIANCE],
-        duplicates=counts[_RowClass.DUPLICATE], suppressed=counts[_RowClass.SUPPRESSED],
-        quarantined=counts[_RowClass.QUARANTINED],
+        duplicates=counts[RowClass.DUPLICATE], suppressed=counts[RowClass.SUPPRESSED],
+        quarantined=counts[RowClass.QUARANTINED],
     )
 
 
