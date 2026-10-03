@@ -32,4 +32,4 @@ def test_cr_and_crlf_are_stripped():
 
 def test_enums_are_the_wire_values():
     assert [m.value for m in SyncPhase] == ["connecting", "downloading", "reading", "done", "error"]
-    assert [m.value for m in SyncKind] == ["connect", "refresh", "pull"]
+    assert [m.value for m in SyncKind] == ["connect", "refresh", "pull", "clone"]

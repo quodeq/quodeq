@@ -15,6 +15,7 @@ class SyncKind(StrEnum):
     CONNECT = "connect"
     REFRESH = "refresh"
     PULL = "pull"
+    CLONE = "clone"
 
 
 class SyncPhase(StrEnum):

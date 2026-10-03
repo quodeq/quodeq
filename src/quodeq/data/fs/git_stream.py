@@ -40,7 +40,7 @@ _logger = logging.getLogger(__name__)
 _TAIL_CHARS = 4096
 _READ_BYTES = 4096
 _REAP_SECONDS = 5
-_TIMED_OUT = "git command timed out"
+TIMED_OUT = "git command timed out"
 _FAILED_TO_RUN = "git command failed to run"
 _SPLIT = ("\r", "\n")
 _IS_WINDOWS = sys.platform == "win32"
@@ -144,5 +144,5 @@ def run_git_streaming(
             _reap(proc)
         proc.stderr.close()
     if (fired.is_set() or expired) and proc.returncode != 0:
-        return False, _TIMED_OUT
+        return False, TIMED_OUT
     return proc.returncode == 0, output_tail(text)

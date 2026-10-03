@@ -314,3 +314,6 @@ _.load_standard_catalog  # data/fs/standard_index_loader.py: admission catalog l
 
 # pywebview window event. The toolkit fires it; we only subscribe.
 _.minimized  # dashboard/_webview_window_visibility.py: pywebview window event, fired by the toolkit.
+
+# Clone phase of a project-add job; the job runner that publishes it lands in a later task.
+_.CLONE  # core/types/sync_phase.py: SyncKind member, read once add-project runs as a background job.

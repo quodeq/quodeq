@@ -22,11 +22,18 @@ from quodeq.context.online_cache import (
     ensure_clone,
     is_inside_cache,
 )
+from quodeq.data.fs.git_stream import run_git_streaming
 from quodeq.data.git_cli import git_env_floor
 from quodeq.data.fs.repo_validation import validate_remote_url as _validate_remote_url
 from quodeq.config.clone_env import git_clone_timeout_s
 
 _logger = logging.getLogger(__name__)
+
+
+def _clone_args(url: str, dest: Path, extra_args: list[str], git_config: Sequence[str]) -> list[str]:
+    """The ``git clone`` argv after the binary; one shape for the buffered and streaming paths."""
+    config_flags = [flag for entry in git_config for flag in ("-c", entry)]
+    return [*config_flags, "clone", "--progress", *extra_args, "--", url, str(dest)]
 
 
 class GitCloneClient:
@@ -61,15 +68,28 @@ class GitCloneClient:
         services layer owns retry orchestration and mapping them to
         user-facing clone errors.
         """
-        env = git_env_floor(self._env)
-        config_flags = [flag for entry in git_config for flag in ("-c", entry)]
         subprocess.run(
-            ["git", *config_flags, "clone", "--progress", *extra_args, "--", url, str(dest)],
+            ["git", *_clone_args(url, dest, extra_args, git_config)],
             check=True,
-            env=env,
+            env=git_env_floor(self._env),
             stdin=subprocess.DEVNULL,
             timeout=timeout_s,
             capture_output=True,
+        )
+
+    def clone_streaming(
+        self, url: str, dest: Path, extra_args: list[str], *, timeout_s: int,
+        git_config: Sequence[str] = (), on_line: Callable[[str], None],
+    ) -> tuple[bool, str]:
+        """``clone_progress`` with every stderr line handed to *on_line* as it arrives.
+
+        Same argv and guards as ``clone_progress`` (pinned locale via
+        ``git_env_floor``, closed stdin, ``--`` before the URL); returns the
+        runner's ``(ok, tail)`` instead of raising, so the caller classifies.
+        """
+        return run_git_streaming(
+            _clone_args(url, dest, extra_args, git_config),
+            timeout=timeout_s, env=git_env_floor(self._env), on_line=on_line,
         )
 
     def clone_legacy(self, repo_input: str, dest: Path, *, timeout_s: int) -> None:

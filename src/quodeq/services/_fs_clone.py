@@ -5,10 +5,13 @@ from __future__ import annotations
 import errno
 import logging
 import subprocess as _subprocess
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from functools import partial
 from pathlib import Path
 
+from quodeq.services.base import ProgressCallback
 from quodeq.services.wiring import clone_repo, pinned_git_config, remove_clone_dir
+from quodeq.services.wiring_sync import TIMED_OUT, GitCloneClient, parse_progress
 from quodeq.config.clone_env import clone_shallow_months, git_clone_timeout_s
 from quodeq.shared.git_errors import GitFailureKind, classify_git_output
 from quodeq.shared.ssrf import resolve_addresses
@@ -54,23 +57,52 @@ def _pinned_git_config(url: str) -> list[str]:
         raise CloneError(_KIND_NETWORK, str(exc)) from exc
 
 
+def _failed_clone(stderr: str) -> CloneError:
+    """The CloneError for a failed clone's stderr, shared by the buffered and streaming paths."""
+    kind = classify_git_output(stderr)
+    return CloneError(kind, f"git clone failed ({kind})", stderr, retryable=kind in _RETRYABLE_KINDS)
+
+
+def _stream_clone(
+    run: Callable[..., tuple[bool, str]], progress: ProgressCallback,
+) -> None:
+    """One streaming clone attempt; a failed run raises the CloneError the buffered path raises."""
+    def on_line(line: str) -> None:
+        update = parse_progress(line)
+        if update is not None:
+            progress(update)
+
+    ok, tail = run(on_line=on_line)
+    if ok:
+        return
+    if tail == TIMED_OUT:
+        raise CloneError(GitFailureKind.TIMEOUT, "git clone timed out")
+    raise _failed_clone(tail)
+
+
 def _clone_once(
     url: str, clone_dest: Path, extra_args: list[str], *, timeout_s: int | None = None,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str] | None = None, progress: ProgressCallback | None = None,
 ) -> None:
     # The subprocess invocation lives in the data layer (ports.clone_repo);
     # this function owns mapping its raw failures onto CloneError kinds.
     resolved_timeout = timeout_s if timeout_s is not None else git_clone_timeout_s()
     git_config = _pinned_git_config(url)
+    if progress is not None:
+        _stream_clone(
+            partial(
+                GitCloneClient(env).clone_streaming, url, clone_dest, extra_args,
+                timeout_s=resolved_timeout, git_config=git_config,
+            ),
+            progress,
+        )
+        return
     try:
         clone_repo(url, clone_dest, extra_args, timeout_s=resolved_timeout, git_config=git_config, env=env)
     except _subprocess.CalledProcessError as exc:
         raw = exc.stderr
         stderr = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else (raw or "")
-        kind = classify_git_output(stderr)
-        raise CloneError(
-            kind, f"git clone failed ({kind})", stderr, retryable=kind in _RETRYABLE_KINDS,
-        ) from exc
+        raise _failed_clone(stderr) from exc
     except _subprocess.TimeoutExpired as exc:
         # Not retryable: the attempt already spent the whole clone timeout,
         # a full clone can only be slower.
@@ -84,7 +116,7 @@ def _clone_once(
 
 def run_git_clone(
     url: str, clone_dest: Path, *, timeout_s: int | None = None, shallow_months: int | None = None,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str] | None = None, progress: ProgressCallback | None = None,
 ) -> None:
     """Execute ``git clone`` for *url* into *clone_dest*. Raises CloneError on failure.
 
@@ -106,10 +138,13 @@ def run_git_clone(
     (each getter call is lazy, so env overrides set after import still apply).
     *env* is the base environment for the git process (``None`` means the
     process environment); the access ladder passes a token-carrying one.
+    *progress*, when given, switches to the streaming clone and receives a
+    ``ProgressUpdate`` per git progress line; failures map to the same
+    ``CloneError`` either way.
     """
     months = shallow_months if shallow_months is not None else clone_shallow_months()
     if months <= 0:
-        _clone_once(url, clone_dest, [], timeout_s=timeout_s, env=env)
+        _clone_once(url, clone_dest, [], timeout_s=timeout_s, env=env, progress=progress)
         return
     try:
         _clone_once(
@@ -118,6 +153,7 @@ def run_git_clone(
             ["--single-branch", "--no-tags", f"--shallow-since={months} months ago"],
             timeout_s=timeout_s,
             env=env,
+            progress=progress,
         )
     except CloneError as exc:
         if not exc.retryable:
@@ -127,4 +163,4 @@ def run_git_clone(
         # killed or on checkout-phase errors; a leftover partial dir would
         # turn the retry into a bogus dest_exists failure.
         remove_clone_dir(clone_dest)
-        _clone_once(url, clone_dest, [], timeout_s=timeout_s, env=env)
+        _clone_once(url, clone_dest, [], timeout_s=timeout_s, env=env, progress=progress)
