@@ -197,9 +197,11 @@ function renderStatus(props = {}) {
 describe('EvaluationStatus live-findings filter', () => {
   beforeEach(() => { localStorage.clear(); });
 
-  it('hides carried-forward findings by default', () => {
+  // The feed opens its group once the progress query has answered which
+  // dimension is being analyzed, so the rows are awaited.
+  it('hides carried-forward findings by default', async () => {
     renderStatus();
-    expect(screen.getByText('new.py:1')).toBeInTheDocument();
+    expect(await screen.findByText('new.py:1')).toBeInTheDocument();
     expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
     // The strip must see the same filtered set as the feed (1 fresh of 3).
     expect(screen.getByTestId('strip-sum')).toHaveTextContent('1');
@@ -210,15 +212,15 @@ describe('EvaluationStatus live-findings filter', () => {
     expect(screen.getByText(/2 carried forward hidden/)).toBeInTheDocument();
   });
 
-  it('shows everything when the preference is off', () => {
+  it('shows everything when the preference is off', async () => {
     localStorage.setItem(NEW_FINDINGS_ONLY_KEY, 'false');
     renderStatus();
-    expect(screen.getByText('old-a.py:2')).toBeInTheDocument();
+    expect(await screen.findByText('old-a.py:2')).toBeInTheDocument();
     expect(screen.queryByText(/carried forward hidden/)).not.toBeInTheDocument();
     expect(screen.getByTestId('strip-sum')).toHaveTextContent('3');
   });
 
-  it('hides snake_case carried_forward findings too (SSE payloads with no violation-model mapping)', () => {
+  it('hides snake_case carried_forward findings too (SSE payloads with no violation-model mapping)', async () => {
     // Under VITE_USE_SSE_EVENTS, findings land in the cache as raw wire
     // payloads, so they carry `carried_forward` instead of `carriedForward`.
     const QC = withQueryClient();
@@ -235,7 +237,7 @@ describe('EvaluationStatus live-findings filter', () => {
         />
       </QC>
     );
-    expect(screen.getByText('new.py:1')).toBeInTheDocument();
+    expect(await screen.findByText('new.py:1')).toBeInTheDocument();
     expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
     expect(screen.getByText(/1 carried forward hidden/)).toBeInTheDocument();
   });
