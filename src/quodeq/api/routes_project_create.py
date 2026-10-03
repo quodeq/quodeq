@@ -26,29 +26,12 @@ from quodeq.api.helpers import (
 )
 from quodeq.api.routes_github_access import access_failure_response
 from quodeq.services.base import ActionProvider, CreateProjectStatus, NewProjectSpec
+from quodeq.services.clone_codes import clone_code_for
 from quodeq.services.github_access import forget_url, resolve_access
-from quodeq.shared.git_errors import GitFailureKind, output_tail
+from quodeq.shared.git_errors import output_tail
 from quodeq.shared.paths import not_a_directory_reason
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
-
-CODE_CLONE_UNKNOWN = "CLONE_UNKNOWN"
-CODE_CLONE_TIMEOUT = "CLONE_TIMEOUT"
-CODE_HOST_KEY_UNVERIFIED = "HOST_KEY_UNVERIFIED"
-CODE_GIT_MISSING = "GIT_MISSING"
-
-# GitFailureKind -> (wire code, HTTP status) for a failed clone in POST /api/projects.
-_CLONE_CODES: dict[GitFailureKind, tuple[str, HTTPStatus]] = {
-    GitFailureKind.AUTH_REQUIRED: ("AUTH_REQUIRED", HTTPStatus.BAD_REQUEST),
-    GitFailureKind.HOST_KEY: (CODE_HOST_KEY_UNVERIFIED, HTTPStatus.BAD_REQUEST),
-    GitFailureKind.NOT_FOUND: ("REPO_NOT_FOUND", HTTPStatus.NOT_FOUND),
-    GitFailureKind.DEST_EXISTS: ("DEST_EXISTS", HTTPStatus.CONFLICT),
-    GitFailureKind.NETWORK: ("NETWORK_ERROR", HTTPStatus.BAD_GATEWAY),
-    GitFailureKind.TIMEOUT: (CODE_CLONE_TIMEOUT, HTTPStatus.GATEWAY_TIMEOUT),
-    GitFailureKind.DISK: ("DISK_ERROR", HTTPStatus.INSUFFICIENT_STORAGE),
-    GitFailureKind.GIT_MISSING: (CODE_GIT_MISSING, HTTPStatus.INTERNAL_SERVER_ERROR),
-    GitFailureKind.UNKNOWN: (CODE_CLONE_UNKNOWN, HTTPStatus.BAD_GATEWAY),
-}
 
 
 def _reports_dir() -> str:
@@ -183,7 +166,7 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
     if result.status == CreateProjectStatus.INVALID_REPO:
         return json_error(result.message, HTTPStatus.BAD_REQUEST, CODE_INVALID_REPO)
     if result.status == CreateProjectStatus.CLONE_FAILED:
-        code, status = _CLONE_CODES.get(result.clone_error_kind, (CODE_CLONE_UNKNOWN, HTTPStatus.BAD_GATEWAY))
+        code, status = clone_code_for(result.clone_error_kind)
         body = {"error": result.message, "code": code, "detail": output_tail(result.clone_stderr)}
         return jsonify(body), status
     return None
