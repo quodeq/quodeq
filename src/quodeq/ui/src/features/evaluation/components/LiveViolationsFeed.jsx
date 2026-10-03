@@ -107,7 +107,7 @@ function computeQueuedFiles(runningDim) {
     : null;
 }
 
-function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, isRunning, currentDimension }) {
+function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, passedCount, isRunning, currentDimension }) {
   return (
     <div className="vlive-head">
       <span className="vlive-head-left">
@@ -119,6 +119,12 @@ function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, 
               { count: totalCount, dims: orderedDimsCount },
             )
             : t('evaluate.noNewFindings')}
+          {/* The console line prints "40 v · 1056 c". Saying the passing
+              checks here keeps the feed from reading as the run's whole
+              output: the rows are the violations, this is the rest. */}
+          {passedCount > 0 && (
+            <span className="vlive-counter-passed"> · {t(pluralKey(passedCount, 'evaluate.checksPassedOne', 'evaluate.checksPassedMany'), { count: passedCount })}</span>
+          )}
           {hiddenCarriedCount > 0 && (
             <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>
           )}
@@ -166,6 +172,9 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   const queued = computeQueuedFiles(runningDim);
 
   const currentDimension = progress?.currentDimension;
+  // Compliance counts come from the same tally the console heartbeat prints
+  // (scan progress), not from the finding stream, which carries violations only.
+  const passedCount = (progress?.dimensions || []).reduce((sum, d) => sum + (d?.compliance ?? 0), 0);
   const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity, currentDimension),
     // lastActivity is a ref's current value — it's intentionally not in deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -185,6 +194,7 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
         totalCount={totalCount}
         orderedDimsCount={orderedDims.length}
         hiddenCarriedCount={hiddenCarriedCount}
+        passedCount={passedCount}
         isRunning={isRunning}
         currentDimension={currentDimension}
       />

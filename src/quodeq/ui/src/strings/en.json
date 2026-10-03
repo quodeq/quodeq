@@ -381,6 +381,8 @@
   "evaluate.changedFilesSuffix": "changed files",
   "evaluate.changedFilesThisRun": "{count} changed files this run",
   "evaluate.checksLabel": "checks",
+  "evaluate.checksPassedMany": "{count} checks passed",
+  "evaluate.checksPassedOne": "{count} check passed",
   "evaluate.chooseModel": "choose model",
   "evaluate.cleanPersistAria": "Clean scan persistence",
   "evaluate.cleanScanDesc": "none of the previous findings are used. every file gets re-analyzed from scratch. use it after changing standards or a quodeq version.",

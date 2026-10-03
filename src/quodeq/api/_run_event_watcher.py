@@ -21,6 +21,7 @@ from quodeq.api._run_event_serializers import (
     serialize_status_event,
     payload_as_sse_finding,
 )
+from quodeq.services.live_finding_filter import LiveFindingFilter
 from quodeq.services.run_event_readers import (  # noqa: F401 — re-export
     DEFAULT_FINDINGS_BATCH,
     STATUS_MTIME_MISSING,
@@ -56,6 +57,41 @@ class WatcherState:
     last_event_counter: int = 0
     last_status_mtime: float | None = None
     emitted_dimensions: frozenset[str] = field(default_factory=frozenset)
+    # Decides which judgments become ``finding`` frames (violations only, deduped,
+    # suppression and standard applied). Holds the per-stream dedup set, so it is
+    # built on the first tick and carried across the rest of the connection.
+    finding_filter: LiveFindingFilter | None = field(default=None, repr=False, compare=False)
+
+
+def _finding_events(
+    run_dir: Path, state: WatcherState, finding_filter: LiveFindingFilter,
+) -> tuple[list[EventTuple], datetime | None, int]:
+    """The ``finding`` frames for the judgments logged since the cursor, plus the new cursor.
+
+    The cursor moves past every judgment read, admitted or not, so a
+    compliance row is never re-read on the next tick. A read or shaping
+    failure yields no frames and leaves the cursor where it was.
+    """
+    new_last_ts = state.last_event_ts
+    new_counter = state.last_event_counter
+    try:
+        new_findings = read_new_findings_from_events(
+            run_dir, state.last_event_ts, state.last_event_counter,
+        )
+        if new_findings:
+            finding_filter.refresh()
+        finding_events: list[EventTuple] = []
+        for event_ts, counter, payload in new_findings:
+            new_last_ts = event_ts
+            new_counter = counter
+            if not finding_filter.admits(payload):
+                continue
+            finding_dict = payload_as_sse_finding(payload, counter)
+            finding_events.append((SseEvent.FINDING, serialize_finding_event(finding_dict), event_ts.isoformat()))
+    except (OSError, ValueError, TypeError) as exc:
+        _LOG.warning(f"events.jsonl read failed for {run_dir}: {exc}")
+        return [], state.last_event_ts, state.last_event_counter
+    return finding_events, new_last_ts, new_counter
 
 
 def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], WatcherState]:
@@ -83,23 +119,8 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         ), None))
 
     # --- Findings ---
-    new_last_ts = state.last_event_ts
-    new_counter = state.last_event_counter
-    try:
-        new_findings = read_new_findings_from_events(
-            run_dir, state.last_event_ts, state.last_event_counter,
-        )
-        finding_events: list[EventTuple] = []
-        for event_ts, counter, payload in new_findings:
-            finding_dict = payload_as_sse_finding(payload, counter)
-            finding_events.append((SseEvent.FINDING, serialize_finding_event(finding_dict), event_ts.isoformat()))
-            new_last_ts = event_ts
-            new_counter = counter
-    except (OSError, ValueError, TypeError) as exc:
-        _LOG.warning(f"events.jsonl read failed for {run_dir}: {exc}")
-        finding_events = []
-        new_last_ts = state.last_event_ts
-        new_counter = state.last_event_counter
+    finding_filter = state.finding_filter or LiveFindingFilter(run_dir, log=_LOG)
+    finding_events, new_last_ts, new_counter = _finding_events(run_dir, state, finding_filter)
     events.extend(finding_events)
 
     # NOTE: scores.updated used to be emitted here on every tick by reading
@@ -114,5 +135,6 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         last_event_counter=new_counter,
         last_status_mtime=status_mtime,
         emitted_dimensions=frozenset(state.emitted_dimensions | set(new_dims)),
+        finding_filter=finding_filter,
     )
     return events, new_state

@@ -47,10 +47,14 @@ def _parse_sse_frames(body: str) -> list[dict]:
 
 
 def _write_finding(event_log: EventLogWriter, p: str, file: str = "x.py", line: int = 1) -> None:
+    # A dimension with no installed standard: "P1" under a real dimension
+    # would be quarantined by the stream's finding filter, as the heartbeat
+    # and the report quarantine it. These tests exercise the stream, not
+    # the standard.
     payload = JudgmentPayload(
         practice_id=p,
         verdict="violation",
-        dimension="security",
+        dimension="dim",
         file=file,
         line=line,
         reason="test reason",

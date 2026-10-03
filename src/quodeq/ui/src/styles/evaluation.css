@@ -1618,7 +1618,8 @@ button.eval-provider-badge--clickable:focus-visible {
   padding: 0 4px;
 }
 
-.vlive-counter-hidden {
+.vlive-counter-hidden,
+.vlive-counter-passed {
   color: var(--color-text-subtle);
 }
 
