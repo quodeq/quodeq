@@ -53,7 +53,7 @@ _ALLOWLIST: set[str] = {
     # before this line, and the call is wrapped in `except OSError`. Kills the
     # streaming git process group (git plus any ssh/credential helper that
     # holds stderr) at the deadline.
-    "data/fs/git_stream.py:62",
+    "data/fs/git_stream.py:65",
 }
 
 

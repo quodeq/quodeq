@@ -23,6 +23,7 @@ the callback raises, git is killed and reaped first, then the error propagates.
 from __future__ import annotations
 
 import codecs
+import errno
 import logging
 import os
 import signal
@@ -41,7 +42,9 @@ _TAIL_CHARS = 4096
 _READ_BYTES = 4096
 _REAP_SECONDS = 5
 TIMED_OUT = "git command timed out"
-_FAILED_TO_RUN = "git command failed to run"
+FAILED_TO_RUN = "git command failed to run"
+GIT_MISSING = "git binary not found"
+_NO_SPACE = "No space left on device"  # the wording the shared git classifier maps to DISK
 _SPLIT = ("\r", "\n")
 _IS_WINDOWS = sys.platform == "win32"
 
@@ -107,6 +110,13 @@ def _pump(fd: int, on_line: Callable[[str], None]) -> str:
     return tail
 
 
+def _spawn_failure_tail(exc: OSError) -> str:
+    """The tail that tells the caller why git could not start (see ``GIT_MISSING``)."""
+    if isinstance(exc, FileNotFoundError):
+        return GIT_MISSING
+    return _NO_SPACE if exc.errno == errno.ENOSPC else FAILED_TO_RUN
+
+
 def run_git_streaming(
     args: list[str], *, cwd: Path | None = None, timeout: int,
     env: Mapping[str, str] | None = None, on_line: Callable[[str], None],
@@ -118,12 +128,12 @@ def run_git_streaming(
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
             start_new_session=not _IS_WINDOWS,
         )
-    except OSError:
-        return False, _FAILED_TO_RUN
+    except OSError as exc:
+        return False, _spawn_failure_tail(exc)
     if proc.stderr is None:
         _terminate(proc)
         _reap(proc)
-        return False, _FAILED_TO_RUN
+        return False, FAILED_TO_RUN
     fired = threading.Event()
     timer = threading.Timer(timeout, _kill_on_deadline, args=(proc, fired))
     timer.daemon = True

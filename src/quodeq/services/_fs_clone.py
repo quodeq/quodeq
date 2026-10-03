@@ -8,10 +8,13 @@ import subprocess as _subprocess
 from collections.abc import Callable, Mapping
 from functools import partial
 from pathlib import Path
+from typing import Protocol
 
 from quodeq.services.base import ProgressCallback
 from quodeq.services.wiring import clone_repo, pinned_git_config, remove_clone_dir
-from quodeq.services.wiring_sync import TIMED_OUT, GitCloneClient, parse_progress
+from quodeq.services.wiring_sync import (
+    FAILED_TO_RUN, GIT_MISSING, TIMED_OUT, GitCloneClient, parse_progress,
+)
 from quodeq.config.clone_env import clone_shallow_months, git_clone_timeout_s
 from quodeq.shared.git_errors import GitFailureKind, classify_git_output
 from quodeq.shared.ssrf import resolve_addresses
@@ -63,9 +66,22 @@ def _failed_clone(stderr: str) -> CloneError:
     return CloneError(kind, f"git clone failed ({kind})", stderr, retryable=kind in _RETRYABLE_KINDS)
 
 
-def _stream_clone(
-    run: Callable[..., tuple[bool, str]], progress: ProgressCallback,
-) -> None:
+class _StreamingRun(Protocol):
+    """A bound streaming clone: feed stderr lines to *on_line*, return ``(ok, tail)``."""
+
+    def __call__(self, *, on_line: Callable[[str], None]) -> tuple[bool, str]: ...
+
+
+# Runner tails that are not git output, mapped to the kinds the buffered path's
+# exception branches give them. Never retryable: a full clone fails identically.
+_RUNNER_TAIL_KINDS = {
+    TIMED_OUT: (GitFailureKind.TIMEOUT, "git clone timed out"),
+    GIT_MISSING: (GitFailureKind.GIT_MISSING, "git binary not found"),
+    FAILED_TO_RUN: (GitFailureKind.UNKNOWN, "git clone could not start"),
+}
+
+
+def _stream_clone(run: _StreamingRun, progress: ProgressCallback) -> None:
     """One streaming clone attempt; a failed run raises the CloneError the buffered path raises."""
     def on_line(line: str) -> None:
         update = parse_progress(line)
@@ -75,8 +91,9 @@ def _stream_clone(
     ok, tail = run(on_line=on_line)
     if ok:
         return
-    if tail == TIMED_OUT:
-        raise CloneError(GitFailureKind.TIMEOUT, "git clone timed out")
+    if tail in _RUNNER_TAIL_KINDS:
+        kind, message = _RUNNER_TAIL_KINDS[tail]
+        raise CloneError(kind, message)
     raise _failed_clone(tail)
 
 

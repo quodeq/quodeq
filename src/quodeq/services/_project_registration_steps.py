@@ -61,7 +61,7 @@ def _resolve_target_path(request: MaterializeRequest) -> Path:
         validate_remote_url(clone_target)
         # run_git_clone raises CloneError on failure; it propagates.
         # progress is passed only when asked for: the buffered path keeps its exact call shape.
-        extra = {"progress": request.progress} if request.progress else {}
+        extra = {"progress": request.progress} if request.progress is not None else {}
         run_git_clone(clone_target, target_path, env=request.git_env, **extra)
         return target_path
 
