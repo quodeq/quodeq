@@ -285,11 +285,18 @@
   border-radius: var(--term-radius);
   border: 1px solid transparent;
   text-transform: uppercase;
+  /* A chip is one token: the stat hint allows breaks anywhere, and a narrow
+     tile would otherwise stack "7 9 3 m a j" one character per line. The row
+     wraps whole chips instead (see .acc-eval-sev-row). */
+  white-space: nowrap;
 }
-/* The change since the baseline run, inside a severity chip: the score
-   tile's trend badge, at the chip's size. */
+/* The change since the previous run or period, inside a severity chip: the
+   score tile's trend badge, at the chip's size. The arrow takes the badge's
+   colour (fewer findings reads good) rather than its own direction colour,
+   since here the arrow points the way the number went. */
 .term-sev-badge__delta { margin-left: 4px; }
 .term-sev-badge__delta .trend-badge { padding: 0; font-size: inherit; gap: 2px; }
+.term-sev-badge__delta .trend-badge .trend-arrow { color: inherit; }
 
 .term-sev-badge__count {
   font-weight: 400;
@@ -533,6 +540,7 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .acc-eval-sev-row {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: var(--term-space-1);
   align-items: center;
 }
@@ -653,6 +661,7 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .principle-detail-sev-row {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: var(--term-space-1);
   align-items: center;
 }

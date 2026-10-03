@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHeadline, chipDeltas, dimensionHeadlineInput, dimensionOpenTypes, filterSinceBaseline, runCounts, sinceBaselineFor, sumSinceBaseline, SCOPE_ALL, SCOPE_CHANGED, SCOPE_MIXED } from './headlineStats.js';
+import { buildHeadline, chipDeltas, dimensionHeadlineInput, dimensionOpenTypes, filterSinceBaseline, periodChipDeltas, runCounts, sinceBaselineFor, sumSinceBaseline, SCOPE_ALL, SCOPE_CHANGED, SCOPE_MIXED } from './headlineStats.js';
 
 const dim = (over = {}) => ({
   dimension: 'maintainability',
@@ -145,4 +145,36 @@ test('chipDeltas splits the blocking delta into criticals and majors only', () =
   assert.deepEqual(chipDeltas({ majorsDelta: -83, criticalDelta: -1 }), { critical: -1, major: -82 });
   assert.deepEqual(chipDeltas({ majorsDelta: 2, criticalDelta: 3 }), { critical: 3, major: -1 });
   assert.equal(chipDeltas(null), null);
+});
+
+const row = (runId, details) => ({ runId, numericAverage: '7.0', dimensionDetails: details });
+const det = (dimension, critical, majors) => ({ dimension, critical, majors });
+
+test('periodChipDeltas compares the selected period row with the previous one, criticals taken out of majors', () => {
+  const trend = [
+    row('r2', [det('a', 2, 10), det('b', 0, 5)]),
+    row('r1', [det('a', 1, 12), det('b', 0, 5)]),
+    row('r0', [det('a', 9, 90)]),
+  ];
+  assert.deepEqual(periodChipDeltas(trend, 'r2'), { critical: 1, major: -3 });
+  assert.deepEqual(periodChipDeltas(trend, null), { critical: 1, major: -3 });
+  assert.deepEqual(periodChipDeltas(trend, 'r1'), { critical: -8, major: -70 });
+});
+
+test('periodChipDeltas counts the dimensions both rows scored only', () => {
+  const trend = [row('r1', [det('a', 1, 3), det('b', 4, 8)]), row('r0', [det('a', 0, 2), det('c', 7, 7)])];
+  assert.deepEqual(periodChipDeltas(trend, 'r1'), { critical: 1, major: 0 });
+});
+
+test('periodChipDeltas is null with no previous period, no shared dimension, or an unknown run', () => {
+  assert.equal(periodChipDeltas([row('r1', [det('a', 1, 3)])], 'r1'), null);
+  assert.equal(periodChipDeltas([row('r1', [det('a', 1, 3)]), row('r0', [det('b', 1, 3)])], 'r1'), null);
+  assert.equal(periodChipDeltas([row('r1', [det('a', 1, 3)]), row('r0', [det('a', 1, 3)])], 'rX'), null);
+  assert.equal(periodChipDeltas([], 'r1'), null);
+  assert.equal(periodChipDeltas(undefined, 'r1'), null);
+});
+
+test('periodChipDeltas skips a dimension whose row lacks a count', () => {
+  const trend = [row('r1', [det('a', 1, 3), { dimension: 'b', majors: 8 }]), row('r0', [det('a', 0, 2), det('b', 4, 8)])];
+  assert.deepEqual(periodChipDeltas(trend, 'r1'), { critical: 1, major: 0 });
 });

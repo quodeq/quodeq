@@ -9,7 +9,7 @@ import { SectionLabel } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 import { DEFAULT_SCORE_HISTORY_GRANULARITY } from '../../../constants.js';
 import { HERO_CARD_KIND } from '../dashboardVocab.js';
-import { buildHeadline, chipDeltas, filterSinceBaseline, sumSinceBaseline } from '../headlineStats.js';
+import { buildHeadline, filterSinceBaseline, periodChipDeltas, sumSinceBaseline } from '../headlineStats.js';
 import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { useAccumulatedComputations, computeAccumulatedStats } from '../hooks/useAccumulatedComputations.js';
 import { AccumulatedHeroSection } from './AccumulatedHeroSection.jsx';
@@ -115,7 +115,7 @@ function makeCardNavigate({ onNavigate, filteredDimensions, reportProjectName })
 
 function AccumulatedOverviewSections({
   data, callbacks, currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredDimensions,
-  filteredAccumulated, filteredStats, chartMountable, dimTrends, topFiles, onCardNavigate, headline, since,
+  filteredAccumulated, filteredStats, chartMountable, dimTrends, topFiles, onCardNavigate, headline,
 }) {
   const { onRunClick, onRunHover, onRunHoverEnd, onDimensionClick, onNavigate } = callbacks;
   // A run or date switch refetches the dashboard and the scores; every
@@ -132,9 +132,8 @@ function AccumulatedOverviewSections({
         onCardNavigate={onCardNavigate}
         selectedSource={data.selectedSource}
         customFormula={data.customFormula}
-        deltas={chipDeltas(since)}
+        deltas={periodChipDeltas(filteredPeriodTrend, currentOverviewRun)}
         density={headline.density}
-       
       />
       <HistoryPanelsRow
         chartMountable={chartMountable}
@@ -173,7 +172,9 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
     [filteredDimensions]
   );
 
-  // Only the dimensions on show: a hidden standard must not move the strip or the report.
+  // Only the dimensions on show: a hidden standard must not move the report.
+  // (The hero chips take their deltas from the period trend instead, so they
+  // follow the chart's grouping like the score arrow; see periodChipDeltas.)
   const since = useMemo(
     () => sumSinceBaseline(filterSinceBaseline(data.sinceBaseline, (filteredDimensions || []).map((d) => d.dimension))),
     [data.sinceBaseline, filteredDimensions],
@@ -192,7 +193,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
       selectedDayDimNames={selectedDayDimNames} filteredPeriodTrend={filteredPeriodTrend}
       filteredDimensions={filteredDimensions} filteredAccumulated={filteredAccumulated}
       filteredStats={filteredStats} chartMountable={chartMountable} dimTrends={dimTrends}
-      topFiles={topFiles} onCardNavigate={onCardNavigate} headline={headline} since={since}
+      topFiles={topFiles} onCardNavigate={onCardNavigate} headline={headline}
     />
   );
 }
