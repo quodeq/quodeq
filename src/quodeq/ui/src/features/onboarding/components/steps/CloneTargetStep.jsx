@@ -1,27 +1,42 @@
 import { useState } from 'react';
 import { TermHeader } from '../../../../components/terminal/index.js';
+import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 import { t } from '../../../../strings/index.js';
 import { readString } from '../../../../adapters/storage.js';
 import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../../constants.js';
 import AccessPanel from '../../../github-access/components/AccessPanel.jsx';
 
+// Where working copies go unless the user picks another folder. The server
+// expands the tilde and creates the folder on first use.
+export const DEFAULT_CLONE_ROOT = '~/quodeq/repos';
+
 function readInitialDest() {
-  return readString(LAST_CLONE_ROOT_STORAGE_KEY) || '~';
+  return readString(LAST_CLONE_ROOT_STORAGE_KEY) || DEFAULT_CLONE_ROOT;
 }
 
-function CloneTargetForm({ cloneDest, setCloneDest, submitting, error, detail, accessFailure, handleSubmit, onBack }) {
+function CloneTargetForm({ cloneDest, setCloneDest, submitting, error, detail, accessFailure, handleSubmit, onBack, onBrowse }) {
   return (
     <form onSubmit={handleSubmit} className="onboarding-clone-target__form">
       <label htmlFor="clone-dest-input" className="onboarding-clone-target__label">{t('onboarding.cloneDestLabel')}</label>
-      <input
-        id="clone-dest-input"
-        type="text"
-        className="onboarding-clone-target__input"
-        value={cloneDest}
-        onChange={(e) => setCloneDest(e.target.value)}
-        disabled={submitting}
-        autoFocus
-      />
+      <div className="onboarding-repo-row">
+        <input
+          id="clone-dest-input"
+          type="text"
+          className="onboarding-clone-target__input"
+          value={cloneDest}
+          onChange={(e) => setCloneDest(e.target.value)}
+          disabled={submitting}
+          autoFocus
+        />
+        <button
+          type="button"
+          className="term-btn--secondary onboarding-repo-row__browse"
+          onClick={onBrowse}
+          disabled={submitting}
+        >
+          {t('onboarding.chooseCloneFolder')}
+        </button>
+      </div>
       <p className="onboarding-clone-target__hint">
         {t('onboarding.cloneDestDesc')}
       </p>
@@ -67,6 +82,7 @@ export default function CloneTargetStep({
   stepTotal = 0,
 }) {
   const [cloneDest, setCloneDest] = useState(readInitialDest);
+  const [browserOpen, setBrowserOpen] = useState(false);
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -75,6 +91,11 @@ export default function CloneTargetStep({
 
   function handleEphemeral() {
     onSubmit({ cloneDest: null, ephemeral: true });
+  }
+
+  function handleFolderSelect(path) {
+    setCloneDest(path);
+    setBrowserOpen(false);
   }
 
   return (
@@ -86,8 +107,16 @@ export default function CloneTargetStep({
       <CloneTargetForm
         cloneDest={cloneDest} setCloneDest={setCloneDest} submitting={submitting} error={error}
         detail={detail} accessFailure={accessFailure}
-        handleSubmit={handleSubmit} onBack={onBack}
+        handleSubmit={handleSubmit} onBack={onBack} onBrowse={() => setBrowserOpen(true)}
       />
+      {browserOpen && (
+        <FolderBrowser
+          onSelect={handleFolderSelect}
+          onClose={() => setBrowserOpen(false)}
+          title={t('onboarding.cloneDestLabel')}
+          confirmText={t('onboarding.useThisFolder')}
+        />
+      )}
       {accessFailure && (
         <AccessPanel failure={accessFailure} url={repoUrl} onResolved={onAccessResolved} onRetry={onRetry} />
       )}

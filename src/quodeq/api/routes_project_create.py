@@ -110,6 +110,16 @@ def _parse_create_project_request(
     ), None
 
 
+def _expand_home(clone_dest: str) -> str:
+    """``~`` and ``~/...`` mean the user's home folder, the same ``Path.home()``
+    the containment check uses (not ``$HOME`` via expanduser, which can differ)."""
+    if clone_dest == "~":
+        return str(Path.home())
+    if clone_dest.startswith("~/"):
+        return str(Path.home() / clone_dest[2:])
+    return clone_dest
+
+
 def _resolve_create_project_clone_dest(
     ephemeral: bool, clone_dest: str | None,
 ) -> tuple[str | None, tuple[Response, int] | None]:
@@ -125,10 +135,14 @@ def _resolve_create_project_clone_dest(
             # Containment and the directory check both live in the try
             # so every rejection exits here. Falling through past a
             # failed containment check on a sentinel would leave the
-            # unguarded value live on one path.
-            dest = contained_path(clone_dest, Path.home())
-            if not os.path.isdir(dest):
-                raise ValueError("cloneDest is not an existing directory")
+            # unguarded value live on one path. A leading "~" is the
+            # wizard's default and means the home folder; a missing
+            # folder under home is created, the way the default working
+            # copy root is.
+            dest = contained_path(_expand_home(clone_dest), Path.home())
+            if os.path.exists(dest) and not os.path.isdir(dest):
+                raise ValueError("cloneDest is not a directory")
+            os.makedirs(dest, exist_ok=True)
         except OSError:
             return None, json_error(
                 "Invalid cloneDest path",
