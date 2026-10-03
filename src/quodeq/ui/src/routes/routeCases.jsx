@@ -58,12 +58,13 @@ export function EvaluateCase({ selectedProject, projects, onGoToProjects, onGoTo
  * @param {{ settings: Object }} props
  * @returns {JSX.Element}
  */
-export function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnected }) {
+export function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnected, onShowWelcome }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
       onOpenGradeFormula={onOpenGradeFormula}
       onSharedDisconnected={onSharedDisconnected}
+      onShowWelcome={onShowWelcome}
     />
   );
 }

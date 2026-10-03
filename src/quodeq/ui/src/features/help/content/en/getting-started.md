@@ -13,6 +13,8 @@ The first time you launch Quodeq, the onboarding wizard opens automatically. Fou
 >
 > The wizard remembers what you typed. If you close it midway, your draft comes back next time. You can also resume an interrupted setup from the **Projects** tab.
 
+Want to see the welcome again later, even after skipping it? Open **Settings**, find the *onboarding* section and press **show welcome**.
+
 ### What happens next
 
 - The **Evaluate** tab streams the run live, including findings as they appear.

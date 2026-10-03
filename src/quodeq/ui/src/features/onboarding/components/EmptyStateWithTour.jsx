@@ -1,12 +1,7 @@
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
-import { removeKey } from '../../../adapters/storage.js';
-import { SKIPPED_KEY } from '../wizardSteps.js';
+import { clearOnboardingSkip as clearSkip } from '../skipFlag.js';
 import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
-
-function clearSkip() {
-  removeKey(SKIPPED_KEY);
-}
 
 export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = null, isEvaluating = false }) {
   const blocked = evalBlockedProps(isEvaluating, t('onboarding.cannotAddWhileRunning'));

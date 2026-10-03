@@ -11,6 +11,7 @@ import TerminalSection from './TerminalSection.jsx';
 import ServerSection from './ServerSection.jsx';
 import GitHubAccessSection from './GitHubAccessSection.jsx';
 import SharedRepoSection from './SharedRepoSection.jsx';
+import OnboardingSection from './OnboardingSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
@@ -24,7 +25,7 @@ const _SETTINGS_PHRASE_KEYS = [
   'settingsPhrase.compass',
 ];
 
-export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDisconnected }) {
+export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDisconnected, onShowWelcome }) {
   const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
@@ -50,6 +51,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
         <ServerSection />
         <GitHubAccessSection />
         <SharedRepoSection onDisconnected={onSharedDisconnected} />
+        <OnboardingSection onShowWelcome={onShowWelcome} />
         <section className="panel settings-section">
           <div className="panel-header">
             <SectionLabel marker="▶">{t('settings.gradeFormula')}</SectionLabel>

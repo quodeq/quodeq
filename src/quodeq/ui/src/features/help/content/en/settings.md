@@ -46,6 +46,10 @@ The same background rebuild runs whenever score caches need re-deriving for othe
 
 Both ship disabled. The *Assistant* section turns the chat drawer on and picks its provider and model; *Enable terminal* switches on the embedded shell. See the **Assistant** and **Terminal** help sections.
 
+### Onboarding
+
+The *onboarding* section has one row, **show welcome**: it opens the welcome and the first-run steps again, even if you skipped them before. Nothing else changes; your projects and settings stay as they are.
+
 ### Grade formula
 
 The *Grade formula* section opens the formula editor, where severity weights, curve shape, grade boundaries, and dimension weights live. See the **Grade Formula** help section for the full tour.
