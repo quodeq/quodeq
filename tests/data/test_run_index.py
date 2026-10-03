@@ -120,11 +120,12 @@ def test_runrow_dataclass_fields() -> None:
 
 
 def test_get_index_db_path_default_and_env(tmp_path, monkeypatch) -> None:
-    from quodeq.shared.env import get_index_db_path
+    from quodeq.shared.env import get_index_db_path, get_quodeq_dir
     monkeypatch.delenv("QUODEQ_INDEX_DB_PATH", raising=False)
     p = Path(get_index_db_path())
     assert p.name == "index.db"
-    assert p.parent.name == ".quodeq"
+    # The default follows the state dir (QUODEQ_DIR, else ~/.quodeq), never a fixed home.
+    assert p.parent == get_quodeq_dir()
 
     monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "custom.db"))
     assert Path(get_index_db_path()) == tmp_path / "custom.db"
