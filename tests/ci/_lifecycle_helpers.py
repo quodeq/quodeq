@@ -39,9 +39,9 @@ def _write_truncated_dim_jsonl(jsonl: Path) -> None:
 
 
 def _assert_partial_coverage(evidence_root: Path) -> None:
-    """Signal (b): _compute_files_read reports fewer files read than input."""
+    """Signal (b): compute_files_read reports fewer files read than input."""
     from quodeq.analysis.cache.dimension_helpers import ClassifyResult
-    from quodeq.analysis.cache.dimension_runner import _compute_files_read
+    from quodeq.analysis.cache.dimension_runner import compute_files_read
 
     all_files = ["a.py", "b.py", "c.py", "d.py", "e.py"]
     misses = ["b.py", "c.py", "d.py", "e.py"]
@@ -53,7 +53,7 @@ def _assert_partial_coverage(evidence_root: Path) -> None:
     jsonl = evidence_root / "flex_evidence.jsonl"
     _write_truncated_dim_jsonl(jsonl)
 
-    files_read = _compute_files_read(classify, jsonl, all_files)
+    files_read = compute_files_read(classify, jsonl, all_files)
     assert files_read == 3, (
         f"expected files_read=3 (1 hit + 2 ok dispatches), got {files_read}; "
         "the c88be50e symptom was files_read=len(input)=5, making coverage "

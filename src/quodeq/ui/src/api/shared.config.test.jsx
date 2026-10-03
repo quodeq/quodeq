@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as shared from './shared.js';
+import { startRefresh } from './syncStatus.js';
 import { createProject } from '../models/project.js';
 
 /**
@@ -30,6 +31,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -81,14 +83,28 @@ describe('shared repo API client', () => {
       });
     });
 
-    it('disconnectShared DELETEs /shared/config', async () => {
+    it('connectShared resolves with the 202 body after a single PUT', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 202, json: async () => ({ started: true, url: 'u' }) })));
+      await expect(shared.connectShared('u')).resolves.toEqual({ started: true, url: 'u' });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0][1].method).toBe('PUT');
+    });
+
+    it('connectShared lets a PUT error through without polling', async () => {
+      const err = { error: 'a connect is already running', code: 'CONNECT_IN_PROGRESS' };
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 409, json: async () => err })));
+      await expect(shared.connectShared('u')).rejects.toMatchObject({ status: 409, code: 'CONNECT_IN_PROGRESS' });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('disconnectShared DELETEs /shared/config with the confirm flag', async () => {
       await shared.disconnectShared();
-      expect(calls[0].url).toBe('/api/shared/config');
+      expect(calls[0].url).toBe('/api/shared/config?confirm=true');
       expect(calls[0].opts.method).toBe('DELETE');
     });
 
-    it('refreshShared POSTs /shared/refresh', async () => {
-      await shared.refreshShared();
+    it('startRefresh POSTs /shared/refresh', async () => {
+      await startRefresh();
       expect(calls[0].url).toBe('/api/shared/refresh');
       expect(calls[0].opts.method).toBe('POST');
     });
@@ -104,6 +120,25 @@ describe('shared repo API client', () => {
       await shared.sharedListProjects();
       expect(calls[0].url).toBe('/api/shared/projects?refresh=0');
       expect(calls[0].opts?.method).toBeUndefined();
+    });
+
+    it('sharedListProjects waits two minutes, not the default 30s (a fresh clone lists slowly)', async () => {
+      vi.useFakeTimers();
+      try {
+        let signal;
+        vi.stubGlobal('fetch', vi.fn((url, opts) => new Promise((_resolve, reject) => {
+          signal = opts.signal;
+          signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        })));
+        const settled = expect(shared.sharedListProjects()).rejects.toThrow();
+        await vi.advanceTimersByTimeAsync(119999);
+        expect(signal.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await settled;
+        expect(signal.aborted).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('sharedListProjects GETs /shared/projects with refresh=1 when requested', async () => {
@@ -189,7 +224,7 @@ describe('shared repo API client', () => {
       expect(calls[0].url).toBe('/api/shared/projects/proj%2Fwith%2Fslashes/info');
     });
 
-    // Finding 5 (final whole-branch review): createProject() only knows the
+    // createProject() only knows the
     // base Project shape and silently drops publishedBy/publishedAt/source --
     // without passing them through explicitly (same idiom as
     // sharedListProjects above), the Overview's shared-project hero badge has

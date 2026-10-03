@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from quodeq.core.run.state import RunState
 from quodeq.core.types import DimensionResult, DimensionSummary
 from quodeq.data.fs.report_parser import RunInfo
 from quodeq.services.dashboard import build_dashboard
@@ -20,7 +21,7 @@ class TestBuildDashboardDismissedFiltering:
     """The run-level dashboard payload must not resurface findings the user
     dismissed or deleted at project level.
 
-    Regression for the 2026-07-04 report: run 03c99d26 showed "1 critical"
+    Regression for the 2026-07-04 report: a run showed "1 critical"
     in the history run view for a finding dismissed on 2026-06-20, while the
     dimension detail (which applies the dismissed-keys filter) correctly hid
     it. The run view, the dimension detail, and the accumulated overview must
@@ -143,8 +144,8 @@ class TestHistoryContextSlimming:
     def test_history_keys_drop_finding_bodies_but_keep_scores(self, tmp_path):
         from quodeq.core.types.finding import Totals
         runs = [
-            RunInfo(run_id="r-new", date_iso="2024-02-01", date_label="2024-02-01", status="complete"),
-            RunInfo(run_id="r-old", date_iso="2024-01-01", date_label="2024-01-01", status="complete"),
+            RunInfo(run_id="r-new", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE),
+            RunInfo(run_id="r-old", date_iso="2024-01-01", date_label="2024-01-01", status=RunState.DONE),
         ]
         selected_dims = [DimensionResult(
             dimension="security", overall_grade="B", overall_score="7.0/10",
@@ -173,11 +174,12 @@ class TestHistoryContextSlimming:
             patch("quodeq.services.dashboard.list_runs", return_value=runs),
             # Selected-run path reads via dashboard.read_run_data; the history
             # trend/previous/stale path reads via the scalar fetcher. In this
-            # no-events/no-db tmp project the scalar reader falls back to
-            # read_run_data at the runs-module level, so patch there too.
+            # no-reports/no-db tmp project the scalar reader falls back to the
+            # accumulated reader's full read, so patch there too.
             patch("quodeq.services.dashboard.read_run_data", side_effect=read_by_run),
             patch("quodeq.services.cache.read_run_data", side_effect=read_by_run),
             patch("quodeq.data.fs.report_parser.runs.read_run_data", side_effect=read_by_run),
+            patch("quodeq.services._accumulated_data.read_run_data", side_effect=read_by_run),
             patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
         ):
             result = build_dashboard(str(tmp_path), "proj-slim-history", "r-new")

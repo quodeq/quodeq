@@ -9,6 +9,7 @@ for its existing callers/tests) is a thin static-method delegate to it. The
 from __future__ import annotations
 
 from quodeq.services.base import EvaluationOptions
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.provider_env import provider_env_exports
 
@@ -17,17 +18,13 @@ def _apply_provider_credentials(built_env: dict[str, str], options: EvaluationOp
     """Export user-entered API credentials into *built_env* in place.
 
     Under the env names the scan subprocess resolves them from (provider's
-    api_key_env). Without this, a key typed in Settings for e.g. OpenRouter
+    ``api_key_env`` or ``credential_env``, e.g. omlx's OMLX_API_KEY/
+    OMLX_BASE_URL). Without this, a key typed in Settings for e.g. OpenRouter
     never reached the run and it failed with a missing-key error.
     """
     built_env.update(provider_env_exports(
         options.ai_cmd, options.provider_api_key, options.provider_api_base,
     ))
-    if options.ai_cmd == "omlx":
-        if options.provider_api_key:
-            built_env["OMLX_API_KEY"] = options.provider_api_key
-        if options.provider_api_base:
-            built_env["OMLX_BASE_URL"] = options.provider_api_base
 
 
 def build_eval_env(
@@ -42,11 +39,11 @@ def build_eval_env(
     call-site module (``evaluation_mixin``).
     """
     base = resolve_env(env)
-    built_env = {**base, "PYTHONUNBUFFERED": "1"}
+    built_env = {**base, "PYTHONUNBUFFERED": ENV_TRUTHY}
     built_env["AI_CMD"] = ai_cmd
-    # Validated at the API boundary (_validate_ai_cmd_path); the scan
+    # Validated at the API boundary (validate_ai_cmd_path); the scan
     # subprocess spawns it as argv[0] while AI_CMD keeps keying the
-    # provider config (analysis._command._cmd_binary).
+    # provider config (analysis._command.cmd_binary).
     if options.ai_cmd_path:
         built_env["AI_CMD_PATH"] = options.ai_cmd_path
     subagent_model = options.subagent_model or ai_model
@@ -57,7 +54,7 @@ def build_eval_env(
     if subagent_model:
         built_env["SUBAGENT_MODEL"] = subagent_model
     if not options.verify_findings:
-        built_env["QUODEQ_NO_VERIFY"] = "1"
+        built_env["QUODEQ_NO_VERIFY"] = ENV_TRUTHY
     # Always propagate the limit, including 0 (unlimited). The CLI
     # subprocess uses positive values to set the run-level deadline
     # (lifecycle.set_deadline + analyzing_start marker) that the
@@ -67,7 +64,7 @@ def build_eval_env(
     if options.time_limit is not None and options.time_limit >= 0:
         built_env["QUODEQ_TIME_LIMIT"] = str(options.time_limit)
     if options.per_dimension:
-        built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
+        built_env["QUODEQ_NO_CONSOLIDATE"] = ENV_TRUTHY
     if options.context_size > 0:
         built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
     _apply_provider_credentials(built_env, options)

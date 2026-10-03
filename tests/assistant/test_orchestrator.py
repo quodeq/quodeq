@@ -95,7 +95,7 @@ def test_history_replayed_on_second_turn(setup):
 
 def test_run_turn_dispatches_cli_provider(setup, monkeypatch):
     repo, ctx = setup
-    monkeypatch.setattr("quodeq.assistant.orchestrator.get_provider_configs",
+    monkeypatch.setattr("quodeq.assistant._turn_grants.get_provider_configs",
                         lambda: {"claude": {"type": "cli"}})
     called = {}
 
@@ -114,7 +114,7 @@ def test_run_turn_dispatches_cli_provider(setup, monkeypatch):
 
 def test_run_turn_cli_empty_output_emits_error(setup, monkeypatch):
     repo, ctx = setup
-    monkeypatch.setattr("quodeq.assistant.orchestrator.get_provider_configs",
+    monkeypatch.setattr("quodeq.assistant._turn_grants.get_provider_configs",
                         lambda: {"claude": {"type": "cli"}})
 
     def boom(**kwargs):

@@ -135,7 +135,7 @@ describe('usePublish', () => {
     }
   });
 
-  // Minor finding (final whole-branch review): refreshListAfterCompletion's
+  // refreshListAfterCompletion's
   // fetchQuery inherited the production QueryClient's staleTime: 30s (see
   // api/queryClient.js), so it could resolve straight from a still-fresh
   // cache entry instead of actually fetching -- silently contradicting its

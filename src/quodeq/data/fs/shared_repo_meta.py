@@ -1,16 +1,23 @@
 """Shared-repo format/bootstrap, index sync, and publish attribution.
 
-Split from ``shared_repo.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim; re-exported from ``shared_repo.py`` (and, in
-turn, from ``services/shared_repo.py``) so existing import sites are
-unaffected.
+Split from ``shared_repo.py``; imports the git layer from
+``shared_repo_git.py`` and is re-exported from ``shared_repo.py`` (and, in
+turn, ``services/shared_repo.py``) so existing import sites are unaffected.
 """
 from __future__ import annotations
 
 import json
+from enum import StrEnum
 from pathlib import Path
 
-from quodeq.data.fs.shared_repo import run_git, shared_cache_dir, shared_evaluations_root, shared_repo_path
+from quodeq.data.fs.shared_repo_git import (
+    EVALUATIONS_DIRNAME,
+    run_git,
+    shared_cache_dir,
+    shared_evaluations_root,
+    shared_repo_path,
+)
+from quodeq.shared.constants import GIT_DIR_NAME
 
 MARKER_FILENAME = "quodeq.json"
 FORMAT_NAME = "quodeq-shared-evaluations"
@@ -20,7 +27,22 @@ PUBLISHED_META_FILENAME = "published.json"
 _GITIGNORE_CONTENT = "**/evaluation.db\n*.log\n"
 
 
-def check_repo_format(repo_root: Path) -> str:
+class RepoFormat(StrEnum):
+    """State of a shared-results clone.
+
+    :func:`check_repo_format` classifies an existing clone as one of the
+    first four; :func:`read_state` adds MISSING when no clone is on disk.
+    The value is what ``repoState`` carries on the wire.
+    """
+
+    OK = "ok"
+    EMPTY = "empty"
+    FOREIGN = "foreign"
+    UNSUPPORTED_VERSION = "unsupported_version"
+    MISSING = "missing"
+
+
+def check_repo_format(repo_root: Path) -> RepoFormat:
     """Classify a clone from its marker file: ok | empty | foreign | unsupported_version.
 
     "empty" means a clone holding nothing but .git, which is publishable.
@@ -33,30 +55,30 @@ def check_repo_format(repo_root: Path) -> str:
         try:
             data = json.loads(marker.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            return "foreign"
+            return RepoFormat.FOREIGN
 
         # Marker JSON must be a dict; if not, it's foreign.
         if not isinstance(data, dict):
-            return "foreign"
+            return RepoFormat.FOREIGN
 
         if data.get("format") != FORMAT_NAME:
-            return "foreign"
+            return RepoFormat.FOREIGN
 
         # Try to parse version as int; if it fails or is non-numeric, unsupported.
         try:
             version = int(data.get("version", 0))
-        except (ValueError, TypeError):
-            return "unsupported_version"
+        except (ValueError, TypeError, OverflowError):
+            return RepoFormat.UNSUPPORTED_VERSION
 
         if version > FORMAT_VERSION:
-            return "unsupported_version"
-        return "ok"
+            return RepoFormat.UNSUPPORTED_VERSION
+        return RepoFormat.OK
 
     try:
-        entries = [p for p in repo_root.iterdir() if p.name != ".git"]
+        entries = [p for p in repo_root.iterdir() if p.name != GIT_DIR_NAME]
     except OSError:
-        return "foreign"
-    return "empty" if not entries else "foreign"
+        return RepoFormat.FOREIGN
+    return RepoFormat.EMPTY if not entries else RepoFormat.FOREIGN
 
 
 def bootstrap_repo_layout(repo_root: Path) -> None:
@@ -67,7 +89,7 @@ def bootstrap_repo_layout(repo_root: Path) -> None:
     marker_content = json.dumps({"format": FORMAT_NAME, "version": FORMAT_VERSION}) + "\n"
     (repo_root / MARKER_FILENAME).write_text(marker_content, encoding="utf-8")
     (repo_root / ".gitignore").write_text(_GITIGNORE_CONTENT, encoding="utf-8")
-    evaluations = repo_root / "evaluations"
+    evaluations = repo_root / EVALUATIONS_DIRNAME
     evaluations.mkdir(exist_ok=True)
     (evaluations / ".gitkeep").write_text("", encoding="utf-8")
 
@@ -99,13 +121,13 @@ def sync_shared_index(url: str, env: dict | None = None) -> None:
         db.close()
 
 
-def read_state(url: str, env: dict | None = None) -> str:
+def read_state(url: str, env: dict | None = None) -> RepoFormat:
     """State of the local shared clone: ok | empty | foreign |
     unsupported_version | missing. "empty" (cloned, never published into)
     is servable -- routes return an empty listing for it."""
     repo = shared_repo_path(url, env)
-    if not (repo / ".git").exists():
-        return "missing"
+    if not (repo / GIT_DIR_NAME).exists():
+        return RepoFormat.MISSING
     return check_repo_format(repo)
 
 
@@ -174,7 +196,7 @@ def _parse_attribution_log(out: str, wanted: set[str]) -> dict[str, dict]:
                 meta = None
             continue
         parts = token.lstrip("\n").split("/", 2)
-        if meta is None or len(parts) < 2 or parts[0] != "evaluations":  # noqa: PLR2004  # the "evaluations" and project segments
+        if meta is None or len(parts) < 2 or parts[0] != EVALUATIONS_DIRNAME:  # noqa: PLR2004  # the "evaluations" and project segments
             continue
         if parts[1] in wanted and parts[1] not in result:
             result[parts[1]] = meta
@@ -190,7 +212,7 @@ def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
     published before that file existed. The fallback is only correct because the
     clone is full history (no --depth) -- a shallow clone made `git log -1
     -- path` return the tip commit for every path, misattributing every
-    project except the most recently pushed one (audit finding C1).
+    project except the most recently pushed one.
     """
     repo = shared_repo_path(url, env)
     root = shared_evaluations_root(url, env)

@@ -10,15 +10,47 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import threading
 import unicodedata
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
+from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.repo import normalize_remote_url
 
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT_S = 10
+
+# Cap on the whole stream_log_names stream. Read at call time so tests can
+# shrink it. A large repo's log takes seconds, so this sits well above the
+# per-command default; past it the stream is cut short and says so.
+_GIT_LOG_STREAM_TIMEOUT_S = 60
+
+# stream_log_names' churn-history window. Public: also the fallback default
+# for analysis/subagents/_git_scoring.py's git_lookback_months config knob,
+# which forwards it into stream_log_names(months=...).
+DEFAULT_GIT_LOOKBACK_MONTHS = 3
+
+# Every git subprocess in quodeq runs with this floor. GIT_TERMINAL_PROMPT=0
+# makes git fail instead of waiting on a credential prompt nobody can answer
+# (the calls below also close stdin); GIT_LFS_SKIP_SMUDGE skips LFS blobs we
+# never read; LC_ALL/LANG=C pin English output so shared/git_errors.py's
+# markers match. ssh reads /dev/tty directly and is not covered: a host-key
+# confirmation or a passphrase without an agent still blocks until the
+# timeout, which the probe then reports as `timeout`.
+GIT_PROMPT_GUARD: dict[str, str] = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_LFS_SKIP_SMUDGE": "1",
+    "LC_ALL": "C",
+    "LANG": "C",
+}
+
+
+def git_env_floor(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    """*env* (None = process environment) layered with :data:`GIT_PROMPT_GUARD`."""
+    return {**resolve_env(env), **GIT_PROMPT_GUARD}
 
 
 def run_git(
@@ -28,8 +60,9 @@ def run_git(
     """Run ``git *args`` and return stdout, or None on any failure."""
     try:
         result = subprocess.run(
-            ["git", *args],
+            [GIT_BIN, *args],
             cwd=str(cwd) if cwd is not None else None,
+            env=git_env_floor(), stdin=subprocess.DEVNULL,
             capture_output=True, text=True, encoding="utf-8", timeout=timeout,
         )
     except (subprocess.SubprocessError, OSError):
@@ -98,7 +131,7 @@ def _tracked_rels(
     """Tracked paths as git reports them, or None when it cannot answer."""
     try:
         out = run_git(
-            ["-C", str(path), "ls-files", "-z", "--cached", *pathspec], timeout=timeout,
+            [GIT_FLAG_C, str(path), "ls-files", "-z", "--cached", *pathspec], timeout=timeout,
         )
     except UnicodeDecodeError:
         # run_git decodes stdout as strict UTF-8; a tracked path carrying
@@ -112,10 +145,10 @@ def _tracked_rels(
 
 def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> list[str]:
     """Local branch names of *repo_dir*; empty when not a git repo."""
-    if not (repo_dir / ".git").exists():
+    if not (repo_dir / GIT_DIR_NAME).exists():
         return []
     out = run_git(
-        ["-C", str(repo_dir), "branch", "--format=%(refname:short)"],
+        [GIT_FLAG_C, str(repo_dir), "branch", "--format=%(refname:short)"],
         timeout=timeout,
     )
     if out is None:
@@ -126,7 +159,7 @@ def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> lis
 
 def remote_origin_url_raw(repo_dir: Path | str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> str | None:
     """``git remote get-url origin`` verbatim, or None when absent/unreadable."""
-    out = run_git(["-C", str(repo_dir), "remote", "get-url", "origin"], timeout=timeout)
+    out = run_git([GIT_FLAG_C, str(repo_dir), "remote", "get-url", "origin"], timeout=timeout)
     if out is None:
         return None
     origin = out.strip()
@@ -141,33 +174,70 @@ def git_remote_url(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> st
     ``host/owner/repo`` via ``shared._repo.normalize_remote_url``.
     """
     out = run_git(
-        ["-C", repo_path, "config", "--get", "remote.origin.url"], timeout=timeout,
+        [GIT_FLAG_C, repo_path, "config", "--get", "remote.origin.url"], timeout=timeout,
     )
     if out is None:
         return None
     return normalize_remote_url(out)
 
 
+def git_head_sha(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> str | None:
+    """Full SHA of the commit checked out at *repo_path*, or None outside a repo."""
+    out = run_git([GIT_FLAG_C, repo_path, "rev-parse", "HEAD"], timeout=timeout)
+    sha = (out or "").strip()
+    return sha or None
+
+
+def git_worktree_dirty(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> bool | None:
+    """True when tracked files at *repo_path* differ from HEAD, False when clean,
+    None outside a repo. Untracked files do not count: they were not evaluated
+    at HEAD either way, so they cannot make two runs' commits incomparable."""
+    out = run_git(
+        [GIT_FLAG_C, repo_path, "status", "--porcelain", "--untracked-files=no"], timeout=timeout,
+    )
+    if out is None:
+        return None
+    return bool(out.strip())
+
+
+def _kill_on_deadline(proc: subprocess.Popen, fired: threading.Event) -> None:
+    """Timer callback: flag the deadline first, then kill, so the stream's
+    ``finally`` (reached once the kill closes stdout) sees the flag."""
+    fired.set()
+    proc.kill()
+
+
 def stream_log_names(
-    repo_dir: Path, *, months: int = 3, timeout: float = _DEFAULT_TIMEOUT_S,
+    repo_dir: Path, *, months: int = DEFAULT_GIT_LOOKBACK_MONTHS, timeout: float = _DEFAULT_TIMEOUT_S,
 ) -> Iterator[str]:
     """Yield ``git log --name-only`` lines one at a time (streaming Popen).
 
     Avoids materializing the full log for large repositories. Yields
-    nothing when git is unavailable or the command cannot start.
+    nothing when git is unavailable or the command cannot start. The whole
+    stream is capped at ``_GIT_LOG_STREAM_TIMEOUT_S``: past it the process is
+    killed, its stdout hits EOF, a warning is logged, and the generator ends
+    with the lines read so far. *timeout* bounds the reap after stdout closes.
     """
     try:
         proc = subprocess.Popen(
             ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
             cwd=str(repo_dir), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, encoding="utf-8",
+            text=True, encoding="utf-8", env=git_env_floor(), stdin=subprocess.DEVNULL,
         )
     except OSError:
         return
+    cap = _GIT_LOG_STREAM_TIMEOUT_S
+    fired = threading.Event()
+    deadline = threading.Timer(cap, _kill_on_deadline, args=(proc, fired))
+    deadline.daemon = True
     try:
         assert proc.stdout is not None
+        deadline.start()
         yield from proc.stdout
     finally:
+        deadline.cancel()
+        if fired.is_set():
+            _logger.warning("git log in %s passed its %ss cap; history is truncated", repo_dir, cap)
         proc.stdout.close()  # type: ignore[union-attr]
         try:
             proc.wait(timeout=timeout)

@@ -4,27 +4,42 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._evaluation_helpers import (
     InvalidEvaluationOption,
-    _check_eval_rate_limit,
-    _sanitize_url,
-    _validate_ai_cmd,
-    _validate_ai_cmd_path,
-    _validate_ai_model,
+    check_eval_rate_limit,
+    sanitize_url,
+    validate_ai_cmd,
+    validate_ai_cmd_path,
+    validate_ai_model,
     clean_scan_conflict_error,
 )
-from quodeq.api._evaluation_options import _build_evaluation_options
-from quodeq.api.helpers import json_error, page_params, scan_target_error, validate_evaluation_payload
+from quodeq.api._evaluation_options import build_evaluation_options
+from quodeq.api._constants import (
+    CODE_INVALID_INPUT,
+    CODE_NOT_DIR,
+    CODE_PATH_MISSING,
+    CODE_URL_NOT_EVALUABLE,
+)
+from quodeq.api.helpers import (
+    json_error,
+    jsonify_error,
+    optional_json_object_or_response,
+    page_params,
+    scan_target_error,
+    validate_evaluation_payload,
+)
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.shared.validation import relative_scope_error
 from quodeq.assistant import get_provider_configs
 from quodeq.api.routes_common import reports_dir
 from quodeq.services.active_evaluation import find_active_evaluation
 from quodeq.services.base import ActionProvider
+from quodeq.shared.log_sink import LoggerSink
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)
@@ -40,15 +55,15 @@ def _validate_start_payload(payload: dict) -> Response | tuple[Response, int] | 
     (or Flask's own error tuple) if invalid, else None."""
     validation_error = validate_evaluation_payload(payload)
     if validation_error:
-        return json_error(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return json_error(validation_error, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     ai_cmd = payload.get("aiCmd") or None
-    ai_cmd_error = _validate_ai_cmd(ai_cmd)
+    ai_cmd_error = validate_ai_cmd(ai_cmd)
     if ai_cmd_error is not None:
         return ai_cmd_error
-    ai_cmd_path_error = _validate_ai_cmd_path(ai_cmd, payload.get("aiCmdPath") or None)
+    ai_cmd_path_error = validate_ai_cmd_path(ai_cmd, payload.get("aiCmdPath") or None)
     if ai_cmd_path_error is not None:
         return ai_cmd_path_error
-    model_error = _validate_ai_model(
+    model_error = validate_ai_model(
         ai_cmd, payload.get("aiModel") or None, get_provider_configs(),
     )
     if model_error is not None:
@@ -65,18 +80,18 @@ class _StartRequest:
 
 
 def _pre_build_options_error(payload: dict) -> tuple[Response, int] | None:
-    """Pre-check every ValueError source ``_build_evaluation_options`` can
+    """Pre-check every ValueError source ``build_evaluation_options`` can
     hit today (clean_scan conflict, then scope path -- same order it checks
     them internally), so the caller's try/except is an unreachable safety
     net, never a path that has to echo exception text."""
     conflict_err = clean_scan_conflict_error(payload)
     if conflict_err is not None:
-        return json_error(conflict_err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return json_error(conflict_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     scope_path = payload.get("scopePath") or None
     if scope_path is not None:
         err = relative_scope_error(str(scope_path))
         if err is not None:
-            return json_error(err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return json_error(err, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     return None
 
 
@@ -86,19 +101,19 @@ def _build_options_or_error(payload: dict) -> tuple[Any, tuple[Response, int] | 
     if pre_error is not None:
         return None, pre_error
     try:
-        return _build_evaluation_options(payload), None
+        return build_evaluation_options(payload), None
     except InvalidEvaluationOption as exc:
         # exc.public_message, not str(exc): the field-naming text an
         # InvalidEvaluationOption carries is written by coerce_int itself,
         # names only the field, and interpolates nothing from the request
         # (never raw exception formatting), so it is safe to return verbatim.
-        return None, json_error(exc.public_message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return None, json_error(exc.public_message, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     except ValueError:
         # Constant message, not str(exc): every other raise source is
         # pre-checked above. Keep it unbound so nothing here can ever echo
         # exception text.
         return None, json_error(
-            "Invalid evaluation options", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            "Invalid evaluation options", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
         )
 
 
@@ -119,8 +134,7 @@ def _repo_target_error(repo: Any) -> tuple[Response, int] | None:
     err = scan_target_error(str(repo), reports_dir())
     if err is None:
         return None
-    body, status = err
-    return jsonify(body), status
+    return jsonify_error(err)
 
 
 def _validated_start_request(
@@ -134,7 +148,7 @@ def _validated_start_request(
     if error is not None:
         return None, error
     repo = payload.get("repo")
-    _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
+    _logger.info("start_evaluation: repo=%s, remote_addr=%s", sanitize_url(repo), request.remote_addr)
     options, options_error = _build_options_or_error(payload)
     if options_error is not None:
         return None, options_error
@@ -173,15 +187,17 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         the staleness rule lives in services.active_evaluation, so shells
         (native window, frontend) consume it instead of re-deriving it.
         """
-        job = find_active_evaluation(provider, reports_dir())
+        job = find_active_evaluation(provider, reports_dir(), log=LoggerSink(_logger))
         return jsonify(to_camel_dict(job) if job is not None else None)
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
-        rate_error = _check_eval_rate_limit(eval_rate_store)
+        rate_error = check_eval_rate_limit(eval_rate_store)
         if rate_error is not None:
             return rate_error
-        payload = request.get_json(silent=True) or {}
+        payload = optional_json_object_or_response(CODE_INVALID_INPUT)
+        if not isinstance(payload, dict):
+            return payload
         start_request, error = _validated_start_request(payload)
         if error is not None:
             return error
@@ -189,9 +205,32 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             job = provider.start_evaluation(
                 repo=start_request.repo, reports_dir=reports_dir(), options=start_request.options,
             )
-        except (FileNotFoundError, ValueError):
-            return json_error(
-                "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
-                HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
-            )
+        except FileNotFoundError:
+            return _repo_folder_error(start_request.repo)
+        except ValueError:
+            return _repo_value_error(start_request.repo)
         return jsonify(to_camel_dict(job)), HTTPStatus.ACCEPTED
+
+
+def _repo_folder_error(repo: str) -> tuple[Response, int]:
+    """The service could not use *repo* as a folder: say which way (never the path)."""
+    if Path(repo).exists():
+        return json_error("Path is not a directory", HTTPStatus.BAD_REQUEST, CODE_NOT_DIR)
+    return json_error("Project path not found on disk", HTTPStatus.BAD_REQUEST, CODE_PATH_MISSING)
+
+
+def _repo_value_error(repo: str) -> tuple[Response, int]:
+    """A git url is not an evaluation target: the registered local copy is."""
+    try:
+        is_url = is_repo_url(repo)
+    except ValueError:
+        is_url = False
+    if is_url:
+        return json_error(
+            "A git url cannot be evaluated directly. Add the repository as a project first.",
+            HTTPStatus.BAD_REQUEST, CODE_URL_NOT_EVALUABLE,
+        )
+    return json_error(
+        "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
+        HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
+    )

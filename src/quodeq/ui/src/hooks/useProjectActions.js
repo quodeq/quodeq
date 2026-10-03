@@ -1,7 +1,6 @@
 /**
- * Encapsulates project-level actions (delete, export, relocate, import) that
- * were previously inlined inside App, keeping the root component focused
- * on composition rather than API plumbing.
+ * Encapsulates project-level actions (delete, export, relocate, import), so
+ * App stays focused on composition rather than API plumbing.
  *
  * Failure handlers return `{ ok: false, messageKey, vars }` (the raw i18n
  * key + interpolation vars, not a rendered string) so a caller can inspect
@@ -13,19 +12,26 @@
  * `{ ok: false, messageKey, vars }` and a caller owns how (or whether) to
  * present them.
  */
+import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext.jsx';
+import { invalidateProjects } from './invalidateProjects.js';
 import { chooseDialog } from '../utils/chooseDialog.js';
 import { t } from '../strings/index.js';
 import { apiErrorMessage } from '../strings/apiErrors.js';
 import { HTTP_STATUS } from '../constants.js';
+import { DIALOG_VARIANT } from '../vocab/dialogVariant.js';
+import { findProject, projectIdOrSelf } from '../utils/projectIdentity.js';
+import { projectPath } from '../api/paths.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
+const MAX_EXPORT_FILENAME_LENGTH = 100; // keeps the downloaded .zip's name reasonable
+
 function sanitizeFilename(name) {
   return String(name || '')
     .replace(/[/\\:*?"<>|\x00-\x1f]+/g, '_')
     .replace(/^\.+/, '_')
-    .slice(0, 100) || 'project';
+    .slice(0, MAX_EXPORT_FILENAME_LENGTH) || 'project';
 }
 
 function makeFail(onError) {
@@ -37,30 +43,30 @@ function makeFail(onError) {
 
 /**
  * Builds the delete handler. It moves the selection to another project when
- * the deleted one was selected, then reloads the list.
+ * the deleted one was selected, then refetches the local project list.
  *
  * @returns {(projectId: string) => Promise<{ok: boolean, messageKey?: string, vars?: object}>}
  */
-export function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail }) {
+export function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, refreshProjects, fail }) {
   return async function handleDeleteProject(projectId) {
     try {
       await deleteProject(projectId);
     } catch (err) {
       return fail('projects.deleteProjectFailed', { error: apiErrorMessage(err, 'projects.deleteProjectFailed') });
     }
-    if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
-    loadProjects();
+    if (selectedProject === projectId) handleProjectChange(projects.find((p) => projectIdOrSelf(p) !== projectId)?.id ?? '');
+    refreshProjects();
     return { ok: true };
   };
 }
 
 function makeHandleExportProject({ projects, getProjectExportUrl }) {
   return function handleExportProject(projectId) {
-    const proj = projects.find((p) => (p.id || p.name) === projectId);
+    const proj = findProject(projects, projectId);
     const filename = `${sanitizeFilename(proj?.name || projectId)}.zip`;
     // PyWebView: native Save dialog, fetches server-side
     if (window.pywebview?.api?.download_url) {
-      window.pywebview.api.download_url(`/api/projects/${encodeURIComponent(projectId)}/export`, filename);
+      window.pywebview.api.download_url(`/api${projectPath(projectId)}/export`, filename);
       return;
     }
     // Regular browser: <a download> works
@@ -74,7 +80,7 @@ function makeHandleExportProject({ projects, getProjectExportUrl }) {
   };
 }
 
-function makeHandleRelocateProject({ relocateProject, loadProjects, fail }) {
+function makeHandleRelocateProject({ relocateProject, refreshProjects, fail }) {
   return async function handleRelocateProject(projectId, newPath) {
     try {
       await relocateProject(projectId, newPath);
@@ -82,7 +88,7 @@ function makeHandleRelocateProject({ relocateProject, loadProjects, fail }) {
       console.error('Relocate failed:', err);
       return fail('projects.relocateFailed', { error: err.message || t('common.unknownError') });
     }
-    loadProjects();
+    refreshProjects();
     return { ok: true };
   };
 }
@@ -97,9 +103,11 @@ function makeAttemptImport(importProject) {
   };
 }
 
+const IMPORT_CONFLICT_SAME_UUID = 'same_uuid'; // backend import-conflict kind: same project uuid already exists locally
+
 function makeResolveImportConflict(attemptImport) {
   return async function _resolveImportConflict(file, err) {
-    const isSameUuid = err.kind === 'same_uuid';
+    const isSameUuid = err.kind === IMPORT_CONFLICT_SAME_UUID;
     // Four whole sentences rather than one with an optional ` "name"` spliced
     // in: the quoting style is locale-dependent (guillemets, low-high quotes)
     // and the name does not sit in the same place in every word order.
@@ -114,9 +122,9 @@ function makeResolveImportConflict(attemptImport) {
     const actions = isSameUuid
       ? [
           { key: 'copy', label: t('projects.importAsCopy'), variant: 'default' },
-          { key: 'replace', label: t('projects.replace'), variant: 'danger' },
+          { key: 'replace', label: t('projects.replace'), variant: DIALOG_VARIANT.DANGER },
         ]
-      : [{ key: 'copy', label: t('projects.importAsCopy'), variant: 'primary' }];
+      : [{ key: 'copy', label: t('projects.importAsCopy'), variant: DIALOG_VARIANT.PRIMARY }];
     const choice = await chooseDialog({
       title: t('projects.alreadyExistsTitle'),
       message,
@@ -143,7 +151,7 @@ async function pickImportFile() {
   return file;
 }
 
-function makeHandleImportProject({ importProject, loadProjects, fail }) {
+function makeHandleImportProject({ importProject, refreshProjects, fail }) {
   const attemptImport = makeAttemptImport(importProject);
   const resolveImportConflict = makeResolveImportConflict(attemptImport);
   return async function handleImportProject() {
@@ -158,8 +166,16 @@ function makeHandleImportProject({ importProject, loadProjects, fail }) {
     if (!attempt.ok) {
       return fail('projects.importProjectFailed', { error: attempt.err.message || t('common.unknownError') });
     }
-    loadProjects();
+    refreshProjects();
     return { ok: true };
+  };
+}
+
+// A failed list refetch after a mutation that already succeeded is not the
+// mutation failing: the list query surfaces its own failure state.
+function makeRefreshProjects(queryClient) {
+  return function refreshProjects() {
+    invalidateProjects(queryClient).catch((err) => console.warn('[useProjectActions] project list refetch failed:', err));
   };
 }
 
@@ -171,16 +187,17 @@ function makeHandleImportProject({ importProject, loadProjects, fail }) {
  * through `onError(messageKey, vars)` so the caller owns how they are shown.
  */
 export function useProjectActions(
-  { projects, selectedProject, handleProjectChange, loadProjects },
+  { projects, selectedProject, handleProjectChange },
   { onError = () => {} } = {},
 ) {
   const { deleteProject, getProjectExportUrl, relocateProject, importProject } = useApi();
+  const refreshProjects = makeRefreshProjects(useQueryClient());
   const fail = makeFail(onError);
 
-  const handleDeleteProject = makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail });
+  const handleDeleteProject = makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, refreshProjects, fail });
   const handleExportProject = makeHandleExportProject({ projects, getProjectExportUrl });
-  const handleRelocateProject = makeHandleRelocateProject({ relocateProject, loadProjects, fail });
-  const handleImportProject = makeHandleImportProject({ importProject, loadProjects, fail });
+  const handleRelocateProject = makeHandleRelocateProject({ relocateProject, refreshProjects, fail });
+  const handleImportProject = makeHandleImportProject({ importProject, refreshProjects, fail });
 
   return { handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject };
 }

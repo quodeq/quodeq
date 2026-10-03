@@ -6,14 +6,17 @@ from collections.abc import Mapping
 
 from flask import Flask
 
+from quodeq.api._error_handlers import register_unhandled_error_handler
 from quodeq.api._log_buffer import LogBuffer
 from quodeq.api._index_routes import register_index_routes
+from quodeq.api._metrics_routes import register_metrics_routes
 from quodeq.api._log_routes import register_log_routes
 from quodeq.api._log_stream_routes import register_log_stream_routes
 from quodeq.api._run_events_routes import register_run_events_routes
 from quodeq.api._ollama_log_routes import register_ollama_log_routes
 from quodeq.api._llamacpp_log_routes import register_llamacpp_log_routes
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.api.routes_project_clone import register_project_clone_routes
 from quodeq.api.routes import (
     register_project_list_routes,
     register_project_data_routes,
@@ -26,6 +29,7 @@ from quodeq.api.standards_routes import register_standards_routes
 from quodeq.api.assistant_routes import register_assistant_routes
 from quodeq.api.terminal_routes import register_terminal_routes
 from quodeq.api.routes_findings import register_findings_routes
+from quodeq.api.routes_findings_by_type import register_findings_by_type_routes
 from quodeq.api.llm_bridge_routes import register_llm_bridge_routes
 from quodeq.api.routes_rescore import register_rescore_routes
 from quodeq.api.routes_update import register_update_routes
@@ -33,7 +37,10 @@ from quodeq.api.routes_menubar import register_menubar_routes
 from quodeq.api._scores_routes import register_scores_routes
 from quodeq.api.routes_compare import register_compare_routes
 from quodeq.api.routes_runs import register_runs_routes
+from quodeq.api.routes_grade_explain import register_grade_explain_routes
+from quodeq.api.routes_run_diff import register_run_diff_routes
 from quodeq.api.routes_shared import register_shared_routes
+from quodeq.api.routes_github_access import register_github_access_routes
 from quodeq.api._grade_formula_routes import register_grade_formula_routes
 from quodeq.services.warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider
@@ -56,8 +63,10 @@ def register_all_routes(
         env: Environment mapping handed to the route groups that read one,
             captured here at app-creation time. None means ``os.environ``.
     """
+    register_unhandled_error_handler(app)
     register_project_list_routes(app, provider, warmup_engine)
     register_project_data_routes(app, provider)
+    register_project_clone_routes(app)
     register_evaluation_list_routes(app, provider, eval_store)
     register_evaluation_item_routes(app, provider)
     register_log_stream_routes(app)
@@ -69,11 +78,15 @@ def register_all_routes(
     register_assistant_routes(app)
     register_terminal_routes(app)
     register_findings_routes(app)
+    register_findings_by_type_routes(app)
     register_rescore_routes(app)
     register_scores_routes(app)
     register_compare_routes(app)
     register_runs_routes(app)
-    register_shared_routes(app)
+    register_run_diff_routes(app)
+    register_grade_explain_routes(app)
+    register_shared_routes(app, provider)
+    register_github_access_routes(app)
     register_grade_formula_routes(app)
     register_llm_bridge_routes(app)
     if log_buffer:
@@ -81,4 +94,5 @@ def register_all_routes(
     register_update_routes(app)
     register_menubar_routes(app)
     register_index_routes(app)
+    register_metrics_routes(app)
     register_static_routes(app, static_dist)

@@ -11,6 +11,10 @@
  */
 import { lazy } from 'react';
 import { buildProjectRootFile } from '../utils/explorerUtils.js';
+import { NAV_TAB } from '../vocab/navTab.js';
+import { ROW_TYPE, VIOLATIONS_SUB_TAB } from '../features/violations/violationsVocab.js';
+import { typeFile } from '../features/violations/byTypeModel.js';
+import { SEVERITY_FILTER_ALL } from '../vocab/severity.js';
 
 const ViolationsPage = lazy(() => import('../features/violations/components/ViolationsPage.jsx'));
 
@@ -23,7 +27,7 @@ export function buildEvalPrincipal(principleObj, principleGrade, runId) {
   const compliance = principleObj.compliance || [];
   return {
     principle: principleObj.principle,
-    score: principleGrade?.score || null,
+    score: principleGrade?.score ?? null,
     grade: principleGrade?.grade || null,
     dimension: principleObj.dimension || '',
     runId: runId || '',
@@ -47,10 +51,10 @@ function makeNavigateToPrinciple({ dimMap, principleMap, nav }) {
     // backend can rescore and project the action into SQL — without this the
     // PrincipleDetail score never moves on dismiss and the entry never lands
     // on the Dismissed tab.
-    nav('evalprinciple', {
+    nav(NAV_TAB.EVAL_PRINCIPLE, {
       evalPrincipal: buildEvalPrincipal(principleObj, pg, dim?.fromRunId),
       severity,
-      sourceTab: 'violations',
+      sourceTab: NAV_TAB.VIOLATIONS,
     });
   };
 }
@@ -65,12 +69,12 @@ function makeNavigateToDimension({ dimMap, nav }) {
     // aggregated from the dimension, with the chosen severity preselected.
     const dimFile = buildProjectRootFile([dim], dim.dimension);
     const severityFilter = severity || 'all';
-    nav('file', {
+    nav(NAV_TAB.FILE, {
       file: dimFile,
       severityFilter,
       runId: dim.fromRunId,
       dateLabel: dim.fromDateLabel,
-      sourceTab: 'violations',
+      sourceTab: NAV_TAB.VIOLATIONS,
     });
   };
 }
@@ -91,47 +95,58 @@ function buildViolationsData({ props, acc, dims }) {
   };
 }
 
-// ViolationsPage fires onRefresh on EVERY mount (its tabKey effect),
-// including plain drill-down/back navigation with no mutation -- the page
-// remounts on every round trip. onRefresh must stay wired to the lazy
-// refreshDashboard (mark-stale, refetchType:'none') so plain navigation
-// never forces an active refetch of the 10-20 MB dashboard payload.
-// Restore/delete (single + bulk) route through a SEPARATE onReconcile
-// callback via useDismissedFindings, called alongside onRefresh from its
-// four mutation handlers. restore-all/delete-all return a payload
-// applyMutationDelta can't patch (scores:null, delta.isLatest:false), so
-// those need the debounced ACTIVE reconcile -- see scheduleDashboardReconcile
-// in useDashboard.js.
-function buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension }) {
+// ViolationsPage does not refresh on mount. Restore/delete (single + bulk)
+// route through onReconcile via useDismissedFindings; restore-all/delete-all
+// return a payload applyMutationDelta can't patch (scores:null,
+// delta.isLatest:false), so those need the debounced ACTIVE reconcile -- see
+// scheduleDashboardReconcile in useDashboard.js.
+// A type row drills into the findings of that requirement code alone, as a
+// synthetic file built from the dimension's own run (the same mechanism the
+// dimension rows use), so the file page needs no new filter.
+function makeNavigateToType({ dimMap, nav }) {
+  return (row) => {
+    const dim = dimMap.get(row.dimension);
+    if (!dim) return;
+    nav(NAV_TAB.FILE, {
+      file: typeFile(row, dim, `${row.req} · ${row.text || dim.dimension}`),
+      severityFilter: SEVERITY_FILTER_ALL,
+      runId: row.runId,
+      dateLabel: row.dateLabel,
+      sourceTab: NAV_TAB.VIOLATIONS,
+    });
+  };
+}
+function buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension, navigateToType }) {
   return {
-    onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
-    onFileClick: (fileObj, opts) => nav('file', { file: fileObj, sourceTab: 'violations', severityFilter: opts?.severity || null }),
+    onTypeClick: navigateToType,
+    onBumpDismissRefresh: props.bumpDismissRefresh,
+    onDimensionClick: (dim) => nav(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: NAV_TAB.VIOLATIONS }),
+    onFileClick: (fileObj, opts) => nav(NAV_TAB.FILE, { file: fileObj, sourceTab: NAV_TAB.VIOLATIONS, severityFilter: opts?.severity || null }),
     onCellClick: ({ row, severity }) => {
-      if (row.type === 'principle' && row.principleObj) {
+      if (row.type === ROW_TYPE.PRINCIPLE && row.principleObj) {
         navigateToPrinciple(row.principleObj, severity);
       } else {
         navigateToDimension(row, severity);
       }
     },
     onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
-    onRefresh: props.refreshDashboard,
     onReconcile: props.scheduleDashboardReconcile,
     onNavigate: nav,
     onRetry: props.dashboardData.onRetry,
   };
 }
 
-function buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPrinciple, navigateToDimension }) {
+function buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPrinciple, navigateToDimension, navigateToType }) {
   return {
     data: buildViolationsData({ props, acc, dims }),
-    callbacks: buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension }),
+    callbacks: buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension, navigateToType }),
     tabKey: params._tabKey || 0,
     // The by-dimension / by-file / dismissed flip is view state on the SAME
     // screen: it lives in the route entry so back/forward and the crumb see
     // it, but flipping replaces (never pushes) so history doesn't grow.
     // Params are spread forward so _tabKey survives the flip.
-    subTab: params.subTab || 'dimension',
-    onSubTabChange: (v) => props.navigation.handleNavigateReplace('violations', { ...params, subTab: v }),
+    subTab: params.subTab || VIOLATIONS_SUB_TAB.DIMENSION,
+    onSubTabChange: (v) => props.navigation.handleNavigateReplace(NAV_TAB.VIOLATIONS, { ...params, subTab: v }),
   };
 }
 
@@ -166,10 +181,11 @@ export function ViolationsRoute({ params, props }) {
   const { dimMap, principleMap } = violationsLookupsFor(dims);
   const navigateToPrinciple = makeNavigateToPrinciple({ dimMap, principleMap, nav });
   const navigateToDimension = makeNavigateToDimension({ dimMap, nav });
+  const navigateToType = makeNavigateToType({ dimMap, nav });
 
   return (
     <ViolationsPage
-      {...buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPrinciple, navigateToDimension })}
+      {...buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPrinciple, navigateToDimension, navigateToType })}
     />
   );
 }

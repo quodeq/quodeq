@@ -15,7 +15,8 @@ import { copyToClipboard } from '../../../utils/clipboard.js';
 import { splitScore, gradeColorClass, gradeLetter } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
-import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations, formatPer100Files } from './dimensionCardModel.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
+import { toggleInList, computePrincipleOptions, filterViolations, formatPer100Files } from './dimensionCardModel.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 
@@ -49,7 +50,7 @@ function DimFilterControls({ severity, file, principles, activeFilterCount, clea
     <div className="dim-filter-section">
       <div className="filter-row">
         <div className="checkbox-pills">
-          {SEVERITY_OPTIONS.map((sev) => (
+          {KNOWN_SEVERITIES.map((sev) => (
             <button
               key={sev}
               type="button"

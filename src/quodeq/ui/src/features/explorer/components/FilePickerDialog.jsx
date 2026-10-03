@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 function FilePickerList({ filtered, selectedFile, onSelect, onClose, search }) {
   return (
@@ -10,7 +11,7 @@ function FilePickerList({ filtered, selectedFile, onSelect, onClose, search }) {
         aria-selected={!selectedFile}
         tabIndex={0}
         onClick={() => { onSelect(''); onClose(); }}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(''); onClose(); } }}
+        onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onSelect(''); onClose(); } }}
       >
         {t('explorer.allFilesNoFilter')}
       </li>
@@ -22,7 +23,7 @@ function FilePickerList({ filtered, selectedFile, onSelect, onClose, search }) {
           aria-selected={selectedFile === file}
           tabIndex={0}
           onClick={() => { onSelect(file); onClose(); }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(file); onClose(); } }}
+          onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onSelect(file); onClose(); } }}
         >
           {file}
         </li>

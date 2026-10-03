@@ -237,3 +237,10 @@ def test_repo_reads_reflect_dismissal_via_actions_log(tmp_path: Path) -> None:
     # applied the dismissal.
     assert len(findings) == 1
     assert findings[0].verdict == "dismissed"
+
+
+def test_list_keys_returns_requirement_file_line_for_every_row(tmp_path: Path):
+    repo = SqliteFindingsRepository(tmp_path)
+    repo.insert_finding(_finding(p="P1", file="x.py", line=1, req="R1"))
+    repo.insert_finding(_finding(p="P2", file="y.py", line=2))
+    assert repo.list_keys() == [("R1", "x.py", 1), (None, "y.py", 2)]

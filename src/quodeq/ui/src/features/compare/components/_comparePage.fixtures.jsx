@@ -22,6 +22,24 @@ export const PROJECTS = [
   { id: 'beta', name: 'beta', displayName: 'beta', languageStats: { ts: 80 }, totalFiles: 100, analyzedFiles: 100, runsCount: 1, latestDate: iso(2) },
 ];
 
+/**
+ * A fleet-endpoint stub built from a per-project resolver: each id's
+ * summary (tagged with its project) or, when the resolver rejects, its
+ * error message under `errors`.
+ */
+export function fleetOf(perProject) {
+  return async (ids) => {
+    const settled = await Promise.allSettled(ids.map((id) => Promise.resolve().then(() => perProject(id))));
+    const summaries = [];
+    const errors = {};
+    settled.forEach((r, i) => {
+      if (r.status === 'fulfilled') summaries.push({ ...r.value, project: ids[i] });
+      else errors[ids[i]] = r.reason?.message || 'failed';
+    });
+    return { summaries, errors };
+  };
+}
+
 export function summary(score, dimScore) {
   return {
     summary: {
@@ -49,7 +67,7 @@ export function summary(score, dimScore) {
       { runId: 'r2', dateISO: iso(1), numericAverage: score, dimensionDetails: [{ dimension: 'Security', score: dimScore }] },
     ],
     runsCount: 2,
-    lastRun: { runId: 'r2', dateISO: iso(1), status: 'complete' },
+    lastRun: { runId: 'r2', dateISO: iso(1), status: 'done' },
   };
 }
 

@@ -1,9 +1,19 @@
 """Each environment read takes an explicit mapping; ``os.environ`` is only the default."""
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
 import pytest
+
+# (module, accessor name, env var, default) for the poll/wait/timeout accessors
+# that fall back to their default on an unparsable or out-of-range value.
+_BOUNDED_INT_ACCESSORS = [
+    ("quodeq.api._sse_log_helpers", "_poll_ms", "QUODEQ_LOG_STREAM_POLL_MS", 100),
+    ("quodeq.api._sse_log_helpers", "_max_wait_s", "QUODEQ_LOG_STREAM_MAX_WAIT_S", 10),
+    ("quodeq.dashboard._build_npm", "_npm_install_timeout_s", "QUODEQ_NPM_INSTALL_TIMEOUT_S", 300),
+    ("quodeq.dashboard._build_npm", "_npm_build_timeout_s", "QUODEQ_NPM_BUILD_TIMEOUT_S", 600),
+]
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +68,7 @@ def test_llamacpp_base_url_is_read_at_call_time(monkeypatch):
     assert _llamacpp._default_base_url(env={"LLAMACPP_BASE_URL": "http://x:1"}) == "http://x:1"
     monkeypatch.setenv("LLAMACPP_BASE_URL", "http://late:2")
     seen: list[str] = []
-    monkeypatch.setattr(_llamacpp, "_normalize_base", lambda url: seen.append(url) or "http://late:2")
+    monkeypatch.setattr(_llamacpp, "normalize_base", lambda url: seen.append(url) or "http://late:2")
     monkeypatch.setattr(_llamacpp.urllib.request, "urlopen",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
     _llamacpp.get_llamacpp_status()
@@ -76,3 +86,16 @@ def test_providers_path_honours_injected_env(tmp_path: Path):
 
     assert providers_path(env={}) == _DEFAULT_PATH
     assert providers_path(env={"QUODEQ_AI_PROVIDERS_PATH": str(tmp_path / "p.json")}) == tmp_path / "p.json"
+
+
+@pytest.mark.parametrize("module_name,func_name,var,default", _BOUNDED_INT_ACCESSORS)
+@pytest.mark.parametrize("bad_value", ["abc", "0", "-5"])
+def test_bounded_int_accessor_falls_back_on_invalid_value(module_name, func_name, var, default, bad_value):
+    accessor = getattr(importlib.import_module(module_name), func_name)
+    assert accessor(env={var: bad_value}) == default
+
+
+@pytest.mark.parametrize("module_name,func_name,var,_default", _BOUNDED_INT_ACCESSORS)
+def test_bounded_int_accessor_honours_a_valid_value(module_name, func_name, var, _default):
+    accessor = getattr(importlib.import_module(module_name), func_name)
+    assert accessor(env={var: "250"}) == 250

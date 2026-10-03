@@ -52,3 +52,20 @@ describe('ZoomablePackView container Escape key (#1907)', () => {
     expect(svg).toHaveClass('viz-focusable');
   });
 });
+
+// Labels belong to the children of the focused node. A view-mode switch
+// builds a new hierarchy while `focus` still points at a node from the old
+// one, so nothing matched until a zoom re-pointed focus into the new tree.
+describe('ZoomablePackView focus across layouts', () => {
+  const labels = (container) => [...container.querySelectorAll('text')].map((n) => n.textContent);
+
+  it('keeps the focused folder and its labels after a view-mode switch', () => {
+    const { container, rerender } = render(
+      <ZoomablePackView node={NODE} viewMode="violations" currentPath="root/a/" />
+    );
+    expect(labels(container)).toEqual(['foo.js']);
+
+    rerender(<ZoomablePackView node={NODE} viewMode="health" currentPath="root/a/" />);
+    expect(labels(container)).toEqual(['foo.js']);
+  });
+});

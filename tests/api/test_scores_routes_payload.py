@@ -7,6 +7,7 @@ import pytest
 
 from quodeq.data.projection.projector import Projector
 from quodeq.services.scoring import get_scores_raw, get_scores_slim
+from quodeq.services.scoring.compliance_detail import DETAIL_FIELDS
 from tests.api._scores_routes_helpers import _DEFAULT_VIOLATION, _scorable_violations, _seed_run
 
 
@@ -156,38 +157,35 @@ def test_get_scores_raw_summary_has_required_fields(tmp_path: Path) -> None:
 # Slim variant (GET /scores/<runId> payload diet)
 # ---------------------------------------------------------------------------
 
-def test_get_scores_slim_reduces_violations_to_identity_keys(tmp_path: Path) -> None:
-    """The run-scores route serves ``get_scores_slim``: each violation keeps
-    only the ``req``/``file``/``line`` fields the Explorer's rescore merge
-    uses as identity keys — heavy fields (reason, snippet, context) are gone.
-    """
+def _raw_and_slim(tmp_path: Path) -> tuple[dict, dict]:
     _seed_run(tmp_path, "myproject", "r1", violations=_scorable_violations())
-
-    result = get_scores_slim(tmp_path, "myproject", "r1")
-
-    dim = next(d for d in result["dimensions"] if d["dimension"] == "Security")
-    assert dim["violations"], "slim payload must still carry violation keys"
-    for v in dim["violations"]:
-        assert set(v.keys()) == {"req", "file", "line"}
-        assert v["file"] and v["line"] is not None
+    return get_scores_raw(tmp_path, "myproject", "r1"), get_scores_slim(tmp_path, "myproject", "r1")
 
 
-def test_get_scores_slim_drops_compliance_but_keeps_scores(tmp_path: Path) -> None:
-    """Compliance bodies are never read from this payload — the list is
-    emptied while grades, principles, totals, and summary stay identical to
-    the raw payload.
-    """
-    _seed_run(tmp_path, "myproject", "r1", violations=_scorable_violations())
-
-    raw = get_scores_raw(tmp_path, "myproject", "r1")
-    slim = get_scores_slim(tmp_path, "myproject", "r1")
+def test_get_scores_slim_keeps_the_scalars(tmp_path: Path) -> None:
+    """The run-scores route serves ``get_scores_slim``: summary and every
+    per-dimension scalar (scores, principles, totals, list lengths) match the
+    raw payload the run page used to get from the full dashboard."""
+    raw, slim = _raw_and_slim(tmp_path)
 
     assert slim["summary"] == raw["summary"]
-    for raw_dim, slim_dim in zip(raw["dimensions"], slim["dimensions"]):
-        assert slim_dim["compliance"] == []
-        assert slim_dim["dimension"] == raw_dim["dimension"]
-        assert slim_dim["overallScore"] == raw_dim["overallScore"]
-        assert slim_dim["overallGrade"] == raw_dim["overallGrade"]
-        assert slim_dim["principles"] == raw_dim["principles"]
-        assert slim_dim["totals"] == raw_dim["totals"]
-        assert len(slim_dim["violations"]) == len(raw_dim["violations"])
+    scalars = ("dimension", "overallScore", "principles", "totals")
+    assert [[d[k] for k in scalars] for d in slim["dimensions"]] == [[d[k] for k in scalars] for d in raw["dimensions"]]
+    assert [len(d["violations"]) for d in slim["dimensions"]] == [len(d["violations"]) for d in raw["dimensions"]]
+    assert [len(d["compliance"]) for d in slim["dimensions"]] == [len(d["compliance"]) for d in raw["dimensions"]]
+
+
+def test_get_scores_slim_defers_finding_detail(tmp_path: Path) -> None:
+    """Every item keeps its identity and scalar fields (the Explorer merges
+    by ``req``/``file``/``line``, the run page sorts by severity and
+    principle) and drops the text fields ``/compliance-detail?run=`` refills.
+    """
+    raw, slim = _raw_and_slim(tmp_path)
+
+    raw_items = [v for d in raw["dimensions"] for v in d["violations"]]
+    slim_items = [v for d in slim["dimensions"] for v in d["violations"]]
+    assert slim_items, "slim payload must still carry the violations"
+    assert all(v["detailDeferred"] is True for v in slim_items)
+    assert not any(set(v) & DETAIL_FIELDS for v in slim_items)
+    identity = ("req", "file", "line", "severity")
+    assert [[v[k] for k in identity] for v in slim_items] == [[v[k] for k in identity] for v in raw_items]

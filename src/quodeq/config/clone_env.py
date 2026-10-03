@@ -7,12 +7,16 @@ call, and passed in.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
+from pathlib import Path
 
 from quodeq.shared.env import env_int
 
 # One month of slack over the default git churn lookback (git_lookback_months,
 # 3) so the boundary commit is never cut off.
 _DEFAULT_SHALLOW_MONTHS = 4
+
+_GIT_CLONE_TIMEOUT_DEFAULT_S = 300  # QUODEQ_GIT_CLONE_TIMEOUT_S fallback
 
 
 def git_clone_timeout_s(env: dict[str, str] | None = None) -> int:
@@ -21,7 +25,7 @@ def git_clone_timeout_s(env: dict[str, str] | None = None) -> int:
     Honors QUODEQ_GIT_CLONE_TIMEOUT_S; malformed or sub-1 values fall back
     to the default (300).
     """
-    return env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", 300, minimum=1, env=env)
+    return env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", _GIT_CLONE_TIMEOUT_DEFAULT_S, minimum=1, env=env)
 
 
 def clone_shallow_months(env: dict[str, str] | None = None) -> int:
@@ -31,8 +35,26 @@ def clone_shallow_months(env: dict[str, str] | None = None) -> int:
     larger git churn lookback, or set to 0 to force full-history clones.
     Malformed values fall back to the default (4).
     """
-    raw = (os.environ if env is None else env).get("QUODEQ_CLONE_SHALLOW_MONTHS", "")
-    try:
-        return int(raw) if raw else _DEFAULT_SHALLOW_MONTHS
-    except ValueError:
-        return _DEFAULT_SHALLOW_MONTHS
+    return env_int("QUODEQ_CLONE_SHALLOW_MONTHS", _DEFAULT_SHALLOW_MONTHS, env=env, warn=False)
+
+
+_GIT_PROBE_TIMEOUT_DEFAULT_S = 15  # QUODEQ_GIT_PROBE_TIMEOUT_S fallback
+
+
+def git_probe_timeout_s(env: dict[str, str] | None = None) -> int:
+    """Timeout for the pre-clone reachability probe (``git ls-remote``).
+
+    Honors QUODEQ_GIT_PROBE_TIMEOUT_S; malformed or sub-1 values fall back
+    to the default (15). Short on purpose: the probe exists so a missing
+    credential surfaces in seconds, not at the 300 s clone timeout.
+    """
+    return env_int("QUODEQ_GIT_PROBE_TIMEOUT_S", _GIT_PROBE_TIMEOUT_DEFAULT_S, minimum=1, env=env)
+
+
+def default_clone_root(env: Mapping[str, str] | None = None) -> Path:
+    """Where a project cloned without an explicit destination lands.
+
+    Honors QUODEQ_REPOS_DIR when set and non-blank, else ``~/quodeq/repos``.
+    """
+    configured = (os.environ if env is None else env).get("QUODEQ_REPOS_DIR", "").strip()
+    return Path(configured) if configured else Path.home() / "quodeq" / "repos"

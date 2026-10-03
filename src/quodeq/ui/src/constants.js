@@ -1,4 +1,29 @@
+import { GRANULARITY } from './utils/granularity.js';
+import { SECONDS_PER_MINUTE, MS_PER_SECOND } from './utils/time.js';
+
+const UNDEFINED_TYPEOF = 'undefined'; // typeof sentinel for the event-dispatch helpers' "are we in a browser" guard
+
 export const ISO_25010_URL = 'https://www.iso.org/';
+
+// Upper bound of every dimension/principle/overall score axis: scores are
+// always shown and compared on a 0-10 scale. Shared across the score charts,
+// compare views, the grade-formula boundary editor and the map visualization
+// so they all agree on where "full score" is.
+export const SCORE_SCALE_MAX = 10;
+
+// Fraction-to-percent multiplier, and the ceiling of any value already on
+// the percent axis (a progress bar's aria-valuemax, a percent field's full
+// value). Shared by every `* 100` percent conversion and percent-scale
+// ceiling across the app so they all agree on what "100%" means. Not a
+// general-purpose "100" default — a value on a different 0-100 domain scale
+// (e.g. confidence) gets its own name next to that scale's other constants.
+export const PERCENT = 100;
+
+// Idle timeout for an SSE stream (the assistant chat and the eval job log):
+// no frame for this long and the stream is treated as stalled and torn
+// down. Shared by useAssistantStream and useJobLogStream so both time out
+// identically instead of drifting apart if one is tuned and not the other.
+export const STREAM_INACTIVITY_MS = SECONDS_PER_MINUTE * MS_PER_SECOND;
 
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
 // These client-side defaults can be overridden by server config (ai_providers.json).
@@ -12,19 +37,18 @@ export const TIME_LIMIT_STORAGE_KEY = 'cc-time-limit';
 export const AI_CMD_STORAGE_KEY = 'cc-ai-cmd';
 export const PER_DIMENSION_STORAGE_KEY = 'cc-per-dimension';
 
-export const ACTIVE_PROVIDER_KEY = 'cc-active-provider';
+// The analysis-power tier (fast/balanced/thorough): canonical home for
+// powerLevels.js's STORAGE_KEY, so hook-layer code (evaluationLifecycleHelpers.js)
+// doesn't have to import a UI components module for a storage key.
+export const ANALYSIS_POWER_STORAGE_KEY = 'quodeq-analysis-power';
 
-// Providers that talk to a local model server. They default to no time limit
-// (Settings renders them as "Unlimited" and only writes the key once the user
-// edits it), so every reader of the stored limit must agree on the list or the
-// UI and the run disagree about whether the run is limited at all.
-export const LOCAL_API_PROVIDERS = new Set(['ollama', 'llamacpp', 'omlx']);
+export const ACTIVE_PROVIDER_KEY = 'cc-active-provider';
 
 export function providerKey(providerId, setting) {
   return `cc-${providerId}-${setting}`;
 }
 
-// Written under providerKey(id, 'api-key') instead of the raw credential once
+// Written under providerKey(id, PROVIDER_SETTING_KEY.API_KEY) instead of the raw credential once
 // the backend confirms it stored one, so "configured" survives a reload
 // without the key itself ever going back into localStorage. Lives here, next
 // to providerKey, because both the settings hook that writes it and the
@@ -36,6 +60,27 @@ export function providerKey(providerId, setting) {
 // on files that never touch it).
 export const PROVIDER_CONFIGURED_MARKER = '•configured•';
 
+// providerKey() setting-name suffixes shared across the provider-settings
+// hook, its tabs, the legacy migration, the onboarding active-provider
+// reader and the effective-settings resolver — one home so all of them read
+// the same suffix. POOL_BUDGET is the legacy name TIME_LIMIT replaced, still
+// read as a fallback.
+export const PROVIDER_SETTING_KEY = Object.freeze({
+  MODEL: 'model',
+  MODEL_ANALYSIS: 'model-analysis',
+  MODEL_FAST: 'model-fast',
+  MODEL_BALANCED: 'model-balanced',
+  MODEL_THOROUGH: 'model-thorough',
+  SUBAGENTS: 'subagents',
+  TIME_LIMIT: 'time-limit',
+  PER_DIMENSION: 'per-dimension',
+  VERIFY: 'verify',
+  API_KEY: 'api-key',
+  API_BASE: 'api-base',
+  CMD_PATH: 'cmd-path',
+  POOL_BUDGET: 'pool-budget',
+});
+
 // Fired (same-tab) whenever any provider setting is written — the analysis
 // active-provider or a per-provider model. The assistant gate listens for it
 // so that in Default mode (which mirrors the analysis provider/model) the
@@ -44,7 +89,7 @@ export const PROVIDER_CONFIGURED_MARKER = '•configured•';
 export const PROVIDER_SETTINGS_CHANGED_EVENT = 'cc-provider-settings-changed';
 
 export function notifyProviderSettingsChanged() {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== UNDEFINED_TYPEOF) {
     window.dispatchEvent(new Event(PROVIDER_SETTINGS_CHANGED_EVENT));
   }
 }
@@ -58,7 +103,7 @@ export const STANDARDS_CHANGED_EVENT = 'quodeq:standards-changed';
 export const STANDARDS_CHANGED_REASON = Object.freeze({ VISIBILITY: 'visibility', LIST: 'list' });
 
 export function notifyStandardsChanged(reason) {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== UNDEFINED_TYPEOF) {
     window.dispatchEvent(new CustomEvent(STANDARDS_CHANGED_EVENT, { detail: { reason } }));
   }
 }
@@ -73,14 +118,7 @@ export const DEFAULT_VISIBLE_STANDARDS = [
 ];
 
 export const SCORE_HISTORY_GRANULARITY_STORAGE_KEY = 'quodeq-score-history-granularity';
-export const SCORE_HISTORY_GRANULARITIES = ['day', 'week', 'month'];
-export const DEFAULT_SCORE_HISTORY_GRANULARITY = 'day';
-
-// Where a selected project's data lives: this machine's evaluations or the
-// shared repository mirror. Wire value and the cache-key segment (queryKeys).
-export const PROJECT_SOURCE = Object.freeze({ LOCAL: 'local', SHARED: 'shared' });
-// What every source-taking factory and hook falls back to when none is passed.
-export const DEFAULT_PROJECT_SOURCE = PROJECT_SOURCE.LOCAL;
+export const DEFAULT_SCORE_HISTORY_GRANULARITY = GRANULARITY.DAY;
 
 // Fired (same-tab) by the assistant's ActionPreviewCard after a successful
 // apply, with { actionType, scores, delta } as detail. App-level effects and
@@ -88,10 +126,15 @@ export const DEFAULT_PROJECT_SOURCE = PROJECT_SOURCE.LOCAL;
 export const ASSISTANT_ACTION_APPLIED_EVENT = 'quodeq:assistant-action-applied';
 
 export function notifyAssistantActionApplied(detail) {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== UNDEFINED_TYPEOF) {
     window.dispatchEvent(new CustomEvent(ASSISTANT_ACTION_APPLIED_EVENT, { detail }));
   }
 }
+
+// Fired (same-tab) after Settings kills every terminal session server-side,
+// so TerminalPane can reconcile its stale views. See TerminalSection.jsx
+// (dispatcher) and TerminalPane.jsx (listener).
+export const TERMINAL_RESTART_EVENT = 'quodeq:terminal-restart';
 
 // <html> attribute carrying the applied theme; every theme CSS selector keys on it.
 export const DATA_THEME_ATTR = 'data-theme';
@@ -104,8 +147,32 @@ export const MOBILE_BREAKPOINT_QUERY = `(max-width: ${MOBILE_BREAKPOINT_PX}px)`;
 // Third-party contract: pywebview dispatches this on window once its JS
 // bridge is injected. Never rename.
 export const PYWEBVIEW_READY_EVENT = 'pywebviewready';
+// The native shell dispatches this on window when it minimises, hides or
+// restores, carrying `{ detail: { hidden: boolean } }`. pywebview never
+// changes document.visibilityState, so this is the only hidden signal the
+// desktop app gets. Mirrored in dashboard/_webview_window_visibility.py.
+export const APP_VISIBILITY_EVENT = 'quodeq:visibility';
 
 // HTTP status codes the UI branches on by name (a 409 collision, a 404
 // gone-missing). Not a full status enum, only the codes callers compare
 // against res.status / err.status.
 export const HTTP_STATUS = Object.freeze({ CONFLICT: 409, NOT_FOUND: 404 });
+
+// URL.protocol values (trailing colon included, per the URL spec) the UI
+// branches on: openExternal's web-scheme allowlist and terminalSocketUrl's
+// http(s) -> ws(s) upgrade.
+export const URL_PROTOCOL = Object.freeze({ HTTP: 'http:', HTTPS: 'https:' });
+
+// Run-id sentinel meaning "the most recently completed run" -- the
+// default/fallback wherever a specific run id has not been selected
+// (query keys, the run navigator, route params). Never a real run id.
+export const LATEST_RUN_ID = 'latest';
+
+// Fetch/DOMException .name values from AbortSignal.timeout(): api/projects.js
+// (registerProject) treats
+// either as "the request timed out or was aborted", not a real server error.
+export const FETCH_ERROR_NAME = Object.freeze({ TIMEOUT: 'TimeoutError', ABORT: 'AbortError' });
+
+// Promise.allSettled()'s result.status for a resolved promise: the health
+// port scan (hooks/useServerHealth.js) and onboarding's provider probes.
+export const SETTLED_FULFILLED = 'fulfilled';

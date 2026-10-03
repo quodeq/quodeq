@@ -1,6 +1,7 @@
 """Local filesystem backend — atomic writes, sharding, corruption handling."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -180,3 +181,32 @@ class TestContentIndexWiring:
     def test_stats_ignore_the_index_file(self, backend: LocalFileBackend):
         backend.put("k1" * 32, self._entry("k1" * 32, path="A.swift"))
         assert backend.stats().entries == 1
+
+
+class TestTempFiles:
+    def test_put_succeeds_when_the_pid_and_id_temp_name_is_taken(self, backend: LocalFileBackend, tmp_path: Path):
+        entry = _make_entry()
+        target_dir = tmp_path / "cache" / entry.key[:2] / entry.key[2:]
+        target_dir.mkdir(parents=True)
+        (target_dir / f".tmp.{os.getpid()}.{id(entry):x}").mkdir()
+        backend.put(entry.key, entry)
+        loaded = backend.get(entry.key)
+        assert loaded is not None
+        assert loaded.findings == entry.findings
+
+    def test_failed_replace_leaves_the_entry_untouched_and_no_temp_file(
+        self, backend: LocalFileBackend, tmp_path: Path, monkeypatch,
+    ):
+        entry = _make_entry()
+        backend.put(entry.key, entry)
+        target_dir = tmp_path / "cache" / entry.key[:2] / entry.key[2:]
+        before = (target_dir / "entry.json").read_text(encoding="utf-8")
+
+        def failing_replace(src, dst):
+            raise OSError("disk full")
+        monkeypatch.setattr(os, "replace", failing_replace)
+        newer = _make_entry()
+        newer.findings = [{"new": True}]
+        backend.put(newer.key, newer)
+        assert (target_dir / "entry.json").read_text(encoding="utf-8") == before
+        assert sorted(p.name for p in target_dir.iterdir()) == ["entry.json"]

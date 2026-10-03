@@ -62,16 +62,33 @@ function useAssistantCatalog(isOpen) {
   return catalog;
 }
 
+// The fields the drawer context carries from the chrome and the
+// conversation hooks; the memoised value is rebuilt only when one changes.
+const CHROME_FIELDS = [
+  'isOpen', 'open', 'close', 'toggle', 'closeActiveTab', 'closePanel',
+  'openPanels', 'activeTab', 'openTab', 'selectTab', 'toggleTopbar', 'terminalEnabled',
+  'height', 'setHeight', 'maximized', 'toggleMaximized', 'setMaximized',
+];
+const CONVERSATION_FIELDS = [
+  'messages', 'turnActive', 'localError', 'sessionId', 'sessionMeta',
+  'webEnabled', 'toggleWebEnabled', 'writeEnabled', 'toggleWriteEnabled',
+  'repoInfo', 'readOnly', 'workspace', 'refreshWorkspace',
+  'catalog', 'addLocalExchange', 'startSession', 'sendMessage', 'stopTurn', 'resetConversation',
+];
+
+function pickFields(source, names) {
+  return Object.fromEntries(names.map((name) => [name, source[name]]));
+}
+
 // The context value the drawer exposes. Everything the caller passes is
-// forwarded as-is except the few fields that are renamed or derived here, so
-// the long field list is spelled out at the call site only.
+// forwarded as-is except the few fields that are renamed or derived here.
 function buildDrawerContextValue({
-  turnActive, localError, stream, sessionId, sessionMeta, ...passthrough
+  turnActive, localError, streamError, sessionId, sessionMeta, ...passthrough
 }) {
   return {
     ...passthrough,
     streaming: turnActive,
-    error: localError || stream.error,
+    error: localError || streamError,
     sessionReady: sessionId != null,
     provider: sessionMeta.provider,
     model: sessionMeta.model,
@@ -103,35 +120,15 @@ function useAssistantConversation(isOpen) {
 }
 
 export function AssistantDrawerProvider({ children }) {
-  const {
-    isOpen, open, close, toggle, closeActiveTab, closePanel,
-    openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
-    height, setHeight, maximized, toggleMaximized, setMaximized,
-  } = useDrawerChrome();
+  const chrome = useDrawerChrome();
+  const conversation = useAssistantConversation(chrome.isOpen);
 
-  const {
-    catalog, messages, sessionId, sessionMeta, localError, stream, turnActive,
-    webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
-    repoInfo, workspace, readOnly, refreshWorkspace,
-    addLocalExchange, startSession, sendMessage, stopTurn, resetConversation,
-  } = useAssistantConversation(isOpen);
-
-  const value = useMemo(() => buildDrawerContextValue({
-    isOpen, open, close, toggle, closeActiveTab, closePanel,
-    openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
-    height, setHeight, maximized, toggleMaximized, setMaximized,
-    messages, turnActive, localError, stream, sessionId, sessionMeta,
-    webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
-    repoInfo, readOnly, workspace, refreshWorkspace,
-    catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation,
-  }), [
-    isOpen, open, close, toggle, closeActiveTab, closePanel, openPanels, activeTab,
-    openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized,
-    toggleMaximized, messages, turnActive, stream.error, localError, sessionId,
-    sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
-    repoInfo, readOnly, workspace, refreshWorkspace, catalog, addLocalExchange,
-    startSession, sendMessage, stopTurn, resetConversation,
-  ]);
+  const fields = {
+    ...pickFields(chrome, CHROME_FIELDS),
+    ...pickFields(conversation, CONVERSATION_FIELDS),
+    streamError: conversation.stream.error,
+  };
+  const value = useMemo(() => buildDrawerContextValue(fields), Object.values(fields));
 
   return (
     <AssistantDrawerContext.Provider value={value}>

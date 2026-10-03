@@ -25,15 +25,16 @@ function setup(overrides = {}) {
   }));
   const queryClient = { fetchQuery: vi.fn() };
   const mountedRef = { current: true };
-  const { result } = renderHook(() => usePublishPolling({
+  const props = {
     queryClient,
     sharedListProjects: vi.fn(),
     getSharedStatus,
     applyOptimisticPublish: vi.fn(),
     mountedRef,
     ...overrides,
-  }));
-  return { result, getSharedStatus };
+  };
+  const { result, rerender } = renderHook(() => usePublishPolling(props));
+  return { result, rerender, getSharedStatus };
 }
 
 describe('usePublishPolling', () => {
@@ -111,5 +112,17 @@ describe('usePublishPolling', () => {
       expect.stringContaining('[usePublishPolling]'),
       expect.any(Error),
     );
+  });
+
+  // The poll timer holds one checkStatus for its whole life, so the callback
+  // must not be rebuilt by a render that changed none of its collaborators.
+  it('keeps the same checkStatus across a rerender with stable collaborators', () => {
+    const { result, rerender } = setup();
+    const before = result.current.checkStatus;
+
+    rerender();
+
+    expect(result.current.checkStatus).toBe(before);
+    expect(result.current.startPolling).toBe(result.current.startPolling);
   });
 });

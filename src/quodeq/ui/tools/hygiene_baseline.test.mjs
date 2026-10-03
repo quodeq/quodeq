@@ -1,6 +1,6 @@
 // The hygiene ratchet burned its last grandfathered entries -- 30 over-complex
-// functions across 26 files -- to zero in maintainability cycle 3 (PR 6). This
-// pins it there: an entry creeping back in means a function was grandfathered
+// functions across 26 files -- to zero. This pins it there: an entry
+// creeping back in means a function was grandfathered
 // instead of split.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

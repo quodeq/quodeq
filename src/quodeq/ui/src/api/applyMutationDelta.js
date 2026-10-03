@@ -1,5 +1,6 @@
 /**
- * Patch the React Query dashboard/scores caches from a dismiss mutation delta.
+ * Patch the React Query dashboard, run findings and scores caches from a
+ * mutation delta.
  *
  * The dismiss endpoint returns a ``delta`` describing the mutation; this writer
  * folds it into the cached dashboard/scores payloads so the Overview updates
@@ -14,6 +15,8 @@
  */
 import { projectKeys } from "./queryKeys";
 import { violationKey } from "../utils/violationKey.js";
+import { LATEST_RUN_ID } from "../constants.js";
+import { DEFAULT_PROJECT_SOURCE } from "../vocab/projectSource.js";
 
 function clampNonNegative(n) {
   return Math.max(0, n | 0);
@@ -51,8 +54,9 @@ function removeDismissed(dim, dismissed) {
 }
 
 /**
- * Apply the rescored per-dimension score/grade to a dimension when present in
- * scoreByDim. Returns the SAME object when there's nothing to patch.
+ * Apply the rescored per-dimension score/grade, and the recounted totals
+ * when the server sent them, to a dimension present in scoreByDim. Returns
+ * the SAME object when there's nothing to patch.
  */
 function patchDimScore(dim, scoreByDim) {
   const resc = scoreByDim.get(dim?.dimension);
@@ -61,19 +65,24 @@ function patchDimScore(dim, scoreByDim) {
     ...dim,
     overallScore: resc.overallScore ?? dim.overallScore,
     overallGrade: resc.overallGrade ?? dim.overallGrade,
+    totals: resc.totals ?? dim.totals,
   };
 }
 
 // Kinds this writer understands. dismiss splices the violation locally; the
-// rest (restore/delete and their -all bulk forms) can't cheaply/correctly
-// reconstruct the violation-list change, so they invalidate the run-detail
-// violation source and let it refetch on next view.
-const KNOWN_KINDS = new Set(["dismiss", "restore", "delete", "restore_all", "delete_all"]);
+// rest (restore/delete and their -all bulk forms, and dismiss_many for a
+// whole requirement type, whose removed keys are not in the delta) can't
+// cheaply/correctly reconstruct the violation-list change, so they
+// invalidate the run-detail violation source and let it refetch on next view.
+const MUTATION_KIND_DISMISS = "dismiss"; // the one kind that splices the cached violation list locally
+const KNOWN_KINDS = new Set([MUTATION_KIND_DISMISS, "restore", "delete", "restore_all", "delete_all", "dismiss_many"]);
 
-// Patch dim score/grade in place, preserving referential identity for
-// untouched dims. ``spliceDismissed`` additionally removes the dismissed
-// violation from the dashboard cache (which carries full violation arrays);
-// the per-run scores cache is slim so it never splices.
+// Patch dim score/grade (and totals) in place, preserving referential
+// identity for untouched dims. ``spliceDismissed`` additionally removes the
+// dismissed violation from the run findings cache (the one cache with
+// violation arrays); the dashboard overview and the accumulated scores carry
+// counts only, so the server's recounted totals cover them. The splice runs
+// first so a dim the delta did not rescore still loses the row and one count.
 function makePatchScores(queryClient, scoreByDim, dismissed) {
   return (key, { spliceDismissed = false } = {}) => {
     const prev = queryClient.getQueryData(key);
@@ -84,8 +93,8 @@ function makePatchScores(queryClient, scoreByDim, dismissed) {
     queryClient.setQueryData(key, (old) => ({
       ...old,
       dimensions: old.dimensions.map((dim) => {
-        const scored = patchDimScore(dim, scoreByDim);
-        return spliceDismissed ? removeDismissed(scored, dismissed) : scored;
+        const spliced = spliceDismissed ? removeDismissed(dim, dismissed) : dim;
+        return patchDimScore(spliced, scoreByDim);
       }),
     }));
   };
@@ -142,25 +151,30 @@ function makeInvalidateViolations(queryClient) {
   };
 }
 
+// The dashboard entry (overview shape: scores and counts, no lists).
+const overviewKey = (projectId, runId) => projectKeys.dashboard(projectId, runId, DEFAULT_PROJECT_SOURCE);
+
 function applyRunScopedPatches({ runId, projectId, patchScores, invalidateViolations, splices }) {
   if (!runId) return;
-  const dashKey = projectKeys.dashboard(projectId, runId);
+  const dashKey = overviewKey(projectId, runId);
+  const findingsKey = projectKeys.runScores(projectId, runId);
   const scoresKey = projectKeys.scores(projectId, runId);
-  // Score-patch is shared across all kinds; dashboard additionally splices
-  // for dismiss.
-  patchScores(dashKey, { spliceDismissed: splices });
+  // Score-patch is shared across all kinds; the run findings (the run page's
+  // and the Explorer's lists) additionally splice for dismiss.
+  patchScores(dashKey);
+  patchScores(findingsKey, { spliceDismissed: splices });
   patchScores(scoresKey);
   // Non-dismiss kinds can't mirror the violation-list change locally →
   // invalidate the run-detail sources so they refetch (scores already patched).
   if (!splices) {
-    invalidateViolations(dashKey);
+    invalidateViolations(findingsKey);
     invalidateViolations(scoresKey);
   }
 }
 
-function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims, splices }) {
+function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims }) {
   if (!delta.isLatest) return;
-  patchScores(projectKeys.dashboard(projectId, "latest"), { spliceDismissed: splices });
+  patchScores(overviewKey(projectId, LATEST_RUN_ID));
   if (delta.accumulated) {
     // A caller supplied the authoritative rollup — prefer it.
     patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);
@@ -184,9 +198,10 @@ function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumul
  * grades and violation lists reflect a dismiss/restore/delete immediately
  * instead of waiting for a refetch.
  *
- * A dismiss splices the finding out of the cached lists (it carries the full
- * violation key); every other kind invalidates the affected lists instead.
- * Unknown kinds and missing arguments are no-ops.
+ * A dismiss splices the finding out of the cached run findings (it carries
+ * the full violation key); every other kind invalidates the affected lists
+ * instead. Counts come from the rescored dimensions' totals. Unknown kinds
+ * and missing arguments are no-ops.
  *
  * @param {import('@tanstack/react-query').QueryClient} queryClient
  * @param {string} projectId
@@ -201,7 +216,7 @@ export function applyMutationDelta(queryClient, projectId, delta) {
   const dismissed = delta.dismissed || {};
   // Only dismiss can splice locally — it carries the full violation key and is
   // a single-finding removal. Every other kind invalidates instead.
-  const splices = delta.kind === "dismiss";
+  const splices = delta.kind === MUTATION_KIND_DISMISS;
   const runId = delta.runId;
 
   const patchScores = makePatchScores(queryClient, scoreByDim, dismissed);
@@ -210,5 +225,5 @@ export function applyMutationDelta(queryClient, projectId, delta) {
   const invalidateViolations = makeInvalidateViolations(queryClient);
 
   applyRunScopedPatches({ runId, projectId, patchScores, invalidateViolations, splices });
-  applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims, splices });
+  applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims });
 }

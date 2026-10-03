@@ -3,10 +3,9 @@ import { describe, it, expect, vi } from 'vitest';
 import DashboardPage from './DashboardPage.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
 
-// Split from DashboardPage.test.jsx: the no-runs -> first-run transition
-// (P5-T2).
+// Split from DashboardPage.test.jsx: the no-runs -> first-run transition.
 
-// P5-T2: the no-runs -> first-run transition. The redundant
+// The no-runs -> first-run transition. The redundant
 // eval-completion refetch, but the sequence "No evaluations yet" -> (dashboard
 // key changes to the new run) -> loader -> content still had two bugs: a
 // window-refocus/background refetch of an empty project used to render a
@@ -35,7 +34,7 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
     );
     expect(getByText('No evaluations yet')).toBeTruthy();
     expect(container.querySelector('.loading-screen')).toBeNull();
-    expect(container.querySelector('.dashboard-page').className).toContain('dashboard-refreshing');
+    expect(container.querySelector('.dashboard-page').className).toContain('section-pending');
   });
 
   it('keeps the empty state (dimmed) through the post-eval selectedRun flip, then swaps straight to content', () => {
@@ -55,11 +54,11 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
     );
     expect(getByText('No evaluations yet')).toBeTruthy();
     expect(container.querySelector('.loading-screen')).toBeNull();
-    expect(container.querySelector('.dashboard-page').className).toContain('dashboard-refreshing');
+    expect(container.querySelector('.dashboard-page').className).toContain('section-pending');
 
     const dims = [{ dimension: 'maintainability', overallScore: '7.0/10' }];
 
-    // Finding 2 (P5 final review): the dashboard query settles before the
+    // The dashboard query settles before the
     // scores query does -- dashboard payload is in, accumulated isn't yet.
     // Releasing the latch here (the pre-fix !dashboard check) swapped the
     // dimmed empty state for the full inline loader for a beat before
@@ -74,7 +73,7 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
             accumulated: null,
             loading: true,
             isFetching: true,
-            availableRuns: [{ runId: 'r1', status: 'complete' }],
+            availableRuns: [{ runId: 'r1', status: 'done' }],
           }}
           callbacks={{}}
           runMode={false}
@@ -83,7 +82,7 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
     );
     expect(getByText('No evaluations yet')).toBeTruthy();
     expect(container.querySelector('.loading-screen')).toBeNull();
-    expect(container.querySelector('.dashboard-page').className).toContain('dashboard-refreshing');
+    expect(container.querySelector('.dashboard-page').className).toContain('section-pending');
 
     rerender(
       <SidePaneProvider>
@@ -94,7 +93,7 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
             accumulated: { dimensions: dims },
             loading: false,
             isFetching: false,
-            availableRuns: [{ runId: 'r1', status: 'complete' }],
+            availableRuns: [{ runId: 'r1', status: 'done' }],
           }}
           callbacks={{}}
           runMode={false}

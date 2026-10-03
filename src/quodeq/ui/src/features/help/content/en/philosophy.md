@@ -29,4 +29,4 @@ Each principle is scored 0 to 10 under four constraints.
 - A log-based **violation ceiling** stops compliance from masking real problems. You cannot reach *Exemplary* with critical issues in play.
 - A **severity grade floor** keeps the label honest. Only an actual critical violation can produce a *Critical* grade.
 
-Quodeq ships with ISO 25010 dimensions plus Clean Architecture and DDD. It works in any language, and you can write your own standards for whatever quality means in your project.
+Quodeq ships with ISO 25010 dimensions plus Clean Architecture, DDD and WCAG 2.2 Accessibility. It works in any language, and you can write your own standards for whatever quality means in your project.

@@ -2,11 +2,11 @@ import os
 
 import pytest
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services.score_cache import (
     accumulated_cache_version,
-    cached_accumulated,
-    load_run_keys,
+    load_run_key_sets,
     open_score_cache,
     per_run_versions,
 )
@@ -49,19 +49,6 @@ def test_version_folds_visible_dims_only_when_given():
         DEFAULT_PARAMS, runs, None, visible_dims=("reliability", "security"))
 
 
-def test_cached_accumulated_miss_then_hit(tmp_path, monkeypatch):
-    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
-    calls = []
-
-    def compute():
-        calls.append(1)
-        return {"dimensions": [], "summary": {"x": 1}}
-    r1 = cached_accumulated("proj", "v1", compute)     # miss -> compute + cache
-    r2 = cached_accumulated("proj", "v1", lambda: (_ for _ in ()).throw(AssertionError("recomputed on hit")))
-    assert r1 == r2 == {"dimensions": [], "summary": {"x": 1}}
-    assert calls == [1]
-
-
 def test_per_run_versions_status_flip_reinvalidates(tmp_path, monkeypatch):
     """A run flipping in_progress -> complete must change the accumulated version.
 
@@ -74,9 +61,9 @@ def test_per_run_versions_status_flip_reinvalidates(tmp_path, monkeypatch):
     pd = tmp_path / "proj"; pd.mkdir()
 
     in_progress = per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "in_progress")], keys=_NO_KEYS)
+        pd, "proj", DEFAULT_PARAMS, [("r1", RunState.RUNNING)], keys=_NO_KEYS)
     complete = per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
+        pd, "proj", DEFAULT_PARAMS, [("r1", RunState.DONE)], keys=_NO_KEYS)
     assert in_progress != complete  # status carried in the tuple
 
     v_ip = accumulated_cache_version(DEFAULT_PARAMS, in_progress, None)
@@ -88,20 +75,20 @@ def test_per_run_versions_does_not_persist_in_progress_keys(tmp_path, monkeypatc
     """Non-terminal runs must not freeze a partial run_keys snapshot.
 
     Persisting an in-progress run's partial findings set would freeze it
-    (load_run_keys short-circuits any re-read), so a suppression targeting a key
+    (a persisted key set short-circuits any re-read), so a suppression targeting a key
     that appears only after the run is observed mid-scan would silently
     under-invalidate.
     """
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     pd = tmp_path / "proj"; pd.mkdir()
 
-    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "in_progress")], keys=_NO_KEYS)
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.RUNNING)], keys=_NO_KEYS)
     with open_score_cache() as conn:
-        assert load_run_keys(conn, "proj") == {}  # nothing persisted
+        assert load_run_key_sets(conn, "proj", "r2") is None  # nothing persisted
 
-    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r2", "complete")], keys=_NO_KEYS)
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r2", RunState.DONE)], keys=_NO_KEYS)
     with open_score_cache() as conn:
-        assert "r2" in load_run_keys(conn, "proj")  # terminal run persisted
+        assert load_run_key_sets(conn, "proj", "r2") is not None  # terminal run persisted
 
 
 @pytest.mark.skipif(
@@ -119,57 +106,7 @@ def test_per_run_versions_degrades_on_unopenable_cache(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(ro_dir / "sc.db"))
     os.chmod(ro_dir, 0o500)  # read+execute only: the db file can never be created
     try:
-        out = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
+        out = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.DONE)], keys=_NO_KEYS)
     finally:
         os.chmod(ro_dir, 0o700)
-    assert [(rid, status) for rid, status, _ in out] == [("r1", "complete")]
-
-
-def test_cached_accumulated_not_cacheable_serves_without_persisting(tmp_path, monkeypatch):
-    """A payload the caller flags as incomplete must be served but never written.
-
-    Regression: a rescore built from a partial run read (1 of 6 dims in the
-    process LRU) was persisted under a version hash identical to the complete
-    payload's, so the half-rescored row was a permanent cache hit.
-    """
-    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
-    calls = []
-
-    def compute():
-        calls.append(1)
-        return {"dimensions": [], "summary": {"partial": True}}
-    r1 = cached_accumulated("proj", "v1", compute, cacheable=lambda _p: False)
-    assert r1 == {"dimensions": [], "summary": {"partial": True}}
-    # Same version misses again: nothing was persisted.
-    r2 = cached_accumulated("proj", "v1", compute, cacheable=lambda _p: False)
-    assert r2 == r1
-    assert calls == [1, 1]
-
-
-def test_cached_accumulated_cacheable_true_persists(tmp_path, monkeypatch):
-    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
-    calls = []
-
-    def compute():
-        calls.append(1)
-        return {"dimensions": [], "summary": {"x": 1}}
-    cached_accumulated("proj", "v1", compute, cacheable=lambda _p: True)
-    r2 = cached_accumulated(
-        "proj", "v1",
-        lambda: (_ for _ in ()).throw(AssertionError("recomputed on hit")),
-        cacheable=lambda _p: True,
-    )
-    assert r2 == {"dimensions": [], "summary": {"x": 1}}
-    assert calls == [1]
-
-
-def test_cached_accumulated_kill_switch(tmp_path, monkeypatch):
-    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
-    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
-    calls = []
-
-    def compute():
-        calls.append(1); return {"y": 2}
-    assert cached_accumulated("proj", "v1", compute) == {"y": 2}
-    assert cached_accumulated("proj", "v1", compute) == {"y": 2}
-    assert calls == [1, 1]  # never cached
+    assert [(rid, status) for rid, status, _ in out] == [("r1", RunState.DONE)]

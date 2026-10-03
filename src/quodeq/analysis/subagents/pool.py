@@ -12,16 +12,17 @@ from quodeq.analysis.subagents._pool_models import (
     PoolOptions,
     PoolPaths,
     SubagentResult,
-    _AGENT_ID_PREFIX,
-    _HEARTBEAT_JOIN_TIMEOUT_S,
+    agent_id_for,
+    HEARTBEAT_JOIN_TIMEOUT_S,
 )
 from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_config, run_single_agent
 from quodeq.analysis.subagents.file_queue import WorkQueue
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.core.evidence.req_mapping import build_principle_resolver
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
-from quodeq.shared.constants import DEFAULT_TIME_LIMIT
+from quodeq.shared.constants import CONSOLIDATED_DIMENSION_KEY, DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 
 # Re-export public API so existing imports keep working.
@@ -46,7 +47,7 @@ class SubagentPool:
         dimension = options.dimension
         if isinstance(dimension, list):
             self._dimensions, self._dimension = dimension, ",".join(dimension)
-            self._dimension_key = "consolidated"
+            self._dimension_key = CONSOLIDATED_DIMENSION_KEY
         else:
             self._dimensions = [dimension] if dimension else []
             self._dimension, self._dimension_key = dimension, dimension
@@ -57,10 +58,11 @@ class SubagentPool:
         )
         self._scout_first, self._jsonl_lock = options.scout_first, threading.Lock()
         self._phase = options.phase
+        self._agent_failure_streak_limit = options.agent_failure_streak_limit
         self._futures: dict[Future[SubagentResult], int] = {}
         self._finished: dict[str, bool] = {}
         self._next_idx = 0
-        self.exit_reason: str = "done"
+        self.exit_reason: str = ExitReason.DONE
 
     def _shared_jsonl_path(self) -> Path:
         return self._evidence_dir / f"{self._dimension_key}_evidence.jsonl"
@@ -75,9 +77,18 @@ class SubagentPool:
         )
 
     def _submit_agent(self, executor: ThreadPoolExecutor) -> None:
-        self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+        self._finished[agent_id_for(self._next_idx)] = False
         self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
         self._next_idx += 1
+
+    def _run_config_evaluators_dir(self) -> Path | None:
+        """The run's evaluators dir, read off ``base_config.run_config`` the
+        same way the heartbeat's principle resolver reads it -- so the
+        suppression matcher and the resolver never disagree on which
+        custom-evaluator files exist. None (not the global default) when the
+        run has no evaluators dir configured."""
+        run_config = getattr(self._base_config, "run_config", None)
+        return getattr(run_config, "evaluators_dir", None)
 
     def _suppression_predicate(self):
         """Predicate the heartbeat uses to net dismissed/deleted findings out.
@@ -92,12 +103,15 @@ class SubagentPool:
         dimension key would never match a real delete key anyway. The counts
         then stay raw, which is the pre-existing behaviour.
         """
-        if self._dimension_key == "consolidated":
+        if self._dimension_key == CONSOLIDATED_DIMENSION_KEY:
             return None
         try:
             from quodeq.services.suppression import matcher_for  # noqa: PLC0415
             project_dir = self._evidence_dir.parent.parent
-            matcher = matcher_for(project_dir, self._dimension_key)
+            matcher = matcher_for(
+                project_dir, self._dimension_key,
+                evaluators_dir=self._run_config_evaluators_dir(),
+            )
         except (ImportError, OSError, ValueError) as exc:
             log_warning(f"Suppression state unavailable, counts stay raw: {exc}")
             return None
@@ -105,7 +119,6 @@ class SubagentPool:
 
     def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
         stop = threading.Event()
-        run_config = getattr(self._base_config, "run_config", None)
         ctx = HeartbeatContext(
             queue_path=self._queue_path, dimension_key=self._dimension_key,
             jsonl_path=self._shared_jsonl_path(), lock=self._jsonl_lock,
@@ -114,7 +127,7 @@ class SubagentPool:
             # heartbeat counts what the report will keep.
             resolver=build_principle_resolver(
                 self._dimension_key,
-                getattr(run_config, "evaluators_dir", None),
+                self._run_config_evaluators_dir(),
                 self._base_config.compiled_dir,
                 req_map_reader=read_req_to_principle_map,
             ),
@@ -148,6 +161,8 @@ class SubagentPool:
                 evidence_dir=self._evidence_dir, dimension_key=self._dimension_key,
                 submit_fn=lambda: self._submit_agent(pool),
                 deadline_at=self._base_config.deadline_at,
+                run_deadline_at=self._base_config.run_deadline_at,
+                agent_failure_streak_limit=self._agent_failure_streak_limit,
             )
             if self._scout_first:
                 scout_loop(ctx)
@@ -160,21 +175,21 @@ class SubagentPool:
         try:
             self._run_loops(results, max_dur, pool_start)
         except BaseException:
-            self.exit_reason = "error"
+            self.exit_reason = ExitReason.ERROR
             raise
         finally:
             stop.set()
-            hb.join(timeout=_HEARTBEAT_JOIN_TIMEOUT_S)
+            hb.join(timeout=HEARTBEAT_JOIN_TIMEOUT_S)
 
     def _record_exit_reason(self, max_dur: int, pool_start: float) -> None:
         """Without an exception, decide between "done" and "time_limit"."""
         elapsed = time.monotonic() - pool_start
         if max_dur > 0 and elapsed >= max_dur:
-            self.exit_reason = "time_limit"
+            self.exit_reason = ExitReason.TIME_LIMIT
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, returning a SubagentResult per agent."""
-        self.exit_reason = "done"
+        self.exit_reason = ExitReason.DONE
         max_dur = self._base_config.time_limit if self._base_config.time_limit is not None else DEFAULT_TIME_LIMIT
         pool_start = time.monotonic()
         self._log_launch()

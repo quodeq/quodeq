@@ -10,8 +10,9 @@ from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
-from quodeq.api._rate_limit_config import _rate_limit_max, _rate_limit_window, default_rate_limit_path
+from quodeq.api._rate_limit_config import rate_limit_max, rate_limit_window, default_rate_limit_path
 from quodeq.core.utils.file_lock import lock_file, unlock_file
+from quodeq.shared.json_state import dump_json_and_replace
 
 _logger = logging.getLogger(__name__)
 
@@ -22,6 +23,19 @@ _DEFAULT_PATH = str(default_rate_limit_path())
 # The shared file_lock default (60s, sized for the subagent pool's batch
 # workload) would do exactly that, so the request path passes its own.
 _LOCK_TIMEOUT_S = 1.5
+
+
+def _drop_idle_ips(data: dict, now: float, window: float) -> None:
+    """Remove every IP with no timestamp inside *window*, so the state file
+    stops growing with every client ever seen. Values that are not a list of
+    numbers (the file is user-writable) are dropped too."""
+    idle = [
+        ip for ip, stamps in data.items()
+        if not isinstance(stamps, list) or not any(
+            isinstance(t, (int, float)) and now - t < window for t in stamps)
+    ]
+    for ip in idle:
+        del data[ip]
 
 
 class FileRateLimitStore:
@@ -54,8 +68,8 @@ class FileRateLimitStore:
     ) -> None:
         self._path = Path(path)
         self._lock = threading.Lock()
-        self._window = window if window is not None else _rate_limit_window()
-        self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
+        self._window = window if window is not None else rate_limit_window()
+        self._max_requests = max_requests if max_requests is not None else rate_limit_max()
         self._cache: dict[str, list[float]] | None = None
         self._cache_loaded_at = 0.0
         # None means "never flushed yet" -- distinct from 0.0, which a caller
@@ -70,11 +84,18 @@ class FileRateLimitStore:
     def _load(self) -> dict[str, list[float]]:
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
+        except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError, OSError):
             return {}
         # The state file is plain user-writable JSON; a valid non-object value
-        # (array, scalar) would crash record()/check() at data.get(...).
-        return data if isinstance(data, dict) else {}
+        # (array, scalar) would crash record()/check() at data.get(...), and a
+        # per-IP value that is not a list of numbers would crash the
+        # timestamp comprehensions, so both are normalised away here.
+        if not isinstance(data, dict):
+            return {}
+        return {
+            ip: [t for t in stamps if isinstance(t, (int, float)) and not isinstance(t, bool)]
+            for ip, stamps in data.items() if isinstance(stamps, list)
+        }
 
     def _save(self, data: dict[str, list[float]]) -> None:
         parent = self._path.parent
@@ -86,39 +107,45 @@ class FileRateLimitStore:
         # Write a fresh temp file then os.replace() onto the target. If an
         # attacker planted a symlink at self._path, the rename replaces the
         # link itself with our regular file and never truncates its target.
-        payload = json.dumps(data).encode("utf-8")
-        tmp_fd, tmp_name = tempfile.mkstemp(dir=parent, prefix=".rl-", suffix=".tmp")
+        tmp_name: str | None = None
         try:
-            with os.fdopen(tmp_fd, "wb") as fh:
-                fh.write(payload)
-            os.chmod(tmp_name, 0o600)
-            os.replace(tmp_name, self._path)
+            tmp_fd, tmp_name = tempfile.mkstemp(dir=parent, prefix=".rl-", suffix=".tmp")
+            dump_json_and_replace(tmp_fd, tmp_name, self._path, data, mode=0o600)
         except OSError:
             _logger.warning("Failed to write rate-limit file %s", self._path)
-            try:
-                os.unlink(tmp_name)
-            except OSError as exc:
-                _logger.debug("temp rate-limit file %s not removed: %s", tmp_name, exc)
+            if tmp_name is not None:
+                try:
+                    os.unlink(tmp_name)
+                except OSError as exc:
+                    _logger.debug("temp rate-limit file %s not removed: %s", tmp_name, exc)
 
     def _cache_for(self, now: float) -> dict[str, list[float]]:
         """Return the in-memory cache, refilling from disk if stale. Caller
         must hold self._lock."""
         stale = self._cache is None or now - self._cache_loaded_at >= self._CACHE_TTL_S
         if stale:
-            if self._cache is not None and self._dirty:
-                # A reload discards self._cache and replaces it wholesale.
-                # If it still holds writes from this process that were never
-                # flushed (the flush TTL hadn't elapsed yet), persist them
-                # first -- otherwise the reload silently drops them, even
-                # with no crash involved. This keeps the "within-process
-                # writes are never lost" guarantee independent of how the
-                # reload TTL and the flush TTL happen to line up.
-                self._save(self._cache)
-                self._last_flush = now
-                self._dirty = False
+            # A reload discards self._cache and replaces it wholesale, so
+            # writes from this process that were never flushed (the flush
+            # TTL hadn't elapsed yet) are persisted first. This keeps the
+            # "within-process writes are never lost" guarantee independent
+            # of how the reload TTL and the flush TTL happen to line up.
+            self._flush_pending(now)
             self._cache = self._load()
             self._cache_loaded_at = now
         return self._cache
+
+    def _persist(self, data: dict[str, list[float]], now: float) -> None:
+        """Write *data* to disk and mark the cache clean as of *now*.
+        Caller must hold self._lock."""
+        self._save(data)
+        self._last_flush = now
+        self._dirty = False
+
+    def _flush_pending(self, now: float) -> None:
+        """Persist cached writes that were never flushed, before the cache
+        is replaced by a fresh read. Caller must hold self._lock."""
+        if self._cache is not None and self._dirty:
+            self._persist(self._cache, now)
 
     def _flush(self, now: float, *, force: bool) -> None:
         """Persist the in-memory cache if forced or the flush TTL elapsed.
@@ -126,9 +153,7 @@ class FileRateLimitStore:
         if not self._dirty:
             return
         if force or self._last_flush is None or now - self._last_flush >= self._CACHE_TTL_S:
-            self._save(self._cache)
-            self._last_flush = now
-            self._dirty = False
+            self._persist(self._cache, now)
 
     def record(self, ip: str, now: float) -> None:
         """Record a request from *ip* at time *now*."""
@@ -143,6 +168,7 @@ class FileRateLimitStore:
                 data[ip] = pruned
             else:
                 data.pop(ip, None)
+            _drop_idle_ips(data, now, self._window)
             self._dirty = True
             self._flush(now, force=False)
 
@@ -204,24 +230,19 @@ class FileRateLimitStore:
     def _check_and_record_locked(self, ip: str, now: float) -> bool:
         """check_and_record()'s read-modify-write. Caller holds self._lock and,
         when it could be taken, the cross-process lock."""
-        if self._cache is not None and self._dirty:
-            # Mirror _cache_for()'s protection: this instance may hold
-            # writes from a prior record() call that were buffered in
-            # memory but not yet flushed (the flush TTL hadn't elapsed).
-            # Reloading from disk and then overwriting it below would
-            # silently discard them from both disk and memory.
-            self._save(self._cache)
-            self._last_flush = now
-            self._dirty = False
+        # This instance may hold writes from a prior record() call that were
+        # buffered in memory but not yet flushed. Reloading from disk and
+        # then overwriting it below would silently discard them from both
+        # disk and memory.
+        self._flush_pending(now)
         data = self._load()
         timestamps = [t for t in data.get(ip, []) if now - t < self._window]
         limited = len(timestamps) >= self._max_requests
         if not limited:
             timestamps.append(now)
             data[ip] = timestamps
-            self._save(data)
-            self._last_flush = now
-            self._dirty = False
+            _drop_idle_ips(data, now, self._window)
+            self._persist(data, now)
         # Keep this process's fast path (record()/check()) warm with the
         # state we just confirmed on disk, win or lose.
         self._cache = data

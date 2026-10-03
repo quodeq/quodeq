@@ -1,27 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
+import { LATEST_RUN_ID } from '../constants.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 // Builds the prev/next/latest/view/select handlers that operate on the
-// overview run index.
-function makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, availableRuns, onRunChange, onNavigate, currentOverviewRun }) {
+// overview run index. The index update is synchronous so the clicked bar
+// highlights in the click's own commit; the run change (which swaps the
+// dashboard and scores queries) runs as a transition behind it.
+function makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, availableRuns, changeRun: onRunChange, onNavigate, currentOverviewRun }) {
   function handleRunPrev() {
     const idx = Math.min(overviewRunIndex + 1, availableRuns.length - 1);
     setOverviewRunIndex(idx);
-    onRunChange(availableRuns[idx]?.runId || 'latest');
+    onRunChange(availableRuns[idx]?.runId || LATEST_RUN_ID);
   }
 
   function handleRunNext() {
     const idx = Math.max(overviewRunIndex - 1, 0);
     setOverviewRunIndex(idx);
-    onRunChange(availableRuns[idx]?.runId || 'latest');
+    onRunChange(availableRuns[idx]?.runId || LATEST_RUN_ID);
   }
 
   function handleRunLatest() {
     setOverviewRunIndex(0);
-    onRunChange(availableRuns[0]?.runId || 'latest');
+    onRunChange(availableRuns[0]?.runId || LATEST_RUN_ID);
   }
 
   function handleRunView() {
-    onNavigate('run', { runId: currentOverviewRun });
+    onNavigate(NAV_TAB.RUN, { runId: currentOverviewRun });
   }
 
   function handleRunSelect(runId) {
@@ -41,16 +45,18 @@ function makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, avail
  * @param {Array} opts.availableRuns - Array of { runId, dateLabel, ... }
  * @param {Function} opts.onRunChange - Callback when run selection changes
  * @param {Function} opts.onNavigate - Callback to push a page onto the nav stack
- * @returns {{ overviewRunIndex: number, currentOverviewRun: string, handleRunPrev: Function,
+ * @returns {{ overviewRunIndex: number, currentOverviewRun: string, isRunSwitchPending: boolean, handleRunPrev: Function,
  *   handleRunNext: Function, handleRunLatest: Function, handleRunView: Function,
  *   handleRunSelect: Function }}
  */
 export function useRunNavigator({ selectedRun, availableRuns, onRunChange, onNavigate }) {
   const [overviewRunIndex, setOverviewRunIndex] = useState(0);
+  const [isRunSwitchPending, startRunSwitch] = useTransition();
+  const changeRun = (runId) => startRunSwitch(() => onRunChange(runId));
 
   useEffect(() => {
     if (!availableRuns.length) return;
-    if (selectedRun === 'latest') {
+    if (selectedRun === LATEST_RUN_ID) {
       setOverviewRunIndex(0);
     } else {
       const idx = availableRuns.findIndex((r) => r.runId === selectedRun);
@@ -58,13 +64,14 @@ export function useRunNavigator({ selectedRun, availableRuns, onRunChange, onNav
     }
   }, [selectedRun, availableRuns]);
 
-  const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
+  const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || LATEST_RUN_ID;
 
-  const handlers = makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, availableRuns, onRunChange, onNavigate, currentOverviewRun });
+  const handlers = makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, availableRuns, changeRun, onNavigate, currentOverviewRun });
 
   return {
     overviewRunIndex,
     currentOverviewRun,
+    isRunSwitchPending,
     ...handlers,
   };
 }

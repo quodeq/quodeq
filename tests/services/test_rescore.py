@@ -127,7 +127,7 @@ def test_rescore_summary_reflects_dimension_changes():
 
 def test_rescore_dimension_uses_evidence_when_run_dir_given(tmp_path):
     """When run_dir has `<dim>_evidence.jsonl`, the score comes from the
-    evidence rescorer (Task 5), not the in-place legacy formula.
+    evidence rescorer, not the in-place legacy formula.
     """
     ev = tmp_path / "evidence"
     ev.mkdir()

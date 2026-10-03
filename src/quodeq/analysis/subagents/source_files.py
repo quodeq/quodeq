@@ -1,7 +1,6 @@
 """Source file listing and filtering for subagent queues."""
 from __future__ import annotations
 
-from quodeq.analysis import dispatch_policy
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 
@@ -11,14 +10,10 @@ def _resolve_source_files(config: RunConfig) -> tuple[list[str], set[str]] | Non
 
     None when neither the target nor the manifest has source files.
     """
-    if config.target is not None and config.target.source_files:
-        files = config.target.source_files
-        extensions = set(config.target.language_stats.keys()) if config.target.language_stats else set()
-        return files, extensions
-    if config.manifest is not None and config.manifest.source_files:
-        files = config.manifest.source_files
-        extensions = set(config.manifest.language_stats.keys()) if config.manifest.language_stats else set()
-        return files, extensions
+    for source in (config.target, config.manifest):
+        if source is not None and source.source_files:
+            extensions = set(source.language_stats.keys()) if source.language_stats else set()
+            return source.source_files, extensions
     return None
 
 
@@ -33,11 +28,15 @@ def _resolve_priority_category(config: RunConfig) -> str | None:
 
 def list_source_files(
     config: RunConfig, dim_id: str, *, ignore_file_filter: bool = False,
+    prioritize: bool = True,
 ) -> tuple[list[str], set[str], list[str]]:
     """List source files for the subagent queue from the target or manifest.
 
     Returns (files, extensions, excluded) or ([], set(), []) if none found.
-    Files are returned in priority order (most important first).
+    Files are returned in priority order (most important first), or in
+    source order with ``prioritize=False``. Prioritizing reads every file and
+    the git log but never adds or drops one, so callers that only count the
+    files can skip it.
 
     ``excluded`` holds files the active provider can never dispatch (API
     size cap) — kept out of ``files`` so queues, estimates, and coverage
@@ -49,22 +48,23 @@ def list_source_files(
     files, extensions = resolved
 
     excluded: list[str] = []
-    if dispatch_policy.provider_is_api():
-        files, excluded = dispatch_policy.split_api_dispatchable(config.src, files)
+    policy = config.dispatch_policy()
+    if policy.provider_is_api():
+        files, excluded = policy.split_api_dispatchable(config.src, files)
         if not files:
             return [], extensions, excluded
 
-    # Prioritize files: most important first
-    evidence_dir = config.work_dir or config.src
-    files = prioritize_files(
-        files, config.src, dim_id,
-        context=PriorityContext(
-            category=_resolve_priority_category(config),
-            language=config.language,
-            evidence_dir=evidence_dir,
-            config=config,
-        ),
-    )
+    if prioritize:
+        evidence_dir = config.work_dir or config.src
+        files = prioritize_files(
+            files, config.src, dim_id,
+            context=PriorityContext(
+                category=_resolve_priority_category(config),
+                language=config.language,
+                evidence_dir=evidence_dir,
+                config=config,
+            ),
+        )
 
     # Incremental mode: filter to only changed + dependent files
     if not ignore_file_filter and config.options.incremental_file_filter is not None:

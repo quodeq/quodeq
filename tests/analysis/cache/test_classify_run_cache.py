@@ -13,7 +13,7 @@ each pass is fast, but they are still pure redundant work — three
 thousand SHA-256s + three thousand ``cache.get`` calls performed twice.
 
 The fix is a small per-``RunConfig`` cache: when the run activates it
-(by setting ``_classify_cache = {}``), ``classify_files_via_cache``
+(by setting ``classify_stash = {}``), ``classify_files_via_cache``
 populates the dict on the first call for a given ``dim_id`` and short-
 circuits the second call when the file list still matches.
 
@@ -59,18 +59,18 @@ def cache(tmp_path: Path) -> LocalFileBackend:
 
 
 def test_classify_populates_run_cache_when_attached(tmp_path: Path, cache: LocalFileBackend):
-    """When ``_classify_cache`` is an empty dict, the first call stores
+    """When ``classify_stash`` is an empty dict, the first call stores
     the (files, result) pair under the dimension id.
     """
     src = tmp_path / "src"
     files = _write_files(src, {"a.py": "x", "b.py": "y"})
     config = _make_config(src)
-    config._classify_cache = {}
+    config.classify_stash = {}
 
     result = classify_files_via_cache(config, "security", files, cache)
 
-    assert "security" in config._classify_cache
-    stashed_files, stashed_result = config._classify_cache["security"]
+    assert "security" in config.classify_stash
+    stashed_files, stashed_result = config.classify_stash["security"]
     assert stashed_files == tuple(files)
     assert stashed_result is result
 
@@ -82,7 +82,7 @@ def test_classify_reuses_stashed_result_on_second_call(tmp_path: Path, cache: Lo
     src = tmp_path / "src"
     files = _write_files(src, {"a.py": "x", "b.py": "y"})
     config = _make_config(src)
-    config._classify_cache = {}
+    config.classify_stash = {}
 
     first = classify_files_via_cache(config, "security", files, cache)
 
@@ -107,7 +107,7 @@ def test_classify_ignores_stash_when_files_differ(tmp_path: Path, cache: LocalFi
     full = _write_files(src, {"a.py": "x", "b.py": "y", "c.py": "z"})
     narrow = ["a.py"]
     config = _make_config(src)
-    config._classify_cache = {}
+    config.classify_stash = {}
 
     classify_files_via_cache(config, "security", full, cache)
     result = classify_files_via_cache(config, "security", narrow, cache)
@@ -126,7 +126,7 @@ def test_classify_does_not_use_stash_when_bypass_reads_true(tmp_path: Path, cach
     src = tmp_path / "src"
     files = _write_files(src, {"a.py": "x"})
     config = _make_config(src)
-    config._classify_cache = {}
+    config.classify_stash = {}
 
     first = classify_files_via_cache(config, "security", files, cache, bypass_reads=False)
     second = classify_files_via_cache(config, "security", files, cache, bypass_reads=True)
@@ -138,17 +138,17 @@ def test_classify_does_not_use_stash_when_bypass_reads_true(tmp_path: Path, cach
 
 
 def test_classify_works_without_stash_attached(tmp_path: Path, cache: LocalFileBackend):
-    """When ``_classify_cache`` is None (the default), classify behaves
+    """When ``classify_stash`` is None (the default), classify behaves
     exactly as before — no stash side effects, no errors.
     """
     src = tmp_path / "src"
     files = _write_files(src, {"a.py": "x"})
     config = _make_config(src)
-    assert config._classify_cache is None
+    assert config.classify_stash is None
 
     result = classify_files_via_cache(config, "security", files, cache)
     assert isinstance(result, ClassifyResult)
-    assert config._classify_cache is None
+    assert config.classify_stash is None
 
 
 def test_classify_stash_isolated_per_dimension(tmp_path: Path, cache: LocalFileBackend):
@@ -158,13 +158,13 @@ def test_classify_stash_isolated_per_dimension(tmp_path: Path, cache: LocalFileB
     src = tmp_path / "src"
     files = _write_files(src, {"a.py": "x"})
     config = _make_config(src)
-    config._classify_cache = {}
+    config.classify_stash = {}
 
     sec_result = classify_files_via_cache(config, "security", files, cache)
     flex_result = classify_files_via_cache(config, "flexibility", files, cache)
 
-    assert "security" in config._classify_cache
-    assert "flexibility" in config._classify_cache
+    assert "security" in config.classify_stash
+    assert "flexibility" in config.classify_stash
     # Different dims produce different miss_keys (cache keys include dimension).
     sec_key = next(iter(sec_result.miss_keys.values()))
     flex_key = next(iter(flex_result.miss_keys.values()))
@@ -178,7 +178,7 @@ def test_classify_cache_accessor_returns_named_stash(tmp_path: Path, cache: Loca
     src = tmp_path / "src"
     files = _write_files(src, {"a.py": "x"})
     config = _make_config(src)
-    config._classify_cache = {}
+    config.classify_stash = {}
 
     result = classify_files_via_cache(config, "security", files, cache)
 
@@ -192,5 +192,5 @@ def test_classify_cache_accessor_none_when_absent(tmp_path: Path):
     """No stash dict, or no entry for the dim, reads as None."""
     config = _make_config(tmp_path / "src")
     assert config.classify_cache("security") is None
-    config._classify_cache = {}
+    config.classify_stash = {}
     assert config.classify_cache("security") is None

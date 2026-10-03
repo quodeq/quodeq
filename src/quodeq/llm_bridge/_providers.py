@@ -1,8 +1,20 @@
 """Provider detection, configuration, and type classification."""
 from __future__ import annotations
 
+from enum import StrEnum
+
 from quodeq.analysis.provider_cache import get_provider_configs as _get_cached_configs
 from quodeq.config.llm_bridge_env import api_key as _api_key, local_api_markers
+from quodeq.config.provider import Provider, ProviderType
+
+
+class _ProviderClass(StrEnum):
+    """classify_provider()'s own classification -- not the provider config's
+    cli/api ``type`` field (see ``ProviderType``)."""
+
+    CLI = "cli"
+    LOCAL_API = "local-api"
+    CLOUD_API = "cloud-api"
 
 
 def get_provider_configs() -> dict[str, dict]:
@@ -13,13 +25,14 @@ def get_provider_configs() -> dict[str, dict]:
 def get_provider_type(provider_id: str) -> str:
     """Return 'cli' or 'api' for a provider ID."""
     configs = get_provider_configs()
-    return configs.get(provider_id, {}).get("type", "cli")
+    return configs.get(provider_id, {}).get("type", ProviderType.CLI)
 
 
 # Fixed-endpoint local model servers. The assistant's in-process web tools
 # (search_web/fetch_url) are only ever registered for these providers; cloud
 # API providers (openrouter/custom) are excluded by design.
-LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
+# omlx is a provider-config id with no Provider member.
+LOCAL_PROVIDERS = frozenset({Provider.OLLAMA, Provider.LLAMACPP, "omlx"})
 
 
 def _local_api_markers(env: dict[str, str] | None = None) -> frozenset[str]:
@@ -50,11 +63,11 @@ def _is_local_api(provider_id: str, *, markers: frozenset[str] | None = None) ->
 def classify_provider(provider_id: str, *, markers: frozenset[str] | None = None) -> str:
     """Classify a provider as 'cli', 'local-api', or 'cloud-api'."""
     ptype = get_provider_type(provider_id)
-    if ptype == "cli":
-        return "cli"
+    if ptype == ProviderType.CLI:
+        return _ProviderClass.CLI
     if _is_local_api(provider_id, markers=markers):
-        return "local-api"
-    return "cloud-api"
+        return _ProviderClass.LOCAL_API
+    return _ProviderClass.CLOUD_API
 
 
 def resolve_api_key_env(provider_id: str = "", api_base: str = "") -> str:
@@ -86,3 +99,44 @@ def resolve_api_key(
     """
     env_name = resolve_api_key_env(provider_id, api_base)
     return _api_key(env_name, env), env_name
+
+
+def _same_endpoint(requested: str, configured: str) -> bool:
+    return requested.rstrip("/") == configured.rstrip("/")
+
+
+def resolve_test_endpoint(
+    provider_id: str, api_base: str, api_key: str,
+) -> tuple[str, str, str]:
+    """Resolve the effective ``(api_base, api_key, api_key_env)`` for a
+    ``/api/provider/test`` call.
+
+    *api_base*/*api_key* are the request body's values (possibly empty). An
+    empty *api_base* falls back to the provider config's default; an empty
+    *api_key* is resolved from the environment. *api_key_env* is returned
+    with it, so the caller can report which variable is missing.
+
+    The environment key belongs to the provider's configured endpoint. A
+    body that names a different *api_base* gets neither the key nor the
+    env name, so the server's credential is never sent to a host the
+    request chose.
+    """
+    configs = get_provider_configs()
+    provider_cfg = configs.get(provider_id, {}) if provider_id else {}
+    resolved_base = api_base or provider_cfg.get("api_base", "")
+    api_key_env = ""
+    if not api_key and _catalog_endpoint(api_base, provider_cfg):
+        api_key, api_key_env = resolve_api_key(provider_id, resolved_base)
+    return resolved_base, api_key, api_key_env
+
+
+def _catalog_endpoint(api_base: str, provider_cfg: dict) -> bool:
+    """True when *api_base* is empty or is the endpoint *provider_cfg* names.
+
+    With no provider config the caller matches the base against the whole
+    catalog (``resolve_api_key_env``), which is a catalog endpoint by
+    construction.
+    """
+    if not api_base or not provider_cfg:
+        return True
+    return _same_endpoint(api_base, provider_cfg.get("api_base") or "")

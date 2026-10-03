@@ -5,6 +5,7 @@
  * compare.css.
  */
 import { t } from '../../../strings/index.js';
+import { SCORE_SCALE_MAX, PERCENT } from '../../../constants.js';
 
 const W = 440;
 const H = 320;
@@ -36,7 +37,7 @@ function point(index, count, frac) {
 
 function polygonPoints(values, count) {
   return values
-    .map((v, i) => point(i, count, Math.max(MIN_POINT_FRACTION, (v ?? 0) / 10)).map((n) => n.toFixed(1)).join(','))
+    .map((v, i) => point(i, count, Math.max(MIN_POINT_FRACTION, (v ?? 0) / SCORE_SCALE_MAX)).map((n) => n.toFixed(1)).join(','))
     .join(' ');
 }
 
@@ -87,7 +88,7 @@ export default function CompareRadar({ axes, series }) {
             <div
               key={axis.label}
               className="compare-radar__label"
-              style={{ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%` }}
+              style={{ left: `${(x / W) * PERCENT}%`, top: `${(y / H) * PERCENT}%` }}
             >
               <span className="compare-radar__labelName">{axis.label}</span>
               {axis.value != null && (

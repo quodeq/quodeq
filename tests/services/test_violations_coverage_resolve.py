@@ -6,7 +6,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 
-from quodeq.services.violations import resolve_dimension_eval, _ResolveOptions
+from quodeq.services.violations import resolve_dimension_eval, ResolveOptions
 
 
 class TestDeletedFilteredFromDimensionEval:
@@ -133,13 +133,13 @@ class TestResolveDimensionEvalExtended:
         # Stream parsing may or may not produce violations, but code path is exercised
 
     def test_custom_exists_fn(self, tmp_path):
-        """Test with custom _ResolveOptions to exercise injection."""
+        """Test with custom ResolveOptions to exercise injection."""
         base = tmp_path / "run"
         (base / "evaluation").mkdir(parents=True)
         (base / "evidence").mkdir()
 
         # All exists return False - should return None
-        opts = _ResolveOptions(exists_fn=lambda p: False)
+        opts = ResolveOptions(exists_fn=lambda p: False)
         result = resolve_dimension_eval(base, "proj", "run", "security", options=opts)
         assert result is None
 
@@ -158,7 +158,7 @@ class TestResolveDimensionEvalExtended:
                 return False
             return p.exists()
 
-        opts = _ResolveOptions(exists_fn=fake_exists)
+        opts = ResolveOptions(exists_fn=fake_exists)
         with patch("quodeq.services.violations.read_text", side_effect=OSError("read error")):
             result = resolve_dimension_eval(base, "proj", "run", "security", options=opts)
             assert result is None
@@ -181,7 +181,7 @@ class TestResolveDimensionEvalExtended:
         class FakeStat:
             st_size = 100
 
-        opts = _ResolveOptions(exists_fn=custom_exists, stat_fn=lambda p: FakeStat())
+        opts = ResolveOptions(exists_fn=custom_exists, stat_fn=lambda p: FakeStat())
         # This exercises the jsonl path; actual parsing may vary
         with patch("quodeq.services.violations.parse_violations_from_jsonl", return_value=MagicMock()) as mock_parse:
             resolve_dimension_eval(base, "proj", "run", "security", options=opts)

@@ -18,47 +18,67 @@ import time
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 from quodeq.api._run_event_serializers import (  # noqa: F401 — re-export
     serialize_dimension_event,
     serialize_finding_event,
     serialize_status_event,
-    _payload_as_sse_finding,
+    payload_as_sse_finding,
+    sse_json,
 )
 from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
-    _DEFAULT_FINDINGS_BATCH,
-    _DIM_FILENAME_SUFFIX,
-    _STATUS_MTIME_MISSING,
+    DEFAULT_FINDINGS_BATCH,
+    STATUS_MTIME_MISSING,
     EventTuple,
     WatcherState,
-    _findings_batch_size,
-    _read_dim_eval,
-    _read_new_findings_from_events,
-    _read_status,
-    _scan_completed_dimensions,
+    findings_batch_size,
+    read_dim_eval,
+    read_new_findings_from_events,
+    read_status,
+    scan_completed_dimensions,
     compute_tick,
 )
-from quodeq.api._sse_log_helpers import sse_line
-from quodeq.shared.env import env_float
+from quodeq.api.sse_frames import SseEvent, heartbeat_frame, sse_line
+from quodeq.core.run.state import TERMINAL_STATES
+from quodeq.shared.env import env_float, env_int
 from quodeq.shared.env_resolve import resolve_env
 
-# env_float never raises, so a malformed QUODEQ_SSE_HEARTBEAT_S can't abort
-# module import (it logs and falls back to 15s). minimum=0.1 keeps a bogus
-# tiny/negative value from turning every tick into a keepalive frame.
-_HEARTBEAT_S = env_float("QUODEQ_SSE_HEARTBEAT_S", 15.0, minimum=0.1)
-
-_TERMINAL_STATES = frozenset({"done", "failed", "cancelled"})
+_EVENT_TYPE_STATUS = SseEvent.STATUS  # compute_tick's event tuple tag for a status.json change
+_DEFAULT_TICK_MS = 250  # QUODEQ_SSE_TICK_MS fallback: observer poll cadence
+_DEFAULT_HEARTBEAT_S = 15.0  # QUODEQ_SSE_HEARTBEAT_S fallback: heartbeat event interval
+_MIN_HEARTBEAT_S = 0.1  # floor: keeps a bogus tiny/negative override from turning every tick into a keepalive frame
 
 
 def _tick_ms(env: Mapping[str, str] | None = None) -> int:
-    """Read tick interval at call time so tests can set QUODEQ_SSE_TICK_MS=0
-    to force a single-tick drain. Reading at module import time made the env
-    var a no-op for tests that set it inside the test body."""
-    try:
-        return int(resolve_env(env).get("QUODEQ_SSE_TICK_MS", "250"))
-    except ValueError:
-        return 250
+    """The observer poll cadence in ms; ``QUODEQ_SSE_TICK_MS`` overrides.
+
+    Read on every call, so a test can set ``QUODEQ_SSE_TICK_MS=0`` inside its
+    body to force a single-tick drain.
+    """
+    return env_int("QUODEQ_SSE_TICK_MS", _DEFAULT_TICK_MS, env=env, warn=False)
+
+
+_last_warned_heartbeat_raw: str | None = None  # dedupes the warning below across streams
+
+
+def _heartbeat_s(env: Mapping[str, str] | None = None) -> float:
+    """Read the SSE heartbeat interval at call time, once per stream.
+
+    env_float never raises, so a malformed QUODEQ_SSE_HEARTBEAT_S can't abort
+    a stream (it logs and falls back to the default). Only the first stream
+    to see a given raw value logs it -- same as when this value was still a
+    module constant decided once at import, before it moved to being read
+    per stream.
+    """
+    global _last_warned_heartbeat_raw
+    raw = resolve_env(env).get("QUODEQ_SSE_HEARTBEAT_S")
+    warn = raw != _last_warned_heartbeat_raw
+    value = env_float(
+        "QUODEQ_SSE_HEARTBEAT_S", _DEFAULT_HEARTBEAT_S, minimum=_MIN_HEARTBEAT_S, env=env, warn=warn,
+    )
+    _last_warned_heartbeat_raw = raw
+    return value
 
 
 def _is_terminal(status_payload: str) -> tuple[bool, str]:
@@ -68,7 +88,7 @@ def _is_terminal(status_payload: str) -> tuple[bool, str]:
     except ValueError:
         return False, ""
     state = data.get("state") if isinstance(data, dict) else None
-    if isinstance(state, str) and state in _TERMINAL_STATES:
+    if isinstance(state, str) and state in TERMINAL_STATES:
         return True, state
     return False, ""
 
@@ -86,7 +106,7 @@ def _format_tick_frames(
     terminal_state = ""
     for event_type, payload, event_id in events:
         frames.append(sse_line(payload, event=event_type, event_id=event_id))
-        if event_type == "status":
+        if event_type == _EVENT_TYPE_STATUS:
             done, terminal = _is_terminal(payload)
             if done:
                 terminal_state = terminal
@@ -95,7 +115,7 @@ def _format_tick_frames(
 
 def _done_frame(terminal_state: str) -> str:
     """SSE `event: done` frame closing the stream on a terminal status."""
-    return sse_line(json.dumps({"state": terminal_state}, separators=(",", ":")), event="done")
+    return sse_line(sse_json({"state": terminal_state}), event=SseEvent.DONE)
 
 
 def run_events_generator(
@@ -108,11 +128,13 @@ def run_events_generator(
     """Yield SSE frames observing run_dir.
 
     tick_seconds overrides QUODEQ_SSE_TICK_MS for tests (0.0 drains a single
-    tick without sleeping). heartbeat_seconds overrides the 15s :keepalive
-    interval for tests.
+    tick without sleeping). heartbeat_seconds overrides the 15s heartbeat
+    interval for tests. A quiet stream sends an ``event: heartbeat`` data
+    frame at that cadence: SSE comments never reach the client's listeners,
+    so only a real event can keep its inactivity timer from tripping.
     """
     sleep_s = tick_seconds if tick_seconds is not None else (_tick_ms() / 1000.0)
-    heartbeat_s = heartbeat_seconds if heartbeat_seconds is not None else _HEARTBEAT_S
+    heartbeat_s = heartbeat_seconds if heartbeat_seconds is not None else _heartbeat_s()
     state = WatcherState(last_event_ts=last_event_ts)
     last_emit_at = time.monotonic()
     yield ":keepalive\n\n"
@@ -130,7 +152,7 @@ def run_events_generator(
             return
 
         if time.monotonic() - last_emit_at >= heartbeat_s:
-            yield ":keepalive\n\n"
+            yield heartbeat_frame()
             last_emit_at = time.monotonic()
 
         if sleep_s > 0:
@@ -138,3 +160,42 @@ def run_events_generator(
         else:
             # tick_seconds=0.0 means "drain once and exit" for tests.
             return
+
+
+def run_events_generator_awaiting_dir(
+    resolve_run_dir: Callable[[], Path | None],
+    is_complete: Callable[[], bool],
+    terminal_state: Callable[[], str],
+    *,
+    last_event_ts: datetime | None = None,
+) -> Iterator[str]:
+    """Wait for a preparing job's run dir, then stream it like run_events_generator.
+
+    The run dir only exists once the runner prints its report_path marker,
+    a moment after the UI opened the stream. Answering 410 in that window
+    closed the browser's EventSource for good (the spec forbids a retry
+    after a non-200), so the Evaluate screen never saw a live finding.
+
+    Ends with ``event: done`` if the job reaches a terminal state before its
+    run dir ever appears (a runner that failed while preparing). A tick of 0
+    (``QUODEQ_SSE_TICK_MS=0``) checks once and returns, the same drain-once
+    contract run_events_generator has for tests.
+    """
+    sleep_s = _tick_ms() / 1000.0
+    heartbeat_s = _heartbeat_s()
+    last_emit_at = time.monotonic()
+    yield ":keepalive\n\n"
+    while True:
+        run_dir = resolve_run_dir()
+        if run_dir is not None:
+            yield from run_events_generator(run_dir, last_event_ts=last_event_ts)
+            return
+        if is_complete():
+            yield _done_frame(terminal_state())
+            return
+        if time.monotonic() - last_emit_at >= heartbeat_s:
+            yield heartbeat_frame()
+            last_emit_at = time.monotonic()
+        if sleep_s <= 0:
+            return
+        time.sleep(sleep_s)

@@ -1,4 +1,4 @@
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
@@ -9,11 +9,7 @@ import { nf, score1 } from '../compareFormatters.js';
  * drill-down. */
 export default function CompareDimensionsBoard({ board, openDimension }) {
   return (
-    <section className="compare-panel" aria-label={t('compare.dimensionsAria')}>
-      <div className="compare-panel__head">
-        <SectionLabel>{t('compare.dimensionsHeader', { count: board.length })}</SectionLabel>
-        <span className="compare-panel__note">{t('compare.dimensionsNote')}</span>
-      </div>
+    <ComparePanel ariaLabel={t('compare.dimensionsAria')} header={t('compare.dimensionsHeader', { count: board.length })} note={t('compare.dimensionsNote')}>
       <ul className="compare-board compare-board--grid">
         {board.map((b) => (
           <li key={b.key}>
@@ -27,6 +23,6 @@ export default function CompareDimensionsBoard({ board, openDimension }) {
           </li>
         ))}
       </ul>
-    </section>
+    </ComparePanel>
   );
 }

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
-    _discard_run_state,
+    discard_run_state,
 )
 
 
@@ -33,7 +33,7 @@ class TestDiscardRunState:
         reports = self._make_run(
             tmp_path, dims=["security", "usability"], scored=["security"],
         )
-        _discard_run_state(
+        discard_run_state(
             str(reports), {"outputProject": "proj", "outputRunId": "run1"},
         )
         evidence = reports / "proj" / "run1" / "evidence"
@@ -52,7 +52,7 @@ class TestDiscardRunState:
         (evidence / "usability_queue.json").write_text("{}")
         (evidence / "usability_fingerprint.json").write_text("{}")
 
-        _discard_run_state(
+        discard_run_state(
             str(tmp_path / "reports"),
             {"outputProject": "proj", "outputRunId": "run1"},
         )
@@ -60,15 +60,15 @@ class TestDiscardRunState:
 
     def test_missing_evidence_dir_is_silent(self, tmp_path: Path):
         # A truly empty run dir shouldn't raise.
-        _discard_run_state(
+        discard_run_state(
             str(tmp_path),
             {"outputProject": "ghost", "outputRunId": "ghost"},
         )
 
     def test_missing_project_or_run_id_is_silent(self, tmp_path: Path):
         # Defensive: a malformed job dict should noop, not throw.
-        _discard_run_state(str(tmp_path), {})
-        _discard_run_state(str(tmp_path), {"outputProject": "p"})
+        discard_run_state(str(tmp_path), {})
+        discard_run_state(str(tmp_path), {"outputProject": "p"})
 
 
 class TestScoreFailedEvaluation:

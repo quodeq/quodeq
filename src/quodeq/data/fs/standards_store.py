@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.data.fs.run_artifacts import replace_json_file
+
 
 def standard_path(evaluators_dir: Path, standard_id: str) -> Path:
     """The on-disk path for *standard_id* in *evaluators_dir*."""
@@ -50,14 +52,25 @@ def resolve_jailed_standard_path(evaluators_dir: Path, standard_id: str) -> Path
 
 
 def read_standard_payload(path: Path) -> dict | None:
-    """Parsed standard JSON at *path*, or None when the file is absent."""
+    """Parsed standard JSON at *path*, or None when the file is absent.
+
+    Raises on corrupt or non-object JSON: a real read failure must never
+    look like "absent", which would let an import silently overwrite a
+    user's corrupt standard instead of surfacing the problem.
+    """
     if not path.is_file():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"standard file is not a JSON object: {path.name}")
+    return data
 
 
 def write_standard_payload(path: Path, data: dict) -> None:
-    """Write a standard payload, creating the parent directory if needed."""
+    """Write a standard payload, creating the parent directory if needed.
+
+    Atomic: a failed write leaves the previous file untouched, never a
+    truncated one that ``read_standard_payload`` would raise on.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(data, indent=2)
-    path.write_text(payload, encoding="utf-8")
+    replace_json_file(path, data, indent=2)

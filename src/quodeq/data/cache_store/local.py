@@ -5,8 +5,8 @@ Layout (git-style two-char sharding to keep each directory bounded):
     <root>/<sha[:2]>/<sha[2:]>/entry.json
     <root>/.index.db          content index sidecar (see ``index.py``)
 
-Writes go via temp file + ``os.rename``, which is atomic on POSIX and on
-NTFS for same-volume renames. A reader either sees the previous contents
+Writes go via a unique ``mkstemp`` temp file + ``os.replace``, which is
+atomic on POSIX and on NTFS for same-volume renames. A reader either sees the previous contents
 or the new contents, never a partial. A crash mid-write leaves an
 orphaned ``.tmp.*`` file that's skipped by readers and cleaned up on the
 next visit to the same directory.
@@ -21,13 +21,15 @@ import logging
 import os
 import re
 import shutil
+import tempfile
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from quodeq.data.cache_store.backend import CacheStats
 from quodeq.data.cache_store.entry import CacheEntry
 from quodeq.data.cache_store.index import INDEX_FILENAME, ContentIndex, IndexEntry, IndexRow
+from quodeq.shared.env_paths import home_state_dir
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
@@ -56,7 +58,7 @@ def default_cache_root(env: Mapping[str, str] | None = None) -> Path:
     ``os.environ`` when provided.
     """
     raw = resolve_env(env).get(_ROOT_ENV, "").strip()
-    base = Path(raw) if raw else Path.home() / ".quodeq" / "cache"
+    base = Path(raw) if raw else home_state_dir() / "cache"
     return base / _RESULTS_SUBDIR
 
 
@@ -114,8 +116,14 @@ class LocalFileBackend:
             text = path.read_text(encoding="utf-8")
         except FileNotFoundError:
             return None
-        except OSError as exc:
+        except (OSError, UnicodeDecodeError) as exc:
+            # Unreadable or non-UTF-8 -- treat as miss and remove so the next put can heal.
             _logger.warning("cache read failed for %s: %s", key, exc)
+            try:
+                path.unlink(missing_ok=True)
+                self._mark_mutated()
+            except OSError as exc:
+                _logger.debug("unreadable local cache entry not removed: %s", exc)
             return None
         try:
             return CacheEntry.from_json(text)
@@ -138,9 +146,12 @@ class LocalFileBackend:
         target_dir = self._dir_for(key)
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / _ENTRY_FILENAME
-        tmp = target_dir / f"{_TMP_PREFIX}{os.getpid()}.{id(entry):x}"
+        payload = entry.to_json()
+        tmp: str | None = None
         try:
-            tmp.write_text(entry.to_json(), encoding="utf-8")
+            fd, tmp = tempfile.mkstemp(dir=str(target_dir), prefix=_TMP_PREFIX)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(payload)
             os.replace(tmp, target)
             self._mark_mutated()
             if index and self._index is not None:
@@ -151,10 +162,11 @@ class LocalFileBackend:
                 ))
         except OSError as exc:
             _logger.warning("cache write failed for %s: %s", key, exc)
-            try:
-                tmp.unlink(missing_ok=True)
-            except OSError as exc:
-                _logger.debug("temp cache file not removed after a failed write: %s", exc)
+            if tmp is not None:
+                try:
+                    Path(tmp).unlink(missing_ok=True)
+                except OSError as exc:
+                    _logger.debug("temp cache file not removed after a failed write: %s", exc)
 
     def has(self, key: str) -> bool:
         """Report whether an entry file exists, without reading or decoding it."""
@@ -177,6 +189,34 @@ class LocalFileBackend:
         self._mark_mutated()
         if self._index is not None:
             self._index.forget(key)
+
+    def delete_many(self, keys: Iterable[str]) -> int:
+        """Remove each key's entry directory, then drop their index rows in one transaction.
+
+        Same per-key rules as :meth:`delete`: a missing key is a no-op and a
+        failed removal is logged and keeps its index row. An invalid key is
+        logged and skipped. Returns how many entries were removed.
+        """
+        removed: list[str] = []
+        for key in keys:
+            try:
+                target_dir = self._dir_for(key)
+            except ValueError as exc:
+                _logger.debug("cache delete skipped an invalid key: %s", exc)
+                continue
+            if not target_dir.exists():
+                continue
+            try:
+                shutil.rmtree(target_dir)
+            except OSError as exc:
+                _logger.warning("cache delete failed for %s: %s", key, exc)
+                continue
+            removed.append(key)
+        if removed:
+            self._mark_mutated()
+            if self._index is not None:
+                self._index.forget_many(removed)
+        return len(removed)
 
     def find_by_content(
         self, content_hash: str, dimension: str, params_hash: str,

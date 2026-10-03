@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-_DEFAULT_DETECT_PRIORITY = 99  # lowest priority — used as fallback catch-all
+DEFAULT_DETECT_PRIORITY = 99  # lowest priority — used as fallback catch-all
 
 
-def _strip_quotes(value: str) -> str:
+def strip_quotes(value: str) -> str:
     if len(value) >= 2 and (  # noqa: PLR2004  # the two quote characters
         (value[0] == value[-1] == '"') or (value[0] == value[-1] == "'")
     ):
@@ -28,7 +28,7 @@ class DisciplineRule:
     detect_glob: str | None = None
     detect_dir: str | None = None
     detect_requires_file: str | None = None
-    detect_priority: int = _DEFAULT_DETECT_PRIORITY
+    detect_priority: int = DEFAULT_DETECT_PRIORITY
     detect_excludes: tuple[str, ...] | None = None
     detect_fallback: bool = False
     suggested_topics: tuple[str, ...] | None = None

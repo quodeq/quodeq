@@ -1,7 +1,7 @@
 """Dashboard start/stop/open lifecycle for the menu bar app.
 
-Mixin methods for QuodeqApp (quodeq/menubar/app.py), split out for file size.
-The host class provides the menu items (_status_item, _error_item, ...), the
+Mixin methods for QuodeqApp (quodeq/menubar/app.py). The host class provides
+the menu items (_status_item, _error_item, ...), the
 _state_lock/_starting/_port/_process fields, _set_error/_clear_error,
 _find_running_port, and _set_ui_state. Nothing here touches rumps directly,
 so this module stays importable without the rumps stub tests use for app.py.
@@ -15,6 +15,7 @@ import subprocess
 import threading
 
 from quodeq.shared.frozen import dashboard_cmd as _dashboard_cmd
+from quodeq.menubar._constants import STATUS_STOPPED
 from quodeq.menubar._process import (
     DashboardCallbacks as _DashboardCallbacks,
     DashboardState as _DashboardState,
@@ -22,8 +23,8 @@ from quodeq.menubar._process import (
     kill_port_processes as _kill_port_processes,
     open_stderr_log as _open_stderr_log,
     wait_for_dashboard as _wait_for_dashboard,
-    _ERROR_DISPLAY_MAX,
-    _STDERR_READ_MAX,
+    ERROR_DISPLAY_MAX,
+    STDERR_READ_MAX,
 )
 
 _logger = _logging.getLogger(__name__)
@@ -67,12 +68,16 @@ class DashboardLifecycleMixin:
         try:
             self._do_start_inner()
         except (OSError, subprocess.SubprocessError, ValueError) as e:
-            self._set_error(f"Error: {e}")
-            self._status_item.title = "Stopped"
-            self._cleanup_stderr_log()
+            self._stop_with_error(f"Error: {e}")
         finally:
             with self._state_lock:
                 self._starting = False
+
+    def _stop_with_error(self, message: str) -> None:
+        """Show *message*, show the dashboard as stopped and drop its stderr log."""
+        self._set_error(message)
+        self._status_item.title = STATUS_STOPPED
+        self._cleanup_stderr_log()
 
     def _cleanup_stderr_log(self) -> None:
         """Remove the stderr log tempfile if it exists."""
@@ -89,9 +94,7 @@ class DashboardLifecycleMixin:
             return True
         except OSError as e:
             stderr_log.close()
-            self._set_error(f"Failed: {e}")
-            self._status_item.title = "Stopped"
-            self._cleanup_stderr_log()
+            self._stop_with_error(f"Failed: {e}")
             return False
 
     def _do_start_inner(self):
@@ -107,10 +110,10 @@ class DashboardLifecycleMixin:
         stderr_log.close()
         try:
             with open(stderr_log.name, encoding="utf-8") as f:
-                err = f.read(_STDERR_READ_MAX).strip()
+                err = f.read(STDERR_READ_MAX).strip()
         except OSError:
             err = "unknown error"
-        sanitized = err[:_ERROR_DISPLAY_MAX].replace("\n", " ").strip()
+        sanitized = err[:ERROR_DISPLAY_MAX].replace("\n", " ").strip()
         if sanitized:
             # Keep the crash detail in the local log for troubleshooting, but
             # do not surface raw dashboard stderr (which may include tokens or
@@ -118,11 +121,9 @@ class DashboardLifecycleMixin:
             _logging.getLogger(__name__).warning(
                 "Dashboard crashed (exit code %s): %s", self._process.returncode, sanitized,
             )
-        self._set_error(
+        self._stop_with_error(
             f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). Try restarting."
         )
-        self._status_item.title = "Stopped"
-        self._cleanup_stderr_log()
 
     def _wait_for_dashboard(self, stderr_log):
         """Poll until the dashboard responds or process crashes."""
@@ -133,9 +134,7 @@ class DashboardLifecycleMixin:
             self._cleanup_stderr_log()
 
         def on_timeout():
-            self._set_error("Timeout: dashboard did not respond")
-            self._status_item.title = "Stopped"
-            self._cleanup_stderr_log()
+            self._stop_with_error("Timeout: dashboard did not respond")
 
         _wait_for_dashboard(
             process=self._process,
@@ -175,6 +174,6 @@ class DashboardLifecycleMixin:
         self._sweep_stragglers()
         with self._state_lock:
             self._port = None
-        self._status_item.title = "Stopped"
+        self._status_item.title = STATUS_STOPPED
         self._set_ui_state(running=False)
         self._cleanup_stderr_log()

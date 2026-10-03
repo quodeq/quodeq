@@ -10,13 +10,36 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Callable
 
 from quodeq.core.evidence.req_mapping import PrincipleResolver
+from quodeq.core.types.finding_type import FINDING_TYPES, FindingType
+from quodeq.shared.appended_lines import AppendedLines
 from quodeq.shared.utils import open_text
 
 _logger = logging.getLogger(__name__)
+
+
+class RowClass(StrEnum):
+    """_classify_finding_row's non-finding-type outcomes (see its docstring).
+
+    A finding row classifies as one of these, or as FindingType.VIOLATION /
+    FindingType.COMPLIANCE.
+    """
+
+    SKIP = "skip"
+    DUPLICATE = "duplicate"
+    QUARANTINED = "quarantined"
+    SUPPRESSED = "suppressed"
+
+
+# The row classes a tally counts, one counter each.
+_COUNTED_KINDS = (
+    FindingType.VIOLATION, FindingType.COMPLIANCE,
+    RowClass.DUPLICATE, RowClass.SUPPRESSED, RowClass.QUARANTINED,
+)
 
 
 @dataclass(frozen=True)
@@ -60,7 +83,7 @@ def _classify_finding_row(
 
     *resolver* classifies "quarantined" a finding whose principle is not in
     the dimension's standard, matching the report path's
-    :func:`~quodeq.core.evidence.req_mapping._group_judgments`. *suppressed*
+    :func:`~quodeq.core.evidence.req_mapping.group_judgments`. *suppressed*
     (see ``quodeq.services.suppression``, injected to keep this module free
     of a services dependency) classifies "suppressed" a violation the user
     already dismissed or deleted. Quarantine is checked first: a finding
@@ -70,30 +93,51 @@ def _classify_finding_row(
     """
     stripped = raw.strip()
     if not stripped:
-        return "skip"
+        return RowClass.SKIP
     try:
         obj = json.loads(stripped)
     except json.JSONDecodeError:
-        return "skip"
+        return RowClass.SKIP
     if not isinstance(obj, dict):
-        return "skip"  # valid JSON but not an object (a bare list/number)
+        return RowClass.SKIP  # valid JSON but not an object (a bare list/number)
+    return classify_finding(obj, seen, suppressed=suppressed, resolver=resolver)
+
+
+def classify_finding(
+    obj: dict,
+    seen: "set[tuple]",
+    *,
+    suppressed: "Callable[[dict], bool] | None",
+    resolver: PrincipleResolver | None,
+) -> str:
+    """Classify one finding dict in evidence-row vocabulary, updating *seen* in place.
+
+    The one rule every live reader runs a finding through: the heartbeat
+    line and the scan-progress counters tally evidence rows with it, and the
+    run event stream admits ``finding`` frames with it, so the three never
+    disagree on what counts. *obj* carries ``t`` (the finding type), ``req``
+    and/or ``p``, ``file`` and ``line``; a caller holding a Judgment maps it
+    onto those keys first. See :func:`_classify_finding_row` for the
+    classes and the order the exclusions apply in.
+    """
     t = obj.get("t")
-    key = (obj.get("p"), obj.get("file"), obj.get("line"), t)
+    key = (obj.get("req") or obj.get("p"), obj.get("file"), obj.get("line"), t)
     if key in seen:
-        return "duplicate"
+        return RowClass.DUPLICATE
     seen.add(key)
-    if t not in ("violation", "compliance"):
+    if t not in FINDING_TYPES:
         # Non-finding rows (e.g. the file_done markers the pool appends)
         # still occupy a dedup key but classify as neither.
-        return "skip"
-    # Mirror parse_jsonl_line: `p` wins, `req` is the fallback.
-    if resolver is not None and resolver.resolve(obj.get("p") or obj.get("req")) is None:
-        return "quarantined"
-    if t == "violation":
+        return RowClass.SKIP
+    # Placed the way every other reader places it: by the requirement, then
+    # by the principle the row named.
+    if resolver is not None and resolver.place(obj.get("req"), obj.get("p")) is None:
+        return RowClass.QUARANTINED
+    if t == FindingType.VIOLATION:
         if suppressed is not None and suppressed(obj):
-            return "suppressed"
-        return "violation"
-    return "compliance"
+            return RowClass.SUPPRESSED
+        return FindingType.VIOLATION
+    return FindingType.COMPLIANCE
 
 
 def tally_unique_findings(
@@ -101,7 +145,7 @@ def tally_unique_findings(
     suppressed: "Callable[[dict], bool] | None" = None,
     resolver: PrincipleResolver | None = None,
 ) -> FindingTally:
-    """Count unique findings (deduplicated by ``(p, file, line, t)``) and duplicates.
+    """Count unique findings (deduplicated by ``(requirement or principle, file, line, t)``) and duplicates.
 
     Single source of truth for the heartbeat and the dashboard progress reader,
     so the terminal and UI never disagree mid-batch — before the on-disk
@@ -120,44 +164,42 @@ def tally_unique_findings(
     if not jsonl_path.is_file():
         return FindingTally()
     seen: set[tuple] = set()
-    violations = compliance = duplicates = hidden = quarantined = 0
+    counts = _zero_counts()
     try:
         with open_text(jsonl_path) as f:
             for raw in f:
                 kind = _classify_finding_row(
                     raw, seen, suppressed=suppressed, resolver=resolver,
                 )
-                if kind == "duplicate":
-                    duplicates += 1
-                elif kind == "quarantined":
-                    quarantined += 1
-                elif kind == "suppressed":
-                    hidden += 1
-                elif kind == "violation":
-                    violations += 1
-                elif kind == "compliance":
-                    compliance += 1
+                if kind in counts:
+                    counts[kind] += 1
     except OSError as exc:
         _logger.debug("evidence file unreadable during tally: %s", exc)
+    return _tally_of(counts)
+
+
+def _zero_counts() -> dict[str, int]:
+    """A zero counter per counted row class (SKIP is not counted)."""
+    return dict.fromkeys(_COUNTED_KINDS, 0)
+
+
+def _tally_of(counts: dict[str, int]) -> FindingTally:
+    """The FindingTally for *counts* (see ``_zero_counts``)."""
     return FindingTally(
-        violations=violations, compliance=compliance,
-        duplicates=duplicates, suppressed=hidden, quarantined=quarantined,
+        violations=counts[FindingType.VIOLATION], compliance=counts[FindingType.COMPLIANCE],
+        duplicates=counts[RowClass.DUPLICATE], suppressed=counts[RowClass.SUPPRESSED],
+        quarantined=counts[RowClass.QUARANTINED],
     )
-
-
-_TAIL_GUARD = 512
 
 
 class IncrementalTally:
     """A ``tally_unique_findings`` that resumes where its last call stopped.
 
-    The evidence jsonl is append-only while a pool runs, so each call reads
-    the bytes appended since the previous one and folds them into the same
-    dedup set and counters. Only complete lines are consumed: a trailing
-    partial line (an agent mid-write) waits for the next call. The consumed
-    tail is remembered; when the file is shorter than the offset or the tail
-    no longer matches (the end-of-pool dedup pass rewrites the file in
-    place), everything is re-read from zero.
+    The evidence jsonl is append-only while a pool runs, so each call folds
+    the complete lines appended since the previous one (``AppendedLines``)
+    into the same dedup set and counters. A shrink or a rewritten tail (the
+    end-of-pool dedup pass rewrites the file in place) restarts the count
+    from zero.
     """
 
     def __init__(
@@ -170,17 +212,18 @@ class IncrementalTally:
         self._resolver = resolver
         self._reset()
 
-    def _reset(self) -> None:
-        self.offset = 0
-        self._tail = b""
-        self._seen: set[tuple] = set()
-        self._counts = {"violation": 0, "compliance": 0, "duplicate": 0, "suppressed": 0, "quarantined": 0}
+    @property
+    def offset(self) -> int:
+        """Bytes of the file consumed so far."""
+        return self._lines.offset
 
-    def _tail_matches(self, f) -> bool:
-        if not self._tail:
-            return True
-        f.seek(self.offset - len(self._tail))
-        return f.read(len(self._tail)) == self._tail
+    def _reset(self) -> None:
+        self._lines = AppendedLines(self.path)
+        self._reset_counts()
+
+    def _reset_counts(self) -> None:
+        self._seen: set[tuple] = set()
+        self._counts = _zero_counts()
 
     def advance(self) -> FindingTally:
         """Fold in the bytes appended since the last call and return the running tally.
@@ -191,29 +234,14 @@ class IncrementalTally:
         if not self.path.is_file():
             self._reset()
             return self._tally()
-        try:
-            with open(self.path, "rb") as f:
-                size = f.seek(0, 2)
-                if size < self.offset or not self._tail_matches(f):
-                    self._reset()
-                f.seek(self.offset)
-                data = f.read()
-        except OSError as exc:
-            _logger.debug("evidence file unreadable during tally: %s", exc)
-            return self._tally()
-        end = data.rfind(b"\n")
-        if end < 0:
-            return self._tally()
-        complete = data[: end + 1]
-        for raw in complete.decode("utf-8", errors="replace").split("\n"):
+        restarted, lines = self._lines.read()
+        if restarted:
+            self._reset_counts()
+        for raw in lines:
             kind = _classify_finding_row(raw, self._seen, suppressed=self._suppressed, resolver=self._resolver)
             if kind in self._counts:
                 self._counts[kind] += 1
-        self.offset += len(complete)
-        self._tail = complete[-_TAIL_GUARD:]
         return self._tally()
 
     def _tally(self) -> FindingTally:
-        c = self._counts
-        return FindingTally(violations=c["violation"], compliance=c["compliance"],
-                            duplicates=c["duplicate"], suppressed=c["suppressed"], quarantined=c["quarantined"])
+        return _tally_of(self._counts)

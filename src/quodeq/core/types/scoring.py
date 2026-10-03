@@ -2,8 +2,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 _DEFAULT_GRADE = "Critical"
+
+
+class ConfidenceLevel(StrEnum):
+    """How much evidence backed a principle's score.
+
+    Produced from evidence size (``core.evidence.model.confidence_size``) or
+    read back from a compiled report's ``metrics.confidence_level``; both
+    core.scoring and services (rescore) branch on it.
+    """
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,40 +1,12 @@
 import { TermHeader, StatStrip, Stat } from '../../../../components/terminal/index.js';
-import HelpHint from '../../../../components/HelpHint.jsx';
 import { t } from '../../../../strings/index.js';
-import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
-
+import { SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from '../../../../utils/time.js';
+import StandardList, { INPUT_TYPE } from '../analyze/StandardList.jsx';
 
 function formatTimeLimit(seconds) {
   if (!seconds || seconds <= 0) return 'No limit';
-  if (seconds < SECONDS_PER_HOUR) return `${Math.round(seconds / 60)} min`;
+  if (seconds < SECONDS_PER_HOUR) return `${Math.round(seconds / SECONDS_PER_MINUTE)} min`;
   return `${Math.round(seconds / SECONDS_PER_HOUR)} h`;
-}
-
-function StandardListItem({ s, inputType, state, actions }) {
-  return (
-    <li>
-      <label className={state.standardIds.has(s.id) ? 'onboarding-standard-card onboarding-standard-card--selected' : 'onboarding-standard-card'}>
-        <input
-          type={inputType}
-          name={inputType === 'radio' ? 'standard' : `standard-${s.id}`}
-          checked={state.standardIds.has(s.id)}
-          onChange={() => actions.toggleStandard(s.id)}
-          aria-label={s.name}
-        />
-        <div className="onboarding-standard-card__body">
-          <strong>{s.name}</strong>
-          {s.description && (
-            <span
-              className="onboarding-standard-card__hint"
-              onClick={(e) => e.preventDefault()}
-            >
-              <HelpHint label={`${s.name} description`}>{s.description}</HelpHint>
-            </span>
-          )}
-        </div>
-      </label>
-    </li>
-  );
 }
 
 function StandardLaunchActions({ selectedIds, onLaunch, onBack }) {
@@ -54,7 +26,7 @@ function StandardLaunchActions({ selectedIds, onLaunch, onBack }) {
 }
 
 export default function StandardLaunchStep({ state, actions, standards, onLaunch, onBack, stepIndex = 0, stepTotal = 0 }) {
-  const inputType = state.isFirstProject ? 'radio' : 'checkbox';
+  const inputType = state.isFirstProject ? INPUT_TYPE.RADIO : INPUT_TYPE.CHECKBOX;
   const selectedIds = Array.from(state.standardIds);
   const selectedNames = standards
     .filter((s) => state.standardIds.has(s.id))
@@ -77,11 +49,12 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
         <Stat label="TIME LIMIT" value={formatTimeLimit(state.totalTimeLimitS)} />
       </StatStrip>
 
-      <ul className="onboarding-standard-list">
-        {standards.map((s) => (
-          <StandardListItem key={s.id} s={s} inputType={inputType} state={state} actions={actions} />
-        ))}
-      </ul>
+      <StandardList
+        standards={standards}
+        inputType={inputType}
+        isChecked={(id) => state.standardIds.has(id)}
+        onToggle={actions.toggleStandard}
+      />
 
       <StandardLaunchActions selectedIds={selectedIds} onLaunch={onLaunch} onBack={onBack} />
     </div>

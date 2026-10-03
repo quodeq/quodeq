@@ -1,9 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { applyMutationDelta } from '../api/applyMutationDelta.js';
 import {
-  computeIsEvaluating, useAppBootExtras, useAppWizardBounce, useAppNavBoot, useAppDerived, useAppEvalProgress,
+  computeIsEvaluating, useAppBootExtras, useAppWizardBounce, useAppDerived,
+  useSidebarProviderSelection, useAppStartupGate, useAppNavigationEffects, useSelectedProjectSyncEffects,
+  useVisibleStandardsFiltered,
 } from './useAppShellHooks.js';
 import { useAssistantActionAppliedEffect } from './useAppEffects.js';
+import { findProject } from '../utils/projectIdentity.js';
 
 /**
  * Boot-time extras plus the dismiss-delta bridge shared by the manual dismiss
@@ -27,16 +30,19 @@ export function useAppDismissBridge(state) {
 }
 
 /**
- * Wizard lifecycle, sidebar/startup chrome, the derived view data and the
- * topbar run progress, in the order App has always called them.
+ * Wizard lifecycle, sidebar/startup chrome and the derived view data, in the
+ * order App has always called them.
  */
 export function useAppChrome({ state, sharedSignal }) {
-  const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
+  const selectedProjectInfo = findProject(state.projects, state.selectedProject);
   const isEvaluating = computeIsEvaluating(state);
   const wizard = useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, sharedSignal });
   const { activePage, navSwapAt, navTab, activeTab } = state;
-  const navBoot = useAppNavBoot({ state, activeTab, navTab, sharedSignal });
-  const derived = useAppDerived({ state, navTab, navSwapAt, activePage });
-  const topbarRunProgress = useAppEvalProgress({ state, isEvaluating });
-  return { selectedProjectInfo, isEvaluating, ...wizard, ...navBoot, ...derived, topbarRunProgress };
+  const sidebar = useSidebarProviderSelection();
+  const startup = useAppStartupGate({ state, activeTab });
+  useAppNavigationEffects({ state, activeTab, navTab, sharedSignal });
+  useSelectedProjectSyncEffects(state.selectedProject);
+  const { filteredTrend, filteredAccumulated } = useVisibleStandardsFiltered(state);
+  const derived = useAppDerived({ state, navTab, navSwapAt, activePage, filteredTrend, filteredAccumulated });
+  return { selectedProjectInfo, isEvaluating, ...wizard, ...sidebar, ...startup, ...derived };
 }

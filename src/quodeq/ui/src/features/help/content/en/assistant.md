@@ -2,9 +2,9 @@
 
 The assistant is a chat panel that knows your project. It explains scores, digs into findings, and drafts standards using the same data you see in the dashboard.
 
-### Turning it on
+### Opening it
 
-Off by default. Enable it under **Settings → Assistant**, then toggle it with `` Ctrl+` `` (`` Cmd+` `` on macOS). It lives in a resizable drawer at the bottom of the dashboard.
+On by default. Toggle it with `` Ctrl+` `` (`` Cmd+` `` works too on macOS). It lives in a resizable drawer at the bottom of the dashboard. To hide it, turn it off under **Settings → Assistant**.
 
 ### What it can see
 

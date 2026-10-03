@@ -1,0 +1,10 @@
+# Grandfathered blocking-timeout violations (subprocess.run/wait or
+# an HTTP/SDK call with no explicit timeout=). Do NOT add entries
+# without justification -- the goal is to burn this list down, not
+# grow it.
+# Regenerate intentionally: python tools/check_blocking_timeouts.py --update-baseline
+# Entries are line-keyed (relpath:lineno:kind), so an unrelated line-count
+# change elsewhere in a file can shift existing entries. Prefer hand-editing
+# the baseline (update the shifted line number) over blind --update-baseline
+# regeneration, which can silently absorb a genuinely new violation
+# introduced in the same change.

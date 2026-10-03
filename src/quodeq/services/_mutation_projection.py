@@ -2,9 +2,9 @@
 
 Split out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
 DECLARED_LOGGING_SITES entry (still imports stdlib ``logging``); this sibling
-does not add a new logging import, so ``_project_all_runs`` accepts an
+does not add a new logging import, so ``project_all_runs`` accepts an
 injected ``LogSink`` and, when none is passed, deferred-imports the facade's
-own declared ``_logger`` at the failure site — restoring the original
+own declared ``logger`` at call time — restoring the original
 exc-path logging without a new ``getLogger`` call here and without changing
 the (test-pinned) single-positional-arg production call site.
 """
@@ -15,7 +15,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.observability import LogSink
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.validation import validate_path_segment, validate_resolved_within
 
 
@@ -25,7 +26,7 @@ class ProjectLockRegistry:
     Intentionally unbounded: one tiny Lock object per distinct project name
     that has ever triggered a background projection on this host.  In practice
     this mirrors the number of projects on disk, which is small and naturally
-    bounded by real usage.  Contrast with _scored_jobs (bounded LRU) — scored
+    bounded by real usage.  Contrast with ScoringClaims (bounded LRU) — scored
     jobs can accumulate many run-ids per project, so a size cap there is
     meaningful; here there is one entry per project, not per run.
 
@@ -49,15 +50,15 @@ class ProjectLockRegistry:
             self._locks.clear()
 
 
-_DEFAULT_PROJECT_LOCKS = ProjectLockRegistry()
+DEFAULT_PROJECT_LOCKS = ProjectLockRegistry()
 
 
-def _get_projection_lock(project: str, registry: ProjectLockRegistry | None = None) -> threading.Lock:
+def get_projection_lock(project: str, registry: ProjectLockRegistry | None = None) -> threading.Lock:
     """Return the Lock for *project* from *registry* (default: process-wide)."""
-    return (registry or _DEFAULT_PROJECT_LOCKS).get(project)
+    return (registry or DEFAULT_PROJECT_LOCKS).get(project)
 
 
-def _resolve_project_dir(evaluations_dir: str, project: str) -> Path:
+def resolve_project_dir(evaluations_dir: str, project: str) -> Path:
     """Jailed project-dir resolution; raises ValueError on escape attempts.
 
     The api layer's ``_project_dir`` does the same with a Flask ``abort``;
@@ -68,10 +69,10 @@ def _resolve_project_dir(evaluations_dir: str, project: str) -> Path:
     return validate_resolved_within(Path(evaluations_dir) / project, Path(evaluations_dir))
 
 
-def _project_all_runs(
+def project_all_runs(
     project_dir: Path,
     repo_factory: Callable[[Path], Any] | None = None,
-    *, log: LogSink = NULL_LOG,
+    *, log: LogSink | None = None,
 ) -> None:
     """Trigger projection across every run dir of the project.
 
@@ -85,24 +86,27 @@ def _project_all_runs(
 
     Projection is incremental (gated by checkpoint + log-size), so this is
     cheap in steady state; the first call after a fresh dismiss replays only
-    the actions-log delta.
+    the actions-log delta. *log* defaults to (and resolved at call time to)
+    the ``mutation_rescore`` facade's own declared logger -- named
+    ``quodeq.services.mutation_rescore``, which caplog tests capture -- so
+    this sibling module never needs its own ``getLogger()`` call.
     """
     if not project_dir.is_dir():
         return
     if repo_factory is None:
-        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+        from quodeq.services.wiring import SqliteFindingsRepository  # noqa: PLC0415
         repo_factory = SqliteFindingsRepository
+    if log is None:
+        # No caller-injected log (the production call site can't pass one —
+        # tests patch this whole function with a bare single-arg
+        # side_effect). Fall back to the facade's own declared logger
+        # instead of a new getLogger() here.
+        from quodeq.services.mutation_rescore import logger as log  # noqa: PLC0415
 
     for run_dir in sorted(p for p in project_dir.iterdir() if p.is_dir()):
         if not (run_dir / "events.jsonl").is_file():
             continue
-        try:
-            repo_factory(run_dir).ensure_projected()
-        except Exception as exc:  # noqa: BLE001 - one run's projection failure must not stop projecting the rest
-            if log is NULL_LOG:
-                # No caller-injected log (the production call site can't pass
-                # one — tests patch this whole function with a bare
-                # single-arg side_effect). Fall back to the facade's own
-                # declared logger instead of a new getLogger() here.
-                from quodeq.services.mutation_rescore import _logger as log  # noqa: PLC0415
-            log.warning(f"Projection after mutation failed for {run_dir}: {exc}")
+        run_isolated(
+            lambda run_dir=run_dir: repo_factory(run_dir).ensure_projected(),
+            label=f"projection after mutation for {run_dir}", log=log,
+        )

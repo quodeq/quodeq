@@ -9,6 +9,7 @@ builders live in tests/services/_dashboard_fixtures.py.
 """
 from __future__ import annotations
 
+from quodeq.core.run.state import RunState
 from tests.services._dashboard_fixtures import _dim
 
 # ============================================================
@@ -33,8 +34,8 @@ class TestStatusAwareFetcher:
         from quodeq.services.dashboard import _make_status_aware_fetcher
 
         runs = [
-            _RI(run_id="r-running", date_iso="2024-01-02", date_label="2024-01-02", status="in_progress"),
-            _RI(run_id="r-done", date_iso="2024-01-01", date_label="2024-01-01", status="complete"),
+            _RI(run_id="r-running", date_iso="2024-01-02", date_label="2024-01-02", status=RunState.RUNNING),
+            _RI(run_id="r-done", date_iso="2024-01-01", date_label="2024-01-01", status=RunState.DONE),
         ]
 
         call_count = {"running": 0, "done": 0}
@@ -84,10 +85,10 @@ class TestStatusAwareFetcher:
         from quodeq.services.dashboard import _make_status_aware_fetcher
 
         runs_snapshot1 = [
-            _RI(run_id="r1", date_iso="2024-01-01", date_label="2024-01-01", status="in_progress"),
+            _RI(run_id="r1", date_iso="2024-01-01", date_label="2024-01-01", status=RunState.RUNNING),
         ]
         runs_snapshot2 = [
-            _RI(run_id="r1", date_iso="2024-01-01", date_label="2024-01-01", status="complete"),
+            _RI(run_id="r1", date_iso="2024-01-01", date_label="2024-01-01", status=RunState.DONE),
         ]
 
         calls = []
@@ -166,7 +167,7 @@ class TestStaleCacheSelfHeal:
             (eval_dir / f"{d}.json").write_text("{}")
 
         runs = [
-            _RI(run_id="r-stale", date_iso="2024-01-01", date_label="2024-01-01", status="complete"),
+            _RI(run_id="r-stale", date_iso="2024-01-01", date_label="2024-01-01", status=RunState.DONE),
         ]
 
         # Pre-populate the cache with a STALE 1-dim entry (simulates the
@@ -224,7 +225,7 @@ class TestStaleCacheSelfHeal:
         (eval_dir / "security.json").write_text("{}")
 
         runs = [
-            _RI(run_id="r-fresh", date_iso="2024-01-01", date_label="2024-01-01", status="complete"),
+            _RI(run_id="r-fresh", date_iso="2024-01-01", date_label="2024-01-01", status=RunState.DONE),
         ]
 
         cache = OrderedDict()

@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
+from quodeq.core.run.state import RunState
 from quodeq.core.types import DimensionSummary
 from quodeq.data.fs.report_parser import RunInfo
 from quodeq.services.dashboard import build_dashboard
@@ -44,6 +45,10 @@ class TestBuildDashboard:
             result = build_dashboard(str(tmp_path), "proj", "latest")
         assert result["project"] == "proj"
         assert result["selectedRun"]["runId"] == "r1"
+        # Run metadata rides on selectedRun: the commit (None for a seeded
+        # run) and the per-dimension cache statistics.
+        assert "commitSha" in result["selectedRun"]
+        assert isinstance(result["selectedRun"]["cacheStats"], dict)
         assert len(result["dimensions"]) == 1
         assert "trend" in result
 
@@ -127,8 +132,8 @@ class TestBuildDashboard:
         # ``"latest"`` defaults to the most recent fully-completed run so the
         # per-dim cards reflect a coherent run that agrees with the headline.
         # The cancelled run remains reachable via explicit selection.
-        cancelled = RunInfo(run_id="r-newest", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
-        complete = RunInfo(run_id="r-older", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+        cancelled = RunInfo(run_id="r-newest", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.CANCELLED)
+        complete = RunInfo(run_id="r-older", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -142,8 +147,8 @@ class TestBuildDashboard:
     def test_latest_falls_back_when_all_cancelled(self, tmp_path):
         # If every run is cancelled, fall back to the newest one rather than
         # refusing to render — the dashboard still needs to show something.
-        cancelled1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
-        cancelled2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status="cancelled")
+        cancelled1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.CANCELLED)
+        cancelled2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.CANCELLED)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -158,8 +163,8 @@ class TestBuildDashboard:
         # A failed run must not headline the dashboard while a cancelled run
         # (with real kept-findings data) exists — mirror the Overview's
         # select_default_view_runs rule so the two surfaces agree.
-        failed = RunInfo(run_id="r-failed", date_iso="2024-03-01", date_label="2024-03-01", status="failed")
-        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-02-01", date_label="2024-02-01", status="cancelled")
+        failed = RunInfo(run_id="r-failed", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.FAILED)
+        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.CANCELLED)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -173,8 +178,8 @@ class TestBuildDashboard:
     def test_latest_all_failed_still_renders_newest(self, tmp_path):
         # If every run failed there's nothing trustworthy, but the dashboard
         # must still render something rather than error — pick the newest.
-        failed1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status="failed")
-        failed2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status="failed")
+        failed1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.FAILED)
+        failed2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.FAILED)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -188,8 +193,8 @@ class TestBuildDashboard:
     def test_explicit_run_selection_overrides_latest_default(self, tmp_path):
         # Explicit selection by run_id navigates to that run regardless of
         # state — users can still inspect partial runs from the bar chart.
-        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
-        complete = RunInfo(run_id="r-complete", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.CANCELLED)
+        complete = RunInfo(run_id="r-complete", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -208,15 +213,15 @@ class TestBuildDashboard:
         # (its findings are always needed) via dashboard.read_run_data.
         monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "score_cache.db"))
         runs = [
-            RunInfo(run_id=f"r{i}", date_iso=f"2024-{i:02d}-01", date_label=f"2024-{i:02d}-01", status="complete")
+            RunInfo(run_id=f"r{i}", date_iso=f"2024-{i:02d}-01", date_label=f"2024-{i:02d}-01", status=RunState.DONE)
             for i in range(1, 6)
         ]
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
 
-        # The history fetcher goes through read_run_scalars. For these tmp runs
-        # (no events.jsonl / evaluation.db) the scalar reader falls back to
-        # read_run_data at the runs-module level -- a distinct seam from the
+        # The history fetcher goes through read_scalar_dimensions. For these
+        # tmp runs (no reports, no evaluation.db) it reads the run through the
+        # accumulated reader's tolerant full read -- a distinct seam from the
         # dashboard-scope read_run_data used for the SELECTED run. Tracking the
         # two seams separately proves history never uses the full-data
         # dashboard fetcher.
@@ -238,12 +243,13 @@ class TestBuildDashboard:
             patch("quodeq.services.dashboard.list_runs", return_value=runs),
             patch("quodeq.services.dashboard.read_run_data", side_effect=tracked_selected),
             patch("quodeq.data.fs.report_parser.runs.read_run_data", side_effect=tracked_history),
+            patch("quodeq.services._accumulated_data.read_run_data", side_effect=tracked_history),
             patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
         ):
             build_dashboard(str(tmp_path), "proj-shared", "r3")
 
         # History runs are read via the scalar reader (which fell back to the
-        # runs-module read_run_data for these no-db tmp runs).
+        # accumulated reader's full read for these report-less tmp runs).
         assert history_reads, "expected history path to use the scalar reader"
         # The selected run's full data is read via the dashboard fetcher; the
         # history path must NOT touch that full-data seam.
@@ -256,16 +262,16 @@ class TestBuildDashboard:
         # Regression: build_dashboard formerly raised IndexError when the
         # selected complete run had cancelled/failed runs above it in the
         # full list, because ctx.index (full-list index) was passed to
-        # collect_stale_dimensions / _collect_previous_scores along with
+        # collect_stale_dimensions / collect_previous_scores along with
         # `history_runs` (filtered list of scoreable runs only). When
         # ctx.index >= len(history_runs), `history_runs[newer_idx]` blew up.
         cancelled_top = [
-            RunInfo(run_id=f"c{i}", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
+            RunInfo(run_id=f"c{i}", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.CANCELLED)
             for i in range(5)
         ]
-        selected = RunInfo(run_id="r-selected", date_iso="2024-02-15", date_label="2024-02-15", status="complete")
+        selected = RunInfo(run_id="r-selected", date_iso="2024-02-15", date_label="2024-02-15", status=RunState.DONE)
         complete_below = [
-            RunInfo(run_id=f"c-below-{i}", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+            RunInfo(run_id=f"c-below-{i}", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE)
             for i in range(2)
         ]
         runs = cancelled_top + [selected] + complete_below

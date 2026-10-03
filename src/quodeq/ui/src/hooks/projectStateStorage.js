@@ -2,8 +2,9 @@
  * useProjectState.js's localStorage read/write helpers and the boot-time
  * selection-resolution logic.
  */
-import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from '../constants.js';
-import { writeString } from '../adapters/storage.js';
+import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { readString, writeString } from '../adapters/storage.js';
+import { projectId, projectIdOrSelf } from '../utils/projectIdentity.js';
 
 export const STORAGE_KEY = 'quodeq_selected_project';
 export const SOURCE_STORAGE_KEY = 'quodeq_selected_source';
@@ -38,12 +39,7 @@ export function persistSource(setter, source, storage = localStorage) {
  * or storage is unavailable.
  */
 export function readStoredProject(storage = localStorage) {
-  try {
-    return storage.getItem(STORAGE_KEY) || '';
-  } catch (err) {
-    console.warn('[projectStateStorage] could not read stored project:', err);
-    return '';
-  }
+  return readString(STORAGE_KEY, '', storage);
 }
 
 /**
@@ -52,13 +48,8 @@ export function readStoredProject(storage = localStorage) {
  * that no longer exists.
  */
 export function readStoredSource(storage = localStorage) {
-  try {
-    const stored = storage.getItem(SOURCE_STORAGE_KEY);
-    return VALID_SOURCES.includes(stored) ? stored : DEFAULT_SOURCE;
-  } catch (err) {
-    console.warn('[projectStateStorage] could not read stored source:', err);
-    return DEFAULT_SOURCE;
-  }
+  const stored = readString(SOURCE_STORAGE_KEY, DEFAULT_SOURCE, storage);
+  return VALID_SOURCES.includes(stored) ? stored : DEFAULT_SOURCE;
 }
 
 /** Resolve which project to select from a loaded list, migrating stale storage if needed. */
@@ -76,9 +67,9 @@ export function resolveInitialProject({ list, currentProject, currentSource, onC
     if (onNoProjects) onNoProjects();
     return;
   }
-  const match = current && list.find((p) => (p.id || p.name) === current);
+  const match = current && list.find((p) => projectId(p) === current);
   if (!match) {
-    const pick = list[0].id || list[0].name || list[0];
+    const pick = projectIdOrSelf(list[0]);
     onChangeProject(pick);
   }
 }

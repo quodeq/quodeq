@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from quodeq.core.types import PrincipleScore
+from quodeq.core.types import ConfidenceLevel, PrincipleScore
 from quodeq.core.evidence.model import DEFAULT_WEIGHT
+from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.overall import MODE_NUMERICAL
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import (
@@ -32,7 +33,6 @@ class _PrincipleContext:
     pct: float
     vt_counts: dict[str, int]
     ct_counts: dict[str, int]
-    dampening: float
     using_taxonomy: bool
     conf_level: str
     ci: dict
@@ -44,12 +44,11 @@ def compute_tallies(
 ) -> tuple[dict[str, int], dict[str, int], bool]:
     """Tally distinct violation and compliance types per severity.
 
-    A ``vt`` taxonomy code is a per-finding grouping key, not a per-principle
-    mode switch: each finding is grouped by its ``vt`` when present and by its
-    ``reason`` otherwise, so a partly tagged principle still counts all of its
-    findings (including untagged criticals). ``using_taxonomy`` is reported
-    (any finding carries a ``vt``) for display only; it no longer changes which
-    findings are counted.
+    Each finding is grouped by its ``req`` requirement code, then by its
+    ``vt`` tag, then by its ``reason`` (see ``tally_types``), so a partly
+    tagged principle still counts all of its findings (including untagged
+    criticals). ``using_taxonomy`` is reported (any finding carries a ``vt``)
+    for display only; it does not change which findings are counted.
     """
     using_taxonomy = evidence_has_taxonomy(violations)
     vt_counts = tally_types(violations)
@@ -75,11 +74,11 @@ def _score_numerical(
 ) -> PrincipleScore:
     """Score a single principle in numerical mode."""
     kwargs = _base_kwargs(ctx)
-    if ctx.conf_level == "low":
+    if ctx.conf_level == ConfidenceLevel.LOW:
         return PrincipleScore(
             **kwargs, base_score=0,
             deductions=build_deductions({}, scale_multiplier=ctx.scale_mult),
-            final_score=0.0, grade="Insufficient",
+            final_score=0.0, grade=Grade.INSUFFICIENT,
         )
     base = violation_base(ctx.vt_counts, params=params)
     lift = compliance_lift(ctx.ct_counts, ctx.vt_counts, params=params)
@@ -102,16 +101,18 @@ def _score_graded(
     ``_score_numerical``; the legacy graded ladder is not user-tunable.
     """
     kwargs = _base_kwargs(ctx)
-    if ctx.conf_level == "low":
+    if ctx.conf_level == ConfidenceLevel.LOW:
         return PrincipleScore(
-            **kwargs, base_grade="Insufficient", severity_drops=0,
-            grade="Insufficient",
+            **kwargs, base_grade=Grade.INSUFFICIENT, severity_drops=0,
+            grade=Grade.INSUFFICIENT,
         )
     drops = count_grade_drops(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
+    # Graded mode is the only reader of the legacy dampening multiplier.
+    dampening = compliance_dampening(ctx.ct_counts, ctx.vt_counts)
     return PrincipleScore(
-        **kwargs, base_grade="Exemplary", severity_drops=drops,
-        dampening_multiplier=ctx.dampening,
-        grade=drop_grade("Exemplary", int(drops * ctx.dampening)),
+        **kwargs, base_grade=Grade.EXEMPLARY, severity_drops=drops,
+        dampening_multiplier=dampening,
+        grade=drop_grade(Grade.EXEMPLARY, int(drops * dampening)),
     )
 
 
@@ -121,7 +122,7 @@ def _build_context(
     """Build scoring context for a single principle from its evidence data."""
     metrics = pdata.get("metrics", {})
     pct = metrics.get("compliance_percentage", 0.0)
-    conf_level = metrics.get("confidence_level", "medium")
+    conf_level = metrics.get("confidence_level", ConfidenceLevel.MEDIUM)
     vt_counts, ct_counts, using_taxonomy = compute_tallies(
         pdata.get("violations", []), pdata.get("compliance", []),
     )
@@ -133,13 +134,13 @@ def _build_context(
     )
     return _PrincipleContext(
         key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
-        ct_counts=ct_counts, dampening=compliance_dampening(ct_counts, vt_counts),
+        ct_counts=ct_counts,
         using_taxonomy=using_taxonomy, conf_level=conf_level, ci=ci,
         scale_mult=scale_mult,
     )
 
 
-def _score_all_principles(
+def score_all_principles(
     raw_principles: dict, mode: str, scale_mult: int, files_read: int,
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, PrincipleScore]:

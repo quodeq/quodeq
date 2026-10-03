@@ -24,7 +24,13 @@ _ = _Dyn()
 # Flask view functions. The route decorator registers them; nothing calls the name.
 _._add_security_headers  # api/security.py: Flask view function; the route decorator is its only caller.
 _._gzip_large_json  # api/_compression.py: Flask view function; the route decorator is its only caller.
+_._open_scope  # api/_metrics_routes.py: Flask before_request hook; the decorator is its only caller.
+_._emit_server_timing  # api/_metrics_routes.py: Flask after_request hook; the decorator is its only caller.
+_._close_scope  # api/_metrics_routes.py: Flask teardown_request hook; the decorator is its only caller.
+_.clone_status  # api/routes_project_clone.py: Flask view function; the route decorator is its only caller.
+_.debug_metrics  # api/_metrics_routes.py: Flask view function; the route decorator is its only caller.
 _._handle_project_not_found  # api/routes_findings.py: Flask view function; the route decorator is its only caller.
+_._handle_unexpected_error  # api/_error_handlers.py: Flask errorhandler; the decorator is its only caller.
 _._security_checks  # api/security.py: Flask view function; the route decorator is its only caller.
 _.ai_clients  # api/routes_discovery.py: Flask view function; the route decorator is its only caller.
 _.apply_assistant_action  # api/assistant_action_routes.py: Flask view function; the route decorator is its only caller.
@@ -40,6 +46,7 @@ _.client_cmd_path_check  # api/routes_discovery.py: Flask view function; the rou
 _.client_models  # api/routes_discovery.py: Flask view function; the route decorator is its only caller.
 _.create_assistant_session  # api/assistant_session_routes.py: Flask view function; the route decorator is its only caller.
 _.delete_all  # api/routes_findings.py: Flask view function; the route decorator is its only caller.
+_.dismiss_by_type_route  # api/routes_findings_by_type.py: Flask view function; the route decorator is its only caller.
 _.delete_grade_formula  # api/_grade_formula_routes.py: Flask view function; the route decorator is its only caller.
 _.dimension_eval  # api/routes_project_data.py: Flask view function; the route decorator is its only caller.
 _.export_project  # api/routes_project_list.py: Flask view function; the route decorator is its only caller.
@@ -67,7 +74,9 @@ _.menubar_status  # api/routes_menubar.py: Flask view function; the route decora
 _.plain_logs  # api/_log_stream_routes.py: Flask view function; the route decorator is its only caller.
 _.post_assistant_message  # api/assistant_turn_routes.py: Flask view function; the route decorator is its only caller.
 _.preview_grade_formula  # api/_grade_formula_routes.py: Flask view function; the route decorator is its only caller.
+_.fleet_compare  # api/routes_compare.py: Flask view function; the route decorator is its only caller.
 _.project_compare_summary  # api/routes_compare.py: Flask view function; the route decorator is its only caller.
+_.project_compliance_detail  # api/_scores_routes.py: Flask view function; the route decorator is its only caller.
 _.project_info  # api/routes_project_list.py: Flask view function; the route decorator is its only caller.
 _.project_run_scores  # api/_scores_routes.py: Flask view function; the route decorator is its only caller.
 _.project_runs  # api/routes_runs.py: Flask view function; the route decorator is its only caller.
@@ -95,6 +104,7 @@ _.terminal_resolve  # api/terminal_routes.py: Flask view function; the route dec
 _.terminal_session_create  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.terminal_session_kill  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.terminal_sessions  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
+_.terminal_status  # api/terminal_routes.py: Flask view function; the route decorator is its only caller. Was masked by an unrelated same-named local var in data/fs/report_parser/runs.py._run_status_for_entry, removed by the 2026-09-22 run-list-vocabulary-into-RunState migration.
 _.terminal_ws  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.unverify  # api/routes_findings.py: Flask view function; the route decorator is its only caller.
 _.update_check  # api/routes_update.py: Flask view function; the route decorator is its only caller.
@@ -107,7 +117,8 @@ _.update_status  # api/routes_update.py: Flask view function; the route decorato
 _.JudgmentPayload  # core/events/models.py: Judgment field; read by name through serialization or a dict key (89 refs).
 _.PERSISTED_MARKERS  # core/finding_markers.py: FindingMarker field; read by name through serialization or a dict key (4 refs).
 _.accumulatedDimensionsCount  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (5 refs).
-_.accumulated_dimensions_count  # core/types/dashboard.py: TrendPoint field; read by name through serialization or a dict key (1 refs).
+_.majors  # services/dashboard_trend.py: TrendEntry and DimensionDetail field; read by name through serialization or a dict key.
+_.openTypes  # services/dashboard_trend.py: TrendEntry and DimensionDetail field; read by name through serialization or a dict key.
 _.active_agents  # services/_scan_progress_types.py: _DimProgress field; read by name through serialization or a dict key (2 refs).
 _.analyzed  # analysis/subagents/_consolidated.py: _ConsolidatedRunContext field; read by name through serialization or a dict key (82 refs).
 _.analyzed_files  # core/types/project.py: ProjectEntry field; read by name through serialization or a dict key (3 refs).
@@ -152,11 +163,11 @@ _.path_exists  # core/types/project.py: ProjectEntry field; read by name through
 _.previous_run_id  # core/types/dimension.py: DimensionResult field; read by name through serialization or a dict key (7 refs).
 _.principle_count  # core/types/standard.py: StandardMeta field; read by name through serialization or a dict key (7 refs).
 _.requirement_count  # core/types/standard.py: StandardMeta field; read by name through serialization or a dict key (7 refs).
+_.subtype  # core/types/standard.py: StandardMeta/StandardDetail field; read by name through serialization (to_camel_dict), shown as the edition in Standards.
+_.version  # core/types/standard.py: StandardMeta/StandardDetail field; read by name through serialization (to_camel_dict).
 _.runId  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (704 refs).
 _.runNumericAverage  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (9 refs).
 _.runOverallGrade  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (7 refs).
-_.run_date_iso  # services/scoring_view/_models.py: DimResolution field; read by name through serialization or a dict key (1 refs).
-_.run_state  # services/scoring_view/_models.py: DimResolution field; read by name through serialization or a dict key (4 refs).
 _.runs_count  # core/types/project.py: ProjectEntry field; read by name through serialization or a dict key (10 refs).
 _.sample  # core/finding_markers.py: FindingMarker field; read by name through serialization or a dict key (35 refs).
 _.severity_drops  # core/types/scoring.py: PrincipleScore field; read by name through serialization or a dict key (5 refs).
@@ -173,15 +184,14 @@ _._build_agent_config  # analysis/subagents/pool.py: Referenced only from tests/
 _._make_rescoring_fetcher  # services/scoring/__init__.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _._make_status_aware_fetcher  # services/dashboard.py: Referenced only from tests/, which this scan does not cover (9 refs).
 _._reset_for_tests  # update/selfupdate.py: Referenced only from tests/, which this scan does not cover (2 refs).
-_.add_log  # services/_job_model.py: Referenced only from tests/, which this scan does not cover (5 refs).
 _.check_node  # shared/prereqs.py: Referenced only from tests/, which this scan does not cover (4 refs).
 _.check_npm  # shared/prereqs.py: Referenced only from tests/, which this scan does not cover (4 refs).
 _.choose_highest_priority  # config/_discipline_detection.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _.clear_cached_queues  # analysis/subagents/_pool_scaling.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _.clear_grades  # data/sqlite/state_store.py: Referenced only from tests/, which this scan does not cover (1 refs).
-_.confidence_label  # core/scoring/engine.py: Referenced only from tests/, which this scan does not cover (7 refs).
 _.get_current_provider  # config/ai_provider.py: Referenced only from tests/, which this scan does not cover (6 refs).
 _.get_latest_timestamp  # data/events/reader.py: Referenced only from tests/, which this scan does not cover (5 refs).
+_.get_run_dir  # shared/env_paths.py: old-name shim for ensure_run_dir; referenced only from tests/, which this scan does not cover (1 refs).
 _.get_valid_categories  # config/disciplines.py: Referenced only from tests/, which this scan does not cover (4 refs).
 _.grade_for_score  # core/scoring/engine.py: Referenced only from tests/, which this scan does not cover (6 refs).
 _.is_subpath  # shared/paths.py: Referenced only from tests/, which this scan does not cover (3 refs).
@@ -205,25 +215,26 @@ _.tb  # shared/run_log.py: Referenced only from tests/, which this scan does not
 _.tool_uses  # assistant/adapters/_stream.py: Referenced only from tests/, which this scan does not cover (6 refs).
 _.update_verdict  # data/sqlite/state_store.py: Referenced only from tests/, which this scan does not cover (12 refs).
 _.wait_for_trip  # analysis/cache/failure_streak.py: Referenced only from tests/, which this scan does not cover (3 refs).
+_.wait_idle  # services/grade_formula_job.py: Referenced only from tests/, which this scan does not cover (7 refs).
 
 # Names reached through a library, a Protocol annotation or a re-export rather than a direct call.
 _.StandardReference  # core/types/standard.py: Referenced as a name or key elsewhere (4 refs outside the definition).
-_._CacheEraser  # services/_run_discard.py: structural Protocol used as an annotation and as the test injection seam.
+_.CacheEraser  # services/_run_discard.py: structural Protocol used as an annotation and as the test injection seam.
 _._api_pid  # dashboard/_webview_window.py: Referenced as a name or key elsewhere (1 refs outside the definition).
-_._build_workdir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_.build_workdir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._coerce_unknown_severity  # analysis/_api_schema.py: pydantic field_validator; pydantic calls it by registration, not by name.
-_._color  # shared/_log_format.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_._normalise_finding_type  # analysis/_api_schema.py: pydantic field_validator; pydantic calls it by registration, not by name.
+_.color  # shared/_log_format.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._count_eval_files  # services/cache.py: Referenced as a name or key elsewhere (8 refs outside the definition).
 _._deepest_scope  # analysis/manifest_build_scope.py: Referenced as a name or key elsewhere (4 refs outside the definition).
-_._dev_build_workdir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_.dev_build_workdir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._drain_pre_marker_buffer  # services/_job_monitor_mixin.py: Referenced as a name or key elsewhere (5 refs outside the definition).
-_._get_ui_source_dir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_.get_ui_source_dir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._poll  # menubar/app.py: Referenced as a name or key elsewhere (2 refs outside the definition).
-_._read_deadline_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
-_._read_dimensions_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
-_._read_provider_model_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
-_._read_scan_summary  # services/_fs_project_primitives.py: Referenced as a name or key elsewhere (9 refs outside the definition).
-_._read_time_limit_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
+_.read_deadline_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_.read_dimensions_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
+_.read_provider_model_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_.read_time_limit_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
 _._tee_run_log  # services/_job_monitor_mixin.py: Referenced as a name or key elsewhere (5 refs outside the definition).
 _.clear_accumulated_process_cache  # services/_accumulated_cache.py: Referenced as a name or key elsewhere (8 refs outside the definition).
 _.close_all_for_tests  # data/cache_store/index.py: Referenced as a name or key elsewhere (4 refs outside the definition).
@@ -290,4 +301,18 @@ _.row_factory  # data/projection/grade_projector.py: sqlite3 connection attribut
 _.insert_finding  # data/ports/findings.py: FindingsRepository port method; adapters implement it and callers go through the port.
 _.list_by_dimension  # data/ports/findings.py: FindingsRepository port method; adapters implement it and callers go through the port.
 _.read_run_score_from_dim_scores  # data/ports/grade_tables.py: GradeTablesReader port method; adapters implement it and callers go through the port.
+
+# Backward-compat default constants: the resolver now lives in
+# config/services_env.py, so these local aliases are no longer read inside
+# their own module; their only remaining static reference is the seam test
+# that asserts the resolver's default (tests/services/test_env_seams_t5.py).
+_.DEFAULT_RUN_DIM_CACHE_MAX  # services/_dashboard_cache.py: only caller is tests/services/test_env_seams_t5.py.
+_.DEFAULT_MAX_HISTORY_RUNS  # services/_dashboard_history.py: only caller is tests/services/test_env_seams_t5.py.
 _.set_verdict  # data/ports/findings.py: FindingsRepository port method; adapters implement it and callers go through the port.
+_.from_wire  # core/admission/facts.py: FindingFacts entry point, read by the writers once they admit findings.
+_.mapping_stamp  # core/admission/index.py: StandardIndex stamp, recorded per run once projection admits findings.
+_.load_standard_catalog  # data/fs/standard_index_loader.py: admission catalog loader, called by the writers once they admit findings.
+
+# pywebview window event. The toolkit fires it; we only subscribe.
+_.minimized  # dashboard/_webview_window_visibility.py: pywebview window event, fired by the toolkit.
+

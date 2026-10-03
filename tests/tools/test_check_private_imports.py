@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 import _private_imports_rules as rules
 import check_private_imports
 
@@ -44,7 +46,7 @@ def test_rule_a_flags_cross_package_private_name(tmp_path):
     ]
 
 
-def test_rule_a_allows_same_package_private_name(tmp_path):
+def test_rule_a_allows_same_package_private_name_under_rules_a_b(tmp_path):
     _write(tmp_path, "src/quodeq/services/y.py", "def _helper():\n    return 1\n")
     _write(tmp_path, "src/quodeq/services/z.py", "from quodeq.services.y import _helper\n")
     assert _scan_src(tmp_path) == []
@@ -65,7 +67,7 @@ def test_rule_b_allows_same_package_private_module(tmp_path):
     assert _scan_src(tmp_path) == []
 
 
-def test_relative_imports_never_flagged(tmp_path):
+def test_relative_imports_never_flagged_under_rules_a_b(tmp_path):
     _write(tmp_path, "src/quodeq/services/_impl.py", "def f():\n    return 1\n\ndef _g():\n    return 2\n")
     _write(tmp_path, "src/quodeq/api/x.py", "from ._impl import f\nfrom . import _thing\n")
     assert _scan_src(tmp_path) == []
@@ -166,34 +168,44 @@ def test_update_baseline_cli_calls_both_writers(monkeypatch):
     assert written == {"src": True, "tests": True}
 
 
-def test_no_new_src_violations():
+@pytest.fixture(scope="module")
+def src_violations() -> set[str]:
+    """One src scan shared by the new-violation and stale-entry checks."""
+    return set(check_private_imports.collect_src_violations())
+
+
+@pytest.fixture(scope="module")
+def tests_violations() -> set[str]:
+    """One tests scan shared by the new-violation and stale-entry checks."""
+    return set(check_private_imports.collect_tests_violations())
+
+
+def test_no_new_src_violations(src_violations):
     baseline = check_private_imports._ratchet.load_baseline(check_private_imports.SRC_BASELINE_PATH)
-    new = sorted(set(check_private_imports.collect_src_violations()) - baseline)
+    new = sorted(src_violations - baseline)
     assert new == [], (
-        "New private-import violation(s) in src/quodeq. Either move the "
-        "import into the same package or stop importing the private "
-        "symbol/module:\n" + "\n".join(new)
+        "New private-import violation(s) in src/quodeq. Either "
+        "make the name public (drop the underscore) or stop importing it:\n"
+        + "\n".join(new)
     )
 
 
-def test_no_new_tests_violations():
+def test_no_new_tests_violations(tests_violations):
     baseline = check_private_imports._ratchet.load_baseline(check_private_imports.TESTS_BASELINE_PATH)
-    new = sorted(set(check_private_imports.collect_tests_violations()) - baseline)
+    new = sorted(tests_violations - baseline)
     assert new == [], "New private-import violation(s) in tests/:\n" + "\n".join(new)
 
 
-def test_src_baseline_has_no_stale_entries():
-    current = set(check_private_imports.collect_src_violations())
-    stale = sorted(check_private_imports._ratchet.load_baseline(check_private_imports.SRC_BASELINE_PATH) - current)
+def test_src_baseline_has_no_stale_entries(src_violations):
+    stale = sorted(check_private_imports._ratchet.load_baseline(check_private_imports.SRC_BASELINE_PATH) - src_violations)
     assert stale == [], (
         "src baseline lists imports that no longer exist; regenerate with "
         "python tools/check_private_imports.py --update-baseline:\n" + "\n".join(stale)
     )
 
 
-def test_tests_baseline_has_no_stale_entries():
-    current = set(check_private_imports.collect_tests_violations())
-    stale = sorted(check_private_imports._ratchet.load_baseline(check_private_imports.TESTS_BASELINE_PATH) - current)
+def test_tests_baseline_has_no_stale_entries(tests_violations):
+    stale = sorted(check_private_imports._ratchet.load_baseline(check_private_imports.TESTS_BASELINE_PATH) - tests_violations)
     assert stale == [], (
         "tests baseline lists imports that no longer exist; regenerate with "
         "python tools/check_private_imports.py --update-baseline:\n" + "\n".join(stale)

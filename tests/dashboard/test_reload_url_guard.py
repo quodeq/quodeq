@@ -4,10 +4,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
+import pytest
+import webview
+
 from quodeq.dashboard._webview_window import (
-    _download_via_dialog,
-    _is_safe_reload_url,
-    _make_on_reload,
+    download_via_dialog,
+    is_safe_reload_url,
+    make_on_reload,
 )
 
 
@@ -17,44 +20,44 @@ from quodeq.dashboard._webview_window import (
 
 class TestIsSafeReloadUrl:
     def test_localhost_http_allowed(self):
-        assert _is_safe_reload_url("http://localhost:7863") is True
+        assert is_safe_reload_url("http://localhost:7863") is True
 
     def test_localhost_https_allowed(self):
-        assert _is_safe_reload_url("https://localhost:7863") is True
+        assert is_safe_reload_url("https://localhost:7863") is True
 
     def test_127_0_0_1_http_allowed(self):
-        assert _is_safe_reload_url("http://127.0.0.1:7863") is True
+        assert is_safe_reload_url("http://127.0.0.1:7863") is True
 
     def test_127_0_0_1_https_allowed(self):
-        assert _is_safe_reload_url("https://127.0.0.1:7863") is True
+        assert is_safe_reload_url("https://127.0.0.1:7863") is True
 
     def test_ipv6_loopback_allowed(self):
-        assert _is_safe_reload_url("http://[::1]:7863") is True
+        assert is_safe_reload_url("http://[::1]:7863") is True
 
     def test_localhost_with_path_allowed(self):
-        assert _is_safe_reload_url("http://localhost:7863/some/path") is True
+        assert is_safe_reload_url("http://localhost:7863/some/path") is True
 
     def test_remote_host_rejected(self):
-        assert _is_safe_reload_url("http://evil.example.com/payload") is False
+        assert is_safe_reload_url("http://evil.example.com/payload") is False
 
     def test_file_scheme_rejected(self):
-        assert _is_safe_reload_url("file:///etc/passwd") is False
+        assert is_safe_reload_url("file:///etc/passwd") is False
 
     def test_javascript_scheme_rejected(self):
-        assert _is_safe_reload_url("javascript:alert(1)") is False
+        assert is_safe_reload_url("javascript:alert(1)") is False
 
     def test_empty_string_rejected(self):
-        assert _is_safe_reload_url("") is False
+        assert is_safe_reload_url("") is False
 
     def test_localhost_lookalike_rejected(self):
         # attacker-controlled domain that contains "localhost"
-        assert _is_safe_reload_url("http://evillocalhost.com/") is False
+        assert is_safe_reload_url("http://evillocalhost.com/") is False
 
     def test_127_0_0_1_lookalike_with_extra_octet_rejected(self):
-        assert _is_safe_reload_url("http://127.0.0.1.evil.com/") is False
+        assert is_safe_reload_url("http://127.0.0.1.evil.com/") is False
 
     def test_no_scheme_rejected(self):
-        assert _is_safe_reload_url("localhost:7863") is False
+        assert is_safe_reload_url("localhost:7863") is False
 
 
 # ---------------------------------------------------------------------------
@@ -64,14 +67,14 @@ class TestIsSafeReloadUrl:
 class TestOnReloadGuard:
     """Verify that the live _on_reload wiring in main() uses the guard.
 
-    Uses the real ``_make_on_reload`` factory (same code path as ``main()``)
+    Uses the real ``make_on_reload`` factory (same code path as ``main()``)
     so that removing the guard call from ``main()`` would cause these tests
     to fail.
     """
 
     def _make_handler(self) -> tuple[Callable[[str], None], MagicMock]:
         window = MagicMock()
-        return _make_on_reload(window), window
+        return make_on_reload(window), window
 
     def test_safe_url_navigates(self):
         on_reload, window = self._make_handler()
@@ -102,6 +105,29 @@ class TestOnReloadGuard:
         window.load_url.assert_not_called()
         assert window.on_top is False  # raised, then released
 
+    def test_focus_still_raises_on_a_webview_exception(self):
+        # R-FT-7 -- _current_url's narrowed (WebViewException, AttributeError,
+        # RuntimeError): a backend-specific failure mid-teardown.
+        on_reload, window = self._make_handler()
+        window.get_current_url.side_effect = webview.errors.WebViewException("gone")
+        on_reload("")
+        window.load_url.assert_not_called()
+
+    def test_focus_still_raises_on_an_attribute_error(self):
+        on_reload, window = self._make_handler()
+        window.get_current_url.side_effect = AttributeError("no get_current_url")
+        on_reload("")
+        window.load_url.assert_not_called()
+
+    def test_focus_propagates_an_out_of_scope_get_current_url_error(self):
+        """R-FT-7 -- an error outside (WebViewException, AttributeError,
+        RuntimeError) (e.g. a programming bug) must now propagate instead of
+        being swallowed."""
+        on_reload, window = self._make_handler()
+        window.get_current_url.side_effect = ValueError("boom")
+        with pytest.raises(ValueError, match="boom"):
+            on_reload("")
+
     def test_focus_will_not_reload_an_unsafe_current_url(self):
         """Defence in depth: even self-reported URLs go through the guard."""
         on_reload, window = self._make_handler()
@@ -111,12 +137,12 @@ class TestOnReloadGuard:
 
 
 # ---------------------------------------------------------------------------
-# Unit tests for _download_via_dialog URL validation
+# Unit tests for download_via_dialog URL validation
 # ---------------------------------------------------------------------------
 
 
 class TestDownloadViaDialogUrlValidation:
-    """Verify that _download_via_dialog validates joined URLs against the allowlist."""
+    """Verify that download_via_dialog validates joined URLs against the allowlist."""
 
     def _make_window_and_dialog(self, save_path: str) -> MagicMock:
         """Create a mock window with a configured save dialog."""
@@ -132,12 +158,12 @@ class TestDownloadViaDialogUrlValidation:
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = MagicMock()
-            mock_response.read.return_value = b"test data"
+            mock_response.read.side_effect = [b"test data", b""]
             mock_response.__enter__.return_value = mock_response
             mock_response.__exit__.return_value = False
             mock_urlopen.return_value = mock_response
 
-            result = _download_via_dialog(window, base_url, path, "output.txt")
+            result = download_via_dialog(window, base_url, path, "output.txt")
 
         assert result is True
         mock_urlopen.assert_called_once()
@@ -151,7 +177,7 @@ class TestDownloadViaDialogUrlValidation:
         path = "//evil.example.com/steal-data"
 
         with patch("urllib.request.urlopen") as mock_urlopen:
-            result = _download_via_dialog(window, base_url, path, "output.txt")
+            result = download_via_dialog(window, base_url, path, "output.txt")
 
         assert result is False
         mock_urlopen.assert_not_called()
@@ -163,7 +189,7 @@ class TestDownloadViaDialogUrlValidation:
         path = "https://evil.example.com/steal-data"
 
         with patch("urllib.request.urlopen") as mock_urlopen:
-            result = _download_via_dialog(window, base_url, path, "output.txt")
+            result = download_via_dialog(window, base_url, path, "output.txt")
 
         assert result is False
         mock_urlopen.assert_not_called()
@@ -175,7 +201,7 @@ class TestDownloadViaDialogUrlValidation:
         path = "file:///etc/passwd"
 
         with patch("urllib.request.urlopen") as mock_urlopen:
-            result = _download_via_dialog(window, base_url, path, "output.txt")
+            result = download_via_dialog(window, base_url, path, "output.txt")
 
         assert result is False
         mock_urlopen.assert_not_called()
@@ -188,12 +214,12 @@ class TestDownloadViaDialogUrlValidation:
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = MagicMock()
-            mock_response.read.return_value = b"test data"
+            mock_response.read.side_effect = [b"test data", b""]
             mock_response.__enter__.return_value = mock_response
             mock_response.__exit__.return_value = False
             mock_urlopen.return_value = mock_response
 
-            result = _download_via_dialog(window, base_url, path, "output.json")
+            result = download_via_dialog(window, base_url, path, "output.json")
 
         assert result is True
         mock_urlopen.assert_called_once()

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.core.evidence.req_mapping import QuarantinedFinding, _group_judgments
+from quodeq.core.evidence.req_mapping import QuarantinedFinding, group_judgments
 from quodeq.core.evidence.parser import (
     EvidenceContext,
     EvidenceParseOptions,
@@ -117,7 +117,7 @@ def test_empty_evaluators_dir_falls_back_to_compiled_standard(tmp_path):
     """Production config: ~/.quodeq/evaluators exists but is EMPTY and the
     built-in standard lives only in standards/compiled/<dim>.json. The
     quarantine must fall back to the compiled standard instead of silently
-    going permissive. Regression for run 03c99d26 (quodeq 1.5.2): a phantom
+    going permissive. Regression: in quodeq 1.5.2, a phantom
     "N/A" principle plus a principle="N/A" critical were written into
     evaluation/maintainability.json despite the write-time guard."""
     compiled = tmp_path / "standards" / "compiled"
@@ -169,7 +169,7 @@ def test_quarantined_findings_count_matches_quarantined_counter(tmp_path):
         Judgment(practice_id="Modularity", verdict="violation", dimension="maintainability",
                  req="M-MOD-1", file="b.py", line=10, reason="x", severity="major"),
     ]
-    grouped = _group_judgments(
+    grouped = group_judgments(
         judgments, dimension="maintainability",
         req_map_reader=_read_map, evaluators_dir=compiled,
     )

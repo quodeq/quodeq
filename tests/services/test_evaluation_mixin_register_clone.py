@@ -12,11 +12,12 @@ import pytest
 
 from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import (
-    _zero_run_scan_fallback,
+    zero_run_scan_fallback,
 )
 from quodeq.services.project_registration import (
     register_project as _register_project,
 )
+from quodeq.shared.env import get_clones_dir
 
 
 def _read_info(reports_root: Path, uuid: str) -> dict:
@@ -33,8 +34,8 @@ def test_zero_run_scan_fallback_returns_independent_nested_containers():
     (e.g. a caller appending to "modules") silently corrupted every other
     project's fallback result, past and future.
     """
-    a = _zero_run_scan_fallback()
-    b = _zero_run_scan_fallback()
+    a = zero_run_scan_fallback()
+    b = zero_run_scan_fallback()
     assert a == b
     assert a["languages"] is not b["languages"]
     assert a["branches"] is not b["branches"]
@@ -68,7 +69,7 @@ def test_register_url_clones_to_dest_then_scans(tmp_path):
     clone_dest = tmp_path / "code"
     clone_dest.mkdir()
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
@@ -93,7 +94,7 @@ def test_register_url_ephemeral_clones_under_clones_root(tmp_path, monkeypatch):
     fake_home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: fake_home)
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
@@ -102,6 +103,7 @@ def test_register_url_ephemeral_clones_under_clones_root(tmp_path, monkeypatch):
         uuid = _register_project(
             str(reports),
             NewProjectSpec("https://github.com/example/repo.git", None, ephemeral=True),
+            clones_dir=get_clones_dir(),
         )
 
     info = _read_info(reports, uuid)
@@ -165,7 +167,7 @@ def test_register_url_rejects_private_address_before_clone(tmp_path, monkeypatch
 
     clone_calls = []
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         clone_calls.append(url)
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
@@ -191,7 +193,7 @@ def test_register_url_rejects_localhost_before_clone(tmp_path, monkeypatch):
 
     clone_calls = []
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         clone_calls.append(url)
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
@@ -219,7 +221,7 @@ def test_register_url_revalidates_immediately_before_clone(tmp_path, monkeypatch
 
     clone_calls = []
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         clone_calls.append(url)
 
     # First call (top-of-registration guard) passes; second call (the
@@ -244,6 +246,7 @@ def test_register_url_revalidates_immediately_before_clone(tmp_path, monkeypatch
             _register_project(
                 str(reports),
                 NewProjectSpec("https://github.com/example/repo.git", None, ephemeral=True),
+                clones_dir=get_clones_dir(),
             )
 
     assert len(validate_calls) == 2

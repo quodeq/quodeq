@@ -18,7 +18,7 @@ from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
 
-from quodeq.analysis._dim_order import _dimension_deadline, _order_by_backlog
+from quodeq.analysis._dim_order import _dimension_deadline, order_by_backlog
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop
 from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.shared import cancellation
@@ -37,12 +37,12 @@ _PIPELINE_SEAMS = ("run_incremental_loop", "run_per_dimension_loop",
 
 class TestOrderByBacklog:
     def test_biggest_backlog_first_ties_keep_configured_order(self):
-        ordered, counts = _order_by_backlog(_CONFIGURED, _ESTIMATES)
+        ordered, counts = order_by_backlog(_CONFIGURED, _ESTIMATES)
         assert ordered == ["clean-architecture", "security", "reliability"]
         assert counts == {"security": 187, "reliability": 187, "clean-architecture": 806}
 
     def test_logs_one_line_when_the_order_changes(self, recording_log):
-        _order_by_backlog(_CONFIGURED, _ESTIMATES, log=recording_log)
+        order_by_backlog(_CONFIGURED, _ESTIMATES, log=recording_log)
         lines = [m for m in recording_log.info_messages if "pending backlog" in m]
         assert lines == [
             "[loop] dimension order by pending backlog: "
@@ -51,32 +51,32 @@ class TestOrderByBacklog:
 
     def test_no_log_when_the_order_is_unchanged(self, recording_log):
         already = ["clean-architecture", "security", "reliability"]
-        _order_by_backlog(already, _ESTIMATES, log=recording_log)
+        order_by_backlog(already, _ESTIMATES, log=recording_log)
         assert not [m for m in recording_log.info_messages if "pending backlog" in m]
 
     @pytest.mark.parametrize("reason", ["full", "diff", "first-run", "empty"])
     def test_no_reorder_when_any_reason_is_not_incremental(self, reason):
         estimates = {**_ESTIMATES, "clean-architecture": {"count": 806, "reason": reason}}
-        ordered, counts = _order_by_backlog(_CONFIGURED, estimates)
+        ordered, counts = order_by_backlog(_CONFIGURED, estimates)
         assert ordered == _CONFIGURED
         assert counts is None
 
     @pytest.mark.parametrize("estimates", [None, {}, {"security": {"count": 1, "reason": "incremental"}}])
     def test_no_reorder_when_estimates_are_missing(self, estimates):
-        ordered, counts = _order_by_backlog(_CONFIGURED, estimates)
+        ordered, counts = order_by_backlog(_CONFIGURED, estimates)
         assert ordered == _CONFIGURED
         assert counts is None
 
     def test_no_reorder_when_an_estimate_is_not_a_mapping(self):
         # _persist_dim_estimates is patched to a MagicMock in several pipeline
         # tests; its .get() returns a Mock, which must not be ranked.
-        ordered, counts = _order_by_backlog(_CONFIGURED, MagicMock())
+        ordered, counts = order_by_backlog(_CONFIGURED, MagicMock())
         assert ordered == _CONFIGURED
         assert counts is None
 
     def test_negative_counts_clamp_to_zero(self):
         estimates = {**_ESTIMATES, "security": {"count": -5, "reason": "incremental"}}
-        _ordered, counts = _order_by_backlog(_CONFIGURED, estimates)
+        _ordered, counts = order_by_backlog(_CONFIGURED, estimates)
         assert counts["security"] == 0
 
 
@@ -145,7 +145,7 @@ class TestIncrementalLoopDeadlineSlices:
             clock[0] = config.options.deadline_at  # the dim burns its whole slice
             return _FakeEvidence()
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
             run_incremental_loop(
                 cfg, ["clean-architecture", "security", "reliability"], _ctx(3),
                 LoopDeps(runner=_runner_from(fake_runner)),
@@ -190,7 +190,7 @@ class TestIncrementalLoopDeadlineSlices:
             seen.append(config.options.deadline_at)
             return _FakeEvidence()
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
             run_incremental_loop(
                 cfg, ["security", "reliability"], _ctx(2),
                 LoopDeps(runner=_runner_from(fake_runner)),
@@ -212,7 +212,7 @@ class TestIncrementalLoopDeadlineSlices:
             clock[0] = config.options.deadline_at
             return _FakeEvidence()
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
             run_incremental_loop(
                 cfg, ["a", "b", "c"], _ctx(3), LoopDeps(runner=_runner_from(fake_runner)),
             )
@@ -231,7 +231,7 @@ class TestIncrementalLoopDeadlineSlices:
             cancellation.request_cancel()  # breaker trip during the first dim
             return _FakeEvidence()
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
             run_incremental_loop(
                 cfg, ["clean-architecture", "security"], _ctx(2),
                 LoopDeps(runner=_runner_from(fake_runner)),
@@ -249,7 +249,7 @@ class TestIncrementalLoopDeadlineSlices:
         def fake_runner(_config, _dim, _idx, _ctx):
             raise KeyboardInterrupt("ctrl-c mid-dimension")
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result"), \
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"), \
                 pytest.raises(KeyboardInterrupt):
             run_incremental_loop(
                 cfg, ["clean-architecture", "security"], _ctx(2),

@@ -1,4 +1,4 @@
-"""Cluster 36: api best-effort handlers log at debug instead of swallowing."""
+"""api best-effort handlers log at debug instead of swallowing."""
 from __future__ import annotations
 
 import json
@@ -8,6 +8,7 @@ from quodeq.api import _llamacpp_log_routes as llama_routes
 from quodeq.api import _log_tail_helpers as log_tail_helpers
 from quodeq.api import _rate_limit_file_store as store_mod
 from quodeq.api import routes_project_scan
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types.scan import ScanData
 from tests.api._routes_project_list_fixtures import (  # noqa: F401 -- app/client/provider are pytest fixtures
     app,
@@ -63,10 +64,13 @@ def test_project_scan_logs_rescan_on_corrupt_scan_json(client, tmp_path) -> None
 
 
 class _ProviderStub:
-    """Minimal stub providing get_log_run_dir but no in-memory _jobs table."""
+    """Minimal stub: a run dir on disk and no in-memory job."""
 
     def __init__(self, run_dir):
         self._run_dir = run_dir
+
+    def in_memory_job(self, job_id):
+        return None
 
     def get_log_run_dir(self, job_id):
         return self._run_dir
@@ -78,7 +82,7 @@ def test_stream_terminal_state_logs_debug_on_corrupt_status_json(tmp_path) -> No
     (run_dir / "status.json").write_text("[")
     provider = _ProviderStub(run_dir)
     with patch.object(log_tail_helpers._logger, "debug") as debug:
-        state = log_tail_helpers._stream_terminal_state(provider, "job-123")
-    assert state == "completed"
+        state = log_tail_helpers.stream_terminal_state(provider, "job-123")
+    assert state == JobStatus.DONE
     assert debug.called
     assert debug.call_args.args[1] == "job-123"

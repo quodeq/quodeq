@@ -2,13 +2,18 @@ import { useCallback, useMemo } from 'react';
 import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/index.js';
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
+import ByTypeSubTab from './ByTypeSubTab.jsx';
 import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/index.js';
 import { renderViolationsEmptyState } from './ViolationsEmptyStates.jsx';
 import { useViolationsPageState } from '../hooks/useViolationsPageState.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 import { walkTree } from '../../../utils/treeWalk.js';
-import { PROJECT_SOURCE } from '../../../constants.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import DeferredMount from '../../../components/DeferredMount.jsx';
+import CardListSkeleton from '../../../components/CardListSkeleton.jsx';
+import { VIOLATIONS_SUB_TAB } from '../violationsVocab.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 function findSubtree(root, path) {
   if (!path) return root;
@@ -100,9 +105,7 @@ function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePri
   const total = summary.totalViolations || 0;
   const subParts = [
     t('violations.subTotal', { count: total }),
-    visibleDimensions.length === 1
-      ? t('violations.subDim', { count: visibleDimensions.length })
-      : t('violations.subDims', { count: visibleDimensions.length }),
+    t(pluralKey(visibleDimensions.length, 'violations.subDim', 'violations.subDims'), { count: visibleDimensions.length }),
     t('violations.subPrinciples', { count: uniquePrinciples }),
     t('violations.subFiles', { count: topFilesCount }),
   ];
@@ -120,9 +123,10 @@ function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePri
         badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
       <div className="violations-flag-row">
-        <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
-        <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
-        <FlagPill flag={t('violations.flagDismissed')}   active={activeSubTab === 'dismissed'} count={dismissed.length || undefined} onClick={() => setActiveSubTab('dismissed')} />
+        <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === VIOLATIONS_SUB_TAB.DIMENSION} onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.DIMENSION)} />
+        <FlagPill flag={t('violations.flagByType')}      active={activeSubTab === VIOLATIONS_SUB_TAB.TYPE}      onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.TYPE)} />
+        <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === VIOLATIONS_SUB_TAB.FILE}      onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.FILE)} />
+        <FlagPill flag={t('violations.flagDismissed')}   active={activeSubTab === VIOLATIONS_SUB_TAB.DISMISSED} count={dismissed.length || undefined} onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.DISMISSED)} />
       </div>
     </div>
   );
@@ -133,40 +137,37 @@ export function ViolationsSubTabContent(props) {
     activeSubTab, visibleDimensions, dismissed, callbacks,
     fileCurrentPath, setFileCurrentPath,
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
-    selectedSource,
+    selectedSource, selectedProject,
   } = props;
-  if (activeSubTab === 'file') {
+  if (activeSubTab === VIOLATIONS_SUB_TAB.TYPE) {
+    return <ByTypeSubTab dimensions={visibleDimensions} project={selectedProject} selectedSource={selectedSource} callbacks={callbacks} />;
+  }
+  if (activeSubTab === VIOLATIONS_SUB_TAB.FILE) {
     return <FileSubTab dimensions={visibleDimensions} onFileClick={callbacks.onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />;
   }
-  if (activeSubTab === 'dimension') {
+  if (activeSubTab === VIOLATIONS_SUB_TAB.DIMENSION) {
     return <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={callbacks.onDimensionClick} onPrincipleClick={callbacks.onPrincipleClick} onCellClick={callbacks.onCellClick} />;
   }
-  if (activeSubTab === 'dismissed') {
+  if (activeSubTab === VIOLATIONS_SUB_TAB.DISMISSED) {
     // Shared projects have no mutation route on the backend — pass undefined
     // instead of the real handlers so DismissedSubTab hides the actions and
     // the list stays visible read-only. useDismissedFindings' own handlers
     // also no-op as defense in depth (see that hook), but the button must not
     // even render here.
-    const isShared = selectedSource === PROJECT_SOURCE.SHARED;
+    const actions = selectedSource === PROJECT_SOURCE.SHARED
+      ? {}
+      : { onRestore: handleRestore, onRestoreAll: handleRestoreAll, onDelete: handleDelete, onDeleteAll: handleDeleteAll };
     return dismissed.length > 0
-      ? (
-        <DismissedSubTab
-          dismissed={dismissed}
-          onRestore={isShared ? undefined : handleRestore}
-          onRestoreAll={isShared ? undefined : handleRestoreAll}
-          onDelete={isShared ? undefined : handleDelete}
-          onDeleteAll={isShared ? undefined : handleDeleteAll}
-        />
-      )
+      ? <DismissedSubTab dismissed={dismissed} {...actions} />
       : <p className="empty-state">{t('violations.noDismissedViolations')}</p>;
   }
   return null;
 }
 
-export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = 'dimension', onSubTabChange }) {
+export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = VIOLATIONS_SUB_TAB.DIMENSION, onSubTabChange }) {
   const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = PROJECT_SOURCE.LOCAL } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching, error } = data;
-  const { onNavigate, onRefresh, onReconcile, onRetry } = callbacks;
+  const { onNavigate, onReconcile, onRetry } = callbacks;
 
   // The active sub-tab lives in the nav-stack entry, not component state:
   // `subTab` arrives as a route param and flipping it replaces the entry in
@@ -182,7 +183,7 @@ export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = '
     restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
-  } = useViolationsPageState({ tabKey, selectedProject, onRefresh, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource });
+  } = useViolationsPageState({ tabKey, selectedProject, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource });
 
   const emptyState = renderViolationsEmptyState({
     projectsLoaded, projects, selectedSource, selectedProject, onNavigate,
@@ -192,19 +193,23 @@ export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = '
   const isRefreshing = isFetching && !loading;
 
   return (
-    <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+    <div className={`violations-page violations-page--terminal${isRefreshing ? ' section-pending' : ''}`}>
       {restoreError && <div className="error-banner" role="alert">{restoreError}</div>}
       <ViolationsHeader
         summary={summary} visibleDimensions={visibleDimensions} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples}
         selectedSource={selectedSource} activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab} dismissed={dismissed}
       />
-      <ViolationsSubTabContent
-        activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed}
-        callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}
-        handleRestore={handleRestore} handleRestoreAll={handleRestoreAll}
-        handleDelete={handleDelete} handleDeleteAll={handleDeleteAll}
-        selectedSource={selectedSource}
-      />
+      {/* The header paints on the click; the sub-tab body (heat grid, file
+          tree, type rows over every finding) follows in the next commit. */}
+      <DeferredMount fallback={<CardListSkeleton />}>
+        <ViolationsSubTabContent
+          activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed}
+          callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}
+          handleRestore={handleRestore} handleRestoreAll={handleRestoreAll}
+          handleDelete={handleDelete} handleDeleteAll={handleDeleteAll}
+          selectedSource={selectedSource} selectedProject={selectedProject}
+        />
+      </DeferredMount>
     </div>
   );
 }

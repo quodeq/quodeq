@@ -1,37 +1,47 @@
 """Color detection, ANSI formatter, and stderr handler for logging."""
 from __future__ import annotations
 
+import functools
 import logging
 import sys
 from collections.abc import Mapping
 
 from quodeq.shared.env_resolve import resolve_env
 
-_LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
-logging.addLevelName(_LOG_SUCCESS, "SUCCESS")
+LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
+logging.addLevelName(LOG_SUCCESS, "SUCCESS")
+
+_TERM_DUMB = "dumb"  # TERM value meaning no color support
 
 
-def _should_use_color(env: Mapping[str, str] | None = None) -> bool:
+def should_use_color(env: Mapping[str, str] | None = None) -> bool:
     """Determine whether ANSI color codes should be emitted.
 
     *env* overrides ``os.environ`` when provided, making the check
     testable without environment mutation.
     """
     environ = resolve_env(env)
-    return not environ.get("NO_COLOR") and environ.get("TERM") != "dumb"
+    return not environ.get("NO_COLOR") and environ.get("TERM") != _TERM_DUMB
 
 
-_USE_COLOR: bool = _should_use_color()
+@functools.cache
+def use_color() -> bool:
+    """Return whether color output is enabled (decided once, at first use)."""
+    return should_use_color()
 
 
-def _use_color() -> bool:
-    """Return whether color output is enabled (cached at import time)."""
-    return _USE_COLOR
-
-
-def _color(code: str) -> str:
+def color(code: str) -> str:
     """Return the ANSI *code* if color is enabled, else empty string."""
-    return code if _USE_COLOR else ""
+    return code if use_color() else ""
+
+
+_USE_COLOR_OLD_NAME = "USE_COLOR"  # __getattr__ shim for the old module-level constant
+
+
+def __getattr__(name: str):
+    if name == _USE_COLOR_OLD_NAME:
+        return use_color()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 _ANSI_GREY = "\033[0;90m"
@@ -44,7 +54,7 @@ _NC = "\033[0m"
 _STYLES: dict[int, tuple[str, str]] = {
     logging.DEBUG: (_ANSI_GREY, "[DEBUG]"),
     logging.INFO: (_ANSI_BLUE, "[INFO]"),
-    _LOG_SUCCESS: (_ANSI_GREEN, "[SUCCESS]"),
+    LOG_SUCCESS: (_ANSI_GREEN, "[SUCCESS]"),
     logging.WARNING: (_ANSI_YELLOW, "[WARNING]"),
     logging.ERROR: (_ANSI_RED, "[ERROR]"),
 }
@@ -55,9 +65,19 @@ class ColorFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         raw_color, prefix = _STYLES.get(record.levelno, ("", f"[{record.levelname}]"))
-        if _use_color():
-            return f"{raw_color}{prefix}{_NC} {record.getMessage()}"
-        return f"{prefix} {record.getMessage()}"
+        if use_color():
+            line = f"{raw_color}{prefix}{_NC} {record.getMessage()}"
+        else:
+            line = f"{prefix} {record.getMessage()}"
+        # Same traceback and stack handling as logging.Formatter.format,
+        # exc_text cache included, appended uncoloured.
+        if record.exc_info and not record.exc_text:
+            record.exc_text = self.formatException(record.exc_info)
+        if record.exc_text:
+            line += "\n" + record.exc_text
+        if record.stack_info:
+            line += "\n" + self.formatStack(record.stack_info)
+        return line
 
 
 class StderrHandler(logging.StreamHandler):

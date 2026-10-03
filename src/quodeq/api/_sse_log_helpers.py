@@ -2,21 +2,29 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Callable
 
+from flask import Response
+
+from quodeq.api.sse_frames import Heartbeat, SseEvent, sse_line
+from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
+
+
+_DEFAULT_POLL_MS = 100  # QUODEQ_LOG_STREAM_POLL_MS fallback
+_DEFAULT_MAX_WAIT_S = 10  # QUODEQ_LOG_STREAM_MAX_WAIT_S fallback
 
 
 def _poll_ms(env: Mapping[str, str] | None = None) -> int:
     """Poll interval between tail ticks; ``QUODEQ_LOG_STREAM_POLL_MS`` overrides."""
-    return int(resolve_env(env).get("QUODEQ_LOG_STREAM_POLL_MS", "100"))
+    return env_int("QUODEQ_LOG_STREAM_POLL_MS", _DEFAULT_POLL_MS, minimum=1, env=resolve_env(env))
 
 
 def _max_wait_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds to wait for a missing log file; ``QUODEQ_LOG_STREAM_MAX_WAIT_S`` overrides."""
-    return int(resolve_env(env).get("QUODEQ_LOG_STREAM_MAX_WAIT_S", "10"))
+    return env_int("QUODEQ_LOG_STREAM_MAX_WAIT_S", _DEFAULT_MAX_WAIT_S, minimum=1, env=resolve_env(env))
 
 
 # Cadence for SSE comments emitted while waiting on a not-yet-existing log
@@ -24,44 +32,59 @@ def _max_wait_s(env: Mapping[str, str] | None = None) -> int:
 # when the runner spends a long time in the "preparing" phase.
 _KEEPALIVE_MS = 2000
 
-# Per-tick byte cap on the SSE tail read. Caps a runaway log file from blowing
-# out RAM in a single read; remaining bytes are served on the next tick.
-_DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
-_ENV_TAIL_MAX_BYTES = "QUODEQ_LOG_TAIL_MAX_BYTES"
+
+# Per-read byte cap on a log tail (SSE tick or plain poll). Caps a runaway log
+# file from blowing out RAM in a single read; remaining bytes are served on
+# the next read.
+DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
+ENV_TAIL_MAX_BYTES = "QUODEQ_LOG_TAIL_MAX_BYTES"
+
+# _wait_for_log_file/_tail_new_lines tick statuses -- a local closed
+# vocabulary distinct from RunState/JobStatus/FileDoneStatus even though two
+# of its members spell the same words; named so the vocab-literal ratchet
+# doesn't mistake this generator plumbing for one of those.
+_TICK_CONTINUE = "continue"
+_TICK_TIMEOUT = "timeout"
+_TICK_DONE = "done"
+_TICK_ERROR = "error"
 
 
-def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
-    raw = resolve_env(env).get(_ENV_TAIL_MAX_BYTES)
-    if not raw:
-        return _DEFAULT_TAIL_MAX_BYTES
-    try:
-        value = int(raw)
-    except ValueError:
-        return _DEFAULT_TAIL_MAX_BYTES
-    return value if value > 0 else _DEFAULT_TAIL_MAX_BYTES
+def tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
+    """Bytes one log-tail read may pull; ``QUODEQ_LOG_TAIL_MAX_BYTES`` overrides.
 
-
-def sse_line(data: str, event: str | None = None, event_id: int | None = None) -> str:
-    """Render one server-sent-event frame: optional id and event, then data.
-
-    The trailing blank line is what makes the browser dispatch the event, so
-    every frame this module writes goes through here rather than being
-    assembled at the call site.
+    Read on every tick, so an unusable value falls back without a warning.
     """
-    parts = []
-    if event_id is not None:
-        parts.append(f"id: {event_id}\n")
-    if event is not None:
-        parts.append(f"event: {event}\n")
-    parts.append(f"data: {data}\n\n")
-    return "".join(parts)
+    return env_int(ENV_TAIL_MAX_BYTES, DEFAULT_TAIL_MAX_BYTES, minimum=1, env=env, warn=False)
+
+
+def initial_offset(last_event_id: str) -> int:
+    """Parse the SSE ``Last-Event-ID`` header (a byte offset); 0 when absent, malformed, or negative.
+
+    Matches the ``since`` query-param clamp in ``_log_stream_routes.py``: a
+    negative offset would seek before the start of the log file.
+    """
+    try:
+        return max(0, int(last_event_id)) if last_event_id else 0
+    except ValueError:
+        return 0
+
+
+def event_stream_response(frames: Iterable[str]) -> Response:
+    """Wrap *frames* in an uncached ``text/event-stream`` response.
+
+    ``X-Accel-Buffering: no`` stops a reverse proxy from holding frames back.
+    """
+    resp = Response(frames, mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
 
 
 def _emit_done_frame(terminal_state, offset: int) -> str:
     """Build the ``event: done`` frame that ends a tail stream.
 
     terminal_state: optional callable returning a string describing why the
-             run ended (e.g. ``"cancelled"``, ``"failed"``, ``"completed"``).
+             run ended (e.g. ``"cancelled"``, ``"failed"``, ``"done"``).
              If provided and non-empty, that value rides in the done frame
              as ``data:`` so the client can show the right title without
              relying on a separate dashboard poll.
@@ -70,12 +93,12 @@ def _emit_done_frame(terminal_state, offset: int) -> str:
     if terminal_state is not None:
         try:
             state = terminal_state() or ""
-        except Exception:  # noqa: BLE001 — never block the done frame on a bad reader
+        except (OSError, ValueError, AttributeError):
             state = ""
-    return sse_line(state, event="done", event_id=offset or None)
+    return sse_line(state, event=SseEvent.DONE, event_id=offset or None)
 
 
-def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):
+def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int, heartbeat: Heartbeat):
     """One poll tick while the log file doesn't exist yet.
 
     Two regimes when the file is missing:
@@ -88,7 +111,7 @@ def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):
         the original "give up after _max_wait_s()" behaviour so a missing file
         doesn't hang the connection forever.
 
-    Yields keepalive/error SSE frames as needed. Returns
+    Yields keepalive/heartbeat/error SSE frames as needed. Returns
     ``(waited_ms, keepalive_ms, status)`` where status is ``"continue"``,
     ``"timeout"`` (error frame already yielded, caller should return), or
     ``"done"`` (is_done() returned True; caller emits the done frame).
@@ -97,22 +120,26 @@ def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):
     if is_done is None:
         if waited_ms >= _max_wait_s() * 1000:
             yield sse_line("log file unavailable", event="error")
-            return waited_ms, keepalive_ms, "timeout"
+            return waited_ms, keepalive_ms, _TICK_TIMEOUT
         waited_ms += poll_ms
     else:
         if is_done():
-            return waited_ms, keepalive_ms, "done"
+            return waited_ms, keepalive_ms, _TICK_DONE
         keepalive_ms += poll_ms
         if keepalive_ms >= _KEEPALIVE_MS:
             yield ":keepalive\n\n"
             keepalive_ms = 0
+    beat = heartbeat.advance(poll_ms)
+    if beat is not None:
+        yield beat
     time.sleep(poll_ms / 1000)
-    return waited_ms, keepalive_ms, "continue"
+    return waited_ms, keepalive_ms, _TICK_CONTINUE
 
 
-def _tail_new_lines(path: Path, offset: int, line_filter):
+def _tail_new_lines(path: Path, offset: int, line_filter, heartbeat: Heartbeat):
     """Read new bytes from *path* since *offset*, yield an SSE frame per
-    complete new line, and return ``(offset, status)``.
+    complete new line, and return ``(offset, status)``. Emitting a line
+    resets *heartbeat*.
 
     status is ``"continue"`` normally, or ``"error"`` if the open failed --
     in which case an ``event: error`` frame has already been yielded exactly
@@ -122,10 +149,10 @@ def _tail_new_lines(path: Path, offset: int, line_filter):
     try:
         with open(path, "rb") as fh:
             fh.seek(offset)
-            raw = fh.read(_tail_max_bytes())
+            raw = fh.read(tail_max_bytes())
     except OSError:  # includes FileNotFoundError
         yield sse_line("log file unavailable", event="error")
-        return offset, "error"
+        return offset, _TICK_ERROR
     text = raw.decode("utf-8", errors="replace")
     if text:
         complete = text if text.endswith("\n") else text[: text.rfind("\n") + 1]
@@ -133,8 +160,9 @@ def _tail_new_lines(path: Path, offset: int, line_filter):
             for line in complete.splitlines():
                 offset += len(line.encode("utf-8")) + 1  # +1 for '\n'
                 if line_filter is None or line_filter(line):
+                    heartbeat.reset()
                     yield sse_line(line, event_id=offset)
-    return offset, "continue"
+    return offset, _TICK_CONTINUE
 
 
 def sse_tail_generator(
@@ -167,23 +195,28 @@ def sse_tail_generator(
     offset = initial_offset
     waited_ms = 0
     keepalive_ms = 0
+    heartbeat = Heartbeat()
     yield ":keepalive\n\n"
     while True:
         path = _resolve()
         if path is None or not path.exists():
             waited_ms, keepalive_ms, status = yield from _wait_for_log_file(
-                is_done, waited_ms, keepalive_ms,
+                is_done, waited_ms, keepalive_ms, heartbeat,
             )
-            if status == "timeout":
+            if status == _TICK_TIMEOUT:
                 return
-            if status == "done":
+            if status == _TICK_DONE:
                 yield _emit_done_frame(terminal_state, offset)
                 return
             continue
-        offset, tail_status = yield from _tail_new_lines(path, offset, line_filter)
-        if tail_status == "error":
+        offset, tail_status = yield from _tail_new_lines(path, offset, line_filter, heartbeat)
+        if tail_status == _TICK_ERROR:
             return
         if is_done is not None and is_done():
             yield _emit_done_frame(terminal_state, offset)
             return
-        time.sleep(_poll_ms() / 1000)
+        poll_ms = _poll_ms()
+        beat = heartbeat.advance(poll_ms)
+        if beat is not None:
+            yield beat
+        time.sleep(poll_ms / 1000)

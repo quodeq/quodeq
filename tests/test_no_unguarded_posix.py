@@ -23,31 +23,37 @@ _PATTERNS = re.compile(
 # Known, already-handled sites (src-relative "path.py:LINE"). Audited 2026-05-30.
 _ALLOWLIST: set[str] = {
     # kill_tree POSIX branch, in the else of `if sys.platform == "win32"`
-    # (win32 uses taskkill /F /T). Hoisted from analysis/_process.py so
-    # services/ and analysis/ can share one implementation.
-    "shared/process_kill.py:32",
+    # (win32 uses taskkill /F /T). Used by services/ to terminate
+    # background job process trees.
+    "shared/process_kill.py:39",
     # kill_proc_tree POSIX branch, in the else of `if sys.platform == "win32"`
-    # (win32 uses taskkill /F /T). Hoisted from assistant to shared.
-    "shared/process_kill.py:69",
+    # (win32 uses taskkill /F /T). Used by terminal/ PTY sessions and the
+    # assistant CLI provider adapters to terminate subprocess trees.
+    "shared/process_kill.py:75",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
-    "shared/resource_sampler.py:44",
-    "shared/resource_sampler.py:60",
+    "shared/resource_sampler.py:61",
+    "shared/resource_sampler.py:78",
     # child_cwd's macOS branch: only reached when `platform == "darwin"` and
     # wrapped in `except (..., subprocess.SubprocessError)`, so Windows never
     # runs it and a missing lsof degrades to None. Used to resolve clickable
     # terminal links against the shell's live cwd.
-    "terminal/links.py:81",
+    "terminal/links.py:87",
     # quodeq/menubar/ is darwin-only by construction: control.is_supported()
     # gates every spawn on sys.platform == "darwin", and app/_app_lifecycle
     # only run inside the rumps process that spawn starts. lsof/killpg/pkill/ps
     # are therefore never reached on Windows, and each call is wrapped to
     # degrade gracefully anyway. The ps call in _is_quodeq_process only sees
     # pids from find_pids_on_port, which returns [] off-darwin.
-    "menubar/_process.py:83",
-    "menubar/_process.py:95",
-    "menubar/_app_lifecycle.py:157",
-    "menubar/_app_lifecycle.py:169",
+    "menubar/_process.py:86",
+    "menubar/_process.py:98",
+    "menubar/_app_lifecycle.py:156",
+    "menubar/_app_lifecycle.py:168",
+    # _terminate's POSIX branch: `if _IS_WINDOWS` returns after proc.kill()
+    # before this line, and the call is wrapped in `except OSError`. Kills the
+    # streaming git process group (git plus any ssh/credential helper that
+    # holds stderr) at the deadline.
+    "data/fs/git_stream.py:65",
 }
 
 

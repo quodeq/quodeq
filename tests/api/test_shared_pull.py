@@ -2,12 +2,12 @@
 
 Pulls a project from the shared clone into the local evaluations directory
 by building an in-memory zip of the clone's project directory
-(``_build_project_zip``) and feeding it to ``import_zip_stream`` -- the same
+(``build_project_zip``) and feeding it to ``import_zip_stream`` -- the same
 hardened validation/collision logic used by the manual
 ``POST /api/projects/import`` route (see tests/api/test_project_import.py).
 
 Note on project naming: real local project directories under reports_dir are
-named by UUID (``import_project.py``'s ``_validate_archive`` requires the
+named by UUID (``services/project_import.py``'s ``validate_archive`` requires the
 zip's single top-level directory to be a valid UUID), and ``publish_project``
 mirrors the source directory name as-is into the shared repo -- so a
 realistic pull target is UUID-named too. This intentionally differs from
@@ -21,6 +21,7 @@ the conftest fixture) to exercise the real success and collision paths.
 """
 from __future__ import annotations
 
+import functools
 import json
 import uuid as _uuid
 from pathlib import Path
@@ -28,6 +29,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.api.app import create_app
+from quodeq.services import shared_pull_job
 from quodeq.services.shared_publish import publish_project
 from quodeq.services.shared_settings import SharedSettings, write_settings
 from tests.api.conftest import _make_origin
@@ -44,6 +46,18 @@ def app():
 def client(app):
     with app.test_client() as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def pull_slot(monkeypatch):
+    """A fresh pull slot per test, with the job run inline instead of on a thread."""
+    status = shared_pull_job.PullStatus()
+    monkeypatch.setattr(shared_pull_job, "_default_status", status)
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared_pull.start_pull",
+        functools.partial(shared_pull_job.start_pull, spawn=lambda fn: fn()),
+    )
+    return status
 
 
 @pytest.fixture()
@@ -63,7 +77,7 @@ def uuid_named_shared_clone_fixture(tmp_path, monkeypatch):
     tests/api/conftest.py's canonical ``shared_clone_fixture``, but publishes
     a UUID-named project (see module docstring) with a complete
     repository_info.json so the import-side validation
-    (_validate_repository_info requires 'name' and 'path') succeeds.
+    (validate_repository_info requires 'name' and 'path') succeeds.
 
     Returns (url, project_uuid) -- unlike the conftest fixture, which
     publishes the slug "proj-a" and returns only the url.
@@ -132,10 +146,14 @@ def _pull(client, project: str, action: str | None = None):
 
 # --- happy path ---------------------------------------------------------------
 
-def test_pull_materializes_local_copy(client, uuid_named_shared_clone_fixture, local_eval_dir):
+def test_pull_materializes_local_copy(client, uuid_named_shared_clone_fixture, local_eval_dir, pull_slot):
     _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid)
-    assert resp.status_code in (200, 201), resp.get_json()
+    assert resp.status_code == 202, resp.get_json()
+    assert resp.get_json() == {"started": True, "project": project_uuid}
+    slot = pull_slot.copy()
+    assert slot["state"] == shared_pull_job.PullState.DONE
+    assert slot["project_id"] == project_uuid
     assert (local_eval_dir / project_uuid / "repository_info.json").exists()
 
     listing = client.get("/api/projects").get_json()
@@ -143,50 +161,74 @@ def test_pull_materializes_local_copy(client, uuid_named_shared_clone_fixture, l
     assert any(project_uuid in str(i) for i in ids)
 
 
+def test_pull_while_running_is_409(client, uuid_named_shared_clone_fixture, local_eval_dir, pull_slot):
+    _, project_uuid = uuid_named_shared_clone_fixture
+    pull_slot.claim("other")
+    resp = _pull(client, project_uuid)
+    assert resp.status_code == 409
+    assert resp.get_json()["code"] == "PULL_IN_PROGRESS"
+
+
 # --- collision handling --------------------------------------------------------
 
-def test_pull_collision_returns_409(client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision):
+def test_pull_collision_lands_in_slot(client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision, pull_slot):
     _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid)
-    assert resp.status_code == 409  # caller retries with {"action": "copy"}
-    body = resp.get_json()
-    assert body["code"] == "PROJECT_EXISTS"
-    assert body["kind"] == "same_uuid"
+    assert resp.status_code == 202  # caller retries with {"action": "copy"}
+    slot = pull_slot.copy()
+    assert slot["state"] == shared_pull_job.PullState.ERROR
+    assert slot["code"] == "PROJECT_EXISTS"
 
 
-def test_pull_collision_replace_overwrites(client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision):
+def test_pull_collision_slot_carries_kind_and_source_id_on_the_wire(
+    client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision, pull_slot,
+):
+    _, project_uuid = uuid_named_shared_clone_fixture
+    _pull(client, project_uuid)
+    pull = client.get("/api/shared/status").get_json()["pull"]
+    assert pull["conflictKind"] == "same_uuid"
+    assert pull["sourceProjectId"] == project_uuid
+
+
+def test_pull_collision_replace_overwrites(
+    client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision, pull_slot,
+):
     _, project_uuid = uuid_named_shared_clone_fixture
     existing = local_eval_dir_with_collision / project_uuid
     (existing / "old-marker.txt").write_text("stale", encoding="utf-8")
 
     resp = _pull(client, project_uuid, action="replace")
-    assert resp.status_code == 200, resp.get_json()
-    body = resp.get_json()
-    assert body["projectId"] == project_uuid
-    assert body["renamed"] is False
+    assert resp.status_code == 202, resp.get_json()
+    slot = pull_slot.copy()
+    assert slot["project_id"] == project_uuid
+    assert slot["renamed"] is False
     assert not (existing / "old-marker.txt").exists()
     info = json.loads((existing / "repository_info.json").read_text())
     assert info["name"] == "proj-a"
 
 
-def test_pull_collision_copy_creates_new_uuid(client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision):
+def test_pull_collision_copy_creates_new_uuid(
+    client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision, pull_slot,
+):
     _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid, action="copy")
-    assert resp.status_code == 200, resp.get_json()
-    body = resp.get_json()
-    assert body["projectId"] != project_uuid
-    assert body["sourceProjectId"] == project_uuid
-    assert body["renamed"] is True
+    assert resp.status_code == 202, resp.get_json()
+    slot = pull_slot.copy()
+    assert slot["project_id"] != project_uuid
+    assert slot["renamed"] is True
     # Both the pre-existing local project and the newly copied one exist.
     assert (local_eval_dir_with_collision / project_uuid).exists()
-    assert (local_eval_dir_with_collision / body["projectId"]).exists()
+    assert (local_eval_dir_with_collision / slot["project_id"]).exists()
 
 
-def test_pull_invalid_action_returns_400(client, uuid_named_shared_clone_fixture, local_eval_dir):
+def test_pull_unknown_action_returns_400_without_starting_a_job(
+    client, uuid_named_shared_clone_fixture, local_eval_dir, pull_slot,
+):
     _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid, action="nuke")
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "INVALID_ACTION"
+    assert pull_slot.copy()["state"] == shared_pull_job.PullState.IDLE
 
 
 def test_pull_non_string_action_returns_400(client, uuid_named_shared_clone_fixture, local_eval_dir):
@@ -197,6 +239,18 @@ def test_pull_non_string_action_returns_400(client, uuid_named_shared_clone_fixt
         headers=_ORIGIN,
     )
     assert resp.status_code == 400
+    assert resp.get_json()["code"] == "INVALID_ACTION"
+
+
+def test_pull_non_object_body_returns_400(client, uuid_named_shared_clone_fixture, local_eval_dir):  # 2755
+    _, project_uuid = uuid_named_shared_clone_fixture
+    resp = client.post(
+        f"/api/shared/projects/{project_uuid}/pull",
+        json=[1],
+        headers=_ORIGIN,
+    )
+    assert resp.status_code == 400
+    assert resp.is_json
     assert resp.get_json()["code"] == "INVALID_ACTION"
 
 
@@ -220,4 +274,27 @@ def test_pull_without_body_defaults_to_no_action(client, uuid_named_shared_clone
     """A POST with no JSON body at all (not even {}) must not 400/500."""
     _, project_uuid = uuid_named_shared_clone_fixture
     resp = client.post(f"/api/shared/projects/{project_uuid}/pull", headers=_ORIGIN)
-    assert resp.status_code in (200, 201), resp.get_json()
+    assert resp.status_code == 202, resp.get_json()
+
+
+# --- read vs write error reporting ------------------------------------------
+
+def test_pull_read_failure_reports_a_read_error(
+    client, uuid_named_shared_clone_fixture, local_eval_dir, monkeypatch, pull_slot,
+):
+    """R-M7: an OSError reading the pulled zip's own bytes (e.g. a
+    filesystem hiccup on the shared repository's clone) must be reported
+    the way it was before the bounded-upload change: a read failure, not
+    "failed to write imported project"."""
+    _, project_uuid = uuid_named_shared_clone_fixture
+
+    def _raise(*_args, **_kwargs):
+        raise OSError("disk read error")
+
+    monkeypatch.setattr("quodeq.services.project_import.validate_archive", _raise)
+    resp = _pull(client, project_uuid)
+
+    assert resp.status_code == 202
+    slot = pull_slot.copy()
+    assert slot["code"] == "EXPORT_ERROR"
+    assert "read" in slot["error"].lower()

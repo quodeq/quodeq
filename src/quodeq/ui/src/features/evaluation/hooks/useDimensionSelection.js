@@ -2,17 +2,13 @@
  * useDimensionSelection — dimension picking + clean-scan mode + the scan
  * trigger for ReEvaluateCard.
  *
- * Split out of ReEvaluateCard.jsx verbatim, including buildScanPayload
- * (re-exported from ReEvaluateCard.jsx so `from './ReEvaluateCard.jsx'`
- * importers, including the test, keep working unchanged). The one-shot
- * clean-scan consumption in handleScan is coupled to onStart's promise
- * chain — left exactly as it was.
+ * buildScanPayload is re-exported from ReEvaluateCard.jsx for its importers.
+ * The one-shot clean-scan consumption in handleScan is coupled to onStart's
+ * promise chain.
  */
 import { useState, useRef, useEffect } from 'react';
-import { t } from '../../../strings/index.js';
 import { CLEAN_PERSIST } from '../components/scanModes.js';
-
-const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
+import { useDimensionSet } from './useDimensionSet.js';
 
 /**
  * The start-evaluation request body for the selected dimensions, branch,
@@ -70,26 +66,13 @@ function useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims) {
  * leaves the toggle armed for the retry.
  */
 export function useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], project = null, timeLimitS = null }) {
-  const [selectedDims, setSelectedDims] = useState(new Set());
+  const { selectedDims, setSelectedDims, toggleDim, selectAll, clearAll, refuseEmptySelection } = useDimensionSet(allDimensions);
   const [cleanScan, setCleanScan] = useState(CLEAN_PERSIST.OFF);
 
   useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims);
 
-  const toggleDim = (id) => {
-    setSelectedDims((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-  const selectAll = () => setSelectedDims(new Set(allDimensions.map((d) => d.id)));
-  const clearAll = () => setSelectedDims(new Set());
   const handleScan = () => {
-    if (allDimensions.length > 0 && selectedDims.size === 0) {
-      onValidationFail?.(NO_STANDARDS_MESSAGE);
-      return;
-    }
+    if (refuseEmptySelection(onValidationFail)) return;
     const result = onStart(buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan, project, timeLimitS }));
     // Consume the one-shot clean toggle only when the start actually went
     // through. A blocked start (another evaluation running) returns false;

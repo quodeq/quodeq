@@ -2,20 +2,28 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown
-from quodeq.data.fs.standards_loader import is_known_dimension
+from quodeq.config.services_env import max_violation_files as _resolve_max_violation_files
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
-from quodeq.shared.utils import env_int, read_text
+from quodeq.core.types.severity import Severity
+from quodeq.shared.utils import read_text
+from quodeq.services.wiring import (
+    OVERALL_PRINCIPLE,
+    dimension_evidence_file,
+    is_known_dimension,
+    parse_eval_from_json,
+    parse_eval_markdown,
+)
 from quodeq.services.violation_context import ViolationContext  # re-export
 from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
-    _deleted_key_for_violation,
-    _filter_dismissed_from_result,
-    _violation_location,
+    deleted_key_for_violation,
+    filter_dismissed_from_result,
+    violation_location,
 )
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.services.deleted import deleted_keys as _deleted_keys
@@ -25,21 +33,18 @@ from quodeq.services.violations_parsing import (
     parse_violations_from_jsonl,
     parse_violations_from_stream,
 )
+from quodeq.shared.constants import EVIDENCE_DIRNAME
 
 _logger = logging.getLogger(__name__)
-
-_DEFAULT_MAX_VIOLATION_FILES = 20
 
 
 def _max_violation_files(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the max number of violation files to include. *override* bypasses env for testing."""
-    if override is not None:
-        return override
-    return env_int("QUODEQ_MAX_VIOLATION_FILES", _DEFAULT_MAX_VIOLATION_FILES, env=env)
+    return override if override is not None else _resolve_max_violation_files(env=env)
 
 
 @dataclass(frozen=True)
-class _ResolveOptions:
+class ResolveOptions:
     """Injectable options for resolve_dimension_eval: filesystem callbacks and paths."""
     exists_fn: Callable[[Path], bool] = Path.exists
     stat_fn: Callable[[Path], Any] = Path.stat
@@ -48,21 +53,22 @@ class _ResolveOptions:
 
 
 def _try_evidence_formats(
-    base: Path, dimension: str, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
+    base: Path, dimension: str, ctx: ViolationContext, opts: ResolveOptions, keys: SuppressionKeys,
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try evidence file formats (JSON, JSONL, stream) as fallbacks."""
-    evidence_path = base / "evidence" / f"{dimension}_evidence.json"
+    evidence_path = base / EVIDENCE_DIRNAME / f"{dimension}_evidence.json"
     if opts.exists_fn(evidence_path):
-        return _filter_dismissed_from_result(
+        return filter_dismissed_from_result(
             parse_violations_from_evidence(evidence_path, ctx), keys.dismissed,
             keys.deleted, dimension,
         )
 
-    jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
-    stream_path = base / "evidence" / f"{dimension}_live.stream"
+    jsonl_path = dimension_evidence_file(base, dimension)
+    stream_path = base / EVIDENCE_DIRNAME / f"{dimension}_live.stream"
     if opts.exists_fn(jsonl_path) and opts.stat_fn(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(
             jsonl_path, stream_path, ctx, compiled_dir=opts.compiled_dir, keys=keys,
+            evaluators_dir=opts.evaluators_dir,
         )
 
     if opts.exists_fn(stream_path):
@@ -71,48 +77,65 @@ def _try_evidence_formats(
     return None
 
 
+def _adopt_rescored_rows(result: dict[str, Any], dim: dict[str, Any]) -> None:
+    """The eval's flat lists become the run's rescored lists.
+
+    The run page and the detail refill serve those rows; the eval must list
+    the same findings with the same identity (``file, line, endLine,
+    principle, title``) or the refill has nothing to match. Rows parsed
+    from the eval file differ in the fields they carry (no ``endLine``, no
+    ``title``) from rows read back from the run, so filtering them by
+    identity is not enough: adopt the run's rows outright. The per-principle
+    rows (``file:line``, no principle) have no such identity and are left to
+    the wire, which omits them."""
+    for key in ("violations", "compliance"):
+        if isinstance(result.get(key), list):
+            result[key] = list(dim.get(key) or [])
+
+
 def _apply_rescored_grades(
     result: "dict[str, Any] | None", base: Path, project: str, run_id: str, dimension: str,
 ) -> "dict[str, Any] | None":
-    """Overlay the project-wide dismiss-adjusted score/grade onto a parsed eval dict.
+    """Overlay the run's current score/grade onto a parsed eval dict, and
+    replace its flat lists with the run's rescored lists.
 
-    ``parse_eval_from_json`` carries the frozen eval-time overall + principle
-    grades (in ``principleGrades`` / ``principles``). After dismissed and
-    deleted violations are filtered from the lists, those grades are stale --
-    they still describe the pre-dismiss scan. Recompute them with the SAME
-    ``scored_run_dimensions`` transform the accumulated overview, the per-run
-    explorer, and the dashboard selected run use, then substitute the
-    dimension's overall score/grade (the ``isOverall`` entry) and its
-    per-principle score/grade so the dimension detail agrees with every other
-    view. A no-op when there are no active dismissals/deletions.
+    ``parse_eval_from_json`` carries the overall + principle grades frozen at
+    eval time (in ``principleGrades`` / ``principles``). Those go stale in two
+    ways: dismissed, deleted and rule-suppressed violations are filtered from
+    the lists, and the grade tables are re-derived whenever the scoring
+    formula changes. Read the run through ``get_scores_raw``, the SAME read
+    ``/scores/<run>`` and ``/compliance-detail?run=`` serve, so the dimension
+    detail, the run page and the detail refill agree by construction: one
+    read, one suppressed set, one score. Substitute the dimension's overall
+    score/grade (the ``isOverall`` entry) and its per-principle score/grade,
+    then adopt the rescored lists: a suppressed row must not show here when
+    no other view has it, and the wire defers each row's detail to those
+    same lists.
     """
     if not isinstance(result, dict):
         return result
-    # No active project-wide filters -> the eval-time grades are already correct;
-    # skip the extra run read. base.parent is the project dir.
-    if not _dismissed_keys(base.parent) and not _deleted_keys(base.parent):
-        return result
-    from quodeq.services.scoring import scored_run_dimensions  # noqa: PLC0415
+    from quodeq.services.scoring import get_scores_raw  # noqa: PLC0415
 
     reports_root = base.parent.parent
     try:
-        rescored = scored_run_dimensions(reports_root, project, run_id)
-    except (ValueError, FileNotFoundError, OSError):
+        rescored = get_scores_raw(reports_root, project, run_id)["dimensions"]
+    except (ValueError, OSError, sqlite3.Error):
         return result
-    dim = next((d for d in rescored if (d.dimension or "") == dimension), None)
+    dim = next((d for d in rescored if (d.get("dimension") or "") == dimension), None)
     if dim is None:
         return result
 
-    principle_grade = {p.principle: (p.score, p.grade) for p in dim.principles}
+    principle_grade = {p.get("principle"): (p.get("score"), p.get("grade")) for p in dim.get("principles") or []}
     for pg in result.get("principleGrades", []):
-        if pg.get("isOverall") or pg.get("principle") == "Overall":
-            pg["score"] = dim.overall_score
-            pg["grade"] = dim.overall_grade
+        if pg.get("isOverall") or pg.get("principle") == OVERALL_PRINCIPLE:
+            pg["score"] = dim.get("overallScore")
+            pg["grade"] = dim.get("overallGrade")
         elif pg.get("principle") in principle_grade:
             pg["score"], pg["grade"] = principle_grade[pg["principle"]]
     for p in result.get("principles", []):
         if p.get("name") in principle_grade:
             p["score"], p["grade"] = principle_grade[p["name"]]
+    _adopt_rescored_rows(result, dim)
     return result
 
 
@@ -132,9 +155,9 @@ def _accept_known_dimension(
 
 
 def _resolve_from_json_eval(
-    eval_path: Path, base: Path, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
+    eval_path: Path, base: Path, ctx: ViolationContext, opts: ResolveOptions, keys: SuppressionKeys,
 ) -> dict[str, Any] | None:
-    filtered = _filter_dismissed_from_result(
+    filtered = filter_dismissed_from_result(
         parse_eval_from_json(eval_path, ctx.project, ctx.run_id, ctx.dimension, compiled_dir=opts.compiled_dir),
         keys.dismissed, keys.deleted, ctx.dimension,
     )
@@ -148,7 +171,7 @@ def _resolve_from_markdown(
         content = read_text(markdown_path)
     except OSError:
         return None
-    return _filter_dismissed_from_result(
+    return filter_dismissed_from_result(
         parse_eval_markdown(content, ctx.project, ctx.run_id, ctx.dimension),
         keys.dismissed, keys.deleted, ctx.dimension,
     )
@@ -160,7 +183,7 @@ def _suppression_keys(base: Path) -> SuppressionKeys:
 
 
 def _resolve_from_source(
-    base: Path, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
+    base: Path, ctx: ViolationContext, opts: ResolveOptions, keys: SuppressionKeys,
 ) -> ViolationResponse | dict[str, Any] | None:
     eval_path = base / "evaluation" / f"{ctx.dimension}.json"
     if opts.exists_fn(eval_path):
@@ -175,7 +198,7 @@ def _resolve_from_source(
 
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
-    options: _ResolveOptions | None = None,
+    options: ResolveOptions | None = None,
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try successive file formats to load evaluation data for a dimension.
 
@@ -192,7 +215,7 @@ def resolve_dimension_eval(
     directory is configured (e.g. a caller testing file-resolution logic in
     isolation) the check is skipped, preserving prior behaviour.
     """
-    opts = options or _ResolveOptions()
+    opts = options or ResolveOptions()
     if not _accept_known_dimension(dimension, opts.compiled_dir, opts.evaluators_dir):
         return None
     keys = _suppression_keys(base)
@@ -223,8 +246,8 @@ def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
                 file_path, {"path": file_path, "count": 0, "critical": 0, "major": 0, "minor": 0}
             )
             entry["count"] += 1
-            sev = violation.get("severity") or "minor"
-            entry[sev if sev in ("critical", "major") else "minor"] += 1
+            sev = violation.get("severity") or Severity.MINOR
+            entry[sev if sev in (Severity.CRITICAL, Severity.MAJOR) else Severity.MINOR] += 1
     # _max_violation_files() reads from env at call time; the env injection
     # parameter exists for unit-testing _max_violation_files directly.
     top_files = sorted(

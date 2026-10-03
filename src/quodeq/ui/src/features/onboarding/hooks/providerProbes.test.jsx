@@ -154,3 +154,30 @@ describe('providerProbes – detectStoredCloudKey', () => {
     expect(getItemSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('providerProbes – detectOllamaDaemon', () => {
+  function ollamaStatusFetch(running) {
+    return vi.fn((url) => {
+      if (url.includes('/ollama/status')) {
+        return Promise.resolve({ ok: true, json: async () => ({ running }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ clients: [] }) });
+    });
+  }
+
+  it('calls GET /api/ollama/status and reports detected:true when the daemon is running', async () => {
+    const fetchMock = ollamaStatusFetch(true);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const results = await runDetection();
+    expect(results.find((r) => r.id === 'ollama')).toMatchObject({ detected: true });
+    expect(fetchMock.mock.calls.some(([url]) => url === '/api/ollama/status')).toBe(true);
+  });
+
+  it('reports detected:false when the status route answers running:false', async () => {
+    vi.stubGlobal('fetch', ollamaStatusFetch(false));
+
+    const results = await runDetection();
+    expect(results.find((r) => r.id === 'ollama')).toMatchObject({ detected: false });
+  });
+});

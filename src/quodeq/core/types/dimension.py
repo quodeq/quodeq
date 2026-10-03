@@ -36,6 +36,9 @@ class DimensionResult:
     violations: list[Finding] = field(default_factory=list)
     compliance: list[Finding] = field(default_factory=list)
     totals: Totals | None = None
+    # Distinct requirement codes among active violations. Carried as a scalar
+    # so read paths that drop the findings can still count open types.
+    open_types: int | None = None
     source_file_count: int | None = None
     files_read: int | None = None
     # Findings excluded from scoring for naming a principle outside the
@@ -45,6 +48,12 @@ class DimensionResult:
     exit_reason: str | None = None
     evidence_date: str | None = None
     discipline: str | None = None
+    # How many of the scan's violations the project's suppression state hid
+    # from this result: the dismissed filter alone (dismissals and rules), and
+    # dismissals plus deletions together. None when nothing was hidden, so a
+    # serialized dimension omits the keys, as one no suppression touches does.
+    dismissed_count: int | None = None
+    suppressed_count: int | None = None
     trend: str | None = None
     previous_run_id: str | None = None
     previous_score: str | None = None
@@ -53,3 +62,14 @@ class DimensionResult:
     from_date_iso: str | None = None
     from_date_label: str | None = None
     run_id: str | None = None
+
+
+def open_types_of(dim: DimensionResult) -> int:
+    """Distinct requirement codes among *dim*'s active violations.
+
+    The ``open_types`` scalar when the read carried it; otherwise counted
+    from the findings, which every path that drops them must do first.
+    """
+    if dim.open_types is not None:
+        return dim.open_types
+    return len({f.req for f in (dim.violations or []) if f.req})

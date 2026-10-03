@@ -15,12 +15,13 @@ the client directly.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
 
-from quodeq.assistant.worktree import WorktreeError, WorktreeManager
+from quodeq.assistant.worktree import PrResult, WorktreeError, WorktreeManager, WorktreeStatus
 from quodeq.data.ports.assistant import AssistantStore
 
 _logger = logging.getLogger(__name__)
@@ -29,9 +30,82 @@ ClaimTurn = Callable[[str], bool]
 ReleaseTurn = Callable[[str], None]
 
 
+class OutcomeKind(StrEnum):
+    """What an apply, PR or discard attempt concluded; the route maps each kind to its response.
+
+    A local vocabulary, distinct from RunState/JobStatus even where a word
+    ("failed") coincides.
+    """
+
+    TURN_BUSY = "turn_busy"
+    NOT_ACTIVE = "not_active"
+    GONE = "gone"
+    FAILED = "failed"
+    APPLIED = "applied"
+    CREATED = "created"
+    DISCARDED = "discarded"
+
+
+ManagerFactory = Callable[[dict], WorktreeManager]
+
+
 def _manager(row: dict) -> WorktreeManager:
     return WorktreeManager(repo_root=Path(row["repo_root"]),
                            path=Path(row["path"]), branch=row["branch"])
+
+
+_ACTIVE_ONLY = (WorktreeStatus.ACTIVE,)
+
+
+@dataclass(frozen=True, slots=True)
+class _Claim:
+    """The worktree row re-read under a claimed turn, or why there is none.
+
+    ``refusal`` is None when ``row`` is usable, else TURN_BUSY, GONE or
+    NOT_ACTIVE (with the row's status in ``detail``).
+    """
+
+    row: dict | None = None
+    refusal: OutcomeKind | None = None
+    detail: str = ""
+
+
+@contextmanager
+def _claimed_row(
+    repo: AssistantStore, sid: str, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
+    allowed: tuple[WorktreeStatus, ...],
+) -> Iterator[_Claim]:
+    """Claim the turn slot, re-read the row (state may have moved since the
+    route's lookup) and gate it on *allowed*. Releases on every exit path
+    once the claim succeeded."""
+    if not claim_turn(sid):
+        yield _Claim(refusal=OutcomeKind.TURN_BUSY)
+        return
+    try:
+        row = repo.get_worktree(sid)
+        if row is None:
+            yield _Claim(refusal=OutcomeKind.GONE)
+        elif row["status"] not in allowed:
+            yield _Claim(refusal=OutcomeKind.NOT_ACTIVE, detail=row["status"])
+        else:
+            yield _Claim(row=row)
+    finally:
+        release_turn(sid)
+
+
+def _active_refusal(claim: _Claim) -> tuple[OutcomeKind, str]:
+    """(kind, detail) for apply/pr, which report a missing row as NOT_ACTIVE/"gone"."""
+    if claim.refusal is OutcomeKind.GONE:
+        return OutcomeKind.NOT_ACTIVE, "gone"
+    return claim.refusal, claim.detail
+
+
+def _remove_quietly(manager: WorktreeManager, sid: str, after: str, **kwargs) -> None:
+    """Best-effort worktree removal once the row already moved on; logs only."""
+    try:
+        manager.remove(**kwargs)
+    except WorktreeError:
+        _logger.warning("worktree remove failed after %s for %s", after, sid)
 
 
 @dataclass(frozen=True)
@@ -41,7 +115,7 @@ class ApplyOutcome:
     ``detail`` carries the worktree's current status for "not_active", or
     the raw WorktreeError text for "failed" (server-side logging only).
     """
-    kind: Literal["turn_busy", "not_active", "failed", "applied"]
+    kind: OutcomeKind
     detail: str = ""
     stats: list | None = None
 
@@ -49,29 +123,25 @@ class ApplyOutcome:
 def apply_workspace(
     repo: AssistantStore, sid: str,
     *, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
+    manager_factory: ManagerFactory | None = None,
 ) -> ApplyOutcome:
     """Apply the worktree diff onto the user's repo and advance the row to
     "applied". Claims the turn slot first so a concurrent /messages turn (or
-    another apply/pr) sees "turn_busy" instead of racing the same worktree."""
-    if not claim_turn(sid):
-        return ApplyOutcome("turn_busy")
-    try:
-        row = repo.get_worktree(sid)  # re-read under the claim
-        if row is None or row["status"] != "active":
-            return ApplyOutcome("not_active", detail=row["status"] if row else "gone")
-        manager = _manager(row)
+    another apply/pr) sees "turn_busy" instead of racing the same worktree.
+    *manager_factory* defaults to the module's ``_manager`` builder (tests
+    pass a fake)."""
+    build_manager = manager_factory if manager_factory is not None else _manager
+    with _claimed_row(repo, sid, claim_turn, release_turn, _ACTIVE_ONLY) as claim:
+        if claim.refusal is not None:
+            return ApplyOutcome(*_active_refusal(claim))
+        manager = build_manager(claim.row)
         try:
             stats = manager.apply_to_repo()
         except WorktreeError as exc:
-            return ApplyOutcome("failed", detail=str(exc))
-        repo.set_worktree_status(sid, "applied")
-        try:
-            manager.remove()
-        except WorktreeError:
-            _logger.warning("worktree remove failed after apply for %s", sid)
-        return ApplyOutcome("applied", stats=stats)
-    finally:
-        release_turn(sid)
+            return ApplyOutcome(OutcomeKind.FAILED, detail=str(exc))
+        repo.set_worktree_status(sid, WorktreeStatus.APPLIED)
+        _remove_quietly(manager, sid, "apply")
+        return ApplyOutcome(OutcomeKind.APPLIED, stats=stats)
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,42 +158,37 @@ class PrOutcome:
 
     ``detail`` carries the worktree's current status for "not_active", or
     the raw WorktreeError text for "failed" (server-side logging only).
-    ``result`` is ``WorktreeManager.create_pr``'s fail-soft body on success
-    (a missing/None ``prUrl`` there means push or ``gh`` failed, not that
-    this call raised).
+    ``result`` is ``WorktreeManager.create_pr``'s typed, fail-soft
+    ``PrResult`` on success (a missing/None ``pr_url`` there means push or
+    ``gh`` failed, not that this call raised).
     """
-    kind: Literal["turn_busy", "not_active", "failed", "created"]
+    kind: OutcomeKind
     detail: str = ""
-    result: dict | None = None
+    result: PrResult | None = None
 
 
 def create_workspace_pr(
     repo: AssistantStore, sid: str, draft: PrDraft,
     *, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
+    manager_factory: ManagerFactory | None = None,
 ) -> PrOutcome:
     """Commit, push, and open a PR from the worktree; advance the row to
     "pr_created" only once a PR URL actually comes back (fail-soft cases
-    leave the row "active" so the user can retry)."""
-    if not claim_turn(sid):
-        return PrOutcome("turn_busy")
-    try:
-        row = repo.get_worktree(sid)  # re-read under the claim
-        if row is None or row["status"] != "active":
-            return PrOutcome("not_active", detail=row["status"] if row else "gone")
-        manager = _manager(row)
+    leave the row "active" so the user can retry). *manager_factory* defaults
+    to the module's ``_manager`` builder (tests pass a fake)."""
+    build_manager = manager_factory if manager_factory is not None else _manager
+    with _claimed_row(repo, sid, claim_turn, release_turn, _ACTIVE_ONLY) as claim:
+        if claim.refusal is not None:
+            return PrOutcome(*_active_refusal(claim))
+        manager = build_manager(claim.row)
         try:
             result = manager.create_pr(draft.title, draft.body)
         except WorktreeError as exc:
-            return PrOutcome("failed", detail=str(exc))
-        if result.get("prUrl"):
-            repo.set_worktree_status(sid, "pr_created")
-            try:
-                manager.remove(delete_branch=False)  # branch lives on the remote PR
-            except WorktreeError:
-                _logger.warning("worktree remove failed after pr for %s", sid)
-        return PrOutcome("created", result=result)
-    finally:
-        release_turn(sid)
+            return PrOutcome(OutcomeKind.FAILED, detail=str(exc))
+        if result.pr_url:
+            repo.set_worktree_status(sid, WorktreeStatus.PR_CREATED)
+            _remove_quietly(manager, sid, "pr", delete_branch=False)  # branch lives on the remote PR
+        return PrOutcome(OutcomeKind.CREATED, result=result)
 
 
 @dataclass(frozen=True)
@@ -133,32 +198,30 @@ class DiscardOutcome:
     ``detail`` carries the worktree's current status for "gone"/"not_active",
     or the raw WorktreeError text for "failed" (server-side logging only).
     """
-    kind: Literal["turn_busy", "gone", "not_active", "failed", "discarded"]
+    kind: OutcomeKind
     detail: str = ""
 
 
 def discard_workspace(
     repo: AssistantStore, sid: str,
     *, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
+    manager_factory: ManagerFactory | None = None,
 ) -> DiscardOutcome:
     """Remove the worktree/branch and advance the row to "discarded". Claims
     the turn slot like apply/pr: without this, discard raced an in-flight
     apply (overwriting "applied" with "discarded" while the changes sat in
     the user's real tree) and pulled the worktree out from under a running
-    write turn."""
-    if not claim_turn(sid):
-        return DiscardOutcome("turn_busy")
-    try:
-        row = repo.get_worktree(sid)  # re-read under the claim
-        if row is None:
-            return DiscardOutcome("gone")
-        if row["status"] not in ("active", "stale"):
-            return DiscardOutcome("not_active", detail=row["status"])
+    write turn. *manager_factory* defaults to the module's ``_manager``
+    builder (tests pass a fake)."""
+    build_manager = manager_factory if manager_factory is not None else _manager
+    with _claimed_row(
+        repo, sid, claim_turn, release_turn, (WorktreeStatus.ACTIVE, WorktreeStatus.STALE),
+    ) as claim:
+        if claim.refusal is not None:
+            return DiscardOutcome(claim.refusal, detail=claim.detail)
         try:
-            _manager(row).remove()
+            build_manager(claim.row).remove()
         except WorktreeError as exc:
-            return DiscardOutcome("failed", detail=str(exc))
-        repo.set_worktree_status(sid, "discarded")
-        return DiscardOutcome("discarded")
-    finally:
-        release_turn(sid)
+            return DiscardOutcome(OutcomeKind.FAILED, detail=str(exc))
+        repo.set_worktree_status(sid, WorktreeStatus.DISCARDED)
+        return DiscardOutcome(OutcomeKind.DISCARDED)

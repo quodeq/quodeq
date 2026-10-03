@@ -1,8 +1,10 @@
 import { useMemo, useCallback } from 'react';
 import {
   buildRow, buildFleet, buildDimensionsBoard, buildAttention,
-  buildDimensionView, buildDuelView, sortRows,
+  buildDimensionView, buildDuelView, sortRows, COMPARE_VIEW_FLEET,
 } from '../compareModel.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 /**
  * Every row + its "open this project" affordance: rows carry their own
@@ -11,7 +13,7 @@ import {
  */
 function useFleetRows({ fleetProjects, summariesById, now, onOpenProject }) {
   const rows = useMemo(() => {
-    const built = fleetProjects.map((p) => buildRow(p, summariesById[p.id || p.name], now));
+    const built = fleetProjects.map((p) => buildRow(p, summariesById[projectId(p)], now));
     // Shared summaries pass through unfiltered (a remote project has no
     // local standards config), so a standard the user disabled everywhere
     // could re-enter the fleet through a remote row. The fleet speaks the
@@ -29,7 +31,7 @@ function useFleetRows({ fleetProjects, summariesById, now, onOpenProject }) {
 
   const openProject = useCallback((rowId) => {
     const row = rows.find((r) => r.id === rowId);
-    onOpenProject?.(row?.sourceId ?? rowId, row?.source ?? 'local');
+    onOpenProject?.(row?.sourceId ?? rowId, row?.source ?? PROJECT_SOURCE.LOCAL);
   }, [rows, onOpenProject]);
 
   return { rows, openProject };
@@ -62,7 +64,7 @@ export function useCompareRows({
   const attention = useMemo(() => buildAttention(scopeRows), [scopeRows]);
   const orderedRows = useMemo(() => sortRows(scopeRows, sortDir), [scopeRows, sortDir]);
   const dimensionView = useMemo(
-    () => (view === 'fleet' ? null : buildDimensionView(view, scopeRows, now, summariesById)),
+    () => (view === COMPARE_VIEW_FLEET ? null : buildDimensionView(view, scopeRows, now, summariesById)),
     [view, scopeRows, now, summariesById],
   );
   // Duel rows come from `rows`, not `scopeRows` — see the module doc above.

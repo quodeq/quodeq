@@ -1,6 +1,6 @@
 """_tail_new_lines: a TOCTOU race between the caller's path.exists() check and
 open() must end in an SSE error frame, not an uncaught FileNotFoundError
-escaping the streaming generator (cluster 10, fault-tolerance cycle 1).
+escaping the streaming generator.
 
 A persistent open failure (permission denied, run directory removed
 mid-stream) must not turn into an unbounded error-frame flood: the stream
@@ -12,12 +12,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.api._sse_log_helpers import (
-    _DEFAULT_TAIL_MAX_BYTES,
-    _ENV_TAIL_MAX_BYTES,
-    _tail_max_bytes,
+    DEFAULT_TAIL_MAX_BYTES,
+    ENV_TAIL_MAX_BYTES,
     _tail_new_lines,
     sse_tail_generator,
+    tail_max_bytes,
 )
+from quodeq.api.sse_frames import HEARTBEAT_MS, Heartbeat, heartbeat_frame
 
 
 def _drain(gen):
@@ -33,7 +34,7 @@ def _drain(gen):
 class TestTailNewLinesRace:
     def test_missing_file_yields_error_frame_instead_of_raising(self, tmp_path: Path):
         missing = tmp_path / "gone.log"
-        gen = _tail_new_lines(missing, 5, None)
+        gen = _tail_new_lines(missing, 5, None, Heartbeat())
 
         frames, (new_offset, status) = _drain(gen)
 
@@ -47,7 +48,7 @@ class TestTailNewLinesRace:
     def test_existing_file_still_tails_normally(self, tmp_path: Path):
         path = tmp_path / "run.log"
         path.write_text("hello\n", encoding="utf-8")
-        gen = _tail_new_lines(path, 0, None)
+        gen = _tail_new_lines(path, 0, None, Heartbeat())
 
         frames, (new_offset, status) = _drain(gen)
 
@@ -86,27 +87,54 @@ class TestSseTailGeneratorErrorTermination:
         assert "IsADirectoryError" not in error_frames[0]
 
 
+class TestQuietTailHeartbeat:
+    """A tailed file that stops growing must still produce a data event at the
+    heartbeat cadence: the browser's EventSource ignores SSE comments, so a
+    quiet run otherwise trips the client's inactivity timer."""
+
+    def test_quiet_tail_emits_heartbeat_event(self, tmp_path: Path, monkeypatch):
+        path = tmp_path / "run.log"
+        path.write_bytes(b"hello\n")  # bytes: write_text would add \r on Windows
+        poll_ms = HEARTBEAT_MS // 3
+        monkeypatch.setattr("quodeq.api._sse_log_helpers._poll_ms", lambda env=None: poll_ms)
+        monkeypatch.setattr("quodeq.api._sse_log_helpers.time.sleep", lambda _s: None)
+
+        gen = sse_tail_generator(path, initial_offset=0)
+        frames = [next(gen) for _ in range(3)]  # ":keepalive", "hello", heartbeat
+
+        assert frames[-1] == heartbeat_frame()
+        assert frames[-1].startswith("event: heartbeat\n")
+        assert frames[1].startswith("id: ")  # the log line came first
+
+    def test_new_line_resets_the_heartbeat_timer(self):
+        beat = Heartbeat(interval_ms=100)
+        assert beat.advance(60) is None
+        beat.reset()
+        assert beat.advance(60) is None
+        assert beat.advance(40) == heartbeat_frame()
+
+
 class TestTailMaxBytes:
     """Per-tick byte cap: env override, fallbacks, and env injection."""
 
     def test_default_when_unset(self, monkeypatch):
-        monkeypatch.delenv(_ENV_TAIL_MAX_BYTES, raising=False)
-        assert _tail_max_bytes() == _DEFAULT_TAIL_MAX_BYTES
+        monkeypatch.delenv(ENV_TAIL_MAX_BYTES, raising=False)
+        assert tail_max_bytes() == DEFAULT_TAIL_MAX_BYTES
 
     def test_env_override_is_honoured(self, monkeypatch):
-        monkeypatch.setenv(_ENV_TAIL_MAX_BYTES, "2048")
-        assert _tail_max_bytes() == 2048
+        monkeypatch.setenv(ENV_TAIL_MAX_BYTES, "2048")
+        assert tail_max_bytes() == 2048
 
     def test_non_numeric_and_non_positive_fall_back(self, monkeypatch):
-        monkeypatch.setenv(_ENV_TAIL_MAX_BYTES, "not-a-number")
-        assert _tail_max_bytes() == _DEFAULT_TAIL_MAX_BYTES
-        monkeypatch.setenv(_ENV_TAIL_MAX_BYTES, "0")
-        assert _tail_max_bytes() == _DEFAULT_TAIL_MAX_BYTES
+        monkeypatch.setenv(ENV_TAIL_MAX_BYTES, "not-a-number")
+        assert tail_max_bytes() == DEFAULT_TAIL_MAX_BYTES
+        monkeypatch.setenv(ENV_TAIL_MAX_BYTES, "0")
+        assert tail_max_bytes() == DEFAULT_TAIL_MAX_BYTES
 
     def test_injected_empty_env_ignores_host_environment(self, monkeypatch):
-        monkeypatch.setenv(_ENV_TAIL_MAX_BYTES, "2048")
-        assert _tail_max_bytes(env={}) == _DEFAULT_TAIL_MAX_BYTES
+        monkeypatch.setenv(ENV_TAIL_MAX_BYTES, "2048")
+        assert tail_max_bytes(env={}) == DEFAULT_TAIL_MAX_BYTES
 
     def test_injected_env_is_read_instead_of_host(self, monkeypatch):
-        monkeypatch.delenv(_ENV_TAIL_MAX_BYTES, raising=False)
-        assert _tail_max_bytes(env={_ENV_TAIL_MAX_BYTES: "4096"}) == 4096
+        monkeypatch.delenv(ENV_TAIL_MAX_BYTES, raising=False)
+        assert tail_max_bytes(env={ENV_TAIL_MAX_BYTES: "4096"}) == 4096

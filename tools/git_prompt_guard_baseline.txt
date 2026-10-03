@@ -1,0 +1,3 @@
+# git subprocesses lacking stdin=DEVNULL or env= (relpath:lineno)
+src/quodeq/analysis/diff_resolver.py:24
+src/quodeq/data/fs/git_stats.py:26

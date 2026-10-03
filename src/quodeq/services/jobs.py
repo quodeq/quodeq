@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
 from pathlib import Path
 import threading
 import uuid
@@ -11,10 +10,13 @@ from typing import Any, Callable
 
 import subprocess
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.run.exit_reason import DEADLINE_EXIT_REASONS
+from quodeq.core.run.job_status import JobStatus, is_external_job_id, strip_external_prefix
 from quodeq.core.types import JobSnapshot
 
-from quodeq.shared.process_kill import kill_tree as _kill_tree, terminate_process as _terminate_process
+from quodeq.shared.process_kill import kill_tree as _kill_tree, terminate_process
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.services._job_model import (
     Job,
@@ -23,34 +25,28 @@ from quodeq.services._job_model import (
     JobStore,
     InMemoryJobStore,
     REPORT_PATH_RE,
-    # Status strings live with the Job in _job_model; re-exported below.
-    STATUS_CANCELLED,
-    STATUS_DONE,
-    STATUS_FAILED,
-    STATUS_RUNNING,
-    _DEADLINE_EXIT_REASONS,
-    _EXIT_CODE_TIMEOUT,
-    _MAX_COMPLETED_JOBS,
-    _WATCHDOG_POLL_INTERVAL_S,
+    EXIT_CODE_TIMEOUT,
+    MAX_COMPLETED_JOBS,
+    WATCHDOG_POLL_INTERVAL_S,
     mark_spawn_failed,
     new_job,
 )
-from quodeq.services._job_monitor_mixin import _JobMonitorMixin
+from quodeq.services._job_monitor_mixin import JobMonitorMixin
 from quodeq.services._job_file_store import (
     FileJobStore,
     create_job_store,
 )
-from quodeq.services._job_capacity_mixin import _JobCapacityMixin
+from quodeq.services._job_capacity_mixin import JobCapacityMixin
 
 # Re-export public names so existing imports from this module keep working.
 __all__ = [
     "Job", "JobLaunchOptions", "JobProcessSeams", "JobStore", "InMemoryJobStore",
-    "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager",
-    "STATUS_RUNNING", "STATUS_CANCELLED", "STATUS_DONE", "STATUS_FAILED",
+    "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager", "JobStatus",
+    "DEADLINE_EXIT_REASONS",
     # Owned by _job_model (which _job_monitor_mixin also reads them from) and
     # re-exported here: tests import and patch them at this module's path.
-    "_DEADLINE_EXIT_REASONS", "_EXIT_CODE_TIMEOUT", "_MAX_COMPLETED_JOBS",
-    "_WATCHDOG_POLL_INTERVAL_S",
+    "EXIT_CODE_TIMEOUT", "MAX_COMPLETED_JOBS",
+    "WATCHDOG_POLL_INTERVAL_S",
 ]
 
 _EXIT_CODE_SPAWN_FAILURE = -1
@@ -62,10 +58,10 @@ _DEFAULT_LIST_LIMIT = 100
 # legitimate in-flight call is one scaled local read timeout (500s per
 # subagent, realistically up to 3), so the grace must exceed that or a
 # healthy drain gets SIGTERMed and the batch's work is lost.
-_WATCHDOG_DEADLINE_GRACE_S = 1800
+WATCHDOG_DEADLINE_GRACE_S = 1800
 
 
-class JobManager(_JobMonitorMixin, _JobCapacityMixin):
+class JobManager(JobMonitorMixin, JobCapacityMixin):
     """Thread-safe manager for spawning and tracking evaluation subprocesses.
 
     NOTE: Job state is stored via a ``JobStore`` (defaulting to in-memory).
@@ -77,7 +73,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
     ``_consume_stream``, ``_drain_pre_marker_buffer``, ``_tee_run_log``,
     ``_evict_completed_jobs``, ``_job_timeout_cap_s``,
     ``_watchdog_should_kill``, ``_run_status_exit_reason``,
-    ``_classify_exit``, ``_monitor_process``) live in ``_JobMonitorMixin``
+    ``_classify_exit``, ``_monitor_process``) live in ``JobMonitorMixin``
     (see ``_job_monitor_mixin.py``).
     """
 
@@ -104,6 +100,16 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         # Injection seam for the hard job-duration cap; None means "fall back
         # to the QUODEQ_JOB_TIMEOUT_S env var" (see _job_timeout_cap_s below).
         self._job_timeout_cap_s_override = seams.job_timeout_cap_s
+        # Injection seam for the concurrency cap; None means "fall back to
+        # the QUODEQ_MAX_CONCURRENT_JOBS env var" (see _max_concurrent_jobs
+        # in _job_capacity_mixin.py).
+        self._max_concurrent_jobs_override = seams.max_concurrent_jobs
+        # Captured once, here, rather than read off the module on every
+        # watchdog tick: a fixed grace period for this manager's lifetime,
+        # so two ticks never disagree mid-run. A test or caller that mutates
+        # WATCHDOG_DEADLINE_GRACE_S after this manager is built no longer
+        # changes its behavior; mutate it before construction instead.
+        self._watchdog_grace_s = WATCHDOG_DEADLINE_GRACE_S
         # _run_log_writers and _pre_marker_buffer are owned exclusively by the
         # per-job _consume_stream thread started in start_job(). No other code
         # path may read or mutate these dicts — doing so reintroduces the
@@ -122,7 +128,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
     def start_job(self, cmd: list[str], launch: JobLaunchOptions | None = None) -> JobSnapshot:
         """Spawn a subprocess and return its initial job state."""
         launch = launch if launch is not None else JobLaunchOptions()
-        job = new_job(str(uuid.uuid4()), cmd, launch, status=STATUS_RUNNING)
+        job = new_job(str(uuid.uuid4()), cmd, launch, status=JobStatus.RUNNING)
         refusal = self._reserve_slot_or_refuse(job)
         if refusal is not None:
             return refusal
@@ -153,7 +159,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         """Persist *job* as failed to start and return the snapshot the caller reports."""
         self._log.error(f"Failed to start job subprocess: {exc}")
         self._release_slot(job.job_id)
-        mark_spawn_failed(job, exc, status=STATUS_FAILED, exit_code=_EXIT_CODE_SPAWN_FAILURE)
+        mark_spawn_failed(job, exc, status=JobStatus.FAILED, exit_code=_EXIT_CODE_SPAWN_FAILURE)
         with self._lock:
             self._store.put(job)
         result = job.to_dict()
@@ -164,49 +170,62 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         threading.Thread(target=self._consume_stream, args=(job_id, process.stdout), daemon=True).start()
         threading.Thread(target=self._monitor_process, args=(job_id, process), daemon=True).start()
 
-    def cancel_job(self, job_id: str, reports_root: Path | None = None, run_dir: Path | None = None) -> bool:
+    def cancel_job(
+        self, job_id: str, reports_root: Path | None = None, run_dir: Path | None = None,
+        *, wait_for_exit: bool = False, on_exit: Callable[[], None] | None = None,
+    ) -> bool:
         """Terminate a running job. Return True if cancelled successfully.
 
         For external jobs (``ext-`` prefix), sends SIGTERM to the process that
-        owns the run. For internal jobs, kills the tracked subprocess. *run_dir*
-        lets ``_cancel_external`` skip its project-directory scan.
+        owns the run (SIGKILL escalation runs off-thread unless *wait_for_exit*).
+        For internal jobs, kills the tracked subprocess. *on_exit* runs once the
+        process is gone. *run_dir* lets ``_cancel_external`` skip its scan.
         """
-        if job_id.startswith("ext-") and reports_root is not None:
-            return self._cancel_external(job_id, reports_root, run_dir=run_dir)
-        return self._cancel_internal(job_id)
+        if is_external_job_id(job_id) and reports_root is not None:
+            return self._cancel_external(job_id, reports_root, run_dir, wait=wait_for_exit, on_exit=on_exit)
+        return self._cancel_internal(job_id, on_exit)
 
-    def _cancel_internal(self, job_id: str) -> bool:
+    def _cancel_internal(self, job_id: str, on_exit: Callable[[], None] | None = None) -> bool:
         """Kill an internal tracked subprocess, escalating SIGTERM -> SIGKILL.
 
         Bare SIGTERM doesn't reliably interrupt a child blocked in a long
         httpx socket read (e.g. waiting on an Ollama inference that takes
         minutes) -- the signal queues behind the syscall and the process
-        keeps holding the upstream connection. ``_terminate_process`` runs
-        SIGTERM with a grace window then escalates to SIGKILL, matching the
-        external-cancel path in ``_external_jobs.cancel_external_run``.
+        keeps holding the upstream connection. ``terminate_process`` runs
+        SIGTERM with a grace window then escalates to SIGKILL, like
+        ``_external_jobs.cancel_external_run``; *on_exit* runs after it.
         """
         with self._lock:
             job = self._store.get(job_id)
             process = self._processes.get(job_id)
-            if not job or job.status != STATUS_RUNNING:
+            if not job or job.status != JobStatus.RUNNING:
                 return False
-            job.status = STATUS_CANCELLED
-            job.ended_at = datetime.now(timezone.utc).isoformat()
+            job.status = JobStatus.CANCELLED
+            job.ended_at = utc_now_iso()
             self._store.put(job)
         if process:
-            _terminate_process(process)
+            self._terminate(process)
+        if on_exit is not None:  # the process is gone: terminate_process waits for it
+            on_exit()
         return True
 
-    def _cancel_external(self, job_id: str, reports_root: Path, run_dir: Path | None = None) -> bool:
+    def _terminate(self, process: subprocess.Popen) -> None:
+        """Escalating SIGTERM -> SIGKILL kill, shared by cancel and the watchdog
+        (``JobMonitorMixin._monitor_process``), which calls ``self._terminate``
+        so it never imports this module back.
+        """
+        terminate_process(process)
+
+    def _cancel_external(self, job_id: str, reports_root: Path, run_dir: Path | None, *, wait: bool, on_exit: Callable[[], None] | None) -> bool:
         """Send SIGTERM to an external run's process; *run_dir* skips the scan when valid."""
-        from quodeq.services._external_jobs import cancel_external_run, is_safe_run_segment, resolve_external_run_project
-        run_id = job_id[len("ext-"):]
+        from quodeq.services._external_jobs import ExitHandling, cancel_external_run, is_safe_run_segment, resolve_external_run_project
+        run_id = strip_external_prefix(job_id)
         if not is_safe_run_segment(run_id):
             return False
         project_uuid = resolve_external_run_project(reports_root, run_id, run_dir_hint=run_dir)
         if project_uuid is None:
             return False
-        return cancel_external_run(project_uuid, run_id, reports_root, control=self._process_control)
+        return cancel_external_run(project_uuid, run_id, reports_root, control=self._process_control, after=ExitHandling(wait, on_exit))
 
     def shutdown(self) -> None:
         """Kill all running job subprocesses. Called on server shutdown."""
@@ -226,7 +245,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         SQLite index. Callers that encounter an ``ext-`` id here should route
         through the provider instead.
         """
-        if job_id.startswith("ext-"):
+        if is_external_job_id(job_id):
             return None
         with self._lock:
             job = self._store.get(job_id)
@@ -243,7 +262,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         """
         with self._lock:
             job = self._store.get(job_id)
-            if not job or job.status == STATUS_RUNNING:
+            if not job or job.status == JobStatus.RUNNING:
                 return False
             self._store.delete(job_id)
             return True

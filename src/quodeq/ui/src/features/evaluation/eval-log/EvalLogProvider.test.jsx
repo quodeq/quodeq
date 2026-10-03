@@ -168,6 +168,50 @@ describe('EvalLogProvider', () => {
     }
   });
 
+  it('drops the previous job\'s log lines when the active job switches while the pane stays open', () => {
+    // The window slot stays open across the swap ('swaps content without
+    // re-toggling the slot', above) and each job gets its own EventSource
+    // ('opens a new EventSource for the new jobId on swap', above) -- a
+    // real source remount under a mounted viewer, not just a clearLines
+    // trim. No line from the old job may survive it.
+    vi.useFakeTimers();
+    try {
+      function ProbeWithRender() {
+        const { openLog } = useEvalLog();
+        const { windows } = useSidePane();
+        const body = windows[0]?.render?.() ?? null;
+        return (
+          <div>
+            <button onClick={() => openLog('job-a', 'Run A')}>open-a</button>
+            <button onClick={() => openLog('job-b', 'Run B')}>open-b</button>
+            <div data-testid="body">{body}</div>
+          </div>
+        );
+      }
+      render(
+        <SidePaneProvider>
+          <EvalLogProvider>
+            <ProbeWithRender />
+          </EvalLogProvider>
+        </SidePaneProvider>
+      );
+      fireEvent.click(screen.getByText('open-a'));
+      const esA = MockEventSource.instances[0];
+      act(() => { esA.emit('message', { data: 'from job a' }); });
+      act(() => { vi.runAllTimers(); });
+      expect(screen.getByTestId('body')).toHaveTextContent('from job a');
+
+      fireEvent.click(screen.getByText('open-b'));
+      const esB = MockEventSource.instances[1];
+      act(() => { esB.emit('message', { data: 'from job b' }); });
+      act(() => { vi.runAllTimers(); });
+      expect(screen.getByTestId('body')).toHaveTextContent('from job b');
+      expect(screen.getByTestId('body')).not.toHaveTextContent('from job a');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('clears activeJobId when the side-pane window is removed externally', () => {
     function SyncProbe() {
       const { activeJobId, openLog } = useEvalLog();

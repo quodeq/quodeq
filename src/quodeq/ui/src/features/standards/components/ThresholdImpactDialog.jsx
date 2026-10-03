@@ -7,6 +7,8 @@
 import { useEffect, useRef } from 'react';
 import { t } from '../../../strings/index.js';
 import { focusables, trapTab, restoreFocus } from '../../../utils/a11y.js';
+import { KEY } from '../../../vocab/keyboard.js';
+import StandardsModal from './StandardsModal.jsx';
 
 export default function ThresholdImpactDialog({ changedDimensions, onCancel, onSave, onSaveAndRescan }) {
   const many = changedDimensions.length > 1;
@@ -22,7 +24,7 @@ export default function ThresholdImpactDialog({ changedDimensions, onCancel, onS
     const first = focusables(rootRef.current)[0];
     if (first) first.focus();
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') { cancelRef.current(); return; }
+      if (e.key === KEY.ESCAPE) { cancelRef.current(); return; }
       trapTab(rootRef.current, e);
     };
     document.addEventListener('keydown', onKeyDown);
@@ -33,21 +35,24 @@ export default function ThresholdImpactDialog({ changedDimensions, onCancel, onS
   }, []);
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div ref={rootRef} className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="threshold-impact-title" onClick={(e) => e.stopPropagation()}>
-        <h3 id="threshold-impact-title" className="modal-title">{t('standards.thresholdsChangedTitle')}</h3>
-        <p className="modal-body">
-          {t('standards.rewritesPrefix')} <strong>{changedDimensions.join(', ')}</strong>.{' '}
-          {many ? t('standards.impactBodyMany') : t('standards.impactBodyOne')}
-        </p>
-        <div className="modal-actions">
-          <button type="button" className="btn-secondary" onClick={onCancel}>{t('common.cancel')}</button>
+    <StandardsModal
+      title={t('standards.thresholdsChangedTitle')}
+      titleId="threshold-impact-title"
+      dialogRef={rootRef}
+      onCancel={onCancel}
+      actions={(
+        <>
           <button type="button" className="btn-secondary" onClick={onSave}>{t('projects.save')}</button>
           {onSaveAndRescan && (
             <button type="button" className="btn-primary" onClick={onSaveAndRescan}>{t('standards.saveAndRescan')}</button>
           )}
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    >
+      <p className="modal-body">
+        {t('standards.rewritesPrefix')} <strong>{changedDimensions.join(', ')}</strong>.{' '}
+        {many ? t('standards.impactBodyMany') : t('standards.impactBodyOne')}
+      </p>
+    </StandardsModal>
   );
 }

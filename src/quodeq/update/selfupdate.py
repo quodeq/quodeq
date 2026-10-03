@@ -22,7 +22,10 @@ import threading
 from pathlib import Path
 from urllib.parse import urlparse
 
-import httpx
+from quodeq.update.download import download_file as _download_file
+
+from quodeq.shared.constants import PLATFORM_DARWIN
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -34,13 +37,17 @@ EXPECTED_TEAM_ID: str = ""
 # The only asset the dashboard app may replace itself with.
 _ASSET_PREFIX = "Quodeq-"
 _ASSET_SUFFIX = "-macOS.dmg"
+_HDIUTIL = "hdiutil"  # macOS disk-image CLI to mount/unmount the downloaded update
 
 _ACTIVE_PHASES = frozenset({"downloading", "verifying", "installing", "relaunching"})
+_PERCENT_COMPLETE = 100  # a phase-transition progress value, not a running download's percent
+_EXIT_DELAY_S = 0.5  # gives the HTTP response reporting "relaunching" time to flush
+_TEST_JOIN_TIMEOUT_S = 5  # _join_for_tests' cap on waiting for the update thread
+_SUBPROCESS_TIMEOUT_S = 60  # bounds every self-update subprocess call (codesign/spctl/hdiutil/ditto)
 
 _lock = threading.Lock()
 _progress: dict = {"phase": "idle", "percent": 0, "error": None}
 _thread: threading.Thread | None = None
-_shutdown_callback = None
 
 # Test seam: when set, used as the hdiutil mountpoint instead of a temp dir.
 _mountpoint_for_tests: Path | None = None
@@ -48,12 +55,6 @@ _mountpoint_for_tests: Path | None = None
 
 class UpdateError(Exception):
     """A self-update failure with a message safe to show in the UI."""
-
-
-def set_shutdown_callback(callback) -> None:
-    """Install the app's graceful-quit function, used after a successful swap."""
-    global _shutdown_callback
-    _shutdown_callback = callback
 
 
 def _set(**fields) -> None:
@@ -105,7 +106,7 @@ def describe(
     bundle = bundle_path(executable)
     if not is_frozen:
         reason = "not_frozen"
-    elif plat != "darwin":
+    elif plat != PLATFORM_DARWIN:
         reason = "not_macos"
     elif not team:
         reason = "no_team_id"
@@ -145,37 +146,22 @@ def start(
 
 
 def _check(argv: list[str], message: str) -> None:
-    result = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8")
+    result = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", timeout=_SUBPROCESS_TIMEOUT_S)
     if result.returncode != 0:
         _logger.warning("self-update command failed (%s): %s", argv[0], result.stderr)
         raise UpdateError(message)
 
 
-def _download_file(url: str, target: Path, progress) -> None:
-    with httpx.stream(
-        "GET", url, follow_redirects=True, timeout=httpx.Timeout(10.0, read=60.0)
-    ) as response:
-        response.raise_for_status()
-        total = int(response.headers.get("Content-Length") or 0)
-        done = 0
-        with open(target, "wb") as out:
-            for chunk in response.iter_bytes():
-                out.write(chunk)
-                done += len(chunk)
-                if total:
-                    progress(min(99, done * 100 // total))
-
-
 def _request_app_exit() -> None:
-    callback = _shutdown_callback
-    if callback is not None:
-        try:
-            callback()
-            return
-        except Exception:  # noqa: BLE001 - shutdown callback is best-effort
-            _logger.debug("shutdown callback failed", exc_info=True)
     # Give the HTTP response that reported "relaunching" time to flush.
-    threading.Timer(0.5, lambda: os._exit(0)).start()
+    threading.Timer(_EXIT_DELAY_S, lambda: os._exit(0)).start()
+
+
+def _detach(mnt: Path) -> None:  # unmount the downloaded DMG
+    subprocess.run(
+        [_HDIUTIL, "detach", str(mnt)],
+        capture_output=True, text=True, encoding="utf-8", timeout=_SUBPROCESS_TIMEOUT_S,
+    )
 
 
 def _verify_mounted_app(mnt: Path, app_name: str, team: str, target_version: str) -> Path:
@@ -188,7 +174,8 @@ def _verify_mounted_app(mnt: Path, app_name: str, team: str, target_version: str
         "The downloaded update has an invalid signature",
     )
     info = subprocess.run(
-        ["codesign", "-dvv", str(app_src)], capture_output=True, text=True, encoding="utf-8"
+        ["codesign", "-dvv", str(app_src)],
+        capture_output=True, text=True, encoding="utf-8", timeout=_SUBPROCESS_TIMEOUT_S,
     )
     if f"TeamIdentifier={team}" not in (info.stderr or "") + (info.stdout or ""):
         raise UpdateError("The downloaded update is signed by an unexpected developer")
@@ -202,20 +189,35 @@ def _verify_mounted_app(mnt: Path, app_name: str, team: str, target_version: str
 
 
 def _run_update(download_url: str, target_version: str, install_app: Path, team: str) -> None:
+    """Thread target: isolate _do_run_update so a bug there can't crash the
+    daemon thread silently. UpdateError/SubprocessError are already handled
+    (and logged) inside it; this boundary only catches what escapes that."""
+    run_isolated(
+        lambda: _do_run_update(download_url, target_version, install_app, team),
+        label="self-update",
+        log=_logger,
+        on_error=lambda _exc: _set(phase="error", error="Automatic update failed"),
+    )
+
+
+def _do_run_update(download_url: str, target_version: str, install_app: Path, team: str) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="quodeq-selfupdate-"))
     mnt = _mountpoint_for_tests or (tmp / "mnt")
     mounted = False
     try:
         dmg = tmp / (Path(urlparse(download_url).path).name or "update.dmg")
-        _download_file(download_url, dmg, lambda pct: _set(percent=pct))
+        _download_file(
+            download_url, dmg,
+            lambda done, total: _set(percent=min(99, done * 100 // total) if total else 0),
+        )
 
-        _set(phase="verifying", percent=100)
+        _set(phase="verifying", percent=_PERCENT_COMPLETE)
         _check(
             ["spctl", "-a", "-t", "open", "--context", "context:primary-signature", str(dmg)],
             "The downloaded update is not notarized by Apple",
         )
         _check(
-            ["hdiutil", "attach", "-nobrowse", "-readonly", "-mountpoint", str(mnt), str(dmg)],
+            [_HDIUTIL, "attach", "-nobrowse", "-readonly", "-mountpoint", str(mnt), str(dmg)],
             "Could not open the downloaded update",
         )
         mounted = True
@@ -225,22 +227,23 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
         staging = install_app.parent / f".{install_app.name}.new"
         shutil.rmtree(staging, ignore_errors=True)
         _check(["ditto", str(app_src), str(staging)], "Could not copy the update into place")
-        subprocess.run(["hdiutil", "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
+        _detach(mnt)
         mounted = False
 
         _swap_bundle(staging, install_app)
-        _set(phase="relaunching", percent=100)
+        _set(phase="relaunching", percent=_PERCENT_COMPLETE)
         _spawn_relauncher(install_app)
         _request_app_exit()
-    except UpdateError as exc:
+    except (UpdateError, subprocess.SubprocessError) as exc:
         _logger.warning("self-update failed: %s", exc)
         _set(phase="error", error=str(exc))
-    except Exception:
-        _logger.warning("self-update failed", exc_info=True)
-        _set(phase="error", error="Automatic update failed")
     finally:
+        # A retry failure here must not shadow the error state set above.
         if mounted:
-            subprocess.run(["hdiutil", "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
+            try:
+                _detach(mnt)
+            except (subprocess.SubprocessError, OSError) as exc:
+                _logger.warning("could not detach the update volume during cleanup: %s", exc)
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -279,8 +282,8 @@ def cleanup_stale_staging(install_app: Path | None = None) -> None:
             app.parent / f".{app.name}.new"
         ]:
             shutil.rmtree(leftover, ignore_errors=True)
-    except Exception:
-        _logger.debug("stale staging cleanup failed", exc_info=True)
+    except OSError as exc:
+        _logger.warning("stale staging cleanup failed: %s", exc, exc_info=True)
 
 
 def _reset_for_tests() -> None:
@@ -294,4 +297,4 @@ def _reset_for_tests() -> None:
 def _join_for_tests() -> None:
     thread = _thread
     if thread is not None and thread.is_alive():
-        thread.join(timeout=5)
+        thread.join(timeout=_TEST_JOIN_TIMEOUT_S)

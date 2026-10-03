@@ -1,6 +1,6 @@
 import FlagPill from './terminal/FlagPill.jsx';
-
-const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
+import { SEVERITY_ORDER, SEVERITY_FILTER_ALL } from '../vocab/severity.js';
+import { FINDING_TYPE } from '../vocab/findingType.js';
 
 /**
  * Reusable severity filter pill group rendered in the terminal `--flag` style.
@@ -16,12 +16,12 @@ const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
  * }} props
  */
 export default function SeverityFilterPills({ counts, complianceCount = 0, activeFilter, onFilterChange }) {
-  const isAllActive = !activeFilter || activeFilter === 'all';
+  const isAllActive = !activeFilter || activeFilter === SEVERITY_FILTER_ALL;
   const toggle = (key) => onFilterChange(activeFilter === key ? null : key);
   return (
     <div className="term-flag-row">
       <FlagPill flag="all" active={isAllActive} onClick={() => onFilterChange(null)} />
-      {SEVERITY_LEVELS.map((sev) =>
+      {SEVERITY_ORDER.map((sev) =>
         counts[sev] > 0 ? (
           <FlagPill
             key={sev}
@@ -35,10 +35,11 @@ export default function SeverityFilterPills({ counts, complianceCount = 0, activ
       )}
       {complianceCount > 0 && (
         <FlagPill
+          // FlagPill's `--compliance` style key, not the FINDING_TYPE vocabulary.
           flag="compliance"
           count={complianceCount}
-          active={activeFilter === 'compliance'}
-          onClick={() => toggle('compliance')}
+          active={activeFilter === FINDING_TYPE.COMPLIANCE}
+          onClick={() => toggle(FINDING_TYPE.COMPLIANCE)}
         />
       )}
     </div>

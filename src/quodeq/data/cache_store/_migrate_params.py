@@ -39,7 +39,7 @@ def derive_params_hash(
         c = Path(standards_dir) / "compiled" / f"{dimension}.json"
         try:
             _cache[k] = json.loads(c.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001 - same rationale as the writer: never abort
+        except (OSError, json.JSONDecodeError):
             return ""
     try:
         return hash_non_default_params(non_default_from_effective(_cache[k], effective_params))

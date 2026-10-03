@@ -1,0 +1,1062 @@
+{
+  "id": "accessibility",
+  "name": "Accessibility",
+  "description": "Platform-neutral accessibility conformance for native mobile and web apps. Criteria follow WCAG 2.2 level A and AA as applied to software by EN 301 549 clause 11, plus EN 301 549 clauses 5, 7 and 11.5 to 11.7. Each requirement carries detection hints per platform; apply only the hint that matches the discipline under review. Six criteria that EN 301 549 voids for non-web software (2.4.1, 2.4.2, 2.4.5, 3.1.2, 3.2.3, 3.2.4) are out of scope until platform-specific standards exist, so a clean score is not full WCAG conformance for a website.",
+  "type": "wcag",
+  "subtype": "2.2",
+  "version": "2023.10",
+  "managed": true,
+  "weight": 1.0,
+  "source": "WCAG 2.2 (W3C, 2023) and EN 301 549 v3.2.1 (ETSI, 2021)",
+  "sources": [
+    "wcag22",
+    "en301549"
+  ],
+  "principles": [
+    {
+      "name": "Perceivable",
+      "description": "Information and UI components are presented so every user can perceive them, including through a screen reader, magnification or enlarged text.",
+      "source": "WCAG 2.2 principle 1, EN 301 549 clause 11.1",
+      "requirements": [
+        {
+          "id": "ACC-PER-01",
+          "name": "Text alternatives",
+          "text": "Every meaningful image, icon and non-text control MUST expose a text alternative that conveys its purpose, and purely decorative graphics MUST be hidden from assistive technology. Detect on the platform under review. Android: Compose Image/Icon: contentDescription non-null and meaningful when informative or inside a clickable; null only for decorative. IconButton icons need a description. Views: android:contentDescription, importantForAccessibility=\"no\" for decorative. iOS: accessibilityLabel on Image and icon buttons; Image(decorative:) or .accessibilityHidden(true) for decorative; UIKit isAccessibilityElement=false for decorative. Web: alt text on img; alt=\"\" for decorative; aria-label on icon-only buttons; aria-hidden=\"true\" on decorative svg.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.1.1",
+              "name": "Non-text Content",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-content"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Compose Image/Icon: contentDescription non-null and meaningful when informative or inside a clickable; null only for decorative. IconButton icons need a description. Views: android:contentDescription, importantForAccessibility=\"no\" for decorative.",
+            "mobile_ios": "accessibilityLabel on Image and icon buttons; Image(decorative:) or .accessibilityHidden(true) for decorative; UIKit isAccessibilityElement=false for decorative.",
+            "web": "alt text on img; alt=\"\" for decorative; aria-label on icon-only buttons; aria-hidden=\"true\" on decorative svg."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-PER-02",
+          "name": "Media alternatives and audio control",
+          "text": "Video and audio players MUST support caption and audio-description tracks (including live captions for streams) with controls to enable them, audio-only and video-only media MUST have a text or audio alternative, and audio that starts automatically MUST be pausable or stoppable. Detect on the platform under review. Android: Media3/ExoPlayer or SDK players: subtitle track selection exposed in the UI, player controls have semantics, no autoplay with sound without a visible pause control. iOS: AVPlayer legible media selection exposed; player controls accessible; no autoplay with sound without a pause control. Web: <track kind=\"captions\">, native or custom controls with labels, no autoplay with sound.",
+          "level": "A",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.2.1",
+              "name": "Audio-only and Video-only (Prerecorded)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/audio-only-and-video-only-prerecorded"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.2.2",
+              "name": "Captions (Prerecorded)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/captions-prerecorded"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.2.3",
+              "name": "Audio Description or Media Alternative (Prerecorded)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/audio-description-or-media-alternative-prerecorded"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.2.4",
+              "name": "Captions (Live)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/captions-live"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.2.5",
+              "name": "Audio Description (Prerecorded)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/audio-description-prerecorded"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.4.2",
+              "name": "Audio Control",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/audio-control"
+            },
+            {
+              "source": "en301549",
+              "id": "7.1.1",
+              "name": "Captioning playback",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "7.2.1",
+              "name": "Audio description playback",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "7.3",
+              "name": "User controls for captions and audio description",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Media3/ExoPlayer or SDK players: subtitle track selection exposed in the UI, player controls have semantics, no autoplay with sound without a visible pause control.",
+            "mobile_ios": "AVPlayer legible media selection exposed; player controls accessible; no autoplay with sound without a pause control.",
+            "web": "<track kind=\"captions\">, native or custom controls with labels, no autoplay with sound."
+          },
+          "description": "WCAG level A. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-PER-03",
+          "name": "Structure and relationships",
+          "text": "Headings, lists, grids and label-to-field relationships MUST be exposed programmatically, not conveyed by visual styling alone. Detect on the platform under review. Android: Section titles: Modifier.semantics { heading() }. Grids: collectionInfo/collectionItemInfo. Fields: TextField label parameter, not a separate Text. Views: accessibilityHeading, labelFor. iOS: .accessibilityAddTraits(.isHeader) on section titles; .accessibilityLabeledPair for label and value; .accessibilityElement(children: .contain) for groups. Web: h1 to h6, ul/ol, table with th and scope, label for=id; no divs styled as headings.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.3.1",
+              "name": "Info and Relationships",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.6",
+              "name": "Row, column, and headers",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.8",
+              "name": "Label relationships",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.9",
+              "name": "Parent-child relationships",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Section titles: Modifier.semantics { heading() }. Grids: collectionInfo/collectionItemInfo. Fields: TextField label parameter, not a separate Text. Views: accessibilityHeading, labelFor.",
+            "mobile_ios": ".accessibilityAddTraits(.isHeader) on section titles; .accessibilityLabeledPair for label and value; .accessibilityElement(children: .contain) for groups.",
+            "web": "h1 to h6, ul/ol, table with th and scope, label for=id; no divs styled as headings."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-PER-04",
+          "name": "Reading and traversal order",
+          "text": "The order in which assistive technology traverses content MUST match the logical reading order, including after layout changes and in overlays. Detect on the platform under review. Android: isTraversalGroup = true on containers whose children belong together; traversalIndex when layout order differs from reading order; Box overlays and floating elements are common culprits. iOS: .accessibilitySortPriority when visual order differs from element order; set accessibilityElements order on custom UIKit containers. Web: DOM order matches visual order; avoid CSS order or row-reverse reordering; no positive tabindex.",
+          "level": "A",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.3.2",
+              "name": "Meaningful Sequence",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/meaningful-sequence"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.4.3",
+              "name": "Focus Order",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-order"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.13",
+              "name": "Tracking of focus and selection attributes",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "isTraversalGroup = true on containers whose children belong together; traversalIndex when layout order differs from reading order; Box overlays and floating elements are common culprits.",
+            "mobile_ios": ".accessibilitySortPriority when visual order differs from element order; set accessibilityElements order on custom UIKit containers.",
+            "web": "DOM order matches visual order; avoid CSS order or row-reverse reordering; no positive tabindex."
+          },
+          "description": "WCAG level A. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-PER-05",
+          "name": "Not colour or shape alone",
+          "text": "Instructions, state and errors MUST NOT rely solely on colour, shape, position, size or sound; a text or semantic equivalent MUST exist. Detect on the platform under review. Android: Error state needs text or icon, not only a red border. Selected tab or chip needs selected semantics, not only a colour change. Avoid instructions like 'tap the green button'. iOS: Errors carry text; selection exposed via .isSelected trait or accessibilityValue, not colour only. Web: aria-selected, aria-invalid plus visible text or icon; links distinguishable by more than colour.",
+          "level": "A",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.3.3",
+              "name": "Sensory Characteristics",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/sensory-characteristics"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.4.1",
+              "name": "Use of Color",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/use-of-color"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Error state needs text or icon, not only a red border. Selected tab or chip needs selected semantics, not only a colour change. Avoid instructions like 'tap the green button'.",
+            "mobile_ios": "Errors carry text; selection exposed via .isSelected trait or accessibilityValue, not colour only.",
+            "web": "aria-selected, aria-invalid plus visible text or icon; links distinguishable by more than colour."
+          },
+          "description": "WCAG level A. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-PER-06",
+          "name": "Orientation",
+          "text": "Content MUST NOT be locked to a single display orientation unless the orientation is essential. Detect on the platform under review. Android: Flag android:screenOrientation=\"portrait\" in the manifest or requestedOrientation in code, except for a video player in fullscreen. iOS: Flag UISupportedInterfaceOrientations limited to portrait or supportedInterfaceOrientations overrides without essential reason. Web: No orientation media queries that hide functionality.",
+          "level": "AA",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.3.4",
+              "name": "Orientation",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/orientation"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Flag android:screenOrientation=\"portrait\" in the manifest or requestedOrientation in code, except for a video player in fullscreen.",
+            "mobile_ios": "Flag UISupportedInterfaceOrientations limited to portrait or supportedInterfaceOrientations overrides without essential reason.",
+            "web": "No orientation media queries that hide functionality."
+          },
+          "description": "WCAG level AA. Verifiable from source code."
+        },
+        {
+          "id": "ACC-PER-07",
+          "name": "Input purpose",
+          "text": "Fields that collect personal data MUST declare their purpose so autofill and assistive technology can identify them. Detect on the platform under review. Android: Compose semantics contentType (ContentType.EmailAddress, Password, PersonFullName) and matching KeyboardType; Views: autofillHints. iOS: .textContentType(.emailAddress), .username, .password, .newPassword on the relevant fields. Web: autocomplete=\"email\", \"name\", \"current-password\" and friends on inputs.",
+          "level": "AA",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.3.5",
+              "name": "Identify Input Purpose",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/identify-input-purpose"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Compose semantics contentType (ContentType.EmailAddress, Password, PersonFullName) and matching KeyboardType; Views: autofillHints.",
+            "mobile_ios": ".textContentType(.emailAddress), .username, .password, .newPassword on the relevant fields.",
+            "web": "autocomplete=\"email\", \"name\", \"current-password\" and friends on inputs."
+          },
+          "description": "WCAG level AA. Verifiable from source code."
+        },
+        {
+          "id": "ACC-PER-08",
+          "name": "Contrast",
+          "text": "Text MUST reach 4.5:1 contrast (3:1 for large text), and component boundaries, focus indicators and meaningful graphics MUST reach 3:1, in every theme and brand palette. Detect on the platform under review. Android: Check theme colour token pairs (onSurface on surface, onPrimary on primary) per brand and per light/dark; text over images needs a scrim; placeholder and hint colours are common failures. iOS: Check asset-catalog colours for light and dark, text over imagery, secondary label colours. Web: Check CSS custom property pairs, placeholder colours, focus outlines against backgrounds.",
+          "level": "AA",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.4.3",
+              "name": "Contrast (Minimum)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.4.11",
+              "name": "Non-text Contrast",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Check theme colour token pairs (onSurface on surface, onPrimary on primary) per brand and per light/dark; text over images needs a scrim; placeholder and hint colours are common failures.",
+            "mobile_ios": "Check asset-catalog colours for light and dark, text over imagery, secondary label colours.",
+            "web": "Check CSS custom property pairs, placeholder colours, focus outlines against backgrounds."
+          },
+          "description": "WCAG level AA. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-PER-09",
+          "name": "Text scaling and reflow",
+          "text": "Text MUST follow the platform font-size setting up to at least 200 percent without loss of content or function, and layouts MUST reflow rather than clip or truncate. Detect on the platform under review. Android: Text sizes in sp, never dp or dp.toSp(). No fixed height or width on containers holding text. Essential labels without maxLines=1 plus Ellipsis. Rows that can overflow use FlowRow. Screens scroll (verticalScroll or LazyColumn). Previews and tests at fontScale 2f. iOS: Dynamic Type via text styles or @ScaledMetric; no fixed frames around text; no .dynamicTypeSize cap below accessibility sizes on essential text; minimumScaleFactor only for non-essential text. Web: rem or em units, no fixed heights on text containers, reflow at 320 CSS px width and 400 percent zoom.",
+          "level": "AA",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.4.4",
+              "name": "Resize Text",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/resize-text"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.4.10",
+              "name": "Reflow",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/reflow"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.4.12",
+              "name": "Text Spacing",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/text-spacing"
+            },
+            {
+              "source": "en301549",
+              "id": "11.7",
+              "name": "User preferences",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Text sizes in sp, never dp or dp.toSp(). No fixed height or width on containers holding text. Essential labels without maxLines=1 plus Ellipsis. Rows that can overflow use FlowRow. Screens scroll (verticalScroll or LazyColumn). Previews and tests at fontScale 2f.",
+            "mobile_ios": "Dynamic Type via text styles or @ScaledMetric; no fixed frames around text; no .dynamicTypeSize cap below accessibility sizes on essential text; minimumScaleFactor only for non-essential text.",
+            "web": "rem or em units, no fixed heights on text containers, reflow at 320 CSS px width and 400 percent zoom."
+          },
+          "description": "WCAG level AA. Verifiable from source code."
+        },
+        {
+          "id": "ACC-PER-10",
+          "name": "Images of text",
+          "text": "Text MUST be rendered as text rather than embedded in images, except for logos. Detect on the platform under review. Android: Banners or promo drawables that contain text should be Text over an image; string resources instead of baked-in copy. iOS: Same: text as Text, not in the asset. Web: Same: text as HTML, not in a bitmap; CSS for styling.",
+          "level": "AA",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.4.5",
+              "name": "Images of Text",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/images-of-text"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Banners or promo drawables that contain text should be Text over an image; string resources instead of baked-in copy.",
+            "mobile_ios": "Same: text as Text, not in the asset.",
+            "web": "Same: text as HTML, not in a bitmap; CSS for styling."
+          },
+          "description": "WCAG level AA. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-PER-11",
+          "name": "Content on hover or focus",
+          "text": "Tooltips and popovers that appear on hover or focus MUST be dismissible without moving the pointer, hoverable and persistent until dismissed. Detect on the platform under review. Android: TooltipBox and PlainTooltip default behaviour is fine; custom long-press popups must dismiss on back and not vanish on a timer. iOS: Custom popovers dismissible with escape action and not timed. Web: Custom tooltips: dismiss on Escape, stay while hovered, no title-attribute-only tooltips on essential info.",
+          "level": "AA",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.4.13",
+              "name": "Content on Hover or Focus",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus"
+            }
+          ],
+          "hints": {
+            "mobile_android": "TooltipBox and PlainTooltip default behaviour is fine; custom long-press popups must dismiss on back and not vanish on a timer.",
+            "mobile_ios": "Custom popovers dismissible with escape action and not timed.",
+            "web": "Custom tooltips: dismiss on Escape, stay while hovered, no title-attribute-only tooltips on essential info."
+          },
+          "description": "WCAG level AA. Verifiable from source code."
+        }
+      ]
+    },
+    {
+      "name": "Operable",
+      "description": "Every function is reachable and usable through touch, external keyboard, switch access, voice control and screen-reader gestures, without requiring a specific input ability.",
+      "source": "WCAG 2.2 principle 2, EN 301 549 clauses 5 and 11.2",
+      "requirements": [
+        {
+          "id": "ACC-OPR-01",
+          "name": "Keyboard and switch operability",
+          "text": "All functionality MUST be operable through sequential focus navigation (external keyboard, switch access, D-pad) with no pointer-only path, and focus MUST never be trapped. Detect on the platform under review. Android: Use clickable, toggleable, selectable or onClick rather than pointerInput alone; pointerInput gestures need an equivalent action. Dialogs and sheets close via BackHandler. Custom Canvas controls are focusable(). iOS: Buttons and gestures have equivalents reachable with Full Keyboard Access; escape action closes modals; custom controls are .focusable(). Web: No div onclick without tabindex and key handlers; modals trap focus inside but Escape closes them.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.1.1",
+              "name": "Keyboard",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/keyboard"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.1.2",
+              "name": "No Keyboard Trap",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.1.4",
+              "name": "Character Key Shortcuts",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/character-key-shortcuts"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Use clickable, toggleable, selectable or onClick rather than pointerInput alone; pointerInput gestures need an equivalent action. Dialogs and sheets close via BackHandler. Custom Canvas controls are focusable().",
+            "mobile_ios": "Buttons and gestures have equivalents reachable with Full Keyboard Access; escape action closes modals; custom controls are .focusable().",
+            "web": "No div onclick without tabindex and key handlers; modals trap focus inside but Escape closes them."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-OPR-02",
+          "name": "Gestures, dragging and pointer cancellation",
+          "text": "Functions operated by multipoint, path-based, dragging or simultaneous gestures MUST also be available through a single tap, and single-tap actions MUST complete on release, not on press. Detect on the platform under review. Android: SwipeToDismissBox, swipe-to-reveal, drag-to-reorder and pull-to-refresh need a visible button or customActions in semantics. HorizontalPager needs next and previous controls or page indicators that are actionable. No action fired on awaitFirstDown or onPress. iOS: .swipeActions and drag gestures need matching .accessibilityAction(named:); no action on touchDown. Web: Drag and drop needs button alternatives; actions on click or keyup, not mousedown or pointerdown.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.5.1",
+              "name": "Pointer Gestures",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/pointer-gestures"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.5.2",
+              "name": "Pointer Cancellation",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/pointer-cancellation"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.5.7",
+              "name": "Dragging Movements",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements"
+            },
+            {
+              "source": "en301549",
+              "id": "5.9",
+              "name": "Simultaneous user actions",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "SwipeToDismissBox, swipe-to-reveal, drag-to-reorder and pull-to-refresh need a visible button or customActions in semantics. HorizontalPager needs next and previous controls or page indicators that are actionable. No action fired on awaitFirstDown or onPress.",
+            "mobile_ios": ".swipeActions and drag gestures need matching .accessibilityAction(named:); no action on touchDown.",
+            "web": "Drag and drop needs button alternatives; actions on click or keyup, not mousedown or pointerdown."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-OPR-03",
+          "name": "Motion actuation",
+          "text": "Functions triggered by device motion such as shake or tilt MUST also be available through UI controls, and motion triggers MUST be disableable. Detect on the platform under review. Android: SensorManager shake detectors for refresh or feedback need a button equivalent and a setting to turn them off. iOS: motionEnded shake handling needs a button equivalent and a setting. Web: DeviceMotionEvent triggers need a button equivalent.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.5.4",
+              "name": "Motion Actuation",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/motion-actuation"
+            }
+          ],
+          "hints": {
+            "mobile_android": "SensorManager shake detectors for refresh or feedback need a button equivalent and a setting to turn them off.",
+            "mobile_ios": "motionEnded shake handling needs a button equivalent and a setting.",
+            "web": "DeviceMotionEvent triggers need a button equivalent."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-OPR-04",
+          "name": "Target size",
+          "text": "Interactive targets MUST meet the platform minimum size (48x48 dp Android, 44x44 pt iOS, 24x24 CSS px web) or have equivalent spacing so neighbours cannot be hit by mistake. Detect on the platform under review. Android: Material components enforce 48 dp via minimumInteractiveComponentSize unless LocalMinimumInteractiveComponentSize is lowered. Flag Icon or Text with clickable at 24 dp without padding, and any override that disables the enforcement. iOS: Flag Button or onTapGesture on views framed under 44 pt without a larger .contentShape. Web: Flag icon buttons and inline controls under 24 CSS px; aim for 44.",
+          "level": "AA",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.5.8",
+              "name": "Target Size (Minimum)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Material components enforce 48 dp via minimumInteractiveComponentSize unless LocalMinimumInteractiveComponentSize is lowered. Flag Icon or Text with clickable at 24 dp without padding, and any override that disables the enforcement.",
+            "mobile_ios": "Flag Button or onTapGesture on views framed under 44 pt without a larger .contentShape.",
+            "web": "Flag icon buttons and inline controls under 24 CSS px; aim for 44."
+          },
+          "description": "WCAG level AA. Verifiable from source code."
+        },
+        {
+          "id": "ACC-OPR-05",
+          "name": "Timing",
+          "text": "Time limits MUST be adjustable, extendable or absent, and auto-updating or moving content MUST be pausable; messages with an action MUST NOT disappear on a timer. Detect on the platform under review. Android: Snackbar with an action uses SnackbarDuration.Indefinite or Long. Auto-advancing pagers, tickers and LaunchedEffect timers that dismiss dialogs are flagged. iOS: Toasts with actions do not auto-dismiss; auto-advancing carousels pausable; no asyncAfter dismissing dialogs. Web: Toasts with actions persist; carousels have pause; setTimeout dismissals only for pure notices.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.2.1",
+              "name": "Timing Adjustable",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/timing-adjustable"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.2.2",
+              "name": "Pause, Stop, Hide",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/pause-stop-hide"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Snackbar with an action uses SnackbarDuration.Indefinite or Long. Auto-advancing pagers, tickers and LaunchedEffect timers that dismiss dialogs are flagged.",
+            "mobile_ios": "Toasts with actions do not auto-dismiss; auto-advancing carousels pausable; no asyncAfter dismissing dialogs.",
+            "web": "Toasts with actions persist; carousels have pause; setTimeout dismissals only for pure notices."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-OPR-06",
+          "name": "Flashing and motion",
+          "text": "Nothing MUST flash more than three times per second, and non-essential animation, parallax and autoplaying video MUST respect the platform reduce-motion setting. Detect on the platform under review. Android: Gate autoplay video and decorative animations on ValueAnimator.areAnimatorsEnabled() or the animator duration scale; AnimatedVisibility and animateContentSize for decoration only. iOS: Check UIAccessibility.isReduceMotionEnabled or the accessibilityReduceMotion environment before parallax, autoplay and large transitions. Web: prefers-reduced-motion media query disables decorative animation and autoplay.",
+          "level": "A",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.3.1",
+              "name": "Three Flashes or Below Threshold",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/three-flashes-or-below-threshold"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.3.3",
+              "name": "Animation from Interactions",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions"
+            },
+            {
+              "source": "en301549",
+              "id": "11.7",
+              "name": "User preferences",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Gate autoplay video and decorative animations on ValueAnimator.areAnimatorsEnabled() or the animator duration scale; AnimatedVisibility and animateContentSize for decoration only.",
+            "mobile_ios": "Check UIAccessibility.isReduceMotionEnabled or the accessibilityReduceMotion environment before parallax, autoplay and large transitions.",
+            "web": "prefers-reduced-motion media query disables decorative animation and autoplay."
+          },
+          "description": "WCAG level A. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-OPR-07",
+          "name": "Focus management",
+          "text": "When a dialog, sheet or screen opens, focus MUST move into it and return to the trigger on dismiss; content updates MUST NOT reset or steal focus unexpectedly. Detect on the platform under review. Android: Dialog and ModalBottomSheet handle focus by default; custom overlays use FocusRequester in a LaunchedEffect. Stable keys in LazyColumn so recomposition does not recreate focused nodes. No requestFocus on every state change. iOS: Post .screenChanged or .layoutChanged with the target element, or drive .accessibilityFocused; avoid resetting focus on data reload. Web: Move focus into modals, return on close, mark background inert; do not re-render lists in a way that drops focus.",
+          "level": "A",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.4.3",
+              "name": "Focus Order",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-order"
+            },
+            {
+              "source": "wcag22",
+              "id": "3.2.1",
+              "name": "On Focus",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/on-focus"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.13",
+              "name": "Tracking of focus and selection attributes",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.14",
+              "name": "Modification of focus and selection attributes",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Dialog and ModalBottomSheet handle focus by default; custom overlays use FocusRequester in a LaunchedEffect. Stable keys in LazyColumn so recomposition does not recreate focused nodes. No requestFocus on every state change.",
+            "mobile_ios": "Post .screenChanged or .layoutChanged with the target element, or drive .accessibilityFocused; avoid resetting focus on data reload.",
+            "web": "Move focus into modals, return on close, mark background inert; do not re-render lists in a way that drops focus."
+          },
+          "description": "WCAG level A. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-OPR-08",
+          "name": "Focus visible and not obscured",
+          "text": "Focused elements MUST show a visible focus indicator and MUST NOT be hidden behind sticky headers, bottom bars or the software keyboard. Detect on the platform under review. Android: Focusable custom components draw an indication when isFocused; content under bottom bars uses contentPadding or navigationBarsPadding; forms use imePadding so the focused field stays visible. iOS: Default focus ring not suppressed; scroll views respect safeAreaInset and keyboard avoidance. Web: :focus-visible styles never removed by outline: none without replacement; scroll-padding for sticky headers.",
+          "level": "AA",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.4.7",
+              "name": "Focus Visible",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.4.11",
+              "name": "Focus Not Obscured (Minimum)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Focusable custom components draw an indication when isFocused; content under bottom bars uses contentPadding or navigationBarsPadding; forms use imePadding so the focused field stays visible.",
+            "mobile_ios": "Default focus ring not suppressed; scroll views respect safeAreaInset and keyboard avoidance.",
+            "web": ":focus-visible styles never removed by outline: none without replacement; scroll-padding for sticky headers."
+          },
+          "description": "WCAG level AA. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-OPR-09",
+          "name": "Descriptive labels and link purpose",
+          "text": "Buttons, links, headings and labels MUST describe their purpose in context; generic text such as 'Read more' MUST carry the subject in its accessible name. Detect on the platform under review. Android: Card 'Lees meer' or icon-only actions get a contentDescription that includes the article title, or the card merges semantics so the title is read with the action. iOS: accessibilityLabel that includes the subject for repeated generic buttons; combined card elements. Web: aria-label or aria-describedby giving context to repeated 'Read more' links.",
+          "level": "A",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.4.4",
+              "name": "Link Purpose (In Context)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/link-purpose-in-context"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.4.6",
+              "name": "Headings and Labels",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/headings-and-labels"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Card 'Lees meer' or icon-only actions get a contentDescription that includes the article title, or the card merges semantics so the title is read with the action.",
+            "mobile_ios": "accessibilityLabel that includes the subject for repeated generic buttons; combined card elements.",
+            "web": "aria-label or aria-describedby giving context to repeated 'Read more' links."
+          },
+          "description": "WCAG level A. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-OPR-10",
+          "name": "Label in name",
+          "text": "The accessible name of a control MUST include its visible text so voice control users can activate it by saying what they see. Detect on the platform under review. Android: A contentDescription or clearAndSetSemantics that replaces a button's visible Text must start with that text; do not hide visible text from semantics. iOS: accessibilityLabel must contain the visible title of the control. Web: aria-label must contain the visible text.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "2.5.3",
+              "name": "Label in Name",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name"
+            }
+          ],
+          "hints": {
+            "mobile_android": "A contentDescription or clearAndSetSemantics that replaces a button's visible Text must start with that text; do not hide visible text from semantics.",
+            "mobile_ios": "accessibilityLabel must contain the visible title of the control.",
+            "web": "aria-label must contain the visible text."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        }
+      ]
+    },
+    {
+      "name": "Understandable",
+      "description": "Text, behaviour and forms are predictable and understandable, with errors identified and preventable.",
+      "source": "WCAG 2.2 principle 3, EN 301 549 clause 11.3",
+      "requirements": [
+        {
+          "id": "ACC-UND-01",
+          "name": "Language",
+          "text": "The UI language MUST be declared programmatically so screen readers pick the right voice, including per-market locales. Detect on the platform under review. Android: All user-facing text in string resources with resConfigs or localeConfig declared; no hardcoded Dutch or English literals in Compose. iOS: Localized strings via String catalogs; Locale not overridden to a mismatch. Web: html lang set to the content language.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "3.1.1",
+              "name": "Language of Page",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/language-of-page"
+            }
+          ],
+          "hints": {
+            "mobile_android": "All user-facing text in string resources with resConfigs or localeConfig declared; no hardcoded Dutch or English literals in Compose.",
+            "mobile_ios": "Localized strings via String catalogs; Locale not overridden to a mismatch.",
+            "web": "html lang set to the content language."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-UND-02",
+          "name": "Predictable behaviour",
+          "text": "Receiving focus or changing an input value MUST NOT trigger a context change such as navigation or submission unless the user was told beforehand. Detect on the platform under review. Android: No navigation or submit inside onValueChange, onFocusChanged or onCheckedChange; dropdown selection does not auto-submit. iOS: No navigation from onChange of a TextField or Toggle; pickers do not submit on selection. Web: No submit on change of a select; no navigation on focus.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "3.2.1",
+              "name": "On Focus",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/on-focus"
+            },
+            {
+              "source": "wcag22",
+              "id": "3.2.2",
+              "name": "On Input",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/on-input"
+            }
+          ],
+          "hints": {
+            "mobile_android": "No navigation or submit inside onValueChange, onFocusChanged or onCheckedChange; dropdown selection does not auto-submit.",
+            "mobile_ios": "No navigation from onChange of a TextField or Toggle; pickers do not submit on selection.",
+            "web": "No submit on change of a select; no navigation on focus."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-UND-03",
+          "name": "Error identification and suggestion",
+          "text": "Input errors MUST be identified in text, associated with the field, announced to assistive technology and, where possible, accompanied by a correction suggestion. Detect on the platform under review. Android: TextField isError with supportingText, plus Modifier.semantics { error(message) }; the error text is a live region or gains focus. Message says what to fix, not only 'invalid'. iOS: Error text next to the field with accessibilityValue or an announcement; concrete correction hints. Web: aria-invalid, aria-describedby to the error text, aria-live on the error container.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "3.3.1",
+              "name": "Error Identification",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/error-identification"
+            },
+            {
+              "source": "wcag22",
+              "id": "3.3.3",
+              "name": "Error Suggestion",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion"
+            }
+          ],
+          "hints": {
+            "mobile_android": "TextField isError with supportingText, plus Modifier.semantics { error(message) }; the error text is a live region or gains focus. Message says what to fix, not only 'invalid'.",
+            "mobile_ios": "Error text next to the field with accessibilityValue or an announcement; concrete correction hints.",
+            "web": "aria-invalid, aria-describedby to the error text, aria-live on the error container."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-UND-04",
+          "name": "Labels and instructions",
+          "text": "Every input MUST have a persistent visible label and required-field or format instructions; placeholder-only labelling is not acceptable. Detect on the platform under review. Android: TextField label parameter set, not only placeholder; required and format hints in supportingText. iOS: TextField prompt-only inputs get an accessibilityLabel and a visible label. Web: label for each input, required marked in text not colour, format hints visible.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "3.3.2",
+              "name": "Labels or Instructions",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/labels-or-instructions"
+            }
+          ],
+          "hints": {
+            "mobile_android": "TextField label parameter set, not only placeholder; required and format hints in supportingText.",
+            "mobile_ios": "TextField prompt-only inputs get an accessibilityLabel and a visible label.",
+            "web": "label for each input, required marked in text not colour, format hints visible."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-UND-05",
+          "name": "Error prevention on commitments",
+          "text": "Purchases, subscription changes, account deletion and irreversible submissions MUST be reversible, checked for errors, or confirmed before commit. Detect on the platform under review. Android: Confirmation step or undo for checkout, subscription change, delete account and comment posting; review summary before purchase. iOS: Same: confirmation or undo before irreversible commits. Web: Same: review step or undo before irreversible submissions.",
+          "level": "AA",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "3.3.4",
+              "name": "Error Prevention (Legal, Financial, Data)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/error-prevention-legal-financial-data"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Confirmation step or undo for checkout, subscription change, delete account and comment posting; review summary before purchase.",
+            "mobile_ios": "Same: confirmation or undo before irreversible commits.",
+            "web": "Same: review step or undo before irreversible submissions."
+          },
+          "description": "WCAG level AA. Verifiable from source code."
+        },
+        {
+          "id": "ACC-UND-06",
+          "name": "Redundant entry and accessible authentication",
+          "text": "Information already entered in a flow MUST be auto-populated or selectable, and authentication MUST NOT rely on memorising or transcribing without an alternative such as paste, autofill, passkeys or biometrics. Detect on the platform under review. Android: OTP fields allow paste and autofill (SMS retriever, contentType); login supports password managers and biometrics; do not ask for the same address twice in checkout. iOS: .textContentType(.oneTimeCode) and password autofill; biometrics offered; paste not blocked. Web: autocomplete=\"one-time-code\", paste not blocked, passkey or password manager supported.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "3.3.7",
+              "name": "Redundant Entry",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/redundant-entry"
+            },
+            {
+              "source": "wcag22",
+              "id": "3.3.8",
+              "name": "Accessible Authentication (Minimum)",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum"
+            }
+          ],
+          "hints": {
+            "mobile_android": "OTP fields allow paste and autofill (SMS retriever, contentType); login supports password managers and biometrics; do not ask for the same address twice in checkout.",
+            "mobile_ios": ".textContentType(.oneTimeCode) and password autofill; biometrics offered; paste not blocked.",
+            "web": "autocomplete=\"one-time-code\", paste not blocked, passkey or password manager supported."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-UND-07",
+          "name": "Consistent help",
+          "text": "When help, contact or support options (help screen, chat, phone, FAQ link) are offered on several screens, they MUST appear in the same relative place and order on each of them. Detect on the platform under review. Android: Help or support entry lives in one shared composable (top bar action, settings row, overflow menu) reused across screens, not re-placed per screen. iOS: Help or support entry comes from one shared toolbar item, tab or settings row reused across screens. Web: Help link, chat widget or contact entry comes from a shared header, footer or layout component, in the same position on every page.",
+          "level": "A",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "3.2.6",
+              "name": "Consistent Help",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/consistent-help"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Help or support entry lives in one shared composable (top bar action, settings row, overflow menu) reused across screens, not re-placed per screen.",
+            "mobile_ios": "Help or support entry comes from one shared toolbar item, tab or settings row reused across screens.",
+            "web": "Help link, chat widget or contact entry comes from a shared header, footer or layout component, in the same position on every page."
+          },
+          "description": "WCAG level A. Verifiable from mixed code."
+        }
+      ]
+    },
+    {
+      "name": "Robust",
+      "description": "UI components expose name, role, state, value, grouping and actions through the platform accessibility API so any assistive technology can interpret them.",
+      "source": "WCAG 2.2 principle 4, EN 301 549 clause 11.5",
+      "requirements": [
+        {
+          "id": "ACC-ROB-01",
+          "name": "Name, role, state and value",
+          "text": "Every UI component MUST expose a name, a role, its current state (checked, selected, expanded, disabled) and value through the platform accessibility API, and state changes MUST be notified. Detect on the platform under review. Android: clickable(role = Role.Button); toggleable and selectable instead of clickable plus manual state; semantics { role = Role.Tab; selected = ... ; stateDescription = ... }; expand and collapse actions on expandable items; custom Canvas or pointerInput components declare semantics. iOS: .accessibilityAddTraits(.isButton, .isSelected, .isToggle), .accessibilityValue for sliders and toggles; UIKit accessibilityTraits and accessibilityValue on custom controls. Web: Native elements first; otherwise role plus aria-checked, aria-selected, aria-expanded, aria-disabled kept in sync.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "4.1.2",
+              "name": "Name, Role, Value",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.3",
+              "name": "Use of accessibility services",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.5",
+              "name": "Object information",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.7",
+              "name": "Values",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.16",
+              "name": "Modifications of states and properties",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.17",
+              "name": "Modifications of values and text",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "clickable(role = Role.Button); toggleable and selectable instead of clickable plus manual state; semantics { role = Role.Tab; selected = ... ; stateDescription = ... }; expand and collapse actions on expandable items; custom Canvas or pointerInput components declare semantics.",
+            "mobile_ios": ".accessibilityAddTraits(.isButton, .isSelected, .isToggle), .accessibilityValue for sliders and toggles; UIKit accessibilityTraits and accessibilityValue on custom controls.",
+            "web": "Native elements first; otherwise role plus aria-checked, aria-selected, aria-expanded, aria-disabled kept in sync."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-ROB-02",
+          "name": "Grouping and available actions",
+          "text": "Composite items such as cards and list rows MUST be exposed as one focusable element with a coherent description, and every action on the item MUST be available as an accessibility action rather than only via nested targets or gestures. Detect on the platform under review. Android: Modifier.semantics(mergeDescendants = true) on clickable cards; secondary actions (bookmark, share, play) as customActions = listOf(CustomAccessibilityAction(...)); no nested clickables inside a merged card without custom actions; clearAndSetSemantics must not drop needed children. iOS: .accessibilityElement(children: .combine) on cards with .accessibilityAction(named:) for secondary actions. Web: Card pattern with one primary link and labelled buttons; no click handlers on wrapper divs.",
+          "level": "A",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.3.1",
+              "name": "Info and Relationships",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.5.1",
+              "name": "Pointer Gestures",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/pointer-gestures"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.9",
+              "name": "Parent-child relationships",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.11",
+              "name": "List of available actions",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.12",
+              "name": "Execution of available actions",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Modifier.semantics(mergeDescendants = true) on clickable cards; secondary actions (bookmark, share, play) as customActions = listOf(CustomAccessibilityAction(...)); no nested clickables inside a merged card without custom actions; clearAndSetSemantics must not drop needed children.",
+            "mobile_ios": ".accessibilityElement(children: .combine) on cards with .accessibilityAction(named:) for secondary actions.",
+            "web": "Card pattern with one primary link and labelled buttons; no click handlers on wrapper divs."
+          },
+          "description": "WCAG level A. Verifiable from source code."
+        },
+        {
+          "id": "ACC-ROB-03",
+          "name": "Status messages",
+          "text": "Status changes that do not receive focus (loading finished, saved, result counts, offline, errors) MUST be announced through the platform live-region or announcement mechanism without moving focus and without repetition. Detect on the platform under review. Android: Modifier.semantics { liveRegion = LiveRegionMode.Polite } on the status Text; stateDescription for state; announceForAccessibility is deprecated on API 34 and only a last resort. Avoid live regions on frequently changing text. iOS: AccessibilityNotification.Announcement or UIAccessibility.post(.announcement) for transient status; accessibilityValue for persistent state. Web: aria-live=\"polite\" or role=\"status\" containers; role=\"alert\" only for errors.",
+          "level": "AA",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "4.1.3",
+              "name": "Status Messages",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/status-messages"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.15",
+              "name": "Change notification",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Modifier.semantics { liveRegion = LiveRegionMode.Polite } on the status Text; stateDescription for state; announceForAccessibility is deprecated on API 34 and only a last resort. Avoid live regions on frequently changing text.",
+            "mobile_ios": "AccessibilityNotification.Announcement or UIAccessibility.post(.announcement) for transient status; accessibilityValue for persistent state.",
+            "web": "aria-live=\"polite\" or role=\"status\" containers; role=\"alert\" only for errors."
+          },
+          "description": "WCAG level AA. Verifiable from source code."
+        },
+        {
+          "id": "ACC-ROB-04",
+          "name": "Hidden content",
+          "text": "Content that is visually hidden, off-screen or behind a modal MUST also be hidden from assistive technology, and content that is visible MUST be reachable. Detect on the platform under review. Android: Custom overlays and bottom sheets that are not Dialog windows hide the background with hideFromAccessibility() (formerly invisibleToUser); alpha 0 elements remain focusable and must be removed or hidden; collapsed content not left in the tree. iOS: .accessibilityHidden(true) for hidden layers; accessibilityViewIsModal on custom modals. Web: aria-modal or inert for backgrounds; display:none or visibility:hidden for hidden content, not opacity 0.",
+          "level": "A",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "wcag22",
+              "id": "1.3.2",
+              "name": "Meaningful Sequence",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/meaningful-sequence"
+            },
+            {
+              "source": "wcag22",
+              "id": "4.1.2",
+              "name": "Name, Role, Value",
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value"
+            },
+            {
+              "source": "en301549",
+              "id": "11.5.2.5",
+              "name": "Object information",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Custom overlays and bottom sheets that are not Dialog windows hide the background with hideFromAccessibility() (formerly invisibleToUser); alpha 0 elements remain focusable and must be removed or hidden; collapsed content not left in the tree.",
+            "mobile_ios": ".accessibilityHidden(true) for hidden layers; accessibilityViewIsModal on custom modals.",
+            "web": "aria-modal or inert for backgrounds; display:none or visibility:hidden for hidden content, not opacity 0."
+          },
+          "description": "WCAG level A. Verifiable from mixed code."
+        }
+      ]
+    },
+    {
+      "name": "Platform integration",
+      "description": "The product follows the operating system's accessibility preferences and can prove its accessibility through automated checks.",
+      "source": "EN 301 549 clauses 5.2 and 11.7",
+      "requirements": [
+        {
+          "id": "ACC-PLT-01",
+          "name": "Respect platform preferences",
+          "text": "The product MUST follow the platform settings for font size, bold text, display size, high contrast, colour inversion, reduce motion and reduce transparency, and MUST NOT override them with its own defaults. Detect on the platform under review. Android: Flag CompositionLocalProvider(LocalDensity provides Density(..., fontScale = 1f)) or any Configuration override that pins fontScale or density; respect LocalAccessibilityManager and touch exploration state. iOS: Flag hard caps on dynamicTypeSize for essential text, ignoring isBoldTextEnabled, isDarkerSystemColorsEnabled or reduce transparency. Web: Respect browser zoom and prefers-contrast, prefers-reduced-motion, prefers-color-scheme.",
+          "level": "EN",
+          "verifiability": "source",
+          "refs": [
+            {
+              "source": "en301549",
+              "id": "11.7",
+              "name": "User preferences",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            },
+            {
+              "source": "en301549",
+              "id": "5.2",
+              "name": "Activation of accessibility features",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Flag CompositionLocalProvider(LocalDensity provides Density(..., fontScale = 1f)) or any Configuration override that pins fontScale or density; respect LocalAccessibilityManager and touch exploration state.",
+            "mobile_ios": "Flag hard caps on dynamicTypeSize for essential text, ignoring isBoldTextEnabled, isDarkerSystemColorsEnabled or reduce transparency.",
+            "web": "Respect browser zoom and prefers-contrast, prefers-reduced-motion, prefers-color-scheme."
+          },
+          "description": "EN 301 549 only. Verifiable from source code."
+        },
+        {
+          "id": "ACC-PLT-02",
+          "name": "Accessibility features reachable",
+          "text": "Accessibility-related settings inside the product (text size, captions, autoplay, contrast) MUST be reachable and operable with assistive technology and MUST NOT require the ability they compensate for. Detect on the platform under review. Android: Settings and onboarding screens that host these toggles pass the other criteria; a text-size setting is not itself rendered in unscalable text. iOS: Same: settings screens fully accessible; caption toggles not hidden behind gestures. Web: Same: settings reachable by keyboard and screen reader.",
+          "level": "EN",
+          "verifiability": "mixed",
+          "refs": [
+            {
+              "source": "en301549",
+              "id": "5.2",
+              "name": "Activation of accessibility features",
+              "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+            }
+          ],
+          "hints": {
+            "mobile_android": "Settings and onboarding screens that host these toggles pass the other criteria; a text-size setting is not itself rendered in unscalable text.",
+            "mobile_ios": "Same: settings screens fully accessible; caption toggles not hidden behind gestures.",
+            "web": "Same: settings reachable by keyboard and screen reader."
+          },
+          "description": "EN 301 549 only. Verifiable from mixed code."
+        },
+        {
+          "id": "ACC-PLT-03",
+          "name": "Accessibility verification in tests",
+          "text": "The project MUST include automated accessibility verification (semantics assertions, accessibility test framework checks, large-font previews or screenshot tests) so regressions are caught before release. Detect on the platform under review. Android: Compose UI tests call enableAccessibilityChecks(); Espresso uses AccessibilityChecks.enable(); semantics assertions (assertContentDescriptionEquals, assertIsSelected, heading); @Preview(fontScale = 2f) or screenshot tests at large font. iOS: XCUIApplication().performAccessibilityAudit() in UI tests; snapshot tests at accessibility Dynamic Type sizes. Web: axe-core or jest-axe in component tests; Lighthouse or Playwright accessibility scans in CI.",
+          "level": "EN",
+          "verifiability": "source",
+          "refs": [],
+          "hints": {
+            "mobile_android": "Compose UI tests call enableAccessibilityChecks(); Espresso uses AccessibilityChecks.enable(); semantics assertions (assertContentDescriptionEquals, assertIsSelected, heading); @Preview(fontScale = 2f) or screenshot tests at large font.",
+            "mobile_ios": "XCUIApplication().performAccessibilityAudit() in UI tests; snapshot tests at accessibility Dynamic Type sizes.",
+            "web": "axe-core or jest-axe in component tests; Lighthouse or Playwright accessibility scans in CI."
+          },
+          "description": "EN 301 549 only. Verifiable from source code."
+        }
+      ]
+    }
+  ]
+}

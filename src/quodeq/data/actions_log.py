@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterator
+from typing import Iterable, Iterator
 
 from quodeq.core.events.models import EVENT_MODEL_MAP, BaseEvent, EventType
-from quodeq.data.events.codec import event_from_dict, event_to_json
+from quodeq.data.events.codec import event_from_dict
+from quodeq.data.jsonl_append import JsonlAppendMixin
 from quodeq.data.locking import get_file_lock
 
 
@@ -22,7 +22,7 @@ _logger = logging.getLogger(__name__)
 ACTIONS_LOG_FILENAME = "actions.jsonl"
 
 
-class ActionLogWriter:
+class ActionLogWriter(JsonlAppendMixin):
     """Thread-safe append-only writer for project_dir/actions.jsonl."""
 
     def __init__(self, project_dir: Path) -> None:
@@ -30,34 +30,49 @@ class ActionLogWriter:
         self.log_path = project_dir / ACTIONS_LOG_FILENAME
         project_dir.mkdir(parents=True, exist_ok=True)
         self._lock = get_file_lock()
+        self._logger = _logger
 
-    def emit(self, event: BaseEvent) -> None:
-        """Append one action event. Raises if the write fails; nothing is buffered."""
-        self._append([event], str(event.event_type))
+    def _emit_what(self, event: BaseEvent) -> str:
+        return str(event.event_type)
 
-    def emit_many(self, events: Iterable[BaseEvent]) -> None:
-        """Append every event under one open, one lock and one flush.
 
-        The batch is serialized before the log is opened, so a bad event
-        leaves the file untouched. An empty batch opens nothing.
-        """
-        batch = list(events)
-        if batch:
-            self._append(batch, f"{len(batch)} events")
+def _timestamp_key(line: str) -> tuple[int, str]:
+    """Sort key for a raw actions-log JSON line: timestamped lines first,
+    ordered by timestamp; anything unparseable or missing a timestamp
+    sorts last, in original order."""
+    try:
+        ts = json.loads(line).get("timestamp")
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return (1, "")
+    if not ts:
+        return (1, "")
+    return (0, str(ts))
 
-    def _append(self, events: list[BaseEvent], what: str) -> None:
-        try:
-            lines = [event_to_json(event) + "\n" for event in events]
-            with open(self.log_path, mode="a", encoding="utf-8") as f:
-                self._lock.acquire(f)
-                try:
-                    f.writelines(lines)
-                    f.flush()
-                finally:
-                    self._lock.release(f)
-        except Exception as e:
-            _logger.error("Failed to emit %s to %s: %s", what, self.log_path, e)
-            raise
+
+def merge_action_log_files(dst: Path, srcs: Iterable[Path]) -> None:
+    """Union-merge *srcs* actions.jsonl files into *dst*, deduped and sorted.
+
+    Missing sources are skipped. Nothing is written when the union is empty
+    (a caller staging a project with no actions log at all must not create
+    one). Raises ``ValueError`` (a plain ``UnicodeDecodeError``) if any
+    source is not valid UTF-8 -- callers that need a user-facing error
+    (rather than a raw decode error) catch this themselves.
+    """
+    seen: set[str] = set()
+    lines: list[str] = []
+    for source in srcs:
+        if not source.exists():
+            continue
+        for raw in source.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if line and line not in seen:
+                seen.add(line)
+                lines.append(line)
+    if not lines:
+        return
+    lines.sort(key=_timestamp_key)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def read_action_events(project_dir: Path, *, from_offset: int = 0) -> Iterator[BaseEvent]:
@@ -83,6 +98,9 @@ def read_action_events(project_dir: Path, *, from_offset: int = 0) -> Iterator[B
                 continue
             try:
                 data = json.loads(line)
+                if not isinstance(data, dict):
+                    _logger.warning("Skipping non-object actions.jsonl line")
+                    continue
                 event_type = EventType(data["event_type"])
                 model_cls = EVENT_MODEL_MAP[event_type]
                 yield event_from_dict(model_cls, data)

@@ -1,4 +1,5 @@
 import { t } from '../../strings/index.js';
+import { GRANULARITY } from '../../utils/granularity.js';
 /**
  * PeriodSelect — terminal-styled granularity selector for the score-history
  * chart. A native <select> (keyboard + a11y for free) re-skinned to the mono
@@ -17,9 +18,9 @@ export default function PeriodSelect({ value, onChange }) {
         onChange={(e) => onChange?.(e.target.value)}
         aria-label={t('common.groupHistoryBy')}
       >
-        <option value="day">{t('common.periodDay')}</option>
-        <option value="week">{t('common.periodWeek')}</option>
-        <option value="month">{t('common.periodMonth')}</option>
+        <option value={GRANULARITY.DAY}>{t('common.periodDay')}</option>
+        <option value={GRANULARITY.WEEK}>{t('common.periodWeek')}</option>
+        <option value={GRANULARITY.MONTH}>{t('common.periodMonth')}</option>
       </select>
       <span className="term-period-select__caret" aria-hidden="true">▾</span>
     </span>

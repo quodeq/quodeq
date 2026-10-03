@@ -36,6 +36,16 @@ test('parseReport keys are repo-relative and pair-sorted', () => {
   assert.deepEqual(clones.map((c) => c.key), ['a.py:1-5|b.py:9-13']);
 });
 
+test('parseReport maps absolute names (jscpd --absolute) to repo-relative keys', () => {
+  const root = path.resolve('/repo');
+  const clones = parseReport(
+    payload([path.join(root, 'src', 'a.py'), 1, 5, path.join(root, 'src', 'b.py'), 9, 13]),
+    path.join(root, 'ui'),
+    root,
+  );
+  assert.deepEqual(clones.map((c) => c.key), ['src/a.py:1-5|src/b.py:9-13']);
+});
+
 test('parseReport key is pair-order independent', () => {
   const forward = parseReport(payload(['../a.py', 1, 5, '../b.py', 9, 13]), '/repo/ui', '/repo');
   const reversed = parseReport(payload(['../b.py', 9, 13, '../a.py', 1, 5]), '/repo/ui', '/repo');

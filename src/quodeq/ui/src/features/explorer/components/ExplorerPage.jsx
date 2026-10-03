@@ -5,18 +5,34 @@ import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import DeferredMount from '../../../components/DeferredMount.jsx';
+import CardListSkeleton from '../../../components/CardListSkeleton.jsx';
 import PrinciplesCardsRow from './PrinciplesCardsRow.jsx';
 import ExplorerStatsPanel from './ExplorerStatsPanel.jsx';
 import ExplorerRadialPanel from './ExplorerRadialPanel.jsx';
 import { useExplorerPageSpecs } from './useExplorerPageSpecs.jsx';
 import { buildRadialPrinciples, buildEnrichedPrinciples } from './explorerPrincipleView.js';
 import { t } from '../../../strings/index.js';
-import { PROJECT_SOURCE } from '../../../constants.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
+import { HERO_CARD_KIND } from '../../dashboard/dashboardVocab.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
+import { HELP_SECTION } from '../../../vocab/helpSection.js';
+import { buildHeadline, chipDeltas, dimensionHeadlineInput, sinceBaselineFor, sumSinceBaseline } from '../../dashboard/headlineStats.js';
 
 /** Empty/loading/error states, checked in order — extracted so the main
- * render stays a single happy-path return. */
-function explorerPageStatus(d) {
-  if (d.loading) return <LoadingScreen />;
+ * render stays a single happy-path return. The loading state keeps the
+ * page frame (header with the dimension name) and puts the loader inline,
+ * so the navigation paints as this page, not as a blank screen. */
+function explorerPageStatus(d, dimension) {
+  if (d.loading) {
+    return (
+      <div className="explorer-page">
+        <TermHeader name={String(dimension || '').toLowerCase()} />
+        <LoadingScreen variant="inline" />
+      </div>
+    );
+  }
   if (d.error) return <div className="inline-error">{t('explorer.loadFailed')}</div>;
   if (d.waiting) {
     // 202 from the backend: the run exists but this dimension's report
@@ -55,7 +71,22 @@ function useExplorerPageData({ project, dimension, runId, dateLabel, refreshSign
     [d.evalData, d.complianceByPrinciple, project, activeRunId, activeDateLabel]
   );
 
-  return { d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel, buildEvalPrincipal };
+  // Both builds walk every violation and compliance item; they only depend
+  // on the fetched data, not on granularity or the selected history bar.
+  const { evalData, allViolations, complianceByPrinciple, principleGrades } = d;
+  const dimFile = useMemo(
+    () => (evalData ? buildDimensionRootFile(evalData, allViolations, complianceByPrinciple) : null),
+    [evalData, allViolations, complianceByPrinciple],
+  );
+  const principleViews = useMemo(() => ({
+    radialPrinciples: buildRadialPrinciples(principleGrades),
+    enrichedPrinciples: buildEnrichedPrinciples(principleGrades, allViolations, complianceByPrinciple),
+  }), [principleGrades, allViolations, complianceByPrinciple]);
+
+  return {
+    d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel,
+    buildEvalPrincipal, dimFile, principleViews,
+  };
 }
 
 /**
@@ -65,19 +96,22 @@ function useExplorerPageData({ project, dimension, runId, dateLabel, refreshSign
  * file opened from a cross-project explorer dismisses into ITS project,
  * not the global selection.
  */
-function buildExplorerCardNavigation({ d, onNavigate, project, activeRunId, activeDateLabel, sourceTab }) {
+function buildDimensionRootFile(evalData, allViolations, complianceByPrinciple) {
   const allCompliance = [];
-  if (d.complianceByPrinciple) {
-    for (const items of d.complianceByPrinciple.values()) allCompliance.push(...items);
+  if (complianceByPrinciple) {
+    for (const items of complianceByPrinciple.values()) allCompliance.push(...items);
   }
-  const dimFile = buildProjectRootFile(
-    [{ dimension: d.evalData.dimension, violations: d.allViolations, compliance: allCompliance }],
-    d.evalData.dimension,
+  return buildProjectRootFile(
+    [{ dimension: evalData.dimension, violations: allViolations, compliance: allCompliance }],
+    evalData.dimension,
   );
+}
+
+function buildExplorerCardNavigation({ dimFile, onNavigate, project, activeRunId, activeDateLabel, sourceTab }) {
   const handleCardNavigate = (kind) => {
     if (!onNavigate) return;
-    const severityFilter = kind === 'violations' ? 'all' : kind;
-    onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project });
+    const severityFilter = kind === HERO_CARD_KIND.VIOLATIONS ? SEVERITY_FILTER_ALL : kind;
+    onNavigate(NAV_TAB.FILE, { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project });
   };
   const onSeverityBadge = (level) => () => handleCardNavigate(level);
   return { handleCardNavigate, onSeverityBadge };
@@ -86,7 +120,7 @@ function buildExplorerCardNavigation({ d, onNavigate, project, activeRunId, acti
 /** Top grid: the stats panel (score/violations/compliance/history) plus
  * the principles radial. */
 function ExplorerTopGrid({
-  overallScoreNum, d, onSeverityBadge, onNavigate, handleCardNavigate, trend, granularity,
+  overallScoreNum, d, sinceBaseline, onSeverityBadge, onNavigate, handleCardNavigate, trend, granularity,
   onGranularityChange, setActiveRunId, setActiveDateLabel, activeRunId, radialPrinciples, onPrincipleClick,
 }) {
   return (
@@ -97,6 +131,8 @@ function ExplorerTopGrid({
         allViolations={d.allViolations}
         totalCompliant={d.totalCompliant}
         sev={d.severityCounts}
+        deltas={chipDeltas(sinceBaseline ? sumSinceBaseline({ entry: sinceBaseline }) : null)}
+        density={buildHeadline([dimensionHeadlineInput(d.allViolations, d.severityCounts, d.evalData)]).density}
         onSeverityBadge={onSeverityBadge}
         onNavigate={onNavigate}
         onCardNavigate={handleCardNavigate}
@@ -121,39 +157,46 @@ function ExplorerPageBody({
   isRefreshing, dim, standardDescription, activeDateLabel, activeRunId, overallScoreNum, d,
   onSeverityBadge, onNavigate, handleCardNavigate, trend, granularity, onGranularityChange,
   setActiveRunId, setActiveDateLabel, radialPrinciples, onPrincipleClick, enrichedPrinciples,
-  sourceTab, project,
+  sourceTab, project, sinceBaseline,
 }) {
   return (
-    <div className={`explorer-page dashboard-fade${isRefreshing ? ' dashboard-refreshing' : ''}`}>
-      <TermHeader name={dim} description={standardDescription} sub={activeDateLabel || activeRunId || null} />
+    <div className={`explorer-page dashboard-fade${isRefreshing ? ' section-pending' : ''}`}>
+      <TermHeader
+        name={dim} description={standardDescription} sub={activeDateLabel || activeRunId || null}
+        learnMore={onNavigate ? { label: t('helpHint.learnMore'), onClick: () => onNavigate(NAV_TAB.HELP, { section: HELP_SECTION.WHY_THIS_GRADE, dimension: dim }) } : undefined}
+      />
 
       <ExplorerTopGrid
-        overallScoreNum={overallScoreNum} d={d} onSeverityBadge={onSeverityBadge} onNavigate={onNavigate}
+        overallScoreNum={overallScoreNum} d={d} sinceBaseline={sinceBaseline} onSeverityBadge={onSeverityBadge} onNavigate={onNavigate}
         handleCardNavigate={handleCardNavigate} trend={trend} granularity={granularity}
         onGranularityChange={onGranularityChange} setActiveRunId={setActiveRunId} setActiveDateLabel={setActiveDateLabel}
         activeRunId={activeRunId} radialPrinciples={radialPrinciples} onPrincipleClick={onPrincipleClick}
       />
 
-      <section className="qd-cards-panel" aria-label={t('explorer.principlesAria')}>
-        <div className="qd-cards-panel__head">
-          <SectionLabel>{t('explorer.principlesLabel')} · {radialPrinciples.length}</SectionLabel>
-        </div>
-        <PrinciplesCardsRow
-          principles={enrichedPrinciples}
-          onPrincipleClick={onPrincipleClick}
-        />
-      </section>
+      {/* Header and the top grid paint first; the card row and the files
+          table are the heavy part and follow in the next commit. */}
+      <DeferredMount fallback={<CardListSkeleton />}>
+        <section className="qd-cards-panel" aria-label={t('explorer.principlesAria')}>
+          <div className="qd-cards-panel__head">
+            <SectionLabel>{t('explorer.principlesLabel')} · {radialPrinciples.length}</SectionLabel>
+          </div>
+          <PrinciplesCardsRow
+            principles={enrichedPrinciples}
+            onPrincipleClick={onPrincipleClick}
+          />
+        </section>
 
-      <section className="qd-cards-panel offending-panel" aria-label={t('overview.violationsByFileAria')}>
-        <div className="qd-cards-panel__head">
-          <SectionLabel>{t('overview.violationsByFileLabel')} · {d.topFiles.length}</SectionLabel>
-          <span className="run-history-panel__stats">{t('overview.sortedBySeverity')}</span>
-        </div>
-        <TopOffendingFilesTable
-          files={d.topFiles}
-          onFileClick={(f) => onNavigate?.('file', { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project })}
-        />
-      </section>
+        <section className="qd-cards-panel offending-panel" aria-label={t('overview.violationsByFileAria')}>
+          <div className="qd-cards-panel__head">
+            <SectionLabel>{t('overview.violationsByFileLabel')} · {d.topFiles.length}</SectionLabel>
+            <span className="run-history-panel__stats">{t('overview.sortedBySeverity')}</span>
+          </div>
+          <TopOffendingFilesTable
+            files={d.topFiles}
+            onFileClick={(f) => onNavigate?.(NAV_TAB.FILE, { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project })}
+          />
+        </section>
+      </DeferredMount>
     </div>
   );
 }
@@ -162,14 +205,14 @@ function ExplorerPageBody({
  * radial/enriched principle views, the principle-click handler, score,
  * refreshing flag). Thread sourceTab through onPrincipleClick: without it a
  * principle click from a Violations-tab drill-in falls back to the
- * Overview tab, force-remounting the whole content subtree (App.jsx keys
- * it on activeTab) and jumping the sidebar highlight. */
-function buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal) {
+ * Overview tab, swapping the whole page for the Overview and jumping the
+ * sidebar highlight. */
+function buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal, principleViews) {
   return {
     dim: String(d.evalData.dimension || '').toLowerCase(),
-    radialPrinciples: buildRadialPrinciples(d.principleGrades),
-    enrichedPrinciples: buildEnrichedPrinciples(d.principleGrades, d.allViolations, d.complianceByPrinciple),
-    onPrincipleClick: (name) => onNavigate?.('evalprinciple', { evalPrincipal: buildEvalPrincipal(name), sourceTab }),
+    radialPrinciples: principleViews.radialPrinciples,
+    enrichedPrinciples: principleViews.enrichedPrinciples,
+    onPrincipleClick: (name) => onNavigate?.(NAV_TAB.EVAL_PRINCIPLE, { evalPrincipal: buildEvalPrincipal(name), sourceTab }),
     overallScoreNum: parseFloat(d.overallGrade?.score),
     isRefreshing: d.isFetching && !!d.evalData,
   };
@@ -187,25 +230,29 @@ export default function ExplorerPage({
   trend = [],
   granularity = 'day',
   onGranularityChange,
+  sinceBaseline,
+  sinceBaselineRunId,
 }) {
-  const { d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel, buildEvalPrincipal } =
-    useExplorerPageData({ project, dimension, runId, dateLabel, refreshSignal, selectedSource });
+  const {
+    d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel,
+    buildEvalPrincipal, dimFile, principleViews,
+  } = useExplorerPageData({ project, dimension, runId, dateLabel, refreshSignal, selectedSource });
 
   useExplorerPageSpecs({
     evalData: d.evalData, principleGrades: d.principleGrades, allViolations: d.allViolations,
     overallGrade: d.overallGrade, activeDateLabel, activeRunId,
   });
 
-  const status = explorerPageStatus(d);
+  const status = explorerPageStatus(d, dimension);
   if (status) return status;
 
   const { handleCardNavigate, onSeverityBadge } = buildExplorerCardNavigation({
-    d, onNavigate, project, activeRunId, activeDateLabel, sourceTab,
+    dimFile, onNavigate, project, activeRunId, activeDateLabel, sourceTab,
   });
 
   const {
     dim, radialPrinciples, enrichedPrinciples, onPrincipleClick, overallScoreNum, isRefreshing,
-  } = buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal);
+  } = buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal, principleViews);
 
   return (
     <ExplorerPageBody
@@ -216,6 +263,7 @@ export default function ExplorerPage({
       setActiveRunId={setActiveRunId} setActiveDateLabel={setActiveDateLabel}
       radialPrinciples={radialPrinciples} onPrincipleClick={onPrincipleClick} enrichedPrinciples={enrichedPrinciples}
       sourceTab={sourceTab} project={project}
+      sinceBaseline={sinceBaselineFor(sinceBaseline, dim, { runId: activeRunId, baselineRunId: sinceBaselineRunId })}
     />
   );
 }

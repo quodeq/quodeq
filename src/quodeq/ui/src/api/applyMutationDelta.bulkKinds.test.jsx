@@ -50,6 +50,14 @@ function securityDim() {
   };
 }
 
+// The run page's overview dashboard dimension: counts, no lists.
+function overviewDim() {
+  const { violations, ...rest } = securityDim();
+  return rest;
+}
+
+const overviewKey = (run) => projectKeys.dashboard(PROJECT, run, "local");
+
 function maintainabilityDim() {
   return {
     dimension: "maintainability",
@@ -78,18 +86,19 @@ describe("applyMutationDelta — restore/delete/bulk kinds (slice 2)", () => {
     );
   }
 
-  for (const kind of ["restore", "delete", "restore_all", "delete_all"]) {
-    it(`${kind}: patches dashboard dim score`, () => {
+  for (const kind of ["restore", "delete", "restore_all", "delete_all", "dismiss_many"]) {
+    it(`${kind}: patches the overview dashboard dim score and totals`, () => {
       const { client, store } = makeClient();
-      const key = projectKeys.dashboard(PROJECT, RUN);
-      seedDashboard(store, key, [securityDim(), maintainabilityDim()]);
+      const key = overviewKey(RUN);
+      seedDashboard(store, key, [overviewDim(), maintainabilityDim()]);
+      const totals = { violationCount: 1, severity: { critical: 0, major: 1, minor: 0 } };
 
       applyMutationDelta(client, PROJECT, {
         kind,
         runId: RUN,
         isLatest: false,
         accumulated: null,
-        dimensions: [{ dimension: "security", overallScore: "6.5", overallGrade: "B" }],
+        dimensions: [{ dimension: "security", overallScore: "6.5", overallGrade: "B", totals }],
       });
 
       const sec = store
@@ -97,6 +106,7 @@ describe("applyMutationDelta — restore/delete/bulk kinds (slice 2)", () => {
         .dimensions.find((d) => d.dimension === "security");
       expect(sec.overallScore).toBe("6.5");
       expect(sec.overallGrade).toBe("B");
+      expect(sec.totals).toEqual(totals);
     });
 
     it(`${kind}: patches per-run scores dim score`, () => {
@@ -122,9 +132,9 @@ describe("applyMutationDelta — restore/delete/bulk kinds (slice 2)", () => {
 
     it(`${kind}: INVALIDATES the run-detail violation source (does not splice)`, () => {
       const { client, store, invalidateQueries } = makeClient();
-      const dashKey = projectKeys.dashboard(PROJECT, RUN);
+      const findingsKey = projectKeys.runScores(PROJECT, RUN);
       const scoresKey = projectKeys.scores(PROJECT, RUN);
-      seedDashboard(store, dashKey, [securityDim()]);
+      seedDashboard(store, findingsKey, [securityDim()]);
       store.set(JSON.stringify(scoresKey), {
         dimensions: [{ dimension: "security", overallScore: "5.0", overallGrade: "C" }],
         summary: {},
@@ -138,14 +148,14 @@ describe("applyMutationDelta — restore/delete/bulk kinds (slice 2)", () => {
         dimensions: [],
       });
 
-      // Both the dashboard and per-run scores violation sources are invalidated
-      // with refetchType:"none" so lists refetch on next view.
-      expect(invalidatedNoRefetch(invalidateQueries, dashKey)).toBe(true);
+      // Both the run findings and per-run scores violation sources are
+      // invalidated with refetchType:"none" so lists refetch on next view.
+      expect(invalidatedNoRefetch(invalidateQueries, findingsKey)).toBe(true);
       expect(invalidatedNoRefetch(invalidateQueries, scoresKey)).toBe(true);
 
-      // The dashboard violation list is NOT spliced in place — both violations
+      // The run findings list is NOT spliced in place — both violations
       // remain until the refetch replaces them.
-      const sec = store.get(JSON.stringify(dashKey)).dimensions[0];
+      const sec = store.get(JSON.stringify(findingsKey)).dimensions[0];
       expect(sec.violations).toHaveLength(2);
     });
 
@@ -207,7 +217,7 @@ describe("applyMutationDelta — restore/delete/bulk kinds (slice 2)", () => {
 
   it("dismiss still SPLICES the violation (regression, not invalidate)", () => {
     const { client, store, invalidateQueries } = makeClient();
-    const dashKey = projectKeys.dashboard(PROJECT, RUN);
+    const dashKey = projectKeys.runScores(PROJECT, RUN);
     seedDashboard(store, dashKey, [securityDim()]);
 
     applyMutationDelta(client, PROJECT, {
@@ -223,7 +233,7 @@ describe("applyMutationDelta — restore/delete/bulk kinds (slice 2)", () => {
     // Spliced in place, not left for a refetch.
     expect(sec.violations.map((v) => v.req)).toEqual(["R2"]);
     expect(sec.totals.violationCount).toBe(1);
-    // dismiss must NOT invalidate the dashboard violation source.
+    // dismiss must NOT invalidate the run findings source.
     const dashInvalidated = invalidateQueries.mock.calls.some(
       ([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(dashKey),
     );

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.shared.constants import GIT_DIR_NAME
 
 _MAX_FILE_BYTES = 65_536
 _MAX_DIR_ENTRIES = 500
@@ -12,7 +13,7 @@ _DENY_BASENAMES = (".env", "id_rsa", "id_ed25519", ".netrc", ".npmrc", ".pypirc"
 _DENY_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".keystore")
 
 
-def _jail(ctx: ToolContext, rel_path: str) -> Path:
+def jail(ctx: ToolContext, rel_path: str) -> Path:
     root_path = ctx.worktree_dir or ctx.repo_root
     if root_path is None:
         raise ToolError(
@@ -28,13 +29,13 @@ def _jail(ctx: ToolContext, rel_path: str) -> Path:
     name = target.name.lower()
     if name.startswith(_DENY_BASENAMES) or name.endswith(_DENY_SUFFIXES):
         raise ToolError("path is on the secrets denylist")
-    if target.name.lower() == ".git" or ".git" in {p.name.lower() for p in target.parents}:
+    if target.name.lower() == GIT_DIR_NAME or GIT_DIR_NAME in {p.name.lower() for p in target.parents}:
         raise ToolError("path is inside the .git directory")
     return target
 
 
 def _read_repo_file(ctx: ToolContext, path: str) -> dict:
-    target = _jail(ctx, path)
+    target = jail(ctx, path)
     if not target.is_file():
         raise ToolError(f"not a file: {path}")
     with target.open("rb") as fh:
@@ -47,7 +48,7 @@ def _read_repo_file(ctx: ToolContext, path: str) -> dict:
 
 
 def _list_repo_dir(ctx: ToolContext, path: str = ".") -> dict:
-    target = _jail(ctx, path)
+    target = jail(ctx, path)
     if not target.is_dir():
         raise ToolError(f"not a directory: {path}")
     entries = []

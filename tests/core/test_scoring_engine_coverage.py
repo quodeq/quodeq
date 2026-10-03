@@ -3,7 +3,6 @@ from __future__ import annotations
 
 
 from quodeq.core.scoring.engine import (
-    confidence_label,
     grade_for_score,
     run_scoring,
     score_evidence,
@@ -32,23 +31,6 @@ class TestGradeForScore:
     def test_mid_score(self):
         grade = grade_for_score(5.0)
         assert isinstance(grade, str)
-
-
-# ---------------------------------------------------------------------------
-# confidence_label
-# ---------------------------------------------------------------------------
-
-class TestConfidenceLabel:
-    def test_known_labels(self):
-        assert confidence_label("low") == "Low"
-        assert confidence_label("medium") == "Medium"
-        assert confidence_label("high") == "High"
-
-    def test_unknown_label_passthrough(self):
-        assert confidence_label("custom") == "custom"
-
-    def test_empty_string(self):
-        assert confidence_label("") == ""
 
 
 # ---------------------------------------------------------------------------

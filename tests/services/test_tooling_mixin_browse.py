@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -213,6 +214,22 @@ class TestBrowseRepoUsesTheListingHelpers:
         FsToolingMixin().browse_repo(str(browse_tree), include_files=True)
 
         assert calls.count(browse_tree) == 1
+
+
+class TestListingHelpersSkipUnreadableEntries:
+    """A symlink loop must not abort the listing for its siblings."""
+    @pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges")
+    def test_symlink_loop_is_skipped_real_entries_still_listed(self, tmp_path: Path):
+        (tmp_path / "a").symlink_to(tmp_path / "b")
+        (tmp_path / "b").symlink_to(tmp_path / "a")
+        (tmp_path / "real_dir").mkdir()
+        (tmp_path / "real_file.txt").write_text("x")
+
+        dirs = FsToolingMixin._list_directories(tmp_path)
+        files = FsToolingMixin._list_files(tmp_path)
+
+        assert [d["name"] for d in dirs] == ["real_dir"]
+        assert [f["name"] for f in files] == ["real_file.txt"]
 
 
 class TestListingHelpersAcceptPreReadEntries:

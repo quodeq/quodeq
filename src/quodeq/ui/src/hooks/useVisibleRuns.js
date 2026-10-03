@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useRef } from 'react';
 import { readVisibleStandardIds } from '../utils/visibleStandards.js';
 import { bucketKey } from '../utils/dailyGrouping.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 /**
  * Filters dailyRuns to those where at least one visible standard dimension
@@ -33,7 +34,7 @@ export function useVisibleRuns(dailyRuns, dashboard, setSelectedRun, granularity
   useEffect(() => {
     // Only reset when the visible runs actually change content (not when transitioning through empty during project switch)
     if (prevRunIdsKeyRef.current !== visibleRunIdsKey && visibleRunIdsKey !== '' && prevRunIdsKeyRef.current !== '') {
-      setSelectedRun('latest');
+      setSelectedRun(LATEST_RUN_ID);
     }
     if (visibleRunIdsKey !== '') {
       prevRunIdsKeyRef.current = visibleRunIdsKey;

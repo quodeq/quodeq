@@ -1,7 +1,9 @@
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
+import { NoEvalsEmptyState } from '../../../components/ProjectEmptyStates.jsx';
 import { t } from '../../../strings/index.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 // These render only the *contents* of DashboardPage's `.dashboard-page` div
 // for each early-return branch -- never the `<>{null}<div className=...>`
@@ -11,7 +13,7 @@ import { t } from '../../../strings/index.js';
 // returns the Fragment directly, switching between them changes the react
 // element *type* at DashboardPage's own return position (component vs
 // Fragment), which makes React tear down and remount the whole subtree --
-// losing the `.dashboard-page` DOM node identity that P3-T2's frame-
+// losing the `.dashboard-page` DOM node identity that the frame-
 // stability tests assert on. The div's children can freely change type
 // across branches (that's normal reconciliation); only the div+Fragment
 // shell itself must stay put.
@@ -33,18 +35,7 @@ export function NoLocalProjectsSharedContent({ onNavigate }) {
       title={t('overview.noLocalProjectsTitle')}
       description={t('overview.noLocalProjectsDesc')}
       actionLabel={t('overview.browseRemote')}
-      onAction={() => onNavigate?.('projects')}
-    />
-  );
-}
-
-export function NoProjectsContent({ onNavigate }) {
-  return (
-    <EmptyState
-      title={t('overview.noProjectsTitle')}
-      description={t('overview.noProjectsDesc')}
-      actionLabel={t('overview.addProject')}
-      onAction={() => onNavigate?.('projects')}
+      onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
     />
   );
 }
@@ -55,7 +46,7 @@ export function NoProjectSelectedContent({ onNavigate }) {
       title={t('overview.noProjectSelectedTitle')}
       description={t('overview.noProjectSelectedDesc')}
       actionLabel={t('overview.chooseProject')}
-      onAction={() => onNavigate?.('projects')}
+      onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
     />
   );
 }
@@ -69,17 +60,6 @@ export function LoadingProjectContent({ projectName }) {
   );
 }
 
-export function LoadProjectFailedContent({ error, onRetry }) {
-  return (
-    <EmptyState
-      title={t('overview.loadProjectFailedTitle')}
-      description={error}
-      actionLabel={t('overview.retry')}
-      onAction={() => onRetry?.()}
-    />
-  );
-}
-
 // Covers both the settled no-runs state and a background refetch of an
 // empty project (isFetching true, dashboard still null -- previously a
 // visually blank .dashboard-page with no dim and no loader), plus the
@@ -90,12 +70,7 @@ export function NoRunsEmptyContent({ projectInfo, onComplete, projectName, onNav
   return (
     <>
       <IncompleteSetupCard projectInfo={projectInfo} onComplete={onComplete} />
-      <EmptyState
-        title={t('overview.noEvalsTitle')}
-        description={t('overview.noEvalsDesc', { name: projectName })}
-        actionLabel={t('overview.startEvaluation')}
-        onAction={() => onNavigate?.('evaluate')}
-      />
+      <NoEvalsEmptyState projectName={projectName} onNavigate={onNavigate} />
     </>
   );
 }

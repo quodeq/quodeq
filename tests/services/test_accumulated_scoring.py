@@ -1,7 +1,7 @@
 """Tests for quodeq.services.accumulated — scoring helpers.
 
 Split from test_accumulated.py: the coverage-0 stub exclusion,
-numeric_average, and _aggregate_severity_counts. Shared builders live in
+numeric_average, and aggregate_severity_counts. Shared builders live in
 tests/services/_accumulated_fixtures.py.
 """
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.types import DimensionResult
-from quodeq.services.accumulated import _aggregate_severity_counts, numeric_average
+from quodeq.services.accumulated import aggregate_severity_counts, numeric_average
 
 from tests.services._accumulated_fixtures import _dim
 
@@ -25,11 +25,11 @@ class TestZeroCoverageStubExcluded:
         return RunInfo(run_id=run_id, date_iso="2024-01-01", date_label="Jan 01")
 
     def test_zero_files_read_dim_falls_through_to_real_run(self):
-        from quodeq.services._accumulated_data import _read_all_run_data
+        from quodeq.services._accumulated_data import read_all_run_data
         stub = _dim("security", "9.9", "A", filesRead=0)   # coverage-0 stub, newest
         real = _dim("security", "6.0", "C", filesRead=5)   # real, older
         fetch = {"r2": [stub], "r1": [real]}
-        latest, _prev, _prev_run = _read_all_run_data(
+        latest, _prev, _prev_run = read_all_run_data(
             Path("/x"), "proj", [self._info("r2"), self._info("r1")],
             get_run_data=lambda rid: fetch[rid],
         )
@@ -37,10 +37,10 @@ class TestZeroCoverageStubExcluded:
 
     def test_missing_files_read_is_still_trusted(self):
         # Legacy evals carry no filesRead (None); those must stay valid.
-        from quodeq.services._accumulated_data import _read_all_run_data
+        from quodeq.services._accumulated_data import read_all_run_data
         legacy = _dim("security", "8.0", "A")  # no filesRead field
         fetch = {"r1": [legacy]}
-        latest, _p, _pr = _read_all_run_data(
+        latest, _p, _pr = read_all_run_data(
             Path("/x"), "proj", [self._info("r1")],
             get_run_data=lambda rid: fetch[rid],
         )
@@ -81,7 +81,7 @@ class TestAggregateSeverityCounts:
             _dim("a", totals={"violationCount": 3, "complianceCount": 5, "severity": {"critical": 1, "major": 1, "minor": 1}}),
             _dim("b", totals={"violationCount": 2, "complianceCount": 1, "severity": {"critical": 0, "major": 2, "minor": 0}}),
         ]
-        result = _aggregate_severity_counts(dims)
+        result = aggregate_severity_counts(dims)
         assert result["totalViolations"] == 5
         assert result["totalCompliance"] == 6
         assert result["critical"] == 1
@@ -90,10 +90,10 @@ class TestAggregateSeverityCounts:
 
     def test_handles_missing_totals(self):
         dims = [_dim("a")]
-        result = _aggregate_severity_counts(dims)
+        result = aggregate_severity_counts(dims)
         assert result["totalViolations"] == 0
 
     def test_empty_list(self):
-        result = _aggregate_severity_counts([])
+        result = aggregate_severity_counts([])
         assert result["totalViolations"] == 0
         assert result["critical"] == 0

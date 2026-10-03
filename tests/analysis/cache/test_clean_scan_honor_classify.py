@@ -47,7 +47,7 @@ class TestClassifyBypassReads:
 
 
 # Removed TestOrchestratorFastPathHonorsCleanScan: the orchestrator-level
-# _try_v2_full_hit no longer exists. After B6 the orchestrator delegates
+# _try_v2_full_hit no longer exists. Now the orchestrator delegates
 # to DimensionRunner.run which routes through process_dimension_with_cache,
 # and clean-scan honoring is verified at that layer (TestDispatchBypassesCacheOnCleanScan
 # in test_clean_scan_honor_dispatch.py).

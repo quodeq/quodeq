@@ -2,10 +2,10 @@
 from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
-from quodeq.analysis.run_types import RunConfig, AnalysisOptions, _AnalysisContext
-from quodeq.analysis._dimension_steps import _run_dimension_analysis
+from quodeq.analysis.run_types import RunConfig, AnalysisOptions, AnalysisContext
+from quodeq.analysis._dimension_steps import run_dimension_analysis
 from quodeq.analysis._config import AnalysisConfig
-from quodeq.analysis.subagents._pool_launcher import _default_subagent_model
+from quodeq.analysis.subagents._pool_launcher import default_subagent_model
 
 
 class TestAnalysisOptionsAiModel:
@@ -69,7 +69,7 @@ class TestBuildRunConfigAiModel:
 
 
 class TestDimensionAnalysisModel:
-    """_run_dimension_analysis should pass ai_model to AnalysisConfig."""
+    """run_dimension_analysis should pass ai_model to AnalysisConfig."""
 
     def test_passes_ai_model_to_analysis_config(self, tmp_path):
         config = RunConfig(
@@ -77,7 +77,7 @@ class TestDimensionAnalysisModel:
             language="python",
             options=AnalysisOptions(ai_model="qwen3.5:9b"),
         )
-        ctx = _AnalysisContext(
+        ctx = AnalysisContext(
             dimensions_data={},
             date_str="2026-04-03",
             template="",
@@ -87,7 +87,7 @@ class TestDimensionAnalysisModel:
 
         with patch("quodeq.analysis._dimension_steps.run_analysis") as mock_run:
             mock_run.return_value = None
-            _run_dimension_analysis(config, "security", "test prompt", 0, ctx)
+            run_dimension_analysis(config, "security", "test prompt", 0, ctx)
 
             # run_analysis is called as: run_analysis(work_dir=..., prompt=..., stream_file=..., config=AnalysisConfig(...))
             call_kwargs = mock_run.call_args
@@ -109,7 +109,7 @@ class TestDimensionAnalysisModel:
             language="python",
             options=AnalysisOptions(),
         )
-        ctx = _AnalysisContext(
+        ctx = AnalysisContext(
             dimensions_data={},
             date_str="2026-04-03",
             template="",
@@ -119,7 +119,7 @@ class TestDimensionAnalysisModel:
 
         with patch("quodeq.analysis._dimension_steps.run_analysis") as mock_run:
             mock_run.return_value = None
-            _run_dimension_analysis(config, "security", "test prompt", 0, ctx)
+            run_dimension_analysis(config, "security", "test prompt", 0, ctx)
 
             call_kwargs = mock_run.call_args
             analysis_config = call_kwargs.kwargs.get("config")
@@ -132,21 +132,101 @@ class TestDimensionAnalysisModel:
             assert analysis_config is not None
             assert analysis_config.ai_model is None
 
+    def test_fallback_carries_the_runs_drop_counter_and_mcp_registry(self, tmp_path):
+        """I1: the single-agent fallback (no source files found for the pool
+        queue) must still reach the run's owners, without run_config (that
+        would turn on the per-file API cache writer for this fallback)."""
+        config = RunConfig(src=tmp_path, language="python")
+        ctx = AnalysisContext(
+            dimensions_data={}, date_str="2026-04-03", template="",
+            subagent_template="", total=1,
+        )
+
+        with patch("quodeq.analysis._dimension_steps.run_analysis") as mock_run:
+            mock_run.return_value = None
+            run_dimension_analysis(config, "security", "test prompt", 0, ctx)
+
+            call_kwargs = mock_run.call_args
+            analysis_config = call_kwargs.kwargs.get("config")
+            if analysis_config is None:
+                for arg in call_kwargs.args:
+                    if isinstance(arg, AnalysisConfig):
+                        analysis_config = arg
+                        break
+
+        assert analysis_config is not None
+        assert analysis_config.drop_counter is config.drop_counter
+        assert analysis_config.mcp_registry is config.mcp_registry
+        assert analysis_config.run_config is None
+
 
 class TestSubagentModelEnvVar:
     """Subagent model env vars should be standardized."""
 
     def test_pool_launcher_reads_subagent_model(self):
         env = {"SUBAGENT_MODEL": "sonnet"}
-        assert _default_subagent_model(env=env) == "sonnet"
+        assert default_subagent_model(env=env) == "sonnet"
 
     def test_pool_launcher_falls_back_to_quodeq_prefix(self):
         env = {"QUODEQ_SUBAGENT_MODEL": "haiku"}
-        assert _default_subagent_model(env=env) == "haiku"
+        assert default_subagent_model(env=env) == "haiku"
 
     def test_pool_launcher_prefers_subagent_model(self):
         env = {"SUBAGENT_MODEL": "sonnet", "QUODEQ_SUBAGENT_MODEL": "haiku"}
-        assert _default_subagent_model(env=env) == "sonnet"
+        assert default_subagent_model(env=env) == "sonnet"
 
     def test_pool_launcher_returns_none_when_unset(self):
-        assert _default_subagent_model(env={}) is None
+        assert default_subagent_model(env={}) is None
+
+
+class TestCliRunSettingsReachTheDimensionConfig:
+    """The CLI resolves the command settings once per run (from the process
+    environment here, no injected env) and the single-agent dimension step
+    copies them onto the AnalysisConfig it spawns with."""
+
+    @staticmethod
+    def _dimension_config(tmp_path, run_config) -> AnalysisConfig:
+        ctx = AnalysisContext(
+            dimensions_data={}, date_str="2026-04-03", template="", subagent_template="", total=1,
+        )
+        with patch("quodeq.analysis._dimension_steps.run_analysis") as mock_run:
+            run_dimension_analysis(run_config, "security", "test prompt", 0, ctx)
+        return mock_run.call_args.kwargs["config"]
+
+    def test_ai_cmd_binary_override_and_cache_root(self, tmp_path, monkeypatch):
+        from quodeq.cli import build_run_config
+
+        monkeypatch.setenv("AI_CMD", "codex")
+        monkeypatch.setenv("AI_CMD_PATH", "/opt/bin/codex-wrapper")
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "root"))
+        args = TestBuildRunConfigAiModel._make_args()
+        run_config = build_run_config(
+            args, inputs=TestBuildRunConfigAiModel._make_inputs(tmp_path), evidence_dir=tmp_path,
+        )
+        # Read once per run: a later change to the process env is not seen.
+        monkeypatch.setenv("AI_CMD", "gemini")
+        monkeypatch.setenv("AI_CMD_PATH", "/elsewhere")
+        ac = self._dimension_config(tmp_path, run_config)
+        assert ac.ai_cmd == "codex"
+        assert ac.ai_cmd_path == "/opt/bin/codex-wrapper"
+        assert ac.cache_root == tmp_path / "root" / "results"
+
+    def test_single_agent_ceilings_come_from_the_run(self, tmp_path, monkeypatch):
+        from quodeq.cli import build_run_config
+
+        monkeypatch.setenv("QUODEQ_DEFAULT_MAX_TURNS", "42")
+        monkeypatch.setenv("QUODEQ_DEFAULT_MAX_DURATION", "77")
+        inputs = TestBuildRunConfigAiModel._make_inputs(tmp_path)
+        run_config = build_run_config(
+            TestBuildRunConfigAiModel._make_args(), inputs=inputs, evidence_dir=tmp_path,
+        )
+        monkeypatch.setenv("QUODEQ_DEFAULT_MAX_TURNS", "5")
+        ac = self._dimension_config(tmp_path, run_config)
+        assert (ac.max_turns, ac.max_duration) == (42, 77)
+
+        explicit = build_run_config(
+            TestBuildRunConfigAiModel._make_args(max_turns=10, max_duration=300),
+            inputs=inputs, evidence_dir=tmp_path,
+        )
+        ac = self._dimension_config(tmp_path, explicit)
+        assert (ac.max_turns, ac.max_duration) == (10, 300)

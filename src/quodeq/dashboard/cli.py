@@ -8,8 +8,9 @@ from pathlib import Path
 
 from quodeq.shared.utils import get_evaluations_dir, get_static_dist
 from quodeq.shared.env import get_dashboard_port
+from quodeq.shared.fault_isolation import run_isolated
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
-from ._build import _static_dir
+from ._build import default_static_dir
 
 
 def _default_static_dist() -> str:
@@ -17,7 +18,12 @@ def _default_static_dist() -> str:
     bundled = get_static_dist()
     if bundled:
         return bundled
-    return str(_static_dir())
+    return str(default_static_dir())
+
+
+def _help_default(value: object) -> str:
+    """A default for a help string; argparse %-formats help, so escape %."""
+    return str(value).replace("%", "%%")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,10 +31,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="quodeq dashboard")
     parser.add_argument("--port", type=int, default=get_dashboard_port(),
                         help="Port to run the dashboard server on (default: %(default)s)")
-    parser.add_argument("--evaluations", default=get_evaluations_dir(),
-                        help="Directory containing evaluation reports (default: %(default)s)")
-    parser.add_argument("--static-dist", default=_default_static_dist(),
-                        help="Path to the built UI static files (default: %(default)s)")
+    parser.add_argument("--evaluations", default=None,
+                        help="Directory containing evaluation reports "
+                             f"(default: {_help_default(get_evaluations_dir())})")
+    parser.add_argument("--static-dist", default=None,
+                        help="Path to the built UI static files "
+                             f"(default: {_help_default(_default_static_dist())})")
     parser.add_argument("--repo-root", default=".",
                         help="Root directory of the repository being evaluated (default: %(default)s)")
     parser.add_argument("--api-host", default=None,
@@ -54,10 +62,9 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
     """Parse CLI arguments and return a DashboardConfig."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    raw_argv = argv if argv is not None else sys.argv[1:]
-    reports_defaulted = "--evaluations" not in raw_argv
-    static_dist_defaulted = "--static-dist" not in raw_argv
-    api_forced = "--api-host" in raw_argv or "--api-port" in raw_argv
+    reports_defaulted = args.evaluations is None
+    static_dist_defaulted = args.static_dist is None
+    api_forced = args.api_host is not None or args.api_port is not None
     return DashboardConfig(
         server=ServerConfig(
             port=args.port,
@@ -73,19 +80,24 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
             use_native=not args.browser,
             verbose=args.verbose,
         ),
-        reports_dir=Path(args.evaluations),
-        static_dist=Path(args.static_dist),
+        reports_dir=Path(get_evaluations_dir() if reports_defaulted else args.evaluations),
+        static_dist=Path(_default_static_dist() if static_dist_defaulted else args.static_dist),
         repo_root=Path(args.repo_root),
         reports_defaulted=reports_defaulted,
         static_dist_defaulted=static_dist_defaulted,
     )
 
 
+class _StderrLog:
+    """Adapts ``sys.stderr`` to the ``Warns`` protocol ``run_isolated``
+    expects (this module has no stdlib logging of its own)."""
+
+    def warning(self, message: str) -> None:
+        print(f"Error: {message}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the dashboard command."""
-    config = parse_args(argv)
-    try:
-        return run_dashboard(config)
-    except Exception as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+    return run_isolated(
+        lambda: run_dashboard(parse_args(argv)), label="dashboard", log=_StderrLog(), on_error=lambda _exc: 1,
+    )

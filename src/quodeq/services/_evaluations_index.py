@@ -17,18 +17,19 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from quodeq.core.run.job_status import JOB_FINISHED, JobStatus, external_job_id, is_external_job_id, strip_external_prefix
 from quodeq.core.types.job import JobSnapshot
-from quodeq.data.sqlite import run_index as _run_index
-from quodeq.services._external_jobs import _sync_external_run
+from quodeq.services.wiring import run_index as _run_index
+from quodeq.services._external_jobs import sync_external_run, sync_indexed_run
 from quodeq.services.jobs import JobManager
 from quodeq.services._run_index_fs import (
-    _external_job_is_complete, _merge_internal_jobs, _remove_run_directory,
-    _scan_reports_root_for_run,
+    external_job_is_complete, merge_internal_jobs, remove_run_directory,
+    scan_reports_root_for_run,
 )
 from quodeq.services._run_status_readers import build_job_snapshot
 from quodeq.services._run_status_readers import (  # noqa: F401 — re-export
-    _read_deadline_from_status, _read_dimensions_from_status, _read_provider_model_from_status,
-    _read_time_limit_from_status, _status_json_terminal, _tail_run_log,
+    read_deadline_from_status, read_dimensions_from_status, read_provider_model_from_status,
+    read_time_limit_from_status, status_json_terminal, tail_run_log,
 )
 
 _logger = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ class EvaluationsIndex:
         # can't be filtered in SQL.
         db_limit = limit + len(internal_jobs) if limit and limit > 0 else None
         snapshots = self._indexed_snapshots(reports_dir, db_limit, states)
-        merged = _merge_internal_jobs(snapshots, internal_jobs)
+        merged = merge_internal_jobs(snapshots, internal_jobs)
         if states:
             merged = [s for s in merged if s.status in states]  # keep: in-memory jobs have no row
         merged.sort(key=lambda s: s.started_at or "", reverse=True)
@@ -89,7 +90,8 @@ class EvaluationsIndex:
         """In-memory jobs from the ``JobManager``; empty when it cannot list them."""
         try:
             return self._jobs.list_jobs(reports_root=None)
-        except (AttributeError, TypeError):
+        except (AttributeError, TypeError) as exc:
+            _logger.warning("list_jobs failed: %s", exc)
             return []
 
     def _indexed_snapshots(
@@ -102,23 +104,23 @@ class EvaluationsIndex:
             rows = _run_index.list_runs(db, limit=db_limit, states=states or None)
         finally:
             db.close()
-        return [self._run_row_to_snapshot(r) for r in rows]
+        return [self._run_row_to_snapshot(r, with_logs=r.state == JobStatus.RUNNING) for r in rows]
 
     def delete(self, job_id: str, reports_dir: Path | None = None) -> bool:
         """Delete a run's on-disk dir and index row. Refuses running jobs."""
         snapshot = self.get_status(job_id, reports_dir=reports_dir)
         if snapshot is None:
             return False
-        if snapshot.status == "running":
+        if snapshot.status == JobStatus.RUNNING:
             return False
         reports_dir = self._coerce_reports_dir(reports_dir)
         # External job IDs are "ext-<run_uuid>" where run_uuid is also the
         # run directory name. Internal job IDs are unrelated to the directory
         # name, so prefer the snapshot's own run coordinates when present.
-        run_uuid = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
+        run_uuid = strip_external_prefix(job_id)
         if snapshot.output_run_id:
             run_uuid = snapshot.output_run_id
-        removed_dir = _remove_run_directory(
+        removed_dir = remove_run_directory(
             reports_dir, snapshot.output_project, run_uuid, log=_logger,
         )
         # Remove from index regardless so stale rows get cleaned up. The same
@@ -128,7 +130,7 @@ class EvaluationsIndex:
         try:
             _run_index.delete_run(db, job_id)
             if run_uuid != job_id:
-                _run_index.delete_run(db, f"ext-{run_uuid}")
+                _run_index.delete_run(db, external_job_id(run_uuid))
         finally:
             db.close()
         # Also drop any in-memory JobManager entry.
@@ -146,7 +148,7 @@ class EvaluationsIndex:
         ``ext-`` ids resolve from the SQLite index after a scoped sync so
         stale runs get promoted to cancelled on this request.
         """
-        is_external = job_id.startswith("ext-")
+        is_external = is_external_job_id(job_id)
         if not is_external:
             internal = self._in_memory_job(job_id)
             if internal is not None:
@@ -156,9 +158,9 @@ class EvaluationsIndex:
         db = self._open_index()
         try:
             if is_external:
-                if not _sync_external_run(db, job_id, reports_dir):
+                if not sync_external_run(db, job_id, reports_dir):
                     return None
-            else:
+            elif not sync_indexed_run(db, job_id):
                 _run_index.sync_index(db, reports_dir)
             row = _run_index.get_run(db, job_id)
         finally:
@@ -187,10 +189,10 @@ class EvaluationsIndex:
         if snapshot is None:
             # Nothing to cancel — the user's intent is satisfied.
             return True
-        if snapshot.status != "running":
+        if snapshot.status != JobStatus.RUNNING:
             return False
 
-        from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale
+        from quodeq.services.wiring import force_promote_to_cancelled_stale
 
         run_dir: Path | None = None
         if snapshot.output_project and snapshot.output_run_id and reports_dir:
@@ -214,10 +216,10 @@ class EvaluationsIndex:
         back to a filesystem scan so the SSE endpoint keeps working for any
         run that exists on disk.
         """
-        run_id = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
+        run_id = strip_external_prefix(job_id)
 
         # Active-job fast path: trust the jobs index when present.
-        if not job_id.startswith("ext-"):
+        if not is_external_job_id(job_id):
             snapshot = self._jobs.get_job(job_id)
             if (
                 snapshot is not None
@@ -231,7 +233,7 @@ class EvaluationsIndex:
                         return candidate
 
         # Filesystem fallback: scan reports_root for <project>/<run_id>/.
-        return _scan_reports_root_for_run(self._resolve_reports_root(), run_id)
+        return scan_reports_root_for_run(self._resolve_reports_root(), run_id)
 
     def rebuild(self, reports_root: Path | None = None) -> tuple[int, int]:
         """Rebuild the index from scratch by walking *reports_root*.
@@ -253,13 +255,13 @@ class EvaluationsIndex:
 
     def is_complete(self, job_id: str) -> bool:
         """Return True if *job_id* has reached a terminal state."""
-        if job_id.startswith("ext-"):
+        if is_external_job_id(job_id):
             run_dir = self.get_log_run_dir(job_id)
             if run_dir is None:
                 return False
-            return _external_job_is_complete(run_dir)
+            return external_job_is_complete(run_dir)
         snapshot = self._jobs.get_job(job_id)
-        if snapshot is not None and snapshot.status in {"done", "failed", "cancelled"}:
+        if snapshot is not None and snapshot.status in JOB_FINISHED:
             return True
         # Fall back to disk: scan.json or terminal status.json mean the run
         # is over. Covers eviction from the in-memory store and the gap
@@ -270,7 +272,7 @@ class EvaluationsIndex:
             return False
         if (run_dir / "scan.json").exists():
             return True
-        return _status_json_terminal(run_dir)
+        return status_json_terminal(run_dir)
 
     # -- internals ------------------------------------------------------
 
@@ -290,5 +292,5 @@ class EvaluationsIndex:
             raise ValueError("EvaluationsIndex requires index_db_path to be set")
         return _run_index.open_index(self._index_db_path)
 
-    def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
-        return build_job_snapshot(row)
+    def _run_row_to_snapshot(self, row: "_run_index.RunRow", *, with_logs: bool = True) -> JobSnapshot:
+        return build_job_snapshot(row, with_logs=with_logs)

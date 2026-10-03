@@ -1,6 +1,8 @@
 """Confidence interval estimation for scoring results."""
 from __future__ import annotations
 
+from quodeq.core.types.scoring import ConfidenceLevel
+
 _CI_BASE_WIDTH = 1.0
 _CI_LOW_CONFIDENCE_PENALTY = 1.0
 _CI_MEDIUM_CONFIDENCE_PENALTY = 0.5
@@ -29,9 +31,9 @@ def confidence_interval_for(
     """
     width = _CI_BASE_WIDTH
 
-    if confidence_level == "low":
+    if confidence_level == ConfidenceLevel.LOW:
         width += _CI_LOW_CONFIDENCE_PENALTY
-    elif confidence_level == "medium":
+    elif confidence_level == ConfidenceLevel.MEDIUM:
         width += _CI_MEDIUM_CONFIDENCE_PENALTY
 
     if not is_balanced:

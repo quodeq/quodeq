@@ -1,77 +1,74 @@
 import { describe, it, expect, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 import { useEvaluationQueries } from "./useEvaluationQueries.js";
-import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
+import { evaluationKeys } from "../../../api/queryKeys.js";
 
-// The polling path is what the evaluation screen runs on by default
-// (VITE_USE_SSE_EVENTS off). It fetches each dimension's eval and hands the
-// rows to the live feed, which reads `principle` — a field the backend has
-// never emitted. It emits `practiceId`, on the report path and on the live
-// evidence path alike, so a raw spread reached the feed with no rule to show.
+// The findings slot is subscribe-only: useRunEventStream writes each admitted
+// finding frame into it and this hook groups what is there. These tests
+// stand in for the stream by writing to the same cache key.
 
-const REPORT_ROW = {
-  practiceId: "Authenticity",
+const ROW = {
+  principle: "Authenticity",
   req: "S-AUT-3",
   file: "src/quodeq/api/_assistant_helpers.py",
   line: 116,
   severity: "minor",
-  title: "Path traversal via project_uuid",
-  snippet: "Path(session[\"project_uuid\"])",
-  reqRefs: [{ label: "CWE-22", url: "https://cwe.mitre.org/data/definitions/22.html" }],
-  confidence: 25,
+  dimension: "security",
 };
 
-function makeApi(violations) {
+function makeApi() {
+  // Only the status request exists: a findings request would throw here.
   return {
     getEvaluation: vi.fn().mockResolvedValue({
-      jobId: "job-1",
-      status: "running",
-      outputProject: "proj",
-      outputRunId: "run-1",
-      dimensions: ["security"],
+      jobId: "job-1", status: "running", outputProject: "proj", outputRunId: "run-1",
+      dimensions: ["security", "usability"],
     }),
-    getDimensionEval: vi.fn().mockResolvedValue({ violations }),
   };
 }
 
 function renderQueries(api) {
-  const QC = withQueryClient();
-  return renderHook(() => useEvaluationQueries(api, "job-1"), { wrapper: QC });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const wrapper = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const rendered = renderHook(() => useEvaluationQueries(api, "job-1"), { wrapper });
+  const stream = (...rows) => act(() => {
+    client.setQueryData(evaluationKeys.findings("job-1"), (prev = []) => [...prev, ...rows]);
+  });
+  return { ...rendered, stream };
 }
 
-describe("useEvaluationQueries findings mapping", () => {
-  it("exposes the backend's practiceId as `principle`", async () => {
-    const { result } = renderQueries(makeApi([REPORT_ROW]));
-    await waitFor(() => expect(result.current.liveViolations.security).toHaveLength(1));
+describe("useEvaluationQueries", () => {
+  it("starts with no findings and never requests any", async () => {
+    const api = makeApi();
+    const { result } = renderQueries(api);
+    await waitFor(() => expect(result.current.job).not.toBeNull());
+    expect(result.current.liveViolations).toEqual({});
+    expect(api.getEvaluation).toHaveBeenCalledWith("job-1");
+  });
+
+  it("groups the rows the stream wrote by dimension, in arrival order", async () => {
+    const { result, stream } = renderQueries(makeApi());
+    await stream(ROW, { ...ROW, line: 200 }, { ...ROW, dimension: "usability", file: "src/b.py" });
+    await waitFor(() => expect(result.current.liveViolations.usability).toHaveLength(1));
+    expect(result.current.liveViolations.security.map((r) => r.line)).toEqual([116, 200]);
     expect(result.current.liveViolations.security[0].principle).toBe("Authenticity");
   });
 
-  it("keeps wire-only fields the canonical model does not carry", async () => {
-    const { result } = renderQueries(makeApi([REPORT_ROW]));
+  it("files a row without a dimension under the placeholder group", async () => {
+    const { result, stream } = renderQueries(makeApi());
+    const { dimension: unused, ...bare } = ROW;
+    await stream(bare);
+    await waitFor(() => expect(result.current.liveViolations._).toHaveLength(1));
+  });
+
+  it("keeps one grouped object while the slot is unchanged", async () => {
+    const { result, rerender, stream } = renderQueries(makeApi());
+    await stream(ROW);
     await waitFor(() => expect(result.current.liveViolations.security).toHaveLength(1));
-    expect(result.current.liveViolations.security[0].confidence).toBe(25);
-  });
-
-  it("tags each row with the dimension it was fetched for", async () => {
-    const { result } = renderQueries(makeApi([REPORT_ROW]));
-    await waitFor(() => expect(result.current.liveViolations.security).toHaveLength(1));
-    expect(result.current.liveViolations.security[0].dimension).toBe("security");
-  });
-
-  it("gives two findings on one line distinct identities", async () => {
-    // The feed keys rows on `${dim}-${file}-${principle}-${line}`. With
-    // principle undefined on every row, two findings raised against the same
-    // line under different principles collapsed onto one React key.
-    const second = { ...REPORT_ROW, practiceId: "Integrity", req: "S-INT-1" };
-    const { result } = renderQueries(makeApi([REPORT_ROW, second]));
-    await waitFor(() => expect(result.current.liveViolations.security).toHaveLength(2));
-    const principles = result.current.liveViolations.security.map((v) => v.principle);
-    expect(new Set(principles).size).toBe(2);
-  });
-
-  it("survives a dimension eval that carries no violations", async () => {
-    const { result } = renderQueries(makeApi(undefined));
-    await waitFor(() => expect(result.current.job).not.toBeNull());
-    expect(result.current.liveViolations).toEqual({});
+    const grouped = result.current.liveViolations;
+    rerender();
+    // A new object every render would re-render every live subscriber.
+    expect(result.current.liveViolations).toBe(grouped);
   });
 });

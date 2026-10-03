@@ -2,19 +2,19 @@
 
 ``load_analysis_context`` resolves which dimensions to analyze (from
 the dimensions config, custom evaluators, and the user's
-``--dimensions`` selection) and builds the shared ``_AnalysisContext``
+``--dimensions`` selection) and builds the shared ``AnalysisContext``
 passed to every dimension runner.
 """
 from __future__ import annotations
 
 import json as _json
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
-from quodeq.analysis.run_types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.prompts.builder import load_template
-from quodeq.config.paths import default_paths
+from quodeq.config.paths import ConfigPaths, default_paths
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 from quodeq.shared.logging import log_warning
 
 
@@ -48,8 +48,15 @@ def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[
     return result
 
 
-def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisContext"]:
-    """Load dimensions data and resolve which dimensions to analyze."""
+def load_analysis_context(
+    config: "RunConfig", *, paths: "ConfigPaths | None" = None,
+) -> tuple[list[str], "AnalysisContext"]:
+    """Load dimensions data and resolve which dimensions to analyze.
+
+    *paths* overrides the default ``ConfigPaths`` bundle used to resolve
+    ``evaluators_dir`` when the config doesn't carry its own (testing seam);
+    production callers leave it unset.
+    """
     dims_data = config.dimensions_data
     if dims_data is None:
         raise ValueError("RunConfig.dimensions_data is required")
@@ -58,9 +65,10 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
 
     # Include custom evaluators from evaluators directory (only when dimensions are explicitly requested)
     if config.options.dimensions:
-        _evaluators_dir = getattr(config, 'evaluators_dir', None)
+        _evaluators_dir = config.evaluators_dir
         if _evaluators_dir is None:
-            _evaluators_dir = default_paths().evaluators_dir
+            _paths = paths if paths is not None else default_paths()
+            _evaluators_dir = _paths.evaluators_dir
     else:
         _evaluators_dir = None
     if _evaluators_dir and _evaluators_dir.is_dir():
@@ -85,9 +93,9 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
     else:
         dimensions = all_dims_raw
 
-    ctx = _AnalysisContext(
+    ctx = AnalysisContext(
         dimensions_data=dims_data,
-        date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        date_str=utc_now_iso(timespec=ISO_SECONDS),
         template=load_template(config.options.template_path),
         subagent_template=load_template(template_name="cli_subagent_prompt.md"),
         total=len(dimensions),

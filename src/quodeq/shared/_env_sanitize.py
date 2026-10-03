@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 
 
-def _sanitized_env_path(raw: str) -> str:
+def sanitized_env_path(raw: str) -> str:
     """Normalize an operator-supplied filesystem path from an env var.
 
     Env vars are the operator's own trust domain, but expanduser + abspath

@@ -3,11 +3,16 @@ from __future__ import annotations
 
 import argparse
 
+from quodeq.core.types.severity import SEVERITY_ORDER
 from quodeq.shared.utils import get_evaluations_dir
+
+# argparse compares the raw argv string, so the choices are the plain values.
+_SEVERITY_CHOICES = [s.value for s in SEVERITY_ORDER]
 
 _DEFAULT_N_SUBAGENTS = 5
 _MODE_NUMERICAL = "numerical"
 _MODE_GRADES = "grades"
+_OUTPUT_FLAG = "--output"
 
 # Spells out the single-letter counters in the progress lines the scan emits.
 # They are abbreviated there to keep the line readable at a glance.
@@ -28,7 +33,7 @@ progress lines:
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
     """Register output and scoring mode arguments."""
     parser.add_argument(
-        "-o", "--output", default=get_evaluations_dir(), help="Reports output directory"
+        "-o", _OUTPUT_FLAG, default=get_evaluations_dir(), help="Reports output directory"
     )
     parser.add_argument(
         "-m", "--mode", default=_MODE_NUMERICAL,
@@ -124,7 +129,7 @@ def _add_evaluate_sarif_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--min-severity",
         default=None,
-        choices=["critical", "major", "minor"],
+        choices=_SEVERITY_CHOICES,
         help="When writing SARIF, drop findings below this severity.",
     )
     parser.add_argument(
@@ -192,9 +197,9 @@ def _add_export_subcommand(subparsers) -> None:
     export_sub = export_parser.add_subparsers(dest="export_format")
     sarif_parser = export_sub.add_parser("sarif", help="Export findings as a SARIF 2.1.0 file")
     sarif_parser.add_argument("--evaluation-dir", required=True, help="Directory containing evaluation/<dim>.json reports")
-    sarif_parser.add_argument("-o", "--output", required=True, help="Path to write the .sarif file")
+    sarif_parser.add_argument("-o", _OUTPUT_FLAG, required=True, help="Path to write the .sarif file")
     sarif_parser.add_argument(
-        "--min-severity", default=None, choices=["critical", "major", "minor"],
+        "--min-severity", default=None, choices=_SEVERITY_CHOICES,
         help="Drop findings below this severity.",
     )
     sarif_parser.add_argument(
@@ -228,7 +233,7 @@ def _add_review_subcommand(subparsers) -> None:
              "--pool-budget is a deprecated alias.",
     )
     review_parser.add_argument(
-        "--output",
+        _OUTPUT_FLAG,
         help="Evaluation output directory (default: ~/.quodeq/evaluations)",
     )
     review_parser.add_argument(
@@ -236,6 +241,12 @@ def _add_review_subcommand(subparsers) -> None:
         action="store_true",
         dest="dry_run",
         help="Build the review but do not post it",
+    )
+    review_parser.add_argument(
+        "--yes",
+        action="store_true",
+        dest="yes",
+        help="Post without the interactive confirmation (a non-interactive run never asks)",
     )
 
 

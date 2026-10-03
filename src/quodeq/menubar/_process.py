@@ -13,24 +13,27 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import NamedTuple
+from collections.abc import Callable
+from typing import Any, NamedTuple
 
 from quodeq.menubar._health import health_check as _health_check
+from quodeq.shared.constants import PLATFORM_DARWIN
 
 _logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _HEALTH_POLL_INTERVAL_S = 0.5
-_STDERR_READ_MAX = 500
-_ERROR_DISPLAY_MAX = 200
+STDERR_READ_MAX = 500
+ERROR_DISPLAY_MAX = 200
+_LSOF_TIMEOUT_S = 5  # ceiling for the lsof subprocess that finds pids on a port
 
 
 class DashboardCallbacks(NamedTuple):
     """Callbacks for dashboard startup lifecycle events."""
-    on_port_found: object  # (port: int, stderr_log) -> None
-    on_crash: object       # (stderr_log) -> None
-    on_timeout: object     # () -> None
+    on_port_found: Callable[[int, Any], None]  # port, stderr_log
+    on_crash: Callable[[Any], None]  # stderr_log
+    on_timeout: Callable[[], None]
 
 
 class DashboardState(NamedTuple):
@@ -74,14 +77,14 @@ def find_pids_on_port(port: int) -> list[int]:
 
     macOS-only: relies on ``lsof`` which is available on macOS by default.
     """
-    if sys.platform != "darwin":
+    if sys.platform != PLATFORM_DARWIN:
         return []
     try:
         # int() enforces the argv boundary: whatever the caller passed, only a
         # plain integer ever reaches the lsof argument.
         result = subprocess.run(
             ["lsof", f"-ti:{int(port)}"], capture_output=True, text=True, encoding="utf-8",
-            timeout=5,
+            timeout=_LSOF_TIMEOUT_S,
         )
         return [int(pid.strip()) for pid in result.stdout.strip().split("\n") if pid.strip()]
     except (subprocess.TimeoutExpired, OSError, ValueError):

@@ -13,7 +13,7 @@ build its keys here rather than re-deriving them:
 Evidence rows carry ``p`` (a req ID for custom evaluators, otherwise the
 principle name) and optionally ``req``. The delete store carries principle
 *names*, so ``p`` is mapped through the evaluator's req -> principle table
-before the delete key is built -- the same order ``_parse_jsonl_findings``
+before the delete key is built -- the same order ``_jsonl_parser``
 applies when it builds the scored report.
 """
 from __future__ import annotations
@@ -24,6 +24,7 @@ from typing import Mapping
 
 from quodeq.config.paths import default_paths
 from quodeq.core.dismissals import DismissedKeys
+from quodeq.core.types.finding_type import FindingType
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.suppression_keys import (  # re-exported API
@@ -34,8 +35,7 @@ from quodeq.services.suppression_keys import (  # re-exported API
 from quodeq.shared.validation import validate_path_segment
 from quodeq.services.wiring import load_suppression_rules  # re-exported API
 from quodeq.services.wiring import read_req_to_principle_map
-
-_TYPE_VIOLATION = "violation"
+from quodeq.core.evidence.req_mapping import PrincipleResolver
 
 
 @dataclass(frozen=True)
@@ -48,15 +48,25 @@ class SuppressionMatcher:
     deleted: frozenset = frozenset()
     rules: tuple = ()
     req_to_principle: Mapping[str, str] = field(default_factory=dict)
+    _resolver: PrincipleResolver = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_resolver", PrincipleResolver(
+            dict(self.req_to_principle), frozenset(self.req_to_principle.values())))
 
     @property
     def active(self) -> bool:
         """False when nothing is suppressed -- callers can skip the scan."""
         return bool(self.dismissed or self.deleted or self.rules)
 
-    def principle_for(self, raw: str) -> str:
-        """Map an evidence ``p`` (req ID or principle name) to a principle name."""
-        return self.req_to_principle.get(raw, raw)
+    def principle_for(self, raw: str, *, req: str | None = None) -> str:
+        """The principle a row is filed under, for the delete key.
+
+        Placed like every reader places it (``PrincipleResolver.place``, so a
+        near-miss code folds); a row the standard cannot place keeps what it
+        named, so deleting it still matches the row the user saw.
+        """
+        return self._resolver.place(req, raw) or raw
 
     def is_suppressed(self, row: dict) -> bool:
         """True when the dashboard would hide this raw evidence row.
@@ -65,7 +75,7 @@ class SuppressionMatcher:
         violations, and hiding a passing check would silently inflate the
         compliance ratio.
         """
-        if not self.active or row.get("t") != _TYPE_VIOLATION:
+        if not self.active or row.get("t") != FindingType.VIOLATION:
             return False
         raw = row.get("p") or row.get("req")
         if not raw:
@@ -76,19 +86,19 @@ class SuppressionMatcher:
         if is_dismissed(self.dismissed, ref, rules=self.rules):
             return True
         return is_deleted(self.deleted, dimension=self.dimension,
-                          principle=self.principle_for(raw), file=file)
+                          principle=self.principle_for(row.get("p") or raw, req=row.get("req")), file=file)
 
 
-def load_req_to_principle(
-    dimension: str, evaluators_dir: Path | None = None,
-) -> dict[str, str]:
+def load_req_to_principle(dimension: str, evaluators_dir: Path) -> dict[str, str]:
     """Load the req ID -> principle name mapping for a custom evaluator.
+
+    *evaluators_dir* is required: this is a pure reader, not a config
+    resolver -- callers (``build_matcher``) resolve the production default
+    at call time and hand it in, so this function never reads global config.
 
     Empty dict when the evaluator is absent or malformed: built-in dimensions
     already emit principle names in ``p``, so an empty map is the identity.
     """
-    if evaluators_dir is None:
-        evaluators_dir = default_paths().evaluators_dir
     if not evaluators_dir.is_dir():
         return {}
     validate_path_segment(dimension)
@@ -123,12 +133,13 @@ def build_matcher(
     if not dismissed and not deleted and not rules:
         # Nothing to map against, so skip the evaluator read entirely.
         return SuppressionMatcher(dimension=dimension)
+    resolved_dir = evaluators_dir if evaluators_dir is not None else default_paths().evaluators_dir
     return SuppressionMatcher(
         dimension=dimension,
         dismissed=dismissed,
         deleted=deleted,
         rules=rules,
-        req_to_principle=load_req_to_principle(dimension, evaluators_dir),
+        req_to_principle=load_req_to_principle(dimension, resolved_dir),
     )
 
 

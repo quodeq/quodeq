@@ -29,8 +29,12 @@ export function StatStrip({ children, cards = false }) {
  * @param {React.ReactNode} [props.trailing] Right-aligned accessory slot (badges, delta).
  * @param {string} [props.tone] One of "default" | "success" | "warning" | "critical".
  */
-export function Stat({ label, value, hint, trailing, tone = 'default', onClick, ariaLabel }) {
-  const className = `term-stat term-stat--${tone}${onClick ? ' term-stat--clickable' : ''}`;
+/**
+ * A stat's label and value row, without the card around them: what `Stat`
+ * renders inside its card, and what a split card renders once per half.
+ * @param {{label: React.ReactNode, value: React.ReactNode, trailing?: React.ReactNode}} props
+ */
+export function StatBody({ label, value, trailing }) {
   // Character count of the plain-text value, published to CSS so the value can
   // size itself down to fit its card (see `.term-stat__value`). Numbers are
   // short and stay at the max size; a long word like a dimension name shrinks
@@ -38,7 +42,7 @@ export function Stat({ label, value, hint, trailing, tone = 'default', onClick, 
   // (nodes) carry no measurable length — they keep the default.
   const plain = typeof value === 'string' || typeof value === 'number' ? String(value) : null;
   const valueStyle = plain ? { '--stat-value-len': plain.length } : undefined;
-  const labelValue = (
+  return (
     <>
       <div className="term-stat__label" title={typeof label === 'string' ? label : undefined}>{label}</div>
       <div className="term-stat__value-row">
@@ -47,6 +51,11 @@ export function Stat({ label, value, hint, trailing, tone = 'default', onClick, 
       </div>
     </>
   );
+}
+
+export function Stat({ label, value, hint, trailing, tone = 'default', onClick, ariaLabel }) {
+  const className = `term-stat term-stat--${tone}${onClick ? ' term-stat--clickable' : ''}`;
+  const labelValue = <StatBody label={label} value={value} trailing={trailing} />;
   const hintEl = hint != null ? <div className="term-stat__hint">{hint}</div> : null;
   if (onClick) {
     // The card itself stays a plain <div> so the hint — which may hold its own

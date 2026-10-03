@@ -1,6 +1,7 @@
 """Prompt context dataclass and template placeholder constants."""
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -51,6 +52,10 @@ class PromptContext:
     work_dir: Path | None = None
     previous_findings: list[dict] = field(default_factory=list)
     project_root: Path | None = None
+    # None = production default (load_project_overrides, looked up at call
+    # time so tests can inject a fixed overrides map without patching the
+    # data-layer loader).
+    overrides_loader: Callable[[Path | None], Mapping[str, dict]] | None = None
 
 
 def render_manifest_context(context: PromptContext) -> str:

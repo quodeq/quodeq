@@ -1,0 +1,95 @@
+// The vocab modules mirror the Python StrEnums. These assertions are the
+// mirror: a value drifting from src/quodeq/core/**'s wire spelling breaks here.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { RUN_STATE, TERMINAL_RUN_STATES } from './runState.js';
+import { EXTERNAL_JOB_PREFIX, JOB_STATUS, JOB_TERMINAL, JOB_FINISHED, isExternalJobId } from './jobStatus.js';
+import { EXIT_REASON } from './exitReason.js';
+import { SEVERITY, SEVERITY_ORDER } from './severity.js';
+import { GRADE, GRADE_LADDER } from './grade.js';
+import { DIM_STATE } from './dimState.js';
+import { FINDING_TYPE } from './findingType.js';
+import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from './projectSource.js';
+import { PROVIDER, LOCAL_API_PROVIDERS, WEB_TOOL_PROVIDERS } from './provider.js';
+import { FRAME_TYPE } from './frameType.js';
+import { SCOPE_GATE_RULE } from './scopeGateRule.js';
+import { RESCORE_STATE } from './rescoreState.js';
+import { LOG_STREAM_STATUS } from './logStreamStatus.js';
+import { STAGE_STATUS } from './stageStatus.js';
+import { KEY } from './keyboard.js';
+import { NAV_TAB } from './navTab.js';
+import { REFRESH_OUTCOME } from './refreshOutcome.js';
+
+test('vocab modules spell the wire values', () => {
+  assert.deepEqual(RUN_STATE, {
+    PENDING: 'pending', RUNNING: 'running', FINALIZING: 'finalizing',
+    DONE: 'done', FAILED: 'failed', CANCELLED: 'cancelled',
+  });
+  assert.deepEqual([...TERMINAL_RUN_STATES], ['done', 'failed', 'cancelled']);
+  assert.deepEqual(JOB_STATUS, {
+    RUNNING: 'running', DONE: 'done', FAILED: 'failed', CANCELLED: 'cancelled', LOST: 'lost',
+  });
+  assert.deepEqual([...JOB_TERMINAL], ['done', 'failed', 'cancelled', 'lost']);
+  assert.deepEqual([...JOB_FINISHED], ['done', 'failed', 'cancelled']);
+  assert.deepEqual(Object.values(EXIT_REASON), [
+    'done', 'time_limit', 'deadline', 'failure_streak', 'cancelled', 'error',
+    'stale_detected', 'stale_legacy_pid_dead', 'stale_legacy_no_pid',
+  ]);
+  assert.deepEqual(SEVERITY, { CRITICAL: 'critical', MAJOR: 'major', MINOR: 'minor' });
+  assert.deepEqual(SEVERITY_ORDER, ['critical', 'major', 'minor']);
+  assert.deepEqual(GRADE, {
+    EXEMPLARY: 'Exemplary', GOOD: 'Good', ADEQUATE: 'Adequate', POOR: 'Poor', INSUFFICIENT: 'Insufficient',
+  });
+  assert.deepEqual(GRADE_LADDER, Object.values(GRADE));
+  assert.deepEqual(DIM_STATE, {
+    PENDING: 'pending', RUNNING: 'running', DONE: 'done', INCOMPLETE: 'incomplete',
+  });
+  assert.deepEqual(FINDING_TYPE, { VIOLATION: 'violation', COMPLIANCE: 'compliance' });
+  assert.deepEqual(PROJECT_SOURCE, { LOCAL: 'local', SHARED: 'shared' });
+  assert.equal(DEFAULT_PROJECT_SOURCE, 'local');
+  assert.deepEqual(RESCORE_STATE, { IDLE: 'idle', RUNNING: 'running', ERROR: 'error' });
+  assert.deepEqual(LOG_STREAM_STATUS, { IDLE: 'idle', STREAMING: 'streaming', DONE: 'done', ERROR: 'error' });
+  assert.deepEqual(REFRESH_OUTCOME, {
+    UPDATED: 'updated', UP_TO_DATE: 'up_to_date', NOT_REFRESHABLE: 'not_refreshable', BUSY: 'busy',
+    DIRTY: 'dirty', NO_UPSTREAM: 'no_upstream', DIVERGED: 'diverged', FETCH_FAILED: 'fetch_failed',
+  });
+  assert.deepEqual(STAGE_STATUS, { IDLE: 'idle', LOADING: 'loading', READY: 'ready', UNAVAILABLE: 'unavailable', ERROR: 'error' });
+});
+
+test('vocab modules are frozen', () => {
+  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE, FINDING_TYPE, PROJECT_SOURCE, FRAME_TYPE, SCOPE_GATE_RULE, RESCORE_STATE, LOG_STREAM_STATUS, STAGE_STATUS, REFRESH_OUTCOME]) {
+    assert.equal(Object.isFrozen(obj), true);
+  }
+});
+
+test('external job ids carry the ext- prefix', () => {
+  assert.equal(EXTERNAL_JOB_PREFIX, 'ext-');
+  assert.equal(isExternalJobId('ext-abc'), true);
+  assert.equal(isExternalJobId('abc'), false);
+});
+
+test('provider sets derive from PROVIDER', () => {
+  assert.deepEqual([...LOCAL_API_PROVIDERS].sort(), ['llamacpp', 'ollama', 'omlx']);
+  assert.deepEqual([...WEB_TOOL_PROVIDERS].sort(), ['claude', 'llamacpp', 'ollama', 'omlx']);
+  assert.equal(Object.isFrozen(PROVIDER), true);
+});
+
+test('KEY mirrors the DOM KeyboardEvent.key spellings', () => {
+  assert.deepEqual(KEY, {
+    ENTER: 'Enter', ESCAPE: 'Escape', TAB: 'Tab',
+    ARROW_UP: 'ArrowUp', ARROW_DOWN: 'ArrowDown', ARROW_LEFT: 'ArrowLeft', ARROW_RIGHT: 'ArrowRight',
+  });
+  assert.equal(Object.isFrozen(KEY), true);
+});
+
+test('NAV_TAB spells the nav-stack page ids', () => {
+  assert.deepEqual(NAV_TAB, {
+    OVERVIEW: 'overview', VIOLATIONS: 'violations', MAP: 'map', HISTORY: 'history',
+    PROJECTS: 'projects', EVALUATE: 'evaluate', STANDARDS: 'standards', HELP: 'help',
+    SETTINGS: 'settings', COMPARE: 'compare', HISTORY_RUN: 'history-run', RUN: 'run',
+    EXPLORER: 'explorer', EVAL_PRINCIPLE: 'evalprinciple', FILE: 'file', GRADE_FORMULA: 'grade-formula',
+    EVAL_PRINCIPLE_DETAIL: 'eval-principle-detail',
+  });
+  assert.equal(Object.isFrozen(NAV_TAB), true);
+});

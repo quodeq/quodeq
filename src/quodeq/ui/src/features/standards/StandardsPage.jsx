@@ -8,7 +8,7 @@ import ImportModal from './components/ImportModal.jsx';
 import { TermHeader } from '../../components/terminal/index.js';
 import { useAppState } from '../../hooks/useAppState.js';
 import { t } from '../../strings/index.js';
-import { PROJECT_SOURCE } from '../../constants.js';
+import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 
 // Which screen the page shows: the table, or the editor in create/edit mode.
 const VIEW_MODE = { LIST: 'list', EDIT: 'edit', NEW: 'new' };

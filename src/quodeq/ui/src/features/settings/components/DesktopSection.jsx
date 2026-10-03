@@ -2,15 +2,12 @@ import { useEffect, useState } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
-import { SettingsOnOffPills } from './settingsRowParts.jsx';
+import { SettingsOnOffPills, SettingsRowLabel } from './settingsRowParts.jsx';
 
 function MenubarRow({ enabled, onToggle }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.menubarToggle')}</span>
-        <span className="settings-description">{t('settings.menubarToggleDesc')}</span>
-      </div>
+      <SettingsRowLabel hintSlot={false} label={t('settings.menubarToggle')} description={t('settings.menubarToggleDesc')} />
       <SettingsOnOffPills on={enabled} onToggle={onToggle} />
     </div>
   );

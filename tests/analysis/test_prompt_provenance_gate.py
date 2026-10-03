@@ -1,6 +1,6 @@
 """The critical-severity bar must require reachable input provenance.
 
-Run fa56db32 marked 4 of 6 'critical' findings as false positives: unguarded
+A real run marked 4 of 6 'critical' findings as false positives: unguarded
 prop/arg dereferences (R-FT-2) and a path-from-string (S-AUT-3) where the value
 is provably internal (a hook default, a literal, a SHA-256 cache key). A finding
 is only `critical` when a bad/attacker-controlled value can actually reach the

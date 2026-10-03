@@ -1,177 +1,30 @@
-"""Zip export helpers for the action API."""
+"""Zip export route adapter for the action API.
+
+The archive itself is built in services/project_archive_export.py; this module
+resolves the project, maps build failures to coded JSON errors, and streams
+the download.
+"""
 from __future__ import annotations
 
-import json
 import logging
 import os
-import tempfile
 import zipfile
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
 
 from flask import Response, after_this_request, send_file
 
-from quodeq.api.helpers import ClientMessageError, json_error
-from quodeq.shared.env import env_int
+from quodeq.api._constants import CODE_NOT_FOUND
+from quodeq.api.helpers import json_error
+from quodeq.services.project_archive_export import ExportSizeLimitError, build_project_zip
+from quodeq.services.project_archive_format import (  # noqa: F401 -- re-exported for callers and tests
+    MANIFEST_KIND,
+    MANIFEST_SCHEMA,
+    max_zip_size_bytes,
+)
+from quodeq.shared.constants import MANIFEST_FILENAME  # noqa: F401 -- re-exported for tests
 
 _logger = logging.getLogger(__name__)
-
-_DEFAULT_MAX_ZIP_SIZE_MB = 500
-_MANIFEST_FILENAME = "manifest.json"
-_MANIFEST_KIND = "quodeq-project-export"
-_MANIFEST_SCHEMA = 1
-# Import allows the extracted (uncompressed) archive to reach the MB cap times
-# this multiple (evaluation data is text that deflates ~5x). Export applies the
-# same bound so it never produces an archive that would fail re-import.
-_EXTRACT_HEADROOM = 10
-
-
-def _max_zip_size_bytes(max_mb: int | None = None, env: dict[str, str] | None = None) -> int:
-    """Return the max zip export size in bytes.
-
-    *max_mb* overrides the env var for testing. An unparseable
-    QUODEQ_MAX_ZIP_SIZE_MB falls back to the default, with ``env_int``
-    logging a warning that names the variable, the bad value and the
-    default.
-    """
-    if max_mb is None:
-        max_mb = env_int("QUODEQ_MAX_ZIP_SIZE_MB", _DEFAULT_MAX_ZIP_SIZE_MB, env=env)
-    return max_mb * 1024 * 1024
-
-
-def _build_manifest(project_path: Path) -> dict[str, object]:
-    """Build the export manifest payload from a project's repository_info.json."""
-    from quodeq import __version__ as _qd_version
-
-    info: dict[str, object] = {}
-    info_path = project_path / "repository_info.json"
-    if info_path.exists():
-        try:
-            info = json.loads(info_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            info = {}
-    return {
-        "schema": _MANIFEST_SCHEMA,
-        "kind": _MANIFEST_KIND,
-        "source_uuid": info.get("uuid") or project_path.name,
-        "project_name": info.get("name"),
-        "scope_path": info.get("scopePath"),
-        "location": info.get("location"),
-        "repo_path": info.get("path"),
-        "remote_url": info.get("remote_url"),
-        "discipline": info.get("discipline"),
-        "exported_at": datetime.now(timezone.utc).isoformat(),
-        "quodeq_version": _qd_version,
-    }
-
-
-class _ZipSizeLimitError(ClientMessageError, ValueError):
-    """Raised when a zip export crosses its compressed or uncompressed size cap.
-
-    Subclasses ValueError so the existing ``except (..., ValueError)`` guards
-    around zip building still catch it, but gives the upload route a precise
-    type to key off of: the route wants to surface *this* error's own
-    actionable message (it carries the MB limits and the remediation), not a
-    generic one, without risking that treatment for an unrelated ValueError.
-
-    ``public_message`` comes from ClientMessageError: the route reads that
-    attribute rather than ``str(exc)`` so the response never depends on
-    exception formatting.
-    """
-
-
-@dataclass(frozen=True)
-class _ZipLimits:
-    """Size caps for one zip export, plus the errors raised when either is crossed."""
-
-    size_limit: int
-    uncompressed_limit: int
-    compressed_error: _ZipSizeLimitError
-    uncompressed_error: _ZipSizeLimitError
-
-    @staticmethod
-    def build(size_limit: int, uncompressed_limit: int) -> "_ZipLimits":
-        """Build a _ZipLimits with the (compressed, uncompressed) over-limit errors for these caps."""
-        compressed_error = _ZipSizeLimitError(
-            f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB compressed. "
-            f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
-        )
-        uncompressed_error = _ZipSizeLimitError(
-            f"Project exceeds maximum uncompressed size of "
-            f"{uncompressed_limit // (1024 * 1024)} MB (it would be rejected on re-import). "
-            f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
-        )
-        return _ZipLimits(size_limit, uncompressed_limit, compressed_error, uncompressed_error)
-
-
-def _iter_export_files(project_path: Path):
-    """Yield the regular files under *project_path* that belong in the export.
-
-    Symlinks and non-files are skipped, as is any prior manifest so the
-    export-time one is authoritative.
-    """
-    for file_entry in project_path.rglob("*"):
-        if file_entry.is_symlink() or not file_entry.is_file():
-            continue
-        if file_entry == project_path / _MANIFEST_FILENAME:
-            continue
-        yield file_entry
-
-
-def _write_manifest_entry(zf: zipfile.ZipFile, project_path: Path) -> int:
-    """Write the export manifest into *zf*; returns its uncompressed byte size."""
-    manifest_json = json.dumps(_build_manifest(project_path), indent=2)
-    zf.writestr(f"{project_path.name}/{_MANIFEST_FILENAME}", manifest_json)
-    return len(manifest_json.encode("utf-8"))
-
-
-def _write_project_zip_entries(
-    zf: zipfile.ZipFile, fh, project_path: Path, limits: _ZipLimits,
-) -> None:
-    """Write every file under *project_path* plus the manifest into *zf*.
-
-    Raises *limits.compressed_error*/*limits.uncompressed_error* the moment
-    either running total crosses its cap, so a too-large project fails fast
-    mid-write.
-    """
-    total_uncompressed = 0
-    for file_entry in _iter_export_files(project_path):
-        zf.write(file_entry, file_entry.relative_to(project_path.parent))
-        total_uncompressed += file_entry.stat().st_size
-        if fh.tell() > limits.size_limit:
-            raise limits.compressed_error
-        if total_uncompressed > limits.uncompressed_limit:
-            raise limits.uncompressed_error
-    total_uncompressed += _write_manifest_entry(zf, project_path)
-    if total_uncompressed > limits.uncompressed_limit:
-        raise limits.uncompressed_error
-
-
-def _build_project_zip(project_path: Path) -> Path:
-    """Create a temporary zip archive of a project directory and return its path.
-
-    Two caps mirror the import side so a successful export always re-imports:
-    the compressed archive against the MB limit, and the total uncompressed size
-    against that limit times ``_EXTRACT_HEADROOM``.
-    """
-    fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="quodeq_export_")
-    os.close(fd)
-    size_limit = _max_zip_size_bytes()
-    uncompressed_limit = size_limit * _EXTRACT_HEADROOM
-    limits = _ZipLimits.build(size_limit, uncompressed_limit)
-    try:
-        with open(tmp_path, "wb") as fh:
-            with zipfile.ZipFile(fh, "w", zipfile.ZIP_DEFLATED) as zf:
-                _write_project_zip_entries(zf, fh, project_path, limits)
-        # The central directory is written on close; re-check the final size.
-        if os.path.getsize(tmp_path) > size_limit:
-            raise limits.compressed_error
-    except (OSError, zipfile.BadZipFile, ValueError):
-        os.unlink(tmp_path)
-        raise
-    return Path(tmp_path)
 
 
 def _resolve_project_path(project: str, reports_dir: str) -> tuple[Path | None, tuple[Response, int] | None]:
@@ -183,7 +36,7 @@ def _resolve_project_path(project: str, reports_dir: str) -> tuple[Path | None, 
             HTTPStatus.BAD_REQUEST, "BAD_REQUEST",
         )
     if not project_path.exists() or not project_path.is_dir():
-        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return project_path, None
 
 
@@ -204,8 +57,8 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
     if err is not None:
         return err
     try:
-        tmp_path = _build_project_zip(project_path)
-    except _ZipSizeLimitError as exc:
+        tmp_path = build_project_zip(project_path)
+    except ExportSizeLimitError as exc:
         return json_error(exc.public_message, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
     except (OSError, zipfile.BadZipFile, ValueError) as exc:
         # ValueError covers zipfile's own rejections (for example "ZIP does

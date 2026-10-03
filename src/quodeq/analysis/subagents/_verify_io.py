@@ -6,17 +6,20 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.types.finding_type import FINDING_TYPES
 from quodeq.data.fs.report_parser.runs import list_runs
+from quodeq.shared.constants import EVIDENCE_DIRNAME
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import open_text
 
-_TYPE_VIOLATION = "violation"
-_TYPE_COMPLIANCE = "compliance"
+# How many of the project's most recent runs to scan for a usable previous
+# evidence file before giving up.
+_RECENT_RUNS_SEARCH_LIMIT = 20
 
 
 def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_id: str, dim_id: str) -> Path | None:
     """Find the JSONL evidence file from the most recent previous run."""
-    runs = list_runs(reports_root, project_uuid, limit=20)
+    runs = list_runs(reports_root, project_uuid, limit=_RECENT_RUNS_SEARCH_LIMIT)
     for run in runs:
         if run.run_id == current_run_id:
             continue
@@ -24,7 +27,7 @@ def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_i
         # Only use evidence from runs that completed (have a scored report)
         if not (run_dir / "evaluation" / f"{dim_id}.json").is_file():
             continue
-        prev_jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
+        prev_jsonl = run_dir / EVIDENCE_DIRNAME / f"{dim_id}_evidence.jsonl"
         if prev_jsonl.exists() and prev_jsonl.stat().st_size > 0:
             return prev_jsonl
     return None
@@ -39,12 +42,14 @@ def _parse_finding_line(line: str) -> dict | None:
         entry = json.loads(line)
     except json.JSONDecodeError:
         return None
-    if entry.get("p") and entry.get("t") in (_TYPE_VIOLATION, _TYPE_COMPLIANCE):
+    if not isinstance(entry, dict):
+        return None
+    if entry.get("p") and entry.get("t") in FINDING_TYPES:
         return entry
     return None
 
 
-def _load_previous_findings(
+def load_previous_findings(
     jsonl_path: Path,
     open_fn: Callable[[Path], Any] | None = None,
     *,
@@ -76,15 +81,15 @@ def _load_previous_findings(
 def resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
     """Walk up from evidence_dir to find run_id, project_uuid, reports_base."""
     edir = Path(evidence_dir)
-    while edir.name != "evidence" and edir != edir.parent:
+    while edir.name != EVIDENCE_DIRNAME and edir != edir.parent:
         edir = edir.parent
-    if edir.name != "evidence":
+    if edir.name != EVIDENCE_DIRNAME:
         return None
     run_dir = edir.parent
     return run_dir.name, run_dir.parent.name, run_dir.parent.parent
 
 
-def _resolve_previous_evidence(
+def resolve_previous_evidence(
     evidence_dir: Path,
     dim_id: str,
     cache: dict[tuple[str, str], tuple[list[dict], int, int]] | None,
@@ -97,12 +102,10 @@ def _resolve_previous_evidence(
     previous evidence exists.
     """
     paths = resolve_evidence_paths(evidence_dir)
-    if paths is None:
-        if cache is not None:
-            cache[cache_key] = ([], 0, 0)
-        return None, False
-    current_run_id, project_uuid, reports_base = paths
-    prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
+    prev_jsonl = None
+    if paths is not None:
+        current_run_id, project_uuid, reports_base = paths
+        prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
     if prev_jsonl is None:
         if cache is not None:
             cache[cache_key] = ([], 0, 0)

@@ -1,10 +1,11 @@
 import { Fragment, useRef, useState } from 'react';
-import { collapseCrumbs, isRunDateEntry } from './crumbModel.js';
+import { collapseCrumbs, isRunDateEntry, ELLIPSIS_OPEN_KEY } from './crumbModel.js';
 import { useBreadcrumbDismiss } from './useBreadcrumbDismiss.js';
 import { useHoldToOpen } from './useHoldToOpen.js';
 import NavBreadcrumbEllipsisMenu from './NavBreadcrumbEllipsisMenu.jsx';
 import NavBreadcrumbSegmentMenu from './NavBreadcrumbSegmentMenu.jsx';
 import { t } from '../../../strings/index.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 const PAGE_LABELS = {
   overview: t('explorer.overviewCrumb'),
@@ -44,7 +45,7 @@ export function labelFor(entry) {
   // renderer): the crumb shows the folder name, so the trail reads
   // map / src / components. The root map entry (no path) falls through to
   // its tab label.
-  if (entry.page === 'map' && entry.path) {
+  if (entry.page === NAV_TAB.MAP && entry.path) {
     return entry.path.split('/').filter(Boolean).pop() || t('explorer.mapCrumb');
   }
   // hasOwn, not a plain lookup: `entry.page` comes off a stack entry, so a
@@ -76,7 +77,7 @@ function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey,
   if (seg.ellipsis) {
     return (
       <NavBreadcrumbEllipsisMenu
-        seg={seg} sep={sep} open={openKey === 'ellipsis'} setOpenKey={setOpenKey} goTo={goTo}
+        seg={seg} sep={sep} open={openKey === ELLIPSIS_OPEN_KEY} setOpenKey={setOpenKey} goTo={goTo}
       />
     );
   }

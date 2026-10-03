@@ -8,10 +8,8 @@ from quodeq.analysis.errors import classify_fatal_provider_message
 from quodeq.analysis.stream._incremental_lines import iter_line_batches
 from quodeq.analysis.stream.counters import extract_files_from_event, parse_stream_event
 from quodeq.core.stream.events import copilot_error
+from quodeq.core.types.finding_type import FindingType
 from quodeq.shared.logging import log_debug
-
-_TYPE_VIOLATION = "violation"
-_TYPE_COMPLIANCE = "compliance"
 
 
 def _fatal_provider_error(data: dict) -> tuple[str, str] | None:
@@ -102,9 +100,9 @@ class IncrementalProgressReader:
             t = _json.loads(stripped).get("t", "")
         except (ValueError, AttributeError):
             t = ""
-        if t == _TYPE_VIOLATION:
+        if t == FindingType.VIOLATION:
             self._violations += 1
-        elif t == _TYPE_COMPLIANCE:
+        elif t == FindingType.COMPLIANCE:
             self._compliances += 1
         else:
             return

@@ -33,17 +33,17 @@ def test_run_log_captures_log_info_during_pipeline(tmp_path: Path, monkeypatch) 
 
 
 def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypatch) -> None:
-    """_run_pipeline_with_cleanup must install RunLogHandler on entry and remove on exit."""
+    """run_pipeline_with_cleanup must install RunLogHandler on entry and remove on exit."""
     import quodeq.cli_evaluation as cli
     from quodeq.shared.run_log import RunLogHandler
 
     logger = logging.getLogger("quodeq")
     initial_handlers = set(id(h) for h in logger.handlers)
 
-    # Stub _execute_pipeline so we exercise only the wrapper's install/remove logic.
-    with patch.object(cli, "_execute_pipeline", return_value=0), \
-         patch.object(cli, "_save_manifest"), \
-         patch.object(cli, "_build_run_config"), \
+    # Stub execute_pipeline so we exercise only the wrapper's install/remove logic.
+    with patch.object(cli, "execute_pipeline", return_value=0), \
+         patch.object(cli, "save_manifest"), \
+         patch.object(cli, "build_run_config"), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
         evidence_dir = tmp_path / "proj" / "run" / "evidence"
@@ -60,8 +60,8 @@ def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypat
         def _spy(*a, **k):
             attached.append(any(isinstance(h, RunLogHandler) for h in logger.handlers))
             return 0
-        with patch.object(cli, "_execute_pipeline", side_effect=_spy):
-            cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+        with patch.object(cli, "execute_pipeline", side_effect=_spy):
+            cli.run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     assert attached == [True]
     # After exit, no stray RunLogHandler remains.

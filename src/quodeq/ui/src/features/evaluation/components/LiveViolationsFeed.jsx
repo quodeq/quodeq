@@ -6,13 +6,20 @@ import { staggerDelayStyle } from '../../../utils/animation.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
-import { orderDimensions } from './liveViolationsOrdering.js';
+import { orderDimensions, autoOpenTarget } from './liveViolationsOrdering.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { JOB_STATUS } from '../../../vocab/jobStatus.js';
+import { DIM_STATE } from '../../../vocab/dimState.js';
+import { SEVERITY_ORDER } from '../../../vocab/severity.js';
+import { KEY } from '../../../vocab/keyboard.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
-const KNOWN_SEVERITIES = new Set(['critical', 'major', 'minor']);
+// The 3 real severities (as opposed to a missing/unrecognised one), for
+// deciding whether SevBadge (which only knows those 3) can render this row.
+const REAL_SEVERITY_SET = new Set(SEVERITY_ORDER);
 
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
@@ -35,10 +42,10 @@ function ViolationLiveRow({ violation, index }) {
         aria-expanded={open}
         aria-label={t('evaluate.findingAria', { severity: severityLabel(v.severity), title: v.title || v.file || t('evaluate.detailsFallback') })}
         onClick={() => setOpen(o => !o)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
+        onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >
         <span className="vlive-rail" aria-hidden="true" />
-        {KNOWN_SEVERITIES.has(v.severity)
+        {REAL_SEVERITY_SET.has(v.severity)
           ? <SevBadge level={v.severity} format="long" />
           : <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>}
         <span className="vrow-rule">{v.principle || ''}</span>
@@ -79,20 +86,18 @@ function DimensionGroup({ dim, violations, open, onToggle }) {
   );
 }
 
-// Single-open-at-a-time accordion. The topmost (most recently active) dim
-// auto-expands; whenever the topmost changes — i.e. a new dimension starts
-// producing violations — the previous one collapses and the new one opens.
-// The user can still click any header to switch which one is open.
-function useAutoOpenTopDim(orderedDims) {
+// Single-open-at-a-time accordion, following `autoOpenTarget`: whenever the
+// target changes (a new dimension starts producing findings, the run moves
+// on to one that has none yet, the run ends) the accordion follows it. The
+// user can still click any header to switch which one is open.
+function useAutoOpenDim(target) {
   const [openDim, setOpenDim] = useState(null);
-  const topDim = orderedDims[0]?.dim;
-  const prevTopRef = useRef(null);
+  const prevTargetRef = useRef(undefined);
   useEffect(() => {
-    if (topDim && prevTopRef.current !== topDim) {
-      prevTopRef.current = topDim;
-      setOpenDim(topDim);
-    }
-  }, [topDim]);
+    if (target === undefined || prevTargetRef.current === target) return;
+    prevTargetRef.current = target;
+    setOpenDim(target);
+  }, [target]);
   return [openDim, setOpenDim];
 }
 
@@ -102,17 +107,24 @@ function computeQueuedFiles(runningDim) {
     : null;
 }
 
-function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, isRunning, currentDimension }) {
+function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, passedCount, isRunning, currentDimension }) {
   return (
     <div className="vlive-head">
       <span className="vlive-head-left">
         <SectionLabel>{t('evaluate.liveViolationsLabel')}</SectionLabel>
         <span className="vlive-counter">
           {totalCount > 0
-            ? (orderedDimsCount === 1
-                ? t('evaluate.acrossDimsOne', { count: totalCount, dims: orderedDimsCount })
-                : t('evaluate.acrossDimsMany', { count: totalCount, dims: orderedDimsCount }))
+            ? t(
+              pluralKey(orderedDimsCount, 'evaluate.acrossDimsOne', 'evaluate.acrossDimsMany'),
+              { count: totalCount, dims: orderedDimsCount },
+            )
             : t('evaluate.noNewFindings')}
+          {/* The console line prints "40 v · 1056 c". Saying the passing
+              checks here keeps the feed from reading as the run's whole
+              output: the rows are the violations, this is the rest. */}
+          {passedCount > 0 && (
+            <span className="vlive-counter-passed"> · {t(pluralKey(passedCount, 'evaluate.checksPassedOne', 'evaluate.checksPassedMany'), { count: passedCount })}</span>
+          )}
           {hiddenCarriedCount > 0 && (
             <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>
           )}
@@ -152,19 +164,23 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   // Per-dim activity timestamps power "latest active dimension on top".
   const lastActivity = useDimensionActivity(liveViolations);
 
-  const isRunning = job?.status === 'running';
+  const isRunning = job?.status === JOB_STATUS.RUNNING;
   // Shares the progress query cache entry with the strip/progress — the hook
   // adds no polling of its own. Only used for the streaming footer/header.
   const { data: progress } = useEvaluationProgress(job?.jobId, !isRunning);
-  const runningDim = (progress?.dimensions || []).find((d) => d?.state === 'running');
+  const runningDim = (progress?.dimensions || []).find((d) => d?.state === DIM_STATE.RUNNING);
   const queued = computeQueuedFiles(runningDim);
 
-  const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity),
+  const currentDimension = progress?.currentDimension;
+  // Compliance counts come from the same tally the console heartbeat prints
+  // (scan progress), not from the finding stream, which carries violations only.
+  const passedCount = (progress?.dimensions || []).reduce((sum, d) => sum + (d?.compliance ?? 0), 0);
+  const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity, currentDimension),
     // lastActivity is a ref's current value — it's intentionally not in deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [liveViolations]);
+    [liveViolations, currentDimension]);
 
-  const [openDim, setOpenDim] = useAutoOpenTopDim(orderedDims);
+  const [openDim, setOpenDim] = useAutoOpenDim(autoOpenTarget({ isRunning, progress, orderedDims }));
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
   // A fully-cached dimension yields zero NEW findings. Bailing out here
@@ -178,8 +194,9 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
         totalCount={totalCount}
         orderedDimsCount={orderedDims.length}
         hiddenCarriedCount={hiddenCarriedCount}
+        passedCount={passedCount}
         isRunning={isRunning}
-        currentDimension={progress?.currentDimension}
+        currentDimension={currentDimension}
       />
       {(totalCount > 0 || isRunning) && (
         <LiveViolationsCard orderedDims={orderedDims} openDim={openDim} setOpenDim={setOpenDim} isRunning={isRunning} queued={queued} />

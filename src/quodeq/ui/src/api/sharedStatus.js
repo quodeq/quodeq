@@ -1,5 +1,5 @@
 /**
- * Shared repository config management — connect, disconnect, refresh,
+ * Shared repository config management — connect, disconnect,
  * and connection status.
  *
  * Timestamp units: the backend (services/shared_repo.py's published_meta and
@@ -13,6 +13,7 @@
  */
 
 import { request } from './request.js';
+import { MS_PER_SECOND } from '../utils/time.js';
 
 /**
  * Convert a UNIX epoch-seconds timestamp (as sent by the backend) to
@@ -23,15 +24,27 @@ import { request } from './request.js';
  * @returns {number|null}
  */
 export function epochSecondsToMs(seconds) {
-  return typeof seconds === 'number' && seconds ? seconds * 1000 : null;
+  return typeof seconds === 'number' && seconds ? seconds * MS_PER_SECOND : null;
+}
+
+/**
+ * One sync job's slot with its finish time in ms (a missing slot becomes an
+ * empty one). Every reader of /shared/status goes through this, so the single
+ * status cache entry has one shape no matter who fetched it.
+ * @param {Object|null|undefined} raw
+ * @returns {Object}
+ */
+export function normalizeSlot(raw) {
+  const s = raw || {};
+  return { ...s, finishedAt: epochSecondsToMs(s.finishedAt) };
 }
 
 // ── Config Management ───────────────────────────────────────────────────────
 
 /**
  * Get the shared repository connection status.
- * @returns {Promise<{configured: boolean, url: string|null, lastSynced: number|null, publish: Object}>}
- *   lastSynced is epoch-milliseconds (converted from the backend's epoch
+ * @returns {Promise<import('./syncStatus.js').SyncStatus & {publish: Object}>}
+ *   lastSynced and each slot's finishedAt are epoch-milliseconds (converted from the backend's epoch
  *   seconds; see epochSecondsToMs). `publish.finishedAt`, if present, is
  *   passed through unconverted (raw epoch seconds) -- no UI consumer currently
  *   formats it as a date.
@@ -41,37 +54,29 @@ export async function getSharedStatus() {
   return {
     ...data,
     lastSynced: epochSecondsToMs(data?.lastSynced),
+    connect: normalizeSlot(data?.connect), refresh: normalizeSlot(data?.refresh), pull: normalizeSlot(data?.pull),
   };
 }
 
 /**
  * Connect to a shared repository.
+ *
+ * The server clones in a background job: PUT answers 202 {started, url} and
+ * progress appears under `connect` in /shared/status (see api/syncStatus.js).
  * @param {string} url - Git repository URL
- * @returns {Promise<{configured: boolean, url: string}>}
+ * @returns {Promise<{started: boolean, url: string}>}
  */
 export function connectShared(url) {
-  return request('/shared/config', {
-    method: 'PUT',
-    body: JSON.stringify({ url }),
-  });
+  return request('/shared/config', { method: 'PUT', body: JSON.stringify({ url }) });
 }
 
 /**
- * Disconnect from the shared repository.
+ * Disconnect from the shared repository. The server deletes the local clone
+ * and requires ?confirm=true; callers show their own confirm step first.
  * @returns {Promise<{configured: boolean}>}
  */
 export function disconnectShared() {
-  return request('/shared/config', {
+  return request('/shared/config?confirm=true', {
     method: 'DELETE',
-  });
-}
-
-/**
- * Refresh the shared repository (fetch latest changes).
- * @returns {Promise<{stale: boolean, lastSynced: string}>}
- */
-export function refreshShared() {
-  return request('/shared/refresh', {
-    method: 'POST',
   });
 }

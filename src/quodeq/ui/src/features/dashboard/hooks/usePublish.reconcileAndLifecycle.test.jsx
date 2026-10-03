@@ -129,7 +129,7 @@ describe('usePublish', () => {
     expect(result.current.publishErrorProject).toBe('p1');
   });
 
-  // Minor 8 (final whole-branch review): CardFooter keys its inline error
+  // CardFooter keys its inline error
   // banner on publishErrorProject alone (see ProjectsPage.jsx's CardFooter),
   // not on publishState. A rejected click on a DIFFERENT project (409, the
   // single-job guard -- see "does not clobber a genuinely running job" above)
@@ -204,18 +204,16 @@ describe('usePublish', () => {
     }
   });
 
-  // Audit C6: useSharedProjects and usePublish used to each fetch status
+  // useSharedProjects and usePublish used to each fetch status
   // and list independently -- two of every request per Projects mount.
   // Both hooks now read `sharedKeys.status()`/`sharedKeys.list()`, so
   // react-query dedupes: mounting them together issues exactly one status
   // fetch and one list fetch, not one pair per hook.
   it('mounting alongside useSharedProjects issues exactly one status fetch and one list fetch (react-query dedup)', async () => {
-    // Held open so the background revalidate useSharedProjects fires after
-    // its own first successful list never completes during this test --
-    // otherwise its own re-list would add a second, legitimate list fetch
-    // and muddy the "exactly one" assertion this test is making.
-    const refreshShared = vi.fn(() => new Promise(() => {}));
-    const fakeApi = makeFakeApi({ refreshShared });
+    // useSharedProjects polls getSyncStatus and usePublish reads getSharedStatus
+    // from the same cache key; the fake routes both to one counted function.
+    const fakeApi = makeFakeApi();
+    fakeApi.getSyncStatus = (...a) => fakeApi.getSharedStatus(...a);
 
     function BothHooks() {
       useSharedProjects();

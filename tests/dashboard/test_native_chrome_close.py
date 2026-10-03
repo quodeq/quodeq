@@ -1,13 +1,19 @@
 """Native-chrome close handler: off-thread prompt on macOS/GTK/Qt, inline dialog on Windows."""
+import http.client
+import logging
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from quodeq.dashboard import _webview_window as ww
 from quodeq.dashboard import _webview_window_close as wwc
 from tests._timeouts import budget
 
+_LOGGER_NAME = "quodeq.dashboard._webview_window_close"
+
 
 class TestOnClosing:
-    """The close handler behaves differently by backend (see _make_on_closing):
+    """The close handler behaves differently by backend (see make_on_closing):
 
     macOS/GTK/Qt marshal the dialog onto the GUI thread and block the caller, so
     it must run OFF the GUI thread (worker + veto + destroy). Windows/winforms
@@ -24,7 +30,7 @@ class TestOnClosing:
         api._get_running_evaluation.return_value = job
         window = MagicMock()
         with patch.object(ww.sys, "platform", platform):
-            on_closing = ww._make_on_closing(api, window)
+            on_closing = ww.make_on_closing(api, window)
         return on_closing, window, api
 
     @staticmethod
@@ -40,7 +46,18 @@ class TestOnClosing:
 
     def test_no_job_closes_without_prompt(self):
         on_closing, window, api = self._wire(job=None)
-        with patch.object(wwc, "_ask_close_choice") as choose:
+        with patch.object(wwc, "ask_close_choice") as choose:
+            assert on_closing() is True
+        choose.assert_not_called()
+
+    def test_truncated_running_evaluation_response_closes_without_prompt(self):
+        # fetch_running_evaluation already catches (OSError, ValueError); a
+        # truncated/malformed response body (http.client.HTTPException) is
+        # not an OSError and still needs a guard here — treated the same as
+        # "no job running".
+        on_closing, window, api = self._wire(job=None)
+        api._get_running_evaluation.side_effect = http.client.IncompleteRead(b"partial")
+        with patch.object(wwc, "ask_close_choice") as choose:
             assert on_closing() is True
         choose.assert_not_called()
 
@@ -50,7 +67,7 @@ class TestOnClosing:
         # the closing handler (which runs ON the GUI thread) self-deadlocks. The
         # handler vetoes this close and shows the dialog on a worker thread.
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(wwc, "_ask_close_choice", return_value="stay") as choose:
+        with patch.object(wwc, "ask_close_choice", return_value="stay") as choose:
             assert on_closing() is False
             self._join(on_closing)
         choose.assert_called_once()
@@ -65,7 +82,7 @@ class TestOnClosing:
             seen["tid"] = threading.get_ident()
             return "stay"
 
-        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "ask_close_choice", side_effect=_choose):
             assert on_closing() is False
             self._join(on_closing)
         assert seen["tid"] != caller
@@ -82,7 +99,7 @@ class TestOnClosing:
             release.wait()
             return "keep"
 
-        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "ask_close_choice", side_effect=_choose):
             result = []
             caller = threading.Thread(target=lambda: result.append(on_closing()))
             caller.start()
@@ -96,7 +113,7 @@ class TestOnClosing:
 
     def test_keep_scanning_closes_window_without_cancelling(self):
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(wwc, "_ask_close_choice", return_value="keep"):
+        with patch.object(wwc, "ask_close_choice", return_value="keep"):
             on_closing()
             self._join(on_closing)
         window.destroy.assert_called_once()
@@ -106,7 +123,7 @@ class TestOnClosing:
 
     def test_cancel_scan_and_quit_cancels_then_closes(self):
         on_closing, window, api = self._wire(job={"jobId": "job-42"})
-        with patch.object(wwc, "_ask_close_choice", return_value="cancel"):
+        with patch.object(wwc, "ask_close_choice", return_value="cancel"):
             on_closing()
             self._join(on_closing)
         api._cancel_evaluation.assert_called_once_with("job-42")
@@ -115,7 +132,7 @@ class TestOnClosing:
 
     def test_stay_keeps_window_open_and_can_reprompt(self):
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(wwc, "_ask_close_choice", return_value="stay") as choose:
+        with patch.object(wwc, "ask_close_choice", return_value="stay") as choose:
             assert on_closing() is False
             self._join(on_closing)
             window.destroy.assert_not_called()
@@ -139,7 +156,7 @@ class TestOnClosing:
             release.wait()
             return "keep"
 
-        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "ask_close_choice", side_effect=_choose):
             assert on_closing() is False
             first_worker = on_closing._worker
             for _ in range(200):  # wait until the worker is actually prompting
@@ -167,7 +184,7 @@ class TestOnClosing:
             release.wait()
 
         api._cancel_evaluation.side_effect = _cancel
-        with patch.object(wwc, "_ask_close_choice", return_value="cancel") as choose:
+        with patch.object(wwc, "ask_close_choice", return_value="cancel") as choose:
             assert on_closing() is False
             first_worker = on_closing._worker
             assert cancel_started.wait(budget(2))  # worker is now inside the cancel call
@@ -184,7 +201,19 @@ class TestOnClosing:
         # If the choice can't be obtained, fall through to closing the window
         # (treat as 'keep') rather than leaving it un-closeable.
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(wwc, "_ask_close_choice", side_effect=RuntimeError("no GUI")):
+        with patch.object(wwc, "ask_close_choice", side_effect=RuntimeError("no GUI")):
+            assert on_closing() is False
+            self._join(on_closing)
+        window.destroy.assert_called_once()
+        api._cancel_evaluation.assert_not_called()
+
+    def test_out_of_tuple_dialog_error_does_not_trap_the_user(self):
+        # A ValueError is outside ask_close_choice's own narrowed
+        # (WebViewException, OSError, RuntimeError): prompt_close_choice_and_
+        # finish (a bare threading.Thread target, no run_isolated above it)
+        # must still commit the close via _ask_close_choice_isolated.
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+        with patch.object(wwc, "ask_close_choice", side_effect=ValueError("bad args")):
             assert on_closing() is False
             self._join(on_closing)
         window.destroy.assert_called_once()
@@ -194,6 +223,12 @@ class TestOnClosing:
 
     def test_windows_no_job_closes_without_dialog(self):
         on_closing, window, api = self._wire(job=None, platform="win32")
+        assert on_closing() is True
+        window.create_confirmation_dialog.assert_not_called()
+
+    def test_windows_truncated_running_evaluation_response_closes_without_dialog(self):
+        on_closing, window, api = self._wire(job=None, platform="win32")
+        api._get_running_evaluation.side_effect = http.client.IncompleteRead(b"partial")
         assert on_closing() is True
         window.create_confirmation_dialog.assert_not_called()
 
@@ -224,3 +259,42 @@ class TestOnClosing:
         on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
         window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
         assert on_closing() is True
+
+    def test_windows_dialog_failure_logs_a_warning(self):
+        # R-FT-7 -- was `except Exception: return True` with no log at all.
+        on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
+        window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
+        with patch.object(wwc._logger, "warning") as warning:
+            assert on_closing() is True
+        assert warning.called
+        assert warning.call_args.kwargs.get("exc_info") is True
+
+    def test_windows_dialog_out_of_scope_error_propagates(self):
+        on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
+        window.create_confirmation_dialog.side_effect = ValueError("bad args")
+        with pytest.raises(ValueError, match="bad args"):
+            on_closing()
+
+
+class TestPromptCloseChoiceAndFinishDestroy:
+    """R-FT-7 -- window.destroy() in prompt_close_choice_and_finish, narrowed from
+    bare Exception/debug to (WebViewException, RuntimeError, OSError)/warning."""
+
+    def _run(self, destroy_error):
+        window = MagicMock()
+        window.destroy.side_effect = destroy_error
+        state = {"prompting": True, "confirmed": False}
+        with patch.object(wwc, "ask_close_choice", return_value="keep"):
+            wwc.prompt_close_choice_and_finish(MagicMock(), window, state, None)
+        return state
+
+    def test_in_tuple_destroy_failure_is_logged_as_a_warning(self, caplog):
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            state = self._run(RuntimeError("already gone"))
+        assert state["confirmed"] is True
+        assert any(r.exc_info for r in caplog.records
+                    if "window.destroy after close-confirm failed" in r.getMessage())
+
+    def test_out_of_tuple_destroy_failure_propagates(self):
+        with pytest.raises(ValueError, match="boom"):
+            self._run(ValueError("boom"))

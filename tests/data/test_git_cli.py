@@ -219,3 +219,63 @@ def test_callers_carry_no_subprocess_dependency():
 
     for mod in (fs_scan, project_registration, repo, git_scoring):
         assert "subprocess" not in vars(mod), mod.__name__
+
+
+def _stream_python(monkeypatch, script: str) -> list:
+    """Make ``stream_log_names`` run ``python -c script`` instead of git.
+
+    Returns the list the spawned process lands in; its ``kill`` is wrapped
+    in a spy before ``stream_log_names`` sees the process.
+    """
+    import sys
+    from unittest import mock
+
+    import quodeq.data.git_cli as git_cli
+
+    real_popen = sp.Popen
+    procs: list = []
+
+    def fake_popen(_argv, **kwargs):
+        proc = real_popen([sys.executable, "-c", script], **kwargs)
+        proc.kill = mock.Mock(wraps=proc.kill)
+        procs.append(proc)
+        return proc
+
+    monkeypatch.setattr(git_cli.subprocess, "Popen", fake_popen)
+    return procs
+
+
+class TestStreamLogNamesDeadline:
+    def test_a_stream_that_finishes_in_time_is_not_killed(self, tmp_path, monkeypatch):
+        from quodeq.data.git_cli import stream_log_names
+        from tests._timeouts import budget
+
+        procs = _stream_python(monkeypatch, "print('a'); print('b')")
+        lines = list(stream_log_names(tmp_path, timeout=budget(30)))
+        assert lines == ["a\n", "b\n"]
+        (proc,) = procs
+        proc.kill.assert_not_called()
+        assert proc.returncode == 0
+
+    def test_a_stream_past_its_deadline_is_killed_and_the_generator_ends(
+        self, tmp_path, monkeypatch, caplog,
+    ):
+        import logging
+
+        import quodeq.data.git_cli as git_cli
+        from quodeq.data.git_cli import stream_log_names
+
+        monkeypatch.setattr(git_cli, "_GIT_LOG_STREAM_TIMEOUT_S", 0.5)
+        procs = _stream_python(
+            monkeypatch, "import time; print('first', flush=True); time.sleep(20)",
+        )
+        with caplog.at_level(logging.WARNING, logger=git_cli.__name__):
+            lines = list(stream_log_names(tmp_path))
+        assert lines == ["first\n"]
+        (proc,) = procs
+        proc.kill.assert_called()
+        assert proc.poll() is not None
+        (record,) = [r for r in caplog.records if r.name == git_cli.__name__]
+        assert record.levelno == logging.WARNING
+        assert str(tmp_path) in record.getMessage()
+        assert "0.5s" in record.getMessage()

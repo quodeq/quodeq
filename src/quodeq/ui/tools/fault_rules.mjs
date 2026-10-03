@@ -6,6 +6,10 @@
 // are tuned to catch the shapes the audit actually found, and anything they
 // over-report is grandfathered per-file in tools/fault_baseline.json, same
 // contract as the other gates. Counted by tools/check_fault.mjs.
+//
+// Known evasions, not matched: `const s = window.localStorage`,
+// `let s; s = localStorage`, `.catch(noop)` (a named handler) and
+// `.then(ok, () => {})`.
 
 // --- swallowed-catch ---------------------------------------------------
 
@@ -65,6 +69,23 @@ function inspectCatchBody(body, names) {
   return seen;
 }
 
+const FUNCTION_EXPRESSIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
+
+/** True for a body that evaluates to nothing: `{}`, `undefined`, `null`, `void 0`. */
+function isNoOpBody(body) {
+  if (body?.type === 'BlockStatement') return body.body.length === 0;
+  if (body?.type === 'Identifier') return body.name === 'undefined';
+  if (body?.type === 'Literal') return body.value === null;
+  return body?.type === 'UnaryExpression' && body.operator === 'void' && body.argument?.type === 'Literal';
+}
+
+/** True for `p.catch(() => {})` and the other no-op handler shapes. */
+function isNoOpPromiseCatch(node) {
+  if (calleeProperty(node.callee) !== 'catch' || node.arguments.length !== 1) return false;
+  const handler = node.arguments[0];
+  return FUNCTION_EXPRESSIONS.has(handler.type) && isNoOpBody(handler.body);
+}
+
 const swallowedCatch = {
   meta: {
     type: 'problem',
@@ -83,6 +104,13 @@ const swallowedCatch = {
         context.report({
           node,
           message: 'catch swallows the error -- log it (console.warn with a [module] prefix), surface it, or rethrow',
+        });
+      },
+      CallExpression(node) {
+        if (!isNoOpPromiseCatch(node)) return;
+        context.report({
+          node,
+          message: '.catch handler swallows the rejection -- log it (console.warn with a [module] prefix) or surface it',
         });
       },
     };
@@ -165,6 +193,12 @@ const floatingPromise = {
 // --- raw-storage-access ------------------------------------------------
 
 const STORAGE_OBJECTS = new Set(['localStorage', 'sessionStorage']);
+const RAW_STORAGE_MESSAGE = 'raw web storage access -- use src/adapters/storage.js (readString/writeString/readJSON/writeJSON/removeKey)';
+
+/** True for a bare `localStorage` / `sessionStorage` identifier. */
+function isStorageObject(node) {
+  return node?.type === 'Identifier' && STORAGE_OBJECTS.has(node.name);
+}
 
 const rawStorageAccess = {
   meta: {
@@ -181,10 +215,15 @@ const rawStorageAccess = {
         const viaWindow = node.object?.type === 'MemberExpression'
           && STORAGE_OBJECTS.has(node.object.property?.name);
         if (!direct && !viaWindow) return;
-        context.report({
-          node,
-          message: 'raw web storage access -- use src/adapters/storage.js (readString/writeString/readJSON/writeJSON/removeKey)',
-        });
+        context.report({ node, message: RAW_STORAGE_MESSAGE });
+      },
+      // `const s = localStorage`: the bare object is aliased and its methods
+      // called unguarded. A `storage = localStorage` default parameter is the
+      // documented injection convention (see src/adapters/storage.js) and is
+      // not reported; a direct `storage.getItem` on it still bypasses the
+      // adapter's guard, which review has to catch at the call site.
+      VariableDeclarator(node) {
+        if (isStorageObject(node.init)) context.report({ node: node.init, message: RAW_STORAGE_MESSAGE });
       },
     };
   },

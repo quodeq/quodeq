@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.api.app import create_app
-from quodeq.api.zip import _MANIFEST_FILENAME, _MANIFEST_KIND, _MANIFEST_SCHEMA
+from quodeq.api.zip import MANIFEST_FILENAME, MANIFEST_KIND, MANIFEST_SCHEMA
 
 
 _ORIGIN = {"Origin": "http://localhost"}
@@ -60,14 +60,14 @@ def _make_zip(
         zf.writestr(f"{project_uuid}/repository_info.json", json.dumps(repo_info))
         if include_manifest:
             manifest = {
-                "schema": _MANIFEST_SCHEMA,
-                "kind": _MANIFEST_KIND,
+                "schema": MANIFEST_SCHEMA,
+                "kind": MANIFEST_KIND,
                 "source_uuid": project_uuid,
                 "exported_at": datetime.now(timezone.utc).isoformat(),
             }
             if manifest_overrides:
                 manifest.update(manifest_overrides)
-            zf.writestr(f"{project_uuid}/{_MANIFEST_FILENAME}", json.dumps(manifest))
+            zf.writestr(f"{project_uuid}/{MANIFEST_FILENAME}", json.dumps(manifest))
         for name, data in (extra_files or {}).items():
             zf.writestr(f"{project_uuid}/{name}", data)
         if extra_member is not None:

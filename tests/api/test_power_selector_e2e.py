@@ -6,7 +6,7 @@ These tests patch subprocess.Popen (no real AI calls) and assert that
 
     PowerSelector level → subagentModel payload → SUBAGENT_MODEL env /
     AnalysisOptions.subagent_model → AnalysisConfig.ai_model →
-    _build_ai_cmd() → subprocess.Popen args
+    build_ai_cmd() → subprocess.Popen args
 """
 from __future__ import annotations
 
@@ -133,7 +133,7 @@ class TestRunnerModelResolution:
         """Exercise the model-resolution precedence by calling the real
         ``_pool_launcher._build_pool_config`` production function, so a
         regression at its ``config.options.subagent_model or
-        _default_subagent_model(env) or config.options.ai_model`` line fails
+        default_subagent_model(env) or config.options.ai_model`` line fails
         these tests. ``ai_model`` is set to the haiku constant here to stand
         in for whatever default the caller configured, since AnalysisOptions
         itself has no built-in default.
@@ -148,6 +148,12 @@ class TestRunnerModelResolution:
         params = LaunchPoolParams(evidence_dir=Path("."), queue_path=Path("queue.json"), prompt="p")
         env = {"SUBAGENT_MODEL": env_model} if env_model else {}
         built = _build_pool_config(config, "test-dim", params, time_limit=60, env=env)
+        # shared_analysis_config_kwargs() fields pass through unchanged too --
+        # cheap coverage for the pool builder's other AnalysisConfig fields,
+        # not just ai_model. ai_cmd_path isn't set by this fixture, so it's
+        # left unasserted rather than pinned to a value nothing here chose.
+        assert built.cache_root == config.options.cache_root
+        assert built.ai_cmd == config.ai_cmd
         return built.ai_model
 
     @pytest.mark.parametrize("requested", [_MODEL_HAIKU, _MODEL_SONNET, _MODEL_OPUS])

@@ -14,7 +14,7 @@ _logger = logging.getLogger(__name__)
 
 
 def dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:
-    """Deduplicate JSONL lines by ``(p, file, line, t)`` key.
+    """Deduplicate JSONL lines by ``(requirement or principle, file, line, t)`` key.
 
     Returns a list of stripped, unique JSON lines.
     """
@@ -22,7 +22,7 @@ def dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:
 
 
 def _iter_dedup_jsonl_lines(lines: Iterable[str]) -> Iterable[str]:
-    """Yield unique JSONL lines, deduplicating by ``(p, file, line, t)`` key.
+    """Yield unique JSONL lines, deduplicating by ``(requirement or principle, file, line, t)`` key.
 
     Uses a set for seen keys and yields each unique line immediately,
     avoiding accumulation of all lines in memory.
@@ -37,7 +37,7 @@ def _iter_dedup_jsonl_lines(lines: Iterable[str]) -> Iterable[str]:
         except json.JSONDecodeError:
             _logger.debug("Skipping malformed JSONL line: %.100s", stripped)
             continue
-        key = (obj.get("p"), obj.get("file"), obj.get("line"), obj.get("t"))
+        key = (obj.get("req") or obj.get("p"), obj.get("file"), obj.get("line"), obj.get("t"))
         if key in seen:
             continue
         seen.add(key)
@@ -45,7 +45,7 @@ def _iter_dedup_jsonl_lines(lines: Iterable[str]) -> Iterable[str]:
 
 
 def deduplicate_jsonl(jsonl_path: Path) -> int:
-    """Deduplicate a JSONL file in-place by (p, file, line, t).
+    """Deduplicate a JSONL file in-place by (requirement or principle, file, line, t).
 
     Returns the number of unique findings kept.
     """
@@ -62,7 +62,7 @@ def deduplicate_jsonl(jsonl_path: Path) -> int:
 
 
 def merge_jsonl(result_jsonl_files: Iterable[Path], output: Path) -> Path:
-    """Merge JSONL files, deduplicating by (p, file, line, t).
+    """Merge JSONL files, deduplicating by (requirement or principle, file, line, t).
 
     Writes deduplicated lines directly to the output file as they are found
     unique, avoiding accumulation of all lines in memory.

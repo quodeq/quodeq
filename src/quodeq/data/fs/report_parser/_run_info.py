@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.core.run.state import RunState
 from quodeq.data.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.shared.validation import validate_path_segment
 
@@ -22,7 +23,7 @@ class RunInfo:
     date_label: str
     branch: str | None = None
     scope_path: str | None = None
-    status: str = "complete"  # "complete" | "in_progress" | "cancelled" | "failed"
+    status: RunState = RunState.DONE  # RunState; DONE also covers legacy runs without status.json
 
 
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:

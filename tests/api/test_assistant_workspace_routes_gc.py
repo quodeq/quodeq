@@ -8,8 +8,8 @@ from tests.api._assistant_workspace_fixtures import (  # noqa: F401 -- app/clien
 
 
 def _branch_exists(repo, branch):
-    from quodeq.assistant.worktree import _run
-    out = _run(["git", "-C", str(repo), "branch", "--list", branch])
+    from quodeq.assistant.worktree import run_git
+    out = run_git(["git", "-C", str(repo), "branch", "--list", branch])
     return bool(out.strip())
 
 

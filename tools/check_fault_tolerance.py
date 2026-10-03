@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Fault-tolerance ratchet: flag bare/empty/overly-broad exception handlers.
 
-Existing violations are grandfathered via tools/fault_tolerance_baseline.txt
-so the gate runs green in CI today while preventing NEW violations.
-Regenerate the baseline (only with justification) via:
+tools/fault_tolerance_baseline.txt is pinned empty (see
+tests/tools/test_fault_tolerance_baseline_is_empty.py): every prior
+grandfathered violation has been fixed, so any new one fails CI immediately
+instead of being added to the list. Regenerate the baseline (only with
+justification) via:
     python tools/check_fault_tolerance.py --update-baseline
 
 Entries are line-keyed (relpath:lineno:kind), so an unrelated line-count
@@ -14,7 +16,7 @@ introduced in the same change.
 
 Scans src/quodeq/**/*.py (vendored/generated dirs excluded; tests/ and
 JS/TS are out of scope for this ratchet, see the cycle 1 design doc) with
-`ast` for four kinds of violation:
+`ast` for these kinds of violation:
   - bare-except:  `except:` with no type at all
   - empty-except: the handler's entire body is `pass`, an ellipsis
     (`...`), or a docstring-only body
@@ -27,6 +29,16 @@ JS/TS are out of scope for this ratchet, see the cycle 1 design doc) with
     it is treated like `broad-except`/`empty-except`: grandfathered by line,
     not narrowed by the suppressed types (a judgment call, not a mechanical
     one). Keyed at the call's line.
+  - isolated-call: a `run_isolated(...)` call (see
+    src/quodeq/shared/fault_isolation.py) that is not at an entry point: a
+    loop-body statement, a function's only statement, or the body of a
+    lambda passed to another call. Zero-tolerance, no baseline entries.
+  - int-overflow: `int(...)` inside a `try` that catches both ValueError
+    and TypeError but not OverflowError (rules in
+    tools/_fault_tolerance_calls.py).
+  - mkstemp-before-try: a `mkstemp` assignment directly followed by a
+    `try` whose handlers catch OSError (rules in
+    tools/_fault_tolerance_calls.py).
 
 `broad-except` re-raise detection is a reachability-aware scan of the
 handler's TOP LEVEL: a `raise` after a `return` does not count, and a `raise`
@@ -48,6 +60,7 @@ import sys
 from pathlib import Path
 
 import _ratchet
+from _fault_tolerance_calls import scan_calls
 from _ratchet import read_text as _read_text
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -109,6 +122,58 @@ def _is_suppress_call(node: ast.expr) -> bool:
     return False
 
 
+_HELPER_NAME = "run_isolated"
+_HELPER_MODULE = "src/quodeq/shared/fault_isolation.py"
+_LOOPS = (ast.For, ast.AsyncFor, ast.While)
+_FUNCS = (ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+def _parents(tree: ast.AST) -> dict[ast.AST, ast.AST]:
+    """Map every node to its parent (ast has no back-links)."""
+    return {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+
+
+def _is_helper_call(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
+    return name == _HELPER_NAME
+
+
+def _own_statements(body: list[ast.stmt]) -> list[ast.stmt]:
+    """A function body without its leading docstring."""
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+            and isinstance(body[0].value.value, str):
+        return body[1:]
+    return body
+
+
+def _at_entry_point(call: ast.Call, parents: dict[ast.AST, ast.AST]) -> bool:
+    """True when *call* is a loop-body statement, a function's only
+    statement, or the body of a lambda passed to another call."""
+    parent = parents.get(call)
+    if isinstance(parent, ast.Lambda):
+        return isinstance(parents.get(parent), (ast.Call, ast.keyword))
+    if not isinstance(parent, (ast.Expr, ast.Return, ast.Assign)):
+        return False
+    holder = parents.get(parent)
+    if isinstance(holder, _LOOPS):
+        return parent in holder.body
+    if isinstance(holder, _FUNCS):
+        return _own_statements(holder.body) == [parent]
+    return False
+
+
+def _inside_helper(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> bool:
+    cur = parents.get(node)
+    while cur is not None:
+        if isinstance(cur, _FUNCS):
+            return cur.name == _HELPER_NAME
+        cur = parents.get(cur)
+    return False
+
+
 def _handler_kind(handler: ast.ExceptHandler) -> str | None:
     """Return the violation kind for one except-handler, or None if it's fine."""
     if handler.type is None:
@@ -126,14 +191,20 @@ def _relpath(path: Path) -> str:
 
 def _scan_tree(tree: ast.AST, rel: str) -> list[tuple[str, int, str]]:
     """Return (relpath, lineno, kind) violations found in one parsed module."""
+    parents = _parents(tree)
     found: list[tuple[str, int, str]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ExceptHandler):
             kind = _handler_kind(node)
+            if kind == "broad-except" and rel == _HELPER_MODULE and _inside_helper(node, parents):
+                continue
             if kind is not None:
                 found.append((rel, node.lineno, kind))
         elif _is_suppress_call(node):
             found.append((rel, node.lineno, "suppress"))
+        elif _is_helper_call(node) and not _at_entry_point(node, parents):
+            found.append((rel, node.lineno, "isolated-call"))
+    found.extend(scan_calls(tree, rel))
     return found
 
 

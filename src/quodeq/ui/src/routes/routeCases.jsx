@@ -6,20 +6,23 @@
  * renderers.jsx rather than in it so the route table stays a table.
  */
 import { lazy } from 'react';
-import { findProject, makeDismissHandler } from './dismissWiring.js';
+import { makeDismissHandler } from './dismissWiring.js';
+import {
+  useLiveJob, useLiveJobError, useLiveFindings, useLiveStartedProject, useEvaluationActions,
+} from '../features/evaluation/EvaluationLiveContext.jsx';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { findProject, projectIdOrSelf } from '../utils/projectIdentity.js';
 
 const EvaluateScreen = lazy(() => import('../features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('../features/settings/components/SettingsPage.jsx'));
 const PrincipleDetailPage = lazy(() => import('../features/explorer/components/PrincipleDetailPage.jsx'));
 
 /**
- * Evaluate route: splits the evaluation bundle into the three prop groups
- * EvaluateScreen takes, and resolves the project names the screen shows as
- * labels (the global selection, the running job's own project, and the
- * project the job was started for) into full project records.
+ * Evaluate route: reads the live evaluation from the store, splits it into the
+ * three prop groups EvaluateScreen takes, and resolves the project names the
+ * screen shows as labels (the global selection, the running job's own project,
+ * and the project the job was started for) into full project records.
  * @param {object} props
- * @param {object} props.evaluation - useEvaluation's bundle: the job, its
- *   error, live violations and the start/cancel/dismiss handlers.
  * @param {string} props.selectedProject - the app's global project selection.
  * @param {Array} props.projects - every known project, for the name lookups.
  * @param {() => void} props.onGoToProjects - escape hatch from an empty state.
@@ -28,8 +31,12 @@ const PrincipleDetailPage = lazy(() => import('../features/explorer/components/P
  * @param {Array} [props.preselectDims] - dimensions to tick on entry.
  * @returns {JSX.Element}
  */
-export function EvaluateCase({ evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
-  const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, startedProject } = evaluation;
+export function EvaluateCase({ selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
+  const job = useLiveJob();
+  const jobError = useLiveJobError();
+  const liveViolations = useLiveFindings();
+  const startedProject = useLiveStartedProject();
+  const { startEvaluation, dismissEvaluation, cancelEvaluation } = useEvaluationActions();
   const projectInfo = findProject(projects, selectedProject);
   // The in-progress card describes the running job's own project, which can
   // differ from the UI's global selection. Resolve it the same way so the
@@ -42,7 +49,7 @@ export function EvaluateCase({ evaluation, selectedProject, projects, onGoToProj
     <EvaluateScreen
       evaluation={{ job, jobError, liveViolations }}
       context={{ selectedProject, projectInfo, jobProjectInfo, startedProjectInfo, preselectDims }}
-      actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
+      actions={{ onStart: startEvaluation, onDismiss: dismissEvaluation, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
     />
   );
 }
@@ -51,12 +58,13 @@ export function EvaluateCase({ evaluation, selectedProject, projects, onGoToProj
  * @param {{ settings: Object }} props
  * @returns {JSX.Element}
  */
-export function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnected }) {
+export function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnected, onShowWelcome }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
       onOpenGradeFormula={onOpenGradeFormula}
       onSharedDisconnected={onSharedDisconnected}
+      onShowWelcome={onShowWelcome}
     />
   );
 }
@@ -74,10 +82,10 @@ export function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnecte
  * whole App.
  */
 export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects }) {
-  if (selectedSource !== 'shared') return null;
+  if (selectedSource !== PROJECT_SOURCE.SHARED) return null;
   const first = (projects || [])[0];
-  const id = first ? (first.id || first.name || first) : '';
-  return { id, source: 'local' };
+  const id = first ? projectIdOrSelf(first) : '';
+  return { id, source: PROJECT_SOURCE.LOCAL };
 }
 
 /**

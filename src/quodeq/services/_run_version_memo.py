@@ -30,6 +30,7 @@ def suppression_state_fingerprint(
     params_fingerprint: str,
     dismissed_all: "DismissedKeys | set[tuple]",
     deleted_all: set[tuple],
+    standards: str,
 ) -> str:
     """Hash of everything except the run's own keys that feeds run_scoped_version.
 
@@ -42,6 +43,7 @@ def suppression_state_fingerprint(
         "dismissed": as_dismissed_keys(dismissed_all).version_payload(),
         "deleted": sorted(str(k) for k in deleted_all),
         "params": params_fingerprint,
+        "standards": standards,
     }, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

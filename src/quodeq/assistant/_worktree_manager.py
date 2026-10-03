@@ -1,11 +1,14 @@
 """WorktreeManager: create/apply/commit/PR lifecycle for one session's git
 worktree.
 
-Split from ``worktree.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim; the low-level git helpers (``_run``,
-``_run_bytes``, ``WorktreeError``, ``diff_text``, ``diff_stats``,
-``worktrees_base``) stay imported from ``worktree.py`` rather than
-duplicated.
+Each session gets its own worktree under ``worktrees_base()``, named from
+the project id and a short session-id suffix, on a ``quodeq/fix-*`` branch.
+``create()`` allocates the worktree and branch, retrying on a name
+collision; ``apply_to_repo()`` turns the worktree's diff into a binary
+patch applied onto the user's working tree, uncommitted; ``commit_all()``
+and ``create_pr()`` carry it further into a pushed branch and PR.
+``ensure_session_worktree()`` is the module-level entry point: reuse an
+existing active worktree for the session, or create a fresh one.
 """
 from __future__ import annotations
 
@@ -15,22 +18,60 @@ import re
 import shutil
 import tempfile
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
-from quodeq.assistant.worktree import (
-    WorktreeError, _run, _run_bytes, diff_stats, diff_text, worktrees_base,
+from quodeq.assistant._worktree_git import (
+    WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text,
+    mark_intent_to_add, worktrees_base,
 )
+from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
 
 _logger = logging.getLogger(__name__)
 
 _BRANCH_PREFIX = "quodeq/fix-"
 _MAX_BRANCH_TRIES = 5
+_DEFAULT_PROJECT_NAME = "project"  # fallback path segment when no project id is known
+_GIT_SUBCOMMAND_WORKTREE = "worktree"
+_GIT_VERB_ADD = "add"
+_GIT_VERB_PRUNE = "prune"
+
+
+class PrResultReason(StrEnum):
+    """Why ``WorktreeManager.create_pr`` ended the way it did; the route
+    builds the user-facing message from this plus ``PrResult.detail``.
+
+    A local vocabulary, distinct from ``workspace_actions.OutcomeKind`` even
+    where a word ("created") coincides.
+    """
+
+    PUSH_FAILED = "push_failed"
+    NO_GH = "no_gh"
+    GH_FAILED = "gh_failed"
+    CREATED = "created"
+
+
+@dataclass(frozen=True)
+class PrResult:
+    """``create_pr``'s typed, fail-soft result: the route shapes this into
+    the wire body (``prUrl``/``branch``/``pushed``/``message``).
+
+    ``detail`` carries the dynamic part of the route's message (the push or
+    ``gh`` error text); empty for ``NO_GH`` and ``CREATED``, whose message is
+    fixed text.
+    """
+
+    pr_url: str | None
+    branch: str
+    pushed: bool
+    reason: PrResultReason
+    detail: str = ""
 
 
 def _safe_segment(value: str) -> str:
     """Collapse a user-facing name to a filesystem-safe single path segment."""
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value or "").strip("-.")
-    return cleaned or "project"
+    return cleaned or _DEFAULT_PROJECT_NAME
 
 
 @dataclass
@@ -41,11 +82,11 @@ class WorktreeManager:
 
     def _git_repo(self, *args: str) -> str:
         """Run git against the user's repository root and return its stdout."""
-        return _run(["git", "-C", str(self.repo_root), *args])
+        return run_git([GIT_BIN, GIT_FLAG_C, str(self.repo_root), *args])
 
     def _git_worktree(self, *args: str) -> str:
         """Run git against this session's worktree and return its stdout."""
-        return _run(["git", "-C", str(self.path), *args])
+        return run_git([GIT_BIN, GIT_FLAG_C, str(self.path), *args])
 
     @classmethod
     def for_session(cls, repo_root: Path, project_id: str, session_id: str,
@@ -53,15 +94,15 @@ class WorktreeManager:
         base = base or worktrees_base()
         short = session_id[:8]
         return cls(repo_root=Path(repo_root),
-                   path=base / _safe_segment(project_id or "project") / short,
+                   path=base / _safe_segment(project_id or _DEFAULT_PROJECT_NAME) / short,
                    branch=f"{_BRANCH_PREFIX}{short}")
 
     def exists(self) -> bool:
-        return self.path.is_dir() and (self.path / ".git").exists()
+        return self.path.is_dir() and (self.path / GIT_DIR_NAME).exists()
 
     def create(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._git_repo("worktree", "prune")
+        self._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE)
         if self.path.exists() and not self.exists():
             # stale leftover directory (crash, stray files); a live worktree has .git
             shutil.rmtree(self.path, ignore_errors=True)
@@ -70,7 +111,7 @@ class WorktreeManager:
             candidate = (self.branch if attempt == 0
                          else f"{self.branch}-{attempt + 1}")
             try:
-                self._git_repo("worktree", "add", "-b", candidate, str(self.path))
+                self._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_ADD, "-b", candidate, str(self.path))
                 self.branch = candidate
                 return
             except WorktreeError as exc:
@@ -84,10 +125,10 @@ class WorktreeManager:
 
     def remove(self, delete_branch: bool = True) -> None:
         if self.exists():
-            self._git_repo("worktree", "remove", "--force", str(self.path))
+            self._git_repo(_GIT_SUBCOMMAND_WORKTREE, "remove", "--force", str(self.path))
         else:
             shutil.rmtree(self.path, ignore_errors=True)
-            self._git_repo("worktree", "prune")
+            self._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE)
         if delete_branch:
             try:
                 self._git_repo("branch", "-D", self.branch)
@@ -102,8 +143,8 @@ class WorktreeManager:
         deletions, binary and non-UTF-8 changes survive the roundtrip. The
         patch file lives OUTSIDE the worktree so a failed cleanup can never
         leak it into a later diff or apply."""
-        self._git_worktree("add", "-N", ".")
-        patch = _run_bytes(["git", "-C", str(self.path), "diff", "HEAD",
+        mark_intent_to_add(self.path)
+        patch = run_git_bytes([GIT_BIN, GIT_FLAG_C, str(self.path), "diff", "HEAD",
                             "--binary"])
         if not patch.strip():
             raise WorktreeError("no changes to apply")
@@ -124,7 +165,7 @@ class WorktreeManager:
         status = self._git_worktree("status", "--porcelain")
         if not status.strip():
             return False
-        self._git_worktree("add", "-A")
+        self._git_worktree(_GIT_VERB_ADD, "-A")
         self._git_worktree(
             "-c", "user.name=Quodeq Assistant",
             "-c", "user.email=assistant@quodeq.local",
@@ -132,7 +173,7 @@ class WorktreeManager:
         )
         return True
 
-    def create_pr(self, title: str, body: str) -> dict:
+    def create_pr(self, title: str, body: str) -> PrResult:
         """Commit, push, gh pr create. Fail-soft: the branch is always kept.
 
         On push failure the just-made commit is rolled back (soft) so the
@@ -144,42 +185,36 @@ class WorktreeManager:
         except WorktreeError as exc:
             if committed:
                 self._git_worktree("reset", "--soft", "HEAD~1")
-            return {"prUrl": None, "branch": self.branch, "pushed": False,
-                    "message": (f"Push failed: {exc}. The changes are back in the"
-                                " worktree; apply them or open a PR manually.")}
+            return PrResult(None, self.branch, False, PrResultReason.PUSH_FAILED, str(exc))
         if shutil.which("gh") is None:
-            return {"prUrl": None, "branch": self.branch, "pushed": True,
-                    "message": ("Branch pushed. Install and authenticate the gh"
-                                " CLI, or open the PR from your git host.")}
+            return PrResult(None, self.branch, True, PrResultReason.NO_GH)
         # gh runs with the parent process env on purpose (it needs the user's
         # own auth). It is NOT routed through the scrubbed-env CLI spawner
         # used for AI provider CLIs; that scrubber exists to keep secrets
         # away from a model-driven process, and `gh pr create` here is a
         # human-approved, fixed-argv action.
         try:
-            out = _run(["gh", "pr", "create", "--title", title or self.branch,
+            out = run_git(["gh", "pr", "create", "--title", title or self.branch,
                         "--body", body or "", "--head", self.branch],
                        cwd=self.path)
         except WorktreeError as exc:
-            return {"prUrl": None, "branch": self.branch, "pushed": True,
-                    "message": f"gh pr create failed: {exc}"}
+            return PrResult(None, self.branch, True, PrResultReason.GH_FAILED, str(exc))
         url = out.strip().splitlines()[-1] if out.strip() else None
-        return {"prUrl": url, "branch": self.branch, "pushed": True,
-                "message": "PR created"}
+        return PrResult(url, self.branch, True, PrResultReason.CREATED)
 
 
 def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | None,
                             session_id: str, base: Path | None = None) -> WorktreeManager:
     """Return the session's active worktree, creating one when needed."""
     row = repository.get_worktree(session_id)
-    if row and row["status"] == "active" and Path(row["path"]).is_dir():
+    if row and row["status"] == WorktreeStatus.ACTIVE and Path(row["path"]).is_dir():
         return WorktreeManager(repo_root=Path(row["repo_root"]),
                                path=Path(row["path"]), branch=row["branch"])
-    manager = WorktreeManager.for_session(repo_root, project_id or "project",
+    manager = WorktreeManager.for_session(repo_root, project_id or _DEFAULT_PROJECT_NAME,
                                           session_id, base=base)
     if manager.path.exists():  # crash leftover or terminal reuse: start clean
         shutil.rmtree(manager.path, ignore_errors=True)
-        _run(["git", "-C", str(repo_root), "worktree", "prune"])
+        manager._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE)
     manager.create()
     repository.upsert_worktree(session_id=session_id, project_id=project_id,
                                repo_root=str(repo_root), path=str(manager.path),

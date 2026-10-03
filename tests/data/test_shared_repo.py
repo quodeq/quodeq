@@ -4,7 +4,6 @@ import time
 from pathlib import Path
 
 from quodeq.data.fs.shared_repo import (
-    _git_env,
     ensure_shared_clone,
     refresh_shared_clone,
     remove_clone_dir,
@@ -12,6 +11,8 @@ from quodeq.data.fs.shared_repo import (
     shared_cache_dir,
     shared_repo_path,
 )
+from quodeq.data.fs.git_stream import run_git_streaming
+from quodeq.data.fs.shared_repo_git import git_env
 from tests.data._shared_repo_helpers import _make_origin
 
 
@@ -45,7 +46,7 @@ def test_ensure_clone_and_refresh(tmp_path, monkeypatch):
 
 
 def test_clone_and_refresh_are_not_shallow(tmp_path, monkeypatch):
-    """Audit finding C1: a permanently-shallow (--depth 1) clone means
+    """A permanently-shallow (--depth 1) clone means
     `git log -1 -- path` on the shallow root commit attributes EVERY path
     to the tip commit, misattributing every project except the most
     recently pushed one. Both the initial clone and the refresh fetch must
@@ -58,6 +59,33 @@ def test_clone_and_refresh_are_not_shallow(tmp_path, monkeypatch):
     ok, _ = refresh_shared_clone(url)
     assert ok is True
     assert not (repo / ".git" / "shallow").exists()
+
+
+def test_unshallow_failure_falls_through_to_plain_fetch_and_is_logged(tmp_path, monkeypatch, caplog):
+    """A transient failure unshallowing a legacy clone must not abort the
+    refresh: the plain fetch + reset below still runs, and the failure is
+    logged so a discarded (best-effort) reason doesn't vanish silently."""
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    url = _make_origin(tmp_path)
+    repo = ensure_shared_clone(url)
+    assert repo is not None
+    (repo / ".git" / "shallow").write_text("")  # simulate a legacy shallow clone
+
+    real_run_git = run_git
+
+    def flaky_unshallow(args, cwd=None, timeout=None, env=None):
+        if "--unshallow" in args:
+            return False, "fatal: could not read from remote repository"
+        return real_run_git(args, cwd=cwd, timeout=timeout)
+
+    monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git", flaky_unshallow)
+
+    with caplog.at_level("DEBUG", logger="quodeq.data.fs.shared_repo"):
+        ok, reason = refresh_shared_clone(url)
+
+    assert ok is True
+    assert reason == ""
+    assert "unshallow failed" in caplog.text
 
 
 def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path, monkeypatch):
@@ -73,11 +101,18 @@ def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path
     seen_timeouts: list[int] = []
     real_run_git = run_git
 
-    def _spy(args, *, cwd=None, timeout=None):
+    def _spy(args, *, cwd=None, timeout=None, env=None):
         seen_timeouts.append(timeout)
         return real_run_git(args, cwd=cwd, timeout=timeout)
 
+    real_stream = run_git_streaming
+
+    def _stream_spy(args, *, cwd=None, timeout, env=None, on_line):
+        seen_timeouts.append(timeout)
+        return real_stream(args, cwd=cwd, timeout=timeout, env=env, on_line=on_line)
+
     monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git", _spy)
+    monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git_streaming", _stream_spy)
 
     ok, _ = refresh_shared_clone(url, timeout=7)
     assert ok is True
@@ -94,11 +129,18 @@ def test_refresh_shared_clone_default_timeout_is_bounded_not_300s(tmp_path, monk
     seen_timeouts: list[int] = []
     real_run_git = run_git
 
-    def _spy(args, *, cwd=None, timeout=None):
+    def _spy(args, *, cwd=None, timeout=None, env=None):
         seen_timeouts.append(timeout)
         return real_run_git(args, cwd=cwd, timeout=timeout)
 
+    real_stream = run_git_streaming
+
+    def _stream_spy(args, *, cwd=None, timeout, env=None, on_line):
+        seen_timeouts.append(timeout)
+        return real_stream(args, cwd=cwd, timeout=timeout, env=env, on_line=on_line)
+
     monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git", _spy)
+    monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git_streaming", _stream_spy)
 
     ok, _ = refresh_shared_clone(url)
     assert ok is True
@@ -144,7 +186,7 @@ def test_git_env_disables_terminal_prompt_and_keeps_lfs_skip():
     fast instead of trying to read a prompt from a terminal that (with
     stdin=DEVNULL) no longer exists.
     """
-    env = _git_env()
+    env = git_env()
     assert env["GIT_TERMINAL_PROMPT"] == "0"
     assert env["GIT_LFS_SKIP_SMUDGE"] == "1"
     # GIT_SSH_COMMAND must NOT be set here: overriding it would silently
@@ -170,7 +212,7 @@ def test_run_git_does_not_hang_on_credential_prompt(tmp_path):
 
 
 def test_refresh_shared_clone_returns_reason_on_fetch_failure(tmp_path, monkeypatch, caplog):
-    """Audit finding B3: refresh_shared_clone must surface WHY a refresh
+    """refresh_shared_clone must surface WHY a refresh
     failed (the git stderr tail), not just False -- without it, the UI can
     only render "Request failed: 502" for DNS failure vs auth failure vs a
     deleted origin. The failure must also be logged via logger.warning so a

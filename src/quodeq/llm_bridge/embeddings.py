@@ -19,11 +19,16 @@ try:
 except ImportError:
     openai = None  # type: ignore[assignment]
 
+from quodeq.config.provider import Provider
 from quodeq.shared.constants import OLLAMA_DEFAULT_PORT
 from quodeq.shared.lru import LRUDict
 
 BATCH_TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=10.0)
 QUERY_TIMEOUT = httpx.Timeout(connect=10.0, read=10.0, write=30.0, pool=10.0)
+
+# Default capacity of the (model, base_url) -> availability cache; real
+# deployments touch a handful of keys, so this bound is never reached.
+_AVAILABILITY_CACHE_MAX_ENTRIES = 64
 
 ClientFactory = Callable[[], Any]
 
@@ -103,7 +108,7 @@ class EmbeddingAvailabilityCache:
     caches; production shares the module-default instance below.
     """
 
-    def __init__(self, max_entries: int = 64) -> None:
+    def __init__(self, max_entries: int = _AVAILABILITY_CACHE_MAX_ENTRIES) -> None:
         self._lock = threading.Lock()
         self._cache: LRUDict[tuple[str, str], bool] = LRUDict(max_entries)
 
@@ -150,7 +155,7 @@ def embedding_model_available(
         # Narrower than _providers._local_api_markers() on purpose: this gates
         # "/api/tags exists", not "is local" — localhost llama.cpp/omlx must
         # NOT match.
-        if OLLAMA_DEFAULT_PORT in base_url or "ollama" in base_url.lower():
+        if OLLAMA_DEFAULT_PORT in base_url or Provider.OLLAMA in base_url.lower():
             from quodeq.llm_bridge._ollama import list_ollama_models  # noqa: PLC0415
             lister = list_ollama_models
         else:

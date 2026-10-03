@@ -65,6 +65,23 @@ def test_untracked_file_is_not_scanned(tmp_path: Path, detection: dict) -> None:
     assert manifest.skipped_untracked == 1
 
 
+def test_uses_injected_tracked_files_instead_of_asking_git(tmp_path: Path, detection: dict) -> None:
+    """tracked_files is a call-time seam: when set, build_manifest must
+    filter against it directly instead of calling list_tracked_files -- no
+    git repo is involved at all here, proving the injected set alone drives
+    the filtering."""
+    for name in ("app0.py", "app1.py", "app2.py"):
+        _write(tmp_path / name)
+
+    manifest = build_manifest(
+        tmp_path, detection, tracked_files={tmp_path.resolve() / "app0.py"},
+    )
+    # total_files is counted before per-language target thresholds apply, so
+    # it reflects the filter directly regardless of MIN_FILES_PER_TARGET.
+    assert manifest.total_files == 1
+    assert manifest.skipped_untracked == 2
+
+
 def test_skipped_untracked_is_zero_without_git(tmp_path: Path, detection: dict) -> None:
     for name in ("app0.py", "app1.py", "app2.py"):
         _write(tmp_path / name)
@@ -146,7 +163,7 @@ def test_tracked_names_with_spaces_and_non_ascii(tmp_path: Path, detection: dict
 
 
 def test_multi_scope_walk_filters_untracked(tmp_path: Path) -> None:
-    """The monorepo walk shares _iter_source_files, so it filters too."""
+    """The monorepo walk shares iter_source_files, so it filters too."""
     from quodeq.analysis.manifest_build_scope import _walk_and_partition_by_scope
     from quodeq.analysis.manifest_models import ManifestWalkSpec
 
@@ -157,7 +174,7 @@ def test_multi_scope_walk_filters_untracked(tmp_path: Path) -> None:
         tracked_files={(tmp_path / "pkg" / "kept.py").resolve()},
     )
 
-    files_by_scope, _, _, skipped = _walk_and_partition_by_scope(tmp_path, spec, ["pkg"])
+    files_by_scope, _, _, skipped, _ = _walk_and_partition_by_scope(tmp_path, spec, ["pkg"])
     assert files_by_scope["pkg"]["python"] == ["pkg/kept.py"]
     assert skipped == 1
 
@@ -185,14 +202,14 @@ def test_nothing_logged_when_nothing_skipped(
 
 
 def _cli_prescan_stderr(tmp_path: Path, repo: Path, detection: dict, capsys) -> str:
-    from quodeq._cli_resolution import _build_manifest
+    from quodeq._cli_resolution import build_cli_manifest
 
     detection_file = tmp_path / "detection.json"
     detection_file.write_text(json.dumps(detection), encoding="utf-8")
     paths = SimpleNamespace(
         detection_file=detection_file, disciplines_conf=tmp_path / "absent.conf",
     )
-    _build_manifest(SimpleNamespace(no_prescan=False), repo, paths)
+    build_cli_manifest(SimpleNamespace(no_prescan=False), repo, paths)
     return capsys.readouterr().err
 
 

@@ -12,28 +12,64 @@ This module is the entry point. Core logic lives in:
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
+from quodeq.analysis.mcp.jsonrpc_io import JSONRPC_VERSION, send as _send
+from quodeq.analysis.mcp.finding_admission import run_catalog
+from quodeq.analysis.mcp.precedent_signals import precedent_signals
 from quodeq.data.fs.standards_loader import load_compiled_refs as _load_compiled_refs
-from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
-from quodeq.services.precedent_dismiss import precedent_match_hook
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_requirements as _load_compiled_requirements
 from quodeq.data.fs.standards_prefs import load_project_overrides
-from quodeq.data.sqlite.findings_queries import (
-    dismissed_source_stamp,
-    read_dismissed_snippets_strict,
-)
+from quodeq.shared.fault_isolation import run_isolated
 
 # Re-export public API so existing imports keep working.
 from quodeq.analysis.mcp.enricher import CompiledContext, FileReader  # noqa: F401
 from quodeq.analysis.mcp.router import DeduplicationStore, FindingsRouter  # noqa: F401
+
+# JSON-RPC 2.0 reserved server-error code for "something went wrong handling
+# this request that isn't a malformed request or an unknown method" -- see
+# handlers.py's _JSONRPC_METHOD_NOT_FOUND for the sibling constant.
+_JSONRPC_INTERNAL_ERROR = -32603
+
+
+class _StderrWarn:
+    """Minimal ``Warns`` adapter (see ``shared.fault_isolation``) that writes
+    to stderr. This subprocess has no LogSink/logging wiring of its own --
+    stderr is its one diagnostic channel, same as every other error path in
+    this module."""
+
+    def warning(self, message: str) -> None:
+        """Write *message* to stderr, matching this module's other stderr writes."""
+        sys.stderr.write(message + "\n")
+
+
+_STDERR_WARN = _StderrWarn()
+
+
+def _send_dispatch_error_response(msg: dict, exc: Exception) -> None:
+    """JSON-RPC error response for a message whose handling failed
+    unexpectedly (any exception ``_dispatch`` doesn't itself recognize).
+
+    Mirrors ``handlers.handle_unknown_method``'s request-id gating: a
+    notification (no ``id``) gets no response, per the JSON-RPC 2.0 spec.
+    The failure itself is already logged, with its traceback, by
+    ``run_isolated`` at the call site.
+    """
+    req_id = msg.get("id")
+    if req_id is not None:
+        _send({
+            "jsonrpc": JSONRPC_VERSION, "id": req_id,
+            "error": {
+                "code": _JSONRPC_INTERNAL_ERROR,
+                "message": f"{type(exc).__name__}: {exc}",
+            },
+        })
 
 
 def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
@@ -55,6 +91,7 @@ def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
     trust_model = resolve_trust_model(work_dir) if work_dir is not None else None
 
     return CompiledContext(
+        catalog=run_catalog(sa.compiled_dir, sa.dimensions),
         compiled_refs=compiled_refs or {},
         compiled_reqs=compiled_reqs or {},
         req_to_dim=req_to_dim,
@@ -91,13 +128,12 @@ def main() -> None:
                 msg = read_message()
                 if msg is None:
                     break
-                try:
-                    _dispatch(msg, router, queue, sa.agent_id)
-                except (KeyError, TypeError, ValueError, json.JSONDecodeError, OSError) as exc:
-                    sys.stderr.write(
-                        f"Dispatch error: {exc}. "
-                        f"Check that the message format matches the expected MCP schema.\n"
-                    )
+                run_isolated(
+                    lambda msg=msg: _dispatch(msg, router, queue, sa.agent_id),
+                    label=f"MCP message dispatch ({msg.get('method', '?')!r})",
+                    log=_STDERR_WARN,
+                    on_error=lambda exc, msg=msg: _send_dispatch_error_response(msg, exc),
+                )
     except OSError as exc:
         sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")
         sys.exit(1)
@@ -167,14 +203,9 @@ def _build_router(
     """
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
-    # The strict reader raises on a failed open, so the per-run memo skips the
-    # run instead of remembering it as having no dismissals.
-    ctx.precedent_fingerprints = load_precedent_fingerprints(
-        project_dir, read_dismissed=read_dismissed_snippets_strict,
-        source_stamp=dismissed_source_stamp,
-    )
-    ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
-    ctx.on_precedent_match = precedent_match_hook(project_dir)
+    # This server is its own process: its env is the run's env.
+    for field, value in precedent_signals(project_dir, run_dir).items():
+        setattr(ctx, field, value)
     from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
 

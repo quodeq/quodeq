@@ -26,7 +26,7 @@ def test_rescore_requires_project(client):
 
 
 def test_rescore_missing_project_message_names_the_fix(client):
-    """Finding 6209: the message must say how to fix it, not just what's wrong."""
+    """The message must say how to fix it, not just what's wrong."""
     resp = client.get("/api/rescore")
     assert resp.status_code == 400
     data = resp.get_json()
@@ -35,7 +35,7 @@ def test_rescore_missing_project_message_names_the_fix(client):
 
 
 def test_register_rescore_routes_has_a_docstring_with_usage_example():
-    """Finding 6208: register_rescore_routes needs a docstring with a usage example."""
+    """register_rescore_routes needs a docstring with a usage example."""
     from quodeq.api.routes_rescore import register_rescore_routes
     doc = register_rescore_routes.__doc__
     assert doc is not None

@@ -7,16 +7,16 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from enum import StrEnum
 
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared._log_format import (  # noqa: F401
     ColorFormatter as _ColorFormatter,
     StderrHandler as _StderrHandler,
-    _LOG_SUCCESS,
-    _color,
-    _should_use_color,
-    _use_color,
-    _USE_COLOR,
+    LOG_SUCCESS,
+    color,
+    should_use_color,
+    use_color,
 )
 
 # Module-level logger configuration is intentional -- standard Python convention.
@@ -27,12 +27,21 @@ _logger.propagate = False
 _logger.setLevel(logging.INFO)
 
 
+class _EnvLogLevel(StrEnum):
+    """LOG_LEVEL values this module accepts (mirrors stdlib logging level names)."""
+
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
 def _apply_env_log_level(
     level: str | None = None, env: Mapping[str, str] | None = None,
 ) -> None:
     """Apply *level* (or LOG_LEVEL env var) to the logger. Injectable for testing."""
     env_level = (level or resolve_env(env).get("LOG_LEVEL", "")).upper()
-    if env_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
+    if env_level in _EnvLogLevel:
         _logger.setLevel(getattr(logging, env_level))
 
 
@@ -46,7 +55,7 @@ def log_info(message: str, *, logger: logging.Logger | None = None) -> None:
 
 def log_success(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log a success message."""
-    (logger or _logger).log(_LOG_SUCCESS, message)
+    (logger or _logger).log(LOG_SUCCESS, message)
 
 
 def log_warning(message: str, *, logger: logging.Logger | None = None) -> None:
@@ -62,3 +71,12 @@ def log_debug(message: str, *, logger: logging.Logger | None = None) -> None:
 def log_error(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log an error message."""
     (logger or _logger).error(message)
+
+
+_USE_COLOR_OLD_NAME = "USE_COLOR"  # __getattr__ shim for the old module-level constant
+
+
+def __getattr__(name: str):
+    if name == _USE_COLOR_OLD_NAME:
+        return use_color()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

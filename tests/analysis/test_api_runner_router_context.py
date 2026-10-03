@@ -76,6 +76,43 @@ class TestSyncCacheWrite:
         )
 
 
+class TestBuildRouterContextDegradesOnEnrichmentSetupFailure:
+    def test_unreadable_compiled_standards_degrades_to_none(self, tmp_path, monkeypatch, caplog):
+        """_build_router_context's except narrows to (OSError, json.JSONDecodeError):
+        a failure loading compiled refs/requirements must still degrade to
+        raw-findings mode (ctx=None), not abort the run."""
+        import logging
+
+        def boom(*_a, **_kw):
+            raise OSError("disk read failed")
+
+        monkeypatch.setattr("quodeq.analysis._api_runner.load_compiled_refs", boom)
+
+        with caplog.at_level(logging.WARNING, logger="quodeq.analysis._api_runner"):
+            ctx = _build_router_context(
+                tmp_path, "security", None, tmp_path, tmp_path / "run-1",
+            )
+
+        assert ctx is None
+        assert any("Could not build enrichment context" in r.message for r in caplog.records)
+
+    def test_malformed_compiled_standards_json_degrades_to_none(self, tmp_path, monkeypatch):
+        """Same contract for the other tuple member: a compiled-standards
+        read that raises json.JSONDecodeError must also degrade, not abort."""
+        import json
+
+        def boom(*_a, **_kw):
+            raise json.JSONDecodeError("bad json", "doc", 0)
+
+        monkeypatch.setattr("quodeq.analysis._api_runner.load_compiled_requirements", boom)
+
+        ctx = _build_router_context(
+            tmp_path, "security", None, tmp_path, tmp_path / "run-1",
+        )
+
+        assert ctx is None
+
+
 class TestBuildRouterContextCorpus:
     """`_build_router_context` wires precedent_corpus (env-gated, never raises)."""
 
@@ -108,23 +145,25 @@ class TestBuildRouterContextCorpus:
         with (project_dir, run_dir) and stores its return value -- the
         None-when-flag-off test above passes trivially against the
         CompiledContext field default, so this closes that gap."""
-        import quodeq.analysis._api_runner as api_runner_module
+        import quodeq.analysis.mcp.precedent_signals as precedent_signals_module
 
         sentinel = object()
         calls = []
+        # The caller resolves the precedent settings from the process env.
+        monkeypatch.setenv("QUODEQ_PRECEDENT_SIMILARITY", "0.9")
 
-        def fake_load_precedent_corpus(project_dir, run_dir):
-            calls.append((project_dir, run_dir))
+        def fake_load_precedent_corpus(project_dir, run_dir, *, settings):
+            calls.append((project_dir, run_dir, settings.similarity_threshold))
             return sentinel
 
         monkeypatch.setattr(
-            api_runner_module, "load_precedent_corpus", fake_load_precedent_corpus,
+            precedent_signals_module, "load_precedent_corpus", fake_load_precedent_corpus,
         )
 
         run_dir = tmp_path / "run-1"
         ctx = _build_router_context(tmp_path, "security", None, tmp_path, run_dir)
 
-        assert calls == [(tmp_path, run_dir)]
+        assert calls == [(tmp_path, run_dir, 0.9)]
         assert ctx.precedent_corpus is sentinel
 
 
@@ -134,7 +173,7 @@ class TestBuildRouterContextPrecedentReader:
         per-run memo would remember as "no dismissals" until that DB's stat
         changes. The strict reader lets load_precedent_fingerprints see the
         failure, log it and skip the run without memoizing."""
-        import quodeq.analysis._api_runner as api_runner_module
+        import quodeq.analysis.mcp.precedent_signals as precedent_signals_module
         from quodeq.data.sqlite.findings_queries import (
             dismissed_source_stamp, read_dismissed_snippets_strict,
         )
@@ -146,7 +185,7 @@ class TestBuildRouterContextPrecedentReader:
             return {"fp"}
 
         monkeypatch.setattr(
-            api_runner_module, "load_precedent_fingerprints",
+            precedent_signals_module, "load_precedent_fingerprints",
             fake_load_precedent_fingerprints,
         )
 
@@ -155,3 +194,54 @@ class TestBuildRouterContextPrecedentReader:
         assert seams["read_dismissed"] is read_dismissed_snippets_strict
         assert seams["source_stamp"] is dismissed_source_stamp
         assert ctx.precedent_fingerprints == {"fp"}
+
+
+class TestPrecedentSnapshot:
+    def test_later_spawns_of_a_run_reuse_the_first_spawns_read(self, tmp_path, monkeypatch):
+        """Each agent is its own findings-server process with an empty memo;
+        the run's snapshot saves every later spawn from opening every past DB."""
+        import quodeq.analysis.mcp.precedent_signals as precedent_signals_module
+
+        loads = []
+
+        def fake_load(project_dir, **kwargs):
+            loads.append(project_dir)
+            return {"fp"}
+
+        monkeypatch.setattr(precedent_signals_module, "load_precedent_fingerprints", fake_load)
+        run_dir = tmp_path / "run-1"
+        (run_dir / "evidence").mkdir(parents=True)
+
+        first = precedent_signals_module.precedent_signals(tmp_path, run_dir)["precedent_fingerprints"]
+        second = precedent_signals_module.precedent_signals(tmp_path, run_dir)["precedent_fingerprints"]
+        (tmp_path / "run-0").mkdir()
+        (tmp_path / "run-0" / "evaluation.db").write_bytes(b"x")
+        third = precedent_signals_module.precedent_signals(tmp_path, run_dir)["precedent_fingerprints"]
+
+        assert first == second == third == {"fp"}
+        assert len(loads) == 2, "a new or changed run DB invalidates the snapshot"
+
+    def test_a_real_history_is_opened_once_per_run(self, tmp_path, monkeypatch):
+        import quodeq.analysis.mcp.precedent_signals as precedent_signals_module
+        from quodeq.core.events.models import Judgment
+        from quodeq.data.sqlite.state_store import SQLiteStateStore
+
+        past = tmp_path / "run-0"
+        past.mkdir()
+        SQLiteStateStore(past).record_finding(Judgment(
+            practice_id="P1", verdict="violation", dimension="Security",
+            file="a.py", line=1, reason="r", req="S-1", severity="minor",
+        ))
+        run_dir = tmp_path / "run-1"
+        (run_dir / "evidence").mkdir(parents=True)
+        opened = []
+        real = precedent_signals_module.read_dismissed_snippets_strict
+        monkeypatch.setattr(
+            precedent_signals_module, "read_dismissed_snippets_strict",
+            lambda d: (opened.append(d), real(d))[1],
+        )
+
+        precedent_signals_module.precedent_signals(tmp_path, run_dir)
+        precedent_signals_module.precedent_signals(tmp_path, run_dir)
+
+        assert opened == [past]

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import DimensionCard from './DimensionCard.jsx';
 
@@ -23,5 +23,14 @@ describe('DimensionCard density tile', () => {
     const dim = { ...DIM, totals: { ...DIM.totals, violationsPer100Files: null } };
     render(<DimensionCard dimension={dim} />);
     expect(screen.getByText('Per 100 files').nextElementSibling).toHaveTextContent('-');
+  });
+});
+
+describe('DimensionCard principle metrics', () => {
+  it('renders a legitimate zero metric', () => {
+    const principle = { name: 'Retries', grade: 'B', metrics: { instancesExamined: 0, complianceRate: 0 } };
+    const { container } = render(<DimensionCard dimension={{ ...DIM, principles: [principle] }} />);
+    fireEvent.click(container.querySelector('.principle-accordion-header'));
+    expect(screen.getByText('Instances Examined').previousElementSibling).toHaveTextContent('0');
   });
 });

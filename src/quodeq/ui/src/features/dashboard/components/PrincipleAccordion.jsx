@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { gradeColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 function ViolationRow({ v, principle, onViolationClick, handleViolationKeyDown }) {
   return (
@@ -28,13 +29,13 @@ function MetricsSection({ metrics }) {
     <div className="principle-section metrics-section">
       <h4>{t('principle.metrics')}</h4>
       <div className="metrics-grid">
-        {metrics.instancesExamined && (
+        {metrics.instancesExamined != null && (
           <div className="metric">
             <span className="metric-value">{metrics.instancesExamined}</span>
             <span className="metric-label">{t('principle.instancesExamined')}</span>
           </div>
         )}
-        {metrics.complianceRate && (
+        {metrics.complianceRate != null && (
           <div className="metric">
             <span className="metric-value">{metrics.complianceRate}%</span>
             <span className="metric-label">{t('principle.complianceRate')}</span>
@@ -102,7 +103,7 @@ export default function PrincipleAccordion({ principle, onViolationClick }) {
 
   function handleViolationKeyDown(v) {
     return (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onViolationClick(v, principle); }
+      if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onViolationClick(v, principle); }
     };
   }
 

@@ -10,10 +10,13 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/ApiContext.jsx";
-import { projectKeys, samePlaceholderScope } from "../api/queryKeys.js";
+import { projectKeys } from "../api/queryKeys.js";
+import { useScopedPlaceholder } from "./useScopedPlaceholder.js";
 import { resolveAsOf, deriveAvailableRuns } from './projectScoresDerived.js';
 import { t } from '../strings/index.js';
-import { STALE_TIME_MS } from './queryDefaults.js';
+import { STALE_TIME_MS, refetchWhileError } from './queryDefaults.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 /**
  * @param {{
@@ -36,6 +39,9 @@ function buildLatestQueryConfig({ projectKey, selectedSource, fetchScores, selec
     queryFn: () => fetchScores(selectedProject),
     enabled: !!selectedProject,
     staleTime: STALE_TIME_MS,
+    // Self-heal after a failed fetch; the webview never fires the focus
+    // refetch a browser would recover through (see refetchWhileError).
+    refetchInterval: refetchWhileError,
     // Latest scores are project-wide (no per-run swap), so within one project
     // there is nothing to flash — but a project/source switch must still drop
     // to a real loading state rather than showing the old project's grades.
@@ -57,6 +63,9 @@ function buildScoresQueryConfig({ projectKey, asOf, selectedSource, fetchScores,
     // the project subtree and force a refetch regardless of staleTime.
     // Freeze to skip the routine background refetch on re-entry.
     staleTime: asOf ? Infinity : STALE_TIME_MS,
+    // Self-heal after a failed fetch (see refetchWhileError); frozen as-of
+    // queries only poll while errored, never while holding data.
+    refetchInterval: refetchWhileError,
     // Keep prior scores visible while switching runs — see useDashboard for
     // rationale. Scoped to this project+source, so a project switch loads clean.
     placeholderData: keepPlaceholder ? keepInScope : undefined,
@@ -92,18 +101,11 @@ function buildProjectScoresResult({ scoresQuery, latestQuery, availableRuns, ref
  *
  * @returns {{...queryState, availableRuns: object[], refreshScores: Function}}
  */
-export function useProjectScores({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+export function useProjectScores({ selectedProject, selectedRun, selectedSource = PROJECT_SOURCE.LOCAL, keepPlaceholder = true } = {}) {
   const { getProjectScores, sharedGetProjectScores } = useApi();
-  const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
+  const fetchScores = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetProjectScores : getProjectScores;
   const queryClient = useQueryClient();
-  const projectKey = selectedProject || "_none_";
-  // Reuse the previous payload only within the same project+source subtree —
-  // see samePlaceholderScope for why an unguarded (prev) => prev shows the
-  // PREVIOUS project's overview after a project switch.
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
+  const { projectKey, keepInScope } = useScopedPlaceholder(selectedProject, selectedSource);
 
   const latestQuery = useQuery(buildLatestQueryConfig({ projectKey, selectedSource, fetchScores, selectedProject, keepInScope }));
 
@@ -112,7 +114,7 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
   // fall back to 'latest' so the cards keep showing the last finished
   // evaluation instead of going blank mid-flight. Resolution waits for
   // latestQuery so we never fire the scoped query with a stale asOf.
-  const isLatestSelection = !selectedRun || selectedRun === "latest";
+  const isLatestSelection = !selectedRun || selectedRun === LATEST_RUN_ID;
   const asOf = useMemo(
     () => resolveAsOf({ isLatestSelection, selectedRun, latestQueryData: latestQuery.data }),
     [isLatestSelection, selectedRun, latestQuery.data]

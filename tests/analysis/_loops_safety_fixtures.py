@@ -7,12 +7,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from unittest.mock import MagicMock
 
-from quodeq.analysis.run_types import _AnalysisContext
+from quodeq.analysis.run_types import AnalysisContext
 
 
-def _ctx(total: int) -> _AnalysisContext:
-    """Minimal _AnalysisContext — only `total` is read by the loops."""
-    return _AnalysisContext(
+def _ctx(total: int) -> AnalysisContext:
+    """Minimal AnalysisContext — only `total` is read by the loops."""
+    return AnalysisContext(
         dimensions_data=None,
         date_str="",
         template="",
@@ -34,6 +34,9 @@ def _config() -> MagicMock:
     # Default: no run-level deadline (would otherwise be a MagicMock and
     # break the numeric comparison in the loop's deadline guard).
     cfg.options.deadline_at = None
+    # None falls back to the module-default drop counter (would otherwise
+    # be a MagicMock and break report_run_drop_stats's ratio formatting).
+    cfg.drop_counter = None
     return cfg
 
 

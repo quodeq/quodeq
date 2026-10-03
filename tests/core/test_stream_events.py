@@ -102,3 +102,13 @@ def test_violation_services_no_longer_import_analysis():
         with open(mod.__file__, encoding="utf-8") as fh:
             src = fh.read()
         assert "quodeq.analysis" not in src, mod.__name__
+
+
+def test_texts_from_assistant_ignores_non_dict_message_and_blocks():
+    from quodeq.core.stream.events import texts_from_assistant
+
+    assert texts_from_assistant({"message": "oops"}) == []
+    assert texts_from_assistant({"message": {"content": "text"}}) == []
+    assert texts_from_assistant(
+        {"message": {"content": ["str", None, {"type": "text", "text": "ok"}]}}
+    ) == ["ok"]

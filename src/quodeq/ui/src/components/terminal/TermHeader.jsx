@@ -13,15 +13,17 @@ import { t } from '../../strings/index.js';
  *   `?` popover after the name. Omit (or pass falsy) to hide the trigger.
  * @param {React.ReactNode} [props.badge]  Optional node rendered inline after
  *   the name/description (e.g. SharedReadOnlyBadge for a shared project).
+ * @param {{label: string, onClick: Function}} [props.learnMore]  Optional link at the
+ *   foot of the `?` popover, into a help section.
  */
-export default function TermHeader({ name, sub, description, badge }) {
+export default function TermHeader({ name, sub, description, badge, learnMore }) {
   const tip = typeof description === 'string' ? description.trim() : '';
   return (
     <header className="term-header">
       <div className="term-header__prompt">
         <span className="term-header__glyph" aria-hidden="true">▶</span>
         <span className="term-header__name">{name}</span>
-        {tip && <HelpHint label={t('evaluate.aboutTitle', { title: name })}>{tip}</HelpHint>}
+        {tip && <HelpHint label={t('evaluate.aboutTitle', { title: name })} learnMore={learnMore}>{tip}</HelpHint>}
         {badge}
       </div>
       {sub != null && <div className="term-header__sub">{sub}</div>}

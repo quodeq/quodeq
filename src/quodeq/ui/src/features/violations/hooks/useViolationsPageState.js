@@ -1,37 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { computeSummaryFromDimensions } from '../../../utils/visibleStandardsSummary.js';
-import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
+import { writeCachedState } from '../../../utils/pageStateCache.js';
+import { useTabScopedPageState } from '../../../hooks/useTabScopedPageState.js';
 import { useDismissedFindings } from '../components/useDismissedFindings.js';
+
+// This page's pageStateCache scope key.
+const PAGE_STATE_SCOPE = 'violations';
 
 /**
  * Fresh tab click (tabKey changed) drops the cached file-tree path so the
- * user lands at the root, then re-reads the (possibly just-reset) cache and
- * fires the mount/round-trip refresh.
+ * user lands at the root, then re-reads the (possibly just-reset) cache.
+ *
+ * No data refresh happens here. Mounting the page is not evidence that the
+ * dashboard changed: a finished run invalidates the caches itself and
+ * staleTime ages the rest out. Marking the dashboard stale on mount made
+ * the Overview refetch it on every return from this tab.
+ *
+ * `cache` is an optional injected page-state cache (see pageStateCache.js);
+ * with none given this goes through the module's own free functions (the
+ * shared default).
  */
-export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh }) {
+export function useViolationsTabKeyReset({ tabKey, selectedProject, cache }) {
   // Round-tripping through a file detail does NOT change tabKey, so the
   // cache survives unmount and the tree resumes where it was.
-  const lastTabKeyRef = useRef(tabKey);
-  if (lastTabKeyRef.current !== tabKey) {
-    resetCachedScope('violations', selectedProject);
-    lastTabKeyRef.current = tabKey;
-  }
-
-  const cached = readCachedState('violations', selectedProject, {
-    fileCurrentPath: '',
+  const cached = useTabScopedPageState({
+    namespace: PAGE_STATE_SCOPE, scope: selectedProject, tabKey, defaults: { fileCurrentPath: '' }, cache,
   });
-
-  // Fires on every mount, including plain drill-down/back navigation with no
-  // mutation involved (the page remounts on every round trip) -- onRefresh
-  // MUST stay the lazy refreshDashboard (mark-stale only). Do not wire this
-  // to an active-refetching callback (e.g. scheduleDashboardReconcile); that
-  // turns routine navigation into a forced re-download of the dashboard
-  // payload. See App.jsx's ViolationsRoute for the onRefresh/onReconcile split.
-  useEffect(() => {
-    onRefresh?.();
-  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
   return cached;
 }
 
@@ -40,10 +35,11 @@ export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh })
  * summary state: the visible dimensions, their rolled-up counts, and the
  * currently browsed path (cached per project so a round trip resumes there).
  */
-export function useViolationsData({ accumulatedDimensions, selectedProject, onReconcile, initialFilePath, dismissRefreshKey, selectedSource }) {
+export function useViolationsData({ accumulatedDimensions, selectedProject, onReconcile, initialFilePath, dismissRefreshKey, selectedSource, cache }) {
   const [fileCurrentPath, _setFileCurrentPath] = useState(initialFilePath);
+  const write = cache ? cache.writeCachedState : writeCachedState;
   const setFileCurrentPath = (v) => {
-    writeCachedState('violations', selectedProject, { fileCurrentPath: v });
+    write(PAGE_STATE_SCOPE, selectedProject, { fileCurrentPath: v });
     _setFileCurrentPath(v);
   };
 
@@ -98,10 +94,12 @@ function countDistinctViolationField(dimensions, field) {
  * The Violations page's whole state in one call: the tab-key reset runs
  * first, and the cached path it reads back seeds useViolationsData's
  * initialFilePath. Order matters, which is why they are composed here rather
- * than called side by side at the page.
+ * than called side by side at the page. `cache` is an optional injected
+ * page-state cache; omit it in production, where the page shares the
+ * module-level default (see pageStateCache.js).
  */
-export function useViolationsPageState({ tabKey, selectedProject, onRefresh, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource }) {
-  const cached = useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh });
+export function useViolationsPageState({ tabKey, selectedProject, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource, cache }) {
+  const cached = useViolationsTabKeyReset({ tabKey, selectedProject, cache });
   return useViolationsData({
     accumulatedDimensions,
     selectedProject,
@@ -109,5 +107,6 @@ export function useViolationsPageState({ tabKey, selectedProject, onRefresh, onR
     initialFilePath: cached.fileCurrentPath,
     dismissRefreshKey,
     selectedSource,
+    cache,
   });
 }

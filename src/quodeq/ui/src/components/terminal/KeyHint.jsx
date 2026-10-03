@@ -1,3 +1,5 @@
+const JOINER_PLUS = 'plus'; // the only non-default `joiner` value (the default is 'space')
+
 /**
  * KeyHint — keyboard shortcut badges, e.g. `⏎`, `esc`, or `g o`.
  * Pass a single key string or an array of strings; arrays render as a sequence
@@ -9,7 +11,7 @@
  */
 export default function KeyHint({ keys, joiner = 'space' }) {
   const arr = Array.isArray(keys) ? keys : [keys];
-  const sep = joiner === 'plus' ? '+' : ' ';
+  const sep = joiner === JOINER_PLUS ? '+' : ' ';
   return (
     <span className="term-key-hint">
       {arr.map((k, i) => (

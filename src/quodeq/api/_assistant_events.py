@@ -1,10 +1,9 @@
 """SSE event-frame generator for the assistant turn stream.
 
-Split out of _assistant_helpers.py. ``_POLL_SECONDS``/``_IDLE_LIMIT``
-are looked up on the ``_assistant_helpers`` facade at call time (rather than
-read as this module's own globals) so tests patching
-"quodeq.api._assistant_helpers._POLL_SECONDS"/"_IDLE_LIMIT" keep working
-after the split.
+Split out of _assistant_helpers.py. ``POLL_SECONDS``/``IDLE_LIMIT`` are read
+as this module's own globals (not looked up on the ``_assistant_helpers``
+facade) so this module never imports back the facade that re-exports it.
+Tests patch "quodeq.api._assistant_events.POLL_SECONDS"/"IDLE_LIMIT".
 """
 from __future__ import annotations
 
@@ -12,15 +11,12 @@ import time
 
 from quodeq.assistant import AssistantStore
 
-_POLL_SECONDS = 0.25
-_IDLE_LIMIT = 2400  # 2400 * 0.25s = 600s idle backstop. The stream now stays
-# open across turns (done/error no longer end event_frames), so this bounds a
-# session that sits idle with NO new frames for the whole window — a turn that
-# dies without emitting a terminal frame (e.g. a crashed daemon thread), or a
-# session left open with no further turns. On the backstop the generator
-# closes and the client reconnects on its next turn. Sized generously above
-# the slowest legitimate gap (a cold-loading local model or a CLI provider's
-# ~500s read timeout) so it never truncates a live turn.
+POLL_SECONDS = 0.25
+# Idle backstop: 2400 polls x 0.25s = 600s with no new frame closes the
+# stream (the client reconnects on its next turn). It bounds a turn that
+# dies without a terminal frame; sized above the slowest legitimate gap (a
+# cold local model, a CLI provider's ~500s read timeout).
+IDLE_LIMIT = 2400
 
 
 def event_frames(repository: AssistantStore, session_id: str, after_seq: int):
@@ -39,21 +35,20 @@ def event_frames(repository: AssistantStore, session_id: str, after_seq: int):
     silently, so slow-starting local models and long gaps between frames — or
     between turns — don't trip proxy/connection idle timeouts. The idle
     counter resets on ANY new event (including across turns), so only a
-    genuinely idle session (no new frames for the whole ``_IDLE_LIMIT``
+    genuinely idle session (no new frames for the whole ``IDLE_LIMIT``
     window) hits the backstop and closes; the client then reconnects on its
     next turn. Termination is therefore either that idle backstop or the
     client disconnecting (the generator is GC'd → ``GeneratorExit``). The
     traversal stays ordered by seq with ``last`` advancing so no frame is
     missed or duplicated.
     """
-    from quodeq.api import _assistant_helpers as _helpers  # noqa: PLC0415 — deferred: see module docstring
     last, idle = after_seq, 0
-    while idle < _helpers._IDLE_LIMIT:
+    while idle < IDLE_LIMIT:
         rows = repository.events_after(session_id, last)
         if not rows:
             idle += 1
             yield None
-            time.sleep(_helpers._POLL_SECONDS)
+            time.sleep(POLL_SECONDS)
             continue
         idle = 0
         for seq, frame in rows:

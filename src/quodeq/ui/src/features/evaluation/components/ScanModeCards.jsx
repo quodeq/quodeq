@@ -86,12 +86,11 @@ function PersistToggle({ value, onPick, disabled }) {
 }
 
 /**
- * Scan-mode radio cards: incremental vs clean scan. Same tri-state contract
- * as the old CleanScanToggle — `value` is 'off' | 'once' | 'permanent' —
- * so `buildScanPayload`'s cleanScan mapping and the one-shot "once"
- * consumption in `useDimensionSelection` are untouched. Picking clean
- * reveals a "this scan only / always" sub-choice; "always" persists to
- * localStorage exactly like before.
+ * Scan-mode radio cards: incremental vs clean scan. `value` is
+ * 'off' | 'once' | 'permanent', the tri-state contract `buildScanPayload`'s
+ * cleanScan mapping and the one-shot "once" consumption in
+ * `useDimensionSelection` read. Picking clean reveals a "this scan only /
+ * always" sub-choice; "always" persists to localStorage.
  */
 export default function ScanModeCards({ value, onChange, disabled = false }) {
   const { showToast } = useSidePane();

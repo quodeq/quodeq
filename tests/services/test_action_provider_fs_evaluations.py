@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from quodeq.services.base import EvaluationOptions
+from quodeq.services.evaluation_mixin import SubprocessDispatcher
 from quodeq.services.filesystem import FilesystemActionProvider
 
 
@@ -57,7 +58,7 @@ def test_list_projects_returns_latest_run(tmp_path: Path) -> None:
 
     assert result["projects"], "expected projects to be listed"
     # The provider hands back ProjectEntry entities; the route serializes
-    # them to the camelCase wire shape (WS6 boundary).
+    # them to the camelCase wire shape at the API boundary.
     project = result["projects"][0]
     assert project.name == "proj"
     assert project.runs_count == 2
@@ -102,6 +103,18 @@ def test_browse_repo_filters_hidden(tmp_path: Path, monkeypatch) -> None:
     names = [entry["name"] for entry in payload["directories"]]
     assert "visible" in names
     assert ".hidden" not in names
+
+
+def test_provider_wires_a_subprocess_dispatcher_bound_to_its_jobs(tmp_path: Path) -> None:
+    """FilesystemActionProvider must inject dispatcher=SubprocessDispatcher(jobs)
+    into FsEvaluationMixin, not rely on the mixin's own fallback."""
+    jobs = StubJobs()
+    provider = FilesystemActionProvider(job_manager=jobs)
+
+    dispatcher = provider._eval_handler.dispatcher
+
+    assert isinstance(dispatcher, SubprocessDispatcher)
+    assert dispatcher._jobs is jobs
 
 
 def test_start_evaluation_uses_cli_module(tmp_path: Path) -> None:

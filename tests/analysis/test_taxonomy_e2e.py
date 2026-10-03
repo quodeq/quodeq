@@ -17,6 +17,10 @@ from quodeq.core.scoring.engine import score_evidence
 from tests._evidence_helpers import _evidence_line
 
 
+def _message_and_dup(receipt):
+    return receipt.message, receipt.status == "duplicate"
+
+
 def test_taxonomy_used_on_parse_then_score(tmp_path):
     jsonl = tmp_path / "evidence.jsonl"
     jsonl.write_text("\n".join([
@@ -70,7 +74,7 @@ def test_taxonomy_from_mcp_producer_to_score(tmp_path):
     with open(jsonl, "w") as fh:
         router = FindingsRouter(fh)
         for args in report_finding_args:
-            _message, is_dup = router.receive(args)
+            _message, is_dup = _message_and_dup(router.receive(args))
             assert is_dup is False
 
     evidence = parse_jsonl_to_evidence(
@@ -89,13 +93,13 @@ def test_taxonomy_from_api_producer_to_score(tmp_path):
     taxonomy_used=True.
 
     Drives the actual producer seam the writer-side tests above cannot reach:
-    raw model output -> _parse_findings (_Finding validation) -> FindingsRouter
+    raw model output -> parse_findings (_Finding validation) -> FindingsRouter
     -> JSONL -> parse -> score. Before _Finding carried 'vt', validation
     silently stripped the taxonomy and every fresh run fell back to free-text
     reason grouping.
     """
     pytest.importorskip("openai", reason="requires the openai SDK")
-    from quodeq.analysis._api_schema import _parse_findings
+    from quodeq.analysis._api_schema import parse_findings
     from quodeq.analysis.mcp.router import FindingsRouter
 
     raw = json.dumps({"findings": [
@@ -108,7 +112,7 @@ def test_taxonomy_from_api_producer_to_score(tmp_path):
             ("c", "Unsanitised input reaches eval."),
         ], start=1)
     ]})
-    findings, dropped = _parse_findings(raw)
+    findings, dropped = parse_findings(raw)
     assert dropped == 0
     assert len(findings) == 3
 

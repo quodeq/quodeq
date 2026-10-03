@@ -1,18 +1,18 @@
-"""Tests for _fs_metadata.py — run_dir_by_dim per-dimension source rescore.
+"""Tests for _fs_metadata.py — per-dimension source-run rescore.
 
-Split from test_fs_metadata.py (further split out of
-test_fs_metadata_accumulated.py to stay under the file-size cap). Pins
-the `run_dir_by_dim` bookkeeping in `_read_accumulated_summary`: on the
-accumulated/project-card path, each dimension must be rescored from the
-evidence of the run it was actually SOURCED from -- not unconditionally
-from the newest run.
+On the accumulated/project-card path, each dimension must be rescored
+from the evidence of the run it was actually SOURCED from, not
+unconditionally from the newest run. The card reads through the same
+row fetcher as the Overview, whose rescoring step grades each run's
+dimensions against that run's own evidence.
 """
 from __future__ import annotations
 
 import json
 from unittest.mock import patch
 
-from quodeq.services._fs_metadata import _read_accumulated_summary
+from quodeq.core.run.state import RunState
+from quodeq.services._fs_metadata import read_accumulated_summary
 
 
 def _fsm_evidence_line(dim, req, file, line, sev="major", t="violation", p="Confidentiality", vt="VT-COUPLING"):
@@ -66,7 +66,7 @@ def _write_two_run_fixture(project_dir) -> None:
 
 
 def _per_run_scalars():
-    """What read_run_data reports per run: A's last valid run is the older one."""
+    """What the full read reports per run: A's last valid run is the older one."""
     from quodeq.core.types import DimensionResult
     from quodeq.core.types.finding import Finding
 
@@ -116,29 +116,31 @@ def _rescore(run_dir, dismissed):
 
 
 class TestPerDimensionRunDirRescore:
-    """Pins the `run_dir_by_dim` bookkeeping in `_read_accumulated_summary`: on
-    the accumulated/project-card path, each dimension must be rescored from
-    the evidence of the run it was actually SOURCED from -- not
-    unconditionally from the newest run.
-    """
+    """Each dimension is rescored from the evidence of the run it was SOURCED
+    from, not unconditionally from the newest run."""
 
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
-    @patch("quodeq.services._fs_metadata.read_run_data")
     def test_dimension_rescored_from_its_sourced_run_not_the_newest(
-        self, mock_read, mock_summarize, tmp_path, monkeypatch,
+        self, mock_summarize, tmp_path, monkeypatch,
     ):
         from quodeq.core.scoring.params import DEFAULT_PARAMS
         from quodeq.data.fs.report_parser.runs import RunInfo
         from quodeq.services.dismissed import dismiss_finding, dismissed_keys
+        from quodeq.services.trend_fetcher import make_rescoring_fetcher
 
-        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"
         project = "proj-two-run"
         project_dir = reports_root / project
         _write_two_run_fixture(project_dir)
 
         per_run = _per_run_scalars()
-        mock_read.side_effect = lambda root, proj, run_id: per_run[run_id]
+        # The real rescoring step over a stubbed full read, no score cache.
+        monkeypatch.setattr(
+            "quodeq.services.scoring._fetchers.make_scoring_trend_fetcher",
+            lambda rr, p, params=DEFAULT_PARAMS, cacheable_run_ids=None, deps=None: (
+                make_rescoring_fetcher(rr, p, params=params, base_fetcher=lambda rid: per_run[rid])
+            ),
+        )
         mock_summarize.return_value = type(
             "S", (), {"overall_grade": "B", "numeric_average": 6.5},
         )()
@@ -165,10 +167,10 @@ class TestPerDimensionRunDirRescore:
 
         # Runs passed newest-first, exactly like the real list_runs() order.
         runs = [
-            RunInfo(run_id=_RUN_NEW_ID, date_iso="2026-01-02", date_label="Jan 02", status="complete"),
-            RunInfo(run_id=_RUN_OLD_ID, date_iso="2026-01-01", date_label="Jan 01", status="complete"),
+            RunInfo(run_id=_RUN_NEW_ID, date_iso="2026-01-02", date_label="Jan 02", status=RunState.DONE),
+            RunInfo(run_id=_RUN_OLD_ID, date_iso="2026-01-01", date_label="Jan 01", status=RunState.DONE),
         ]
-        _read_accumulated_summary(reports_root, project, runs, DEFAULT_PARAMS)
+        read_accumulated_summary(reports_root, project, runs, DEFAULT_PARAMS, cache_enabled=False)
 
         acc_dims = mock_summarize.call_args[0][0]
         dim_a_result = next(d for d in acc_dims if d.dimension == _DIM_A)

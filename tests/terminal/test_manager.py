@@ -1,5 +1,8 @@
 # tests/terminal/test_manager.py
+import threading
+
 from quodeq.terminal.manager import TerminalManager
+from tests._timeouts import budget
 
 
 class _FakeBackend:
@@ -108,3 +111,74 @@ def test_decoder_state_resets_on_respawn():
     m.ensure_session(cwd="/", cols=80, rows=24)  # respawn
     m._backend._queue = [b"fresh"]
     assert m.read() == "fresh"
+
+
+class _BlockingBackend(_FakeBackend):
+    """read() and spawn() park on events so a test can hold them mid-call."""
+
+    def __init__(self, gates):
+        super().__init__()
+        self._gates = gates
+
+    def spawn(self, *, cwd, cols, rows):
+        if self._gates.get("spawn_blocks"):
+            self._gates["spawning"].set()
+            assert self._gates["release_spawn"].wait(budget(5))
+        super().spawn(cwd=cwd, cols=cols, rows=rows)
+
+    def read(self, max_bytes=65536):
+        self._gates["reading"].set()
+        assert self._gates["release_read"].wait(budget(5))
+        return b"whole chunk"
+
+
+def _run(target, errors):
+    def body():
+        try:
+            target()
+        except BaseException as exc:  # noqa: BLE001 - surfaced to the test thread
+            errors.append(exc)
+    thread = threading.Thread(target=body, daemon=True)
+    thread.start()
+    return thread
+
+
+def test_read_and_scrollback_wait_while_a_respawn_holds_the_ring():
+    gates = {name: threading.Event() for name in ("reading", "release_read", "spawning", "release_spawn")}
+    m = TerminalManager(backend_factory=lambda: _BlockingBackend(gates))
+    m.ensure_session(cwd="/", cols=80, rows=24)
+    errors = []
+    reader = _run(m.read, errors)
+    assert gates["reading"].wait(budget(5))
+    m._backend._alive = False
+    gates["spawn_blocks"] = True
+    respawn = _run(lambda: m.ensure_session(cwd="/", cols=80, rows=24), errors)
+    assert gates["spawning"].wait(budget(5))
+    gates["release_read"].set()
+    replay = _run(m.scrollback, errors)
+    # The respawn holds the ring: neither the decode-and-append nor the replay may run.
+    reader.join(0.05)
+    replay.join(0.05)
+    assert reader.is_alive() and replay.is_alive()
+    gates["release_spawn"].set()
+    for thread in (respawn, reader, replay):
+        thread.join(budget(5))
+        assert not thread.is_alive()
+    assert errors == []
+    assert m.scrollback() == ""
+
+
+def test_a_read_that_returns_after_a_respawn_is_dropped():
+    gates = {name: threading.Event() for name in ("reading", "release_read")}
+    m = TerminalManager(backend_factory=lambda: _BlockingBackend(gates))
+    m.ensure_session(cwd="/", cols=80, rows=24)
+    errors, results = [], []
+    reader = _run(lambda: results.append(m.read()), errors)
+    assert gates["reading"].wait(budget(5))
+    m._backend._alive = False
+    m.ensure_session(cwd="/", cols=80, rows=24)  # the dead session's read is still parked
+    gates["release_read"].set()
+    reader.join(budget(5))
+    assert not reader.is_alive() and errors == []
+    assert results == [""]
+    assert m.scrollback() == ""

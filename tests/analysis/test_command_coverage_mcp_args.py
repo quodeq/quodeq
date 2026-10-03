@@ -2,9 +2,35 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from quodeq.analysis._command import _build_mcp_server_args
 from quodeq.analysis._config import AnalysisConfig
+from quodeq.analysis.subprocess import build_ai_cmd
+
+
+def test_build_ai_cmd_logs_unknown_mcp_style(tmp_path, monkeypatch):
+    """An unrecognized provider mcp_style used to drop MCP args silently.
+
+    Driven through the public ``build_ai_cmd`` seam (not the private
+    ``_mcp_arg_builders.build_mcp_args`` it delegates to), matching how a
+    real caller reaches this path.
+    """
+    jsonl = tmp_path / "findings.jsonl"
+    config = AnalysisConfig(jsonl_file=jsonl, ai_cmd="some-provider")
+    provider_cfg = {"some-provider": {"mcp_style": "not-a-real-style", "cmd": "some-provider"}}
+    monkeypatch.setattr(
+        "quodeq.analysis._command._get_provider_configs", lambda: provider_cfg,
+    )
+
+    with patch("quodeq.analysis._command._log.warning") as warning:
+        args, mcp_config_path = build_ai_cmd("prompt", config)
+
+    assert mcp_config_path is None
+    assert warning.called
+    message = warning.call_args.args[0]
+    assert "not-a-real-style" in message
+    assert "some-provider" in message
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +86,7 @@ class TestBuildMcpServerArgs:
         assert "--work-dir" in args
 
     def test_includes_cache_root_model_id_language(self, tmp_path):
-        """Task 3.5 #6: the args list passed to findings_server.py MUST include
+        """#6: the args list passed to findings_server.py MUST include
         --cache-root, --model-id, and --language so the subprocess can build a
         cache writer with the same fingerprint inputs as the parent's
         classify_files_via_cache. Without these flags, CLI-path and API-path
@@ -74,7 +100,9 @@ class TestBuildMcpServerArgs:
             language="kotlin",
             options=SimpleNamespace(subagent_model="sonnet", ai_model="opus"),
         )
-        config = AnalysisConfig(jsonl_file=jsonl, run_config=run_config)
+        config = AnalysisConfig(
+            jsonl_file=jsonl, run_config=run_config, cache_root=tmp_path / "cache" / "results",
+        )
         args = _build_mcp_server_args(config)
 
         assert "--cache-root" in args
@@ -85,19 +113,19 @@ class TestBuildMcpServerArgs:
         assert args[model_idx + 1] == "sonnet"
         lang_idx = args.index("--language")
         assert args[lang_idx + 1] == "kotlin"
-        # Cache root ends with /cache/results regardless of whether the
-        # default (~/.quodeq/cache) or QUODEQ_CACHE_ROOT override is used.
+        # The run's resolved cache root travels verbatim.
         cr_idx = args.index("--cache-root")
-        expected_tail = str(Path("cache") / "results")
-        assert args[cr_idx + 1].endswith(expected_tail)
+        assert args[cr_idx + 1] == str(tmp_path / "cache" / "results")
 
     def test_cache_flags_fall_back_when_no_run_config(self, tmp_path):
-        """Without a RunConfig carrier, --cache-root is still emitted, model_id
-        comes from AnalysisConfig.ai_model, and language is empty — matching
-        Task 5's contract that language="" means "unset" rather than missing.
+        """Without a RunConfig carrier, --cache-root is emitted because this
+        config sets cache_root directly (it's omitted when cache_root is
+        None), model_id comes from AnalysisConfig.ai_model, and language is
+        empty — matching the contract that language="" means "unset" rather
+        than missing.
         """
         jsonl = tmp_path / "findings.jsonl"
-        config = AnalysisConfig(jsonl_file=jsonl, ai_model="haiku")
+        config = AnalysisConfig(jsonl_file=jsonl, ai_model="haiku", cache_root=tmp_path / "c")
         args = _build_mcp_server_args(config)
 
         assert "--cache-root" in args
@@ -108,7 +136,7 @@ class TestBuildMcpServerArgs:
 
     def test_model_id_falls_back_to_unknown(self, tmp_path):
         """No ai_model and no run_config => model_id is 'unknown' (reference
-        from cache.dimension_helpers._model_id_from).
+        from cache.dimension_helpers.model_id_from).
         """
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl)
@@ -161,17 +189,18 @@ class TestBuildMcpServerArgs:
 
 
 # ---------------------------------------------------------------------------
-# Fix A (#2419): cache root honours QUODEQ_CACHE_ROOT via default_cache_root()
+# Fix A (#2419): the cache root is the run's resolved one, never re-read here.
+# QUODEQ_CACHE_ROOT reaching the spawn through run_analysis is pinned in
+# tests/analysis/test_run_env_settings.py.
 # ---------------------------------------------------------------------------
 
 class TestBuildMcpServerArgsCacheRootEnv:
-    def test_cache_root_honours_quodeq_cache_root_env(self, tmp_path, monkeypatch):
-        """QUODEQ_CACHE_ROOT is forwarded through _build_mcp_server_args so
-        the subprocess cache writer resolves under the same sandbox root as
-        classify_files_via_cache."""
-        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path))
+    def test_cache_root_comes_from_the_config_not_the_env(self, tmp_path, monkeypatch):
+        """The config's cache root is forwarded; an exported QUODEQ_CACHE_ROOT
+        is not consulted by the builder itself."""
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
         jsonl = tmp_path / "findings.jsonl"
-        config = AnalysisConfig(jsonl_file=jsonl, ai_model="test-model")
+        config = AnalysisConfig(jsonl_file=jsonl, ai_model="test-model", cache_root=tmp_path / "results")
         args = _build_mcp_server_args(config)
 
         cr_idx = args.index("--cache-root")

@@ -9,8 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.data.cache_store.local import LocalFileBackend, default_cache_root
-from quodeq.data.fs.repo_clone import _DEFAULT_CLONE_TIMEOUT_S, GitCloneClient, _get_clone_timeout
-from quodeq.data.fs.shared_repo import _cache_base, _git_env, run_git
+from quodeq.data.fs.repo_clone import GitCloneClient, cleanup_cloned_repo, prepare_repository
+from quodeq.data.fs.shared_repo_git import git_env, run_git, shared_cache_base
 
 
 class TestDefaultCacheRoot:
@@ -37,14 +37,34 @@ class TestLocalFileBackendRoot:
         assert backend._root == Path.home() / ".quodeq" / "cache" / "results"
 
 
-class TestCloneTimeout:
-    def test_uses_the_injected_value(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT", "11")
-        assert _get_clone_timeout({"QUODEQ_GIT_CLONE_TIMEOUT": "22"}) == 22
+class _RecordingCloneClient:
+    """Stands in for GitCloneClient on the legacy path; records the timeout."""
 
-    def test_empty_injected_env_ignores_the_process(self, monkeypatch):
+    def __init__(self) -> None:
+        self.timeouts: list[int] = []
+
+    def clone_legacy(self, repo_input: str, dest: Path, *, timeout_s: int) -> None:
+        self.timeouts.append(timeout_s)
+
+
+class TestCloneTimeout:
+    """The legacy clone path reads the same variable as every other clone."""
+
+    def _clone(self, monkeypatch) -> list[int]:
+        monkeypatch.setenv("QUODEQ_DISABLE_ONLINE_CACHE", "1")
+        monkeypatch.setattr("quodeq.data.fs.repo_clone._validate_remote_url", lambda url: None)
+        client = _RecordingCloneClient()
+        cleanup_cloned_repo(prepare_repository("https://github.com/octo/demo.git", client=client))
+        return client.timeouts
+
+    def test_reads_quodeq_git_clone_timeout_s(self, monkeypatch):
+        monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT_S", "42")
+        assert self._clone(monkeypatch) == [42]
+
+    def test_ignores_the_dropped_variable(self, monkeypatch):
+        monkeypatch.delenv("QUODEQ_GIT_CLONE_TIMEOUT_S", raising=False)
         monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT", "11")
-        assert _get_clone_timeout({}) == _DEFAULT_CLONE_TIMEOUT_S
+        assert self._clone(monkeypatch) == [300]
 
 
 class TestGitCloneClientEnv:
@@ -91,17 +111,17 @@ class TestGitCloneClientEnv:
 class TestGitEnv:
     def test_uses_the_injected_value(self, monkeypatch):
         monkeypatch.setenv("VAR", "from-process")
-        env = _git_env({"VAR": "from-env"})
+        env = git_env({"VAR": "from-env"})
         assert env["VAR"] == "from-env"
         assert env["GIT_TERMINAL_PROMPT"] == "0"
 
     def test_empty_injected_env_ignores_the_process(self, monkeypatch):
         monkeypatch.setenv("VAR", "from-process")
-        assert "VAR" not in _git_env({})
+        assert "VAR" not in git_env({})
 
 
 class TestRunGitPassesEnvThrough:
-    """run_git's env reaches git via _git_env, pins included."""
+    """run_git's env reaches git via git_env, pins included."""
 
     def _captured_env(self, monkeypatch, env) -> dict[str, str]:
         seen: dict[str, str] = {}
@@ -115,7 +135,7 @@ class TestRunGitPassesEnvThrough:
             seen.update(kwargs["env"])
             return _Proc()
 
-        monkeypatch.setattr("quodeq.data.fs.shared_repo.subprocess.run", fake_run)
+        monkeypatch.setattr("quodeq.data.fs.shared_repo_git.subprocess.run", fake_run)
         run_git(["status"], env=env)
         return seen
 
@@ -136,11 +156,11 @@ class TestSharedCacheBase:
     def test_uses_the_injected_value(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
         injected = tmp_path / "from-env"
-        assert _cache_base({"QUODEQ_CACHE_ROOT": str(injected)}) == injected / "shared"
+        assert shared_cache_base({"QUODEQ_CACHE_ROOT": str(injected)}) == injected / "shared"
 
     def test_empty_injected_env_ignores_the_process(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
-        assert _cache_base({}) == Path.home() / ".quodeq" / "cache" / "shared"
+        assert shared_cache_base({}) == Path.home() / ".quodeq" / "cache" / "shared"
 
     def test_empty_string_falls_back_to_the_default_root(self):
-        assert _cache_base({"QUODEQ_CACHE_ROOT": ""}) == Path.home() / ".quodeq" / "cache" / "shared"
+        assert shared_cache_base({"QUODEQ_CACHE_ROOT": ""}) == Path.home() / ".quodeq" / "cache" / "shared"

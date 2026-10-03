@@ -18,7 +18,6 @@ from quodeq.core.types import (
     ReqRef,
     SeverityTally,
     Totals,
-    TrendPoint,
     ViolationResponse,
     ViolationSummary,
 )
@@ -28,7 +27,6 @@ from quodeq.data.mappers import (
     parse_job_snapshot,
     parse_plugin_info,
     parse_project_entry,
-    parse_trend_point,
     parse_violation_response,
     parse_violation_summary,
 )
@@ -166,15 +164,6 @@ VIOLATION_SUMMARY = ViolationSummary(
     ],
 )
 
-TREND_POINT = TrendPoint(
-    run_id="run-003",
-    date_iso="2026-03-15",
-    date_label="Mar 15",
-    dimensions_count=4,
-    overall_grade="B",
-    numeric_average=80.0,
-)
-
 
 # ---------------------------------------------------------------------------
 # Serialization tests
@@ -235,10 +224,6 @@ class TestMissingRequiredFields:
     def test_violation_response_missing_dimension(self) -> None:
         with pytest.raises(TypeError, match="dimension must be str"):
             parse_violation_response({"runId": "r", "project": "p"})
-
-    def test_trend_point_missing_run_id(self) -> None:
-        with pytest.raises(TypeError, match="runId must be str"):
-            parse_trend_point({})
 
     def test_finding_with_defaults(self) -> None:
         """Finding has no required fields — empty dict should produce defaults."""

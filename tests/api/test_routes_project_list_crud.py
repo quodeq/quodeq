@@ -71,13 +71,13 @@ class TestListProjects:
             }))
 
         calls: list[str] = []
-        original = fs_projects._build_project_entry
+        original = fs_projects.build_project_entry
 
         def _counting_build(reports_root, entry_name, runs, options, **kwargs):
             calls.append(entry_name)
             return original(reports_root, entry_name, runs, options, **kwargs)
 
-        monkeypatch.setattr(fs_projects, "_build_project_entry", _counting_build)
+        monkeypatch.setattr(fs_projects, "build_project_entry", _counting_build)
 
         flask_app = Flask(__name__)
         flask_app.config["TESTING"] = True
@@ -100,9 +100,9 @@ class TestListProjects:
         ``repository_info.json`` only ever gets an explicit "parent" field
         from the scope_path/subproject creation flow -- two independently
         registered local projects that merely share a path prefix rely
-        entirely on ``_auto_detect_parents`` running at read time. The
+        entirely on ``auto_detect_parents`` running at read time. The
         fixture below uses two *genuinely different* paths (one a real
-        subdirectory of the other) so ``_find_best_parent``'s
+        subdirectory of the other) so ``find_best_parent``'s
         startswith-prefix check actually fires, unlike a fixture where every
         project shares one identical path.
         """

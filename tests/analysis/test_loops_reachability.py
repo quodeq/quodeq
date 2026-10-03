@@ -2,7 +2,7 @@
 
 Motivating incident: the CI Ollama model name in quodeq.env pointed at a model
 that no longer existed on the runner. Every analysis call returned HTTP 404, so
-``_call_api`` flagged each call lossy and ``run_api_analysis`` wrote no markers.
+``call_api`` flagged each call lossy and ``run_api_analysis`` wrote no markers.
 The failure-streak breaker (which only counts ``file_done`` error markers) never
 saw the failures, ``check_zero_findings`` is bypassed in diff/incremental mode,
 and the run exited 0 — green CI that did zero work for weeks.

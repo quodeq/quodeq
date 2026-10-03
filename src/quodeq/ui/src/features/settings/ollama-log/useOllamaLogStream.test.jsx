@@ -31,11 +31,12 @@ class MockEventSource {
 }
 
 function Probe({ active }) {
-  const { logs, status } = useOllamaLogStream(active);
+  const { logs, firstSeq, status } = useOllamaLogStream(active);
   return (
     <div>
       <div data-testid="status">{status}</div>
       <div data-testid="logs">{logs.join('|')}</div>
+      <div data-testid="first-seq">{String(firstSeq)}</div>
     </div>
   );
 }
@@ -93,5 +94,15 @@ describe('useOllamaLogStream', () => {
     const es = MockEventSource.instances[0];
     unmount();
     expect(es.closed).toBe(true);
+  });
+
+  it('toggling the panel off moves firstSeq past the streamed lines', () => {
+    const { rerender } = render(<Probe active />);
+    const es = MockEventSource.instances[MockEventSource.instances.length - 1];
+    act(() => { es.emit('message', { data: 'x' }); es.emit('message', { data: 'y' }); });
+    expect(screen.getByTestId('first-seq')).toHaveTextContent('0');
+    rerender(<Probe active={false} />);
+    expect(screen.getByTestId('logs').textContent).toBe('');
+    expect(screen.getByTestId('first-seq')).toHaveTextContent('2');
   });
 });

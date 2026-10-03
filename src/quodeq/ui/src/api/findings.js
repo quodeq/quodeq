@@ -3,6 +3,7 @@
  */
 
 import { request } from './request.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 // The dismissed list is per-project user data: a single response with all
 // entries is fine for any realistic project (a few thousand at most). Ask
@@ -31,6 +32,20 @@ export async function dismissFinding(projectId, finding) {
   return request('/findings/dismiss', {
     method: 'POST',
     body: JSON.stringify({ project: projectId, ...finding }),
+  });
+}
+
+/**
+ * Dismiss every active finding of one requirement code in a scope (a
+ * dimension, narrowed to a principle and/or file), in one request.
+ * @param {string} projectId
+ * @param {{req: string, dimension: string, runId: string, principle?: string, file?: string, reason?: string}} scope
+ * @returns {Promise<{ok: boolean, dismissed: number, scores: Object|null, delta: Object}>}
+ */
+export async function dismissByType(projectId, { req, dimension, runId, principle, file, reason }) {
+  return request('/findings/dismiss-by-type', {
+    method: 'POST',
+    body: JSON.stringify({ project: projectId, req, dimension, run_id: runId, principle, file, reason }),
   });
 }
 
@@ -66,9 +81,9 @@ export async function restoreAllFindings(projectId) {
  * @param {string} [run='latest'] - Run ID (optional, defaults to latest)
  * @returns {Promise<{dimensions: Array, summary: object}>} Rescored data
  */
-export async function getRescore(projectId, run = 'latest') {
+export async function getRescore(projectId, run = LATEST_RUN_ID) {
   const params = new URLSearchParams({ project: projectId });
-  if (run && run !== 'latest') params.set('run', run);
+  if (run && run !== LATEST_RUN_ID) params.set('run', run);
   return request(`/rescore?${params}`);
 }
 

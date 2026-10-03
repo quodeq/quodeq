@@ -2,7 +2,7 @@ import pytest
 
 from quodeq.assistant.orchestrator import TurnEngines, TurnRequest, run_turn
 from quodeq.assistant.tools import ToolContext
-from quodeq.assistant.worktree import _run
+from quodeq.assistant.worktree import run_git
 from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -11,13 +11,13 @@ from quodeq.data.sqlite.assistant_repository import AssistantRepository
 def repo(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
-    _run(["git", "-C", str(root), "init", "-q", "-b", "main"])
-    _run(["git", "-C", str(root), "config", "core.autocrlf", "false"])
-    _run(["git", "-C", str(root), "config", "user.name", "T"])
-    _run(["git", "-C", str(root), "config", "user.email", "t@example.com"])
+    run_git(["git", "-C", str(root), "init", "-q", "-b", "main"])
+    run_git(["git", "-C", str(root), "config", "core.autocrlf", "false"])
+    run_git(["git", "-C", str(root), "config", "user.name", "T"])
+    run_git(["git", "-C", str(root), "config", "user.email", "t@example.com"])
     (root / "app.py").write_bytes(b"x = 1\n")
-    _run(["git", "-C", str(root), "add", "-A"])
-    _run(["git", "-C", str(root), "commit", "-q", "-m", "init"])
+    run_git(["git", "-C", str(root), "add", "-A"])
+    run_git(["git", "-C", str(root), "commit", "-q", "-m", "init"])
     return root
 
 
@@ -29,7 +29,11 @@ def _fixture(tmp_path, repo_root, monkeypatch):
     ctx = ToolContext(
         repository=store, session_id="s1", run_dir=None, repo_root=repo_root,
         evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
-        dimensions_file=tmp_path / "d.json", project_id="proj")
+        dimensions_file=tmp_path / "d.json", project_id="proj",
+        # Mirrors the composition-root computation (api/_assistant_helpers.
+        # build_tool_context) so this fixture exercises both the with-git
+        # and without-git (test_grant_without_git_repo_stays_read_only) cases.
+        repo_is_git=repo_root is not None and (repo_root / ".git").exists())
     return store, ctx
 
 
@@ -88,7 +92,7 @@ def test_cli_branch_passes_write_args(tmp_path, repo, monkeypatch):
         seen["worktree_dir"] = config.worktree_dir
         return "ok"
 
-    monkeypatch.setattr("quodeq.assistant.orchestrator._provider_type",
+    monkeypatch.setattr("quodeq.assistant.orchestrator.provider_type",
                         lambda p: "cli")
     run_turn(_request(True), repository=store, tool_ctx=ctx,
              engines=TurnEngines(turn_fn=None, cli_turn_fn=fake_cli_turn))

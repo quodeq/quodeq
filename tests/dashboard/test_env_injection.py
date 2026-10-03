@@ -106,8 +106,8 @@ def test_run_npm_build_reads_its_timeouts_from_the_injected_env(monkeypatch, tmp
 
 def test_quodeq_dir_honours_the_injected_env(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path / "from-process"))
-    assert _build_npm._quodeq_dir({"QUODEQ_DIR": str(tmp_path)}) == tmp_path
-    assert _build_npm._quodeq_dir({}) == Path.home() / ".quodeq"
+    assert _build_npm.quodeq_dir({"QUODEQ_DIR": str(tmp_path)}) == tmp_path
+    assert _build_npm.quodeq_dir({}) == Path.home() / ".quodeq"
 
 
 # --------------------------------------------------------------------------
@@ -115,19 +115,19 @@ def test_quodeq_dir_honours_the_injected_env(monkeypatch, tmp_path: Path):
 # --------------------------------------------------------------------------
 
 def test_local_hosts_honours_the_injected_env(monkeypatch):
-    from quodeq.dashboard._networking import _local_hosts
+    from quodeq.dashboard._networking import local_host_names
 
     monkeypatch.setenv("QUODEQ_LOCAL_HOSTS", "from-process")
-    assert "from-env" in _local_hosts({"QUODEQ_LOCAL_HOSTS": "from-env"})
-    assert "from-process" not in _local_hosts({})
+    assert "from-env" in local_host_names({"QUODEQ_LOCAL_HOSTS": "from-env"})
+    assert "from-process" not in local_host_names({})
 
 
 def test_allow_plaintext_http_honours_the_injected_env(monkeypatch):
-    from quodeq.dashboard._networking import _allow_plaintext_http
+    from quodeq.dashboard._networking import allow_plaintext_http
 
     monkeypatch.setenv("QUODEQ_ALLOW_PLAINTEXT_HTTP", "1")
-    assert _allow_plaintext_http(env={"QUODEQ_ALLOW_PLAINTEXT_HTTP": "1"}) is True
-    assert _allow_plaintext_http(env={}) is False
+    assert allow_plaintext_http(env={"QUODEQ_ALLOW_PLAINTEXT_HTTP": "1"}) is True
+    assert allow_plaintext_http(env={}) is False
 
 
 # --------------------------------------------------------------------------
@@ -137,38 +137,38 @@ def test_allow_plaintext_http_honours_the_injected_env(monkeypatch):
 def test_ensure_action_api_writes_the_launch_token_into_the_injected_env(monkeypatch):
     import os
 
-    from quodeq.dashboard._server import _ensure_action_api
-    from quodeq.dashboard._webview_token import _ENV_WEBVIEW_TOKEN
+    from quodeq.dashboard._server import ensure_action_api
+    from quodeq.dashboard._webview_token import ENV_WEBVIEW_TOKEN
     from quodeq.dashboard._probes import ApiProbes
 
-    monkeypatch.delenv(_ENV_WEBVIEW_TOKEN, raising=False)
+    monkeypatch.delenv(ENV_WEBVIEW_TOKEN, raising=False)
     probes = ApiProbes(
         local_hosts=lambda *a, **k: {"127.0.0.1"},
         is_port_open=lambda *_a: False,
         spawn=lambda port, url, cfg: (url, None),
     )
     target: dict[str, str] = {}
-    _ensure_action_api("127.0.0.1", 8000, probes=probes, env=target)
+    ensure_action_api("127.0.0.1", 8000, probes=probes, env=target)
 
-    assert target[_ENV_WEBVIEW_TOKEN]
-    assert _ENV_WEBVIEW_TOKEN not in os.environ
+    assert target[ENV_WEBVIEW_TOKEN]
+    assert ENV_WEBVIEW_TOKEN not in os.environ
 
 
 def test_ensure_action_api_forced_writes_the_launch_token_into_the_injected_env(monkeypatch):
     import os
 
-    from quodeq.dashboard._server import _ensure_action_api_forced
-    from quodeq.dashboard._webview_token import _ENV_WEBVIEW_TOKEN
+    from quodeq.dashboard._server import ensure_action_api_forced
+    from quodeq.dashboard._webview_token import ENV_WEBVIEW_TOKEN
     from quodeq.dashboard._probes import ApiProbes
 
-    monkeypatch.delenv(_ENV_WEBVIEW_TOKEN, raising=False)
+    monkeypatch.delenv(ENV_WEBVIEW_TOKEN, raising=False)
     probes = ApiProbes(
         local_hosts=lambda *a, **k: {"127.0.0.1"},
         is_port_open=lambda *_a: False,
         spawn=lambda port, url, cfg: (url, None),
     )
     target: dict[str, str] = {}
-    _ensure_action_api_forced("127.0.0.1", 5000, probes=probes, env=target)
+    ensure_action_api_forced("127.0.0.1", 5000, probes=probes, env=target)
 
-    assert target[_ENV_WEBVIEW_TOKEN]
-    assert _ENV_WEBVIEW_TOKEN not in os.environ
+    assert target[ENV_WEBVIEW_TOKEN]
+    assert ENV_WEBVIEW_TOKEN not in os.environ

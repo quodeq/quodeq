@@ -7,7 +7,7 @@ the same way it already does for PublishError."""
 from __future__ import annotations
 
 import quodeq.services.shared_publish as shared_publish
-from quodeq.services._publish_git import _commit_staged_changes, _push_with_rebase_fallback
+from quodeq.services._publish_git import commit_staged_changes, push_with_rebase_fallback
 from quodeq.services.shared_publish import GIT_ERROR_SNIPPET_MAX_CHARS, PublishError
 
 
@@ -30,7 +30,7 @@ def test_commit_failure_message_truncated_to_the_shared_length(tmp_path, monkeyp
     monkeypatch.setattr(shared_publish, "run_git", fake_run_git)
 
     try:
-        _commit_staged_changes(tmp_path, "proj", 1)
+        commit_staged_changes(tmp_path, "proj", 1)
         raise AssertionError("expected PublishError")
     except PublishError as exc:
         embedded = str(exc).rsplit(", ", 1)[-1]
@@ -46,8 +46,25 @@ def test_push_failure_message_truncated_to_the_shared_length(tmp_path, monkeypat
     monkeypatch.setattr(shared_publish, "run_git", fake_run_git)
 
     try:
-        _push_with_rebase_fallback(tmp_path)
+        push_with_rebase_fallback(tmp_path)
         raise AssertionError("expected PublishError")
     except PublishError as exc:
         embedded = str(exc).rsplit(". ", 1)[-1]
         assert len(embedded) == GIT_ERROR_SNIPPET_MAX_CHARS
+
+
+def test_push_with_rebase_fallback_forwards_env_to_remote_commands(tmp_path, monkeypatch):
+    seen = []
+
+    def fake_run_git(args, *, cwd=None, env=None):
+        seen.append((args[0], env))
+        return args[0] == "pull", ""
+
+    monkeypatch.setattr(shared_publish, "run_git", fake_run_git)
+    env = {"GIT_CONFIG_COUNT": "1"}
+    try:
+        push_with_rebase_fallback(tmp_path, env=env)
+    except PublishError:
+        pass  # the second push fails too; only the forwarded env matters here
+    remote = [e for verb, e in seen if verb in ("push", "pull", "ls-remote")]
+    assert len(remote) >= 3 and all(e == env for e in remote)

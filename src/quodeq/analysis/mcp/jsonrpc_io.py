@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import sys
 
-_JSONRPC_VERSION = "2.0"
+JSONRPC_VERSION = "2.0"
 _MAX_LOG_LINE_PREVIEW = 200
 
 
@@ -19,7 +19,7 @@ def send(msg: dict) -> None:
 
 def ok(req_id: object, result: dict) -> dict:
     """Build a successful JSON-RPC response."""
-    return {"jsonrpc": _JSONRPC_VERSION, "id": req_id, "result": result}
+    return {"jsonrpc": JSONRPC_VERSION, "id": req_id, "result": result}
 
 
 def read_message() -> dict | None:
@@ -29,8 +29,12 @@ def read_message() -> dict | None:
         if not line:
             continue
         try:
-            return json.loads(line)
+            msg = json.loads(line)
         except json.JSONDecodeError:
             sys.stderr.write(f"Skipping malformed JSON: {line[:_MAX_LOG_LINE_PREVIEW]}\n")
             continue
+        if not isinstance(msg, dict):
+            sys.stderr.write(f"Skipping non-object JSON-RPC message: {line[:_MAX_LOG_LINE_PREVIEW]}\n")
+            continue
+        return msg
     return None

@@ -16,12 +16,17 @@ link" / "didn't open".
 """
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+
+_logger = logging.getLogger(__name__)
 
 # Well-known CLI locations to probe IN ADDITION to $PATH. A macOS app launched
 # from Finder/Dock inherits a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin) that
@@ -38,6 +43,7 @@ _CURSOR_CANDIDATES = (
     "/usr/local/bin/cursor",
     "/Applications/Cursor.app/Contents/Resources/app/bin/cursor",
 )
+_EDITOR_STARTFILE = "startfile"  # Windows os.startfile sentinel: no argv form
 
 
 @dataclass(frozen=True)
@@ -74,7 +80,7 @@ def child_cwd(
     try:
         if platform.startswith("linux"):
             return readlink(f"/proc/{pid}/cwd")
-        if platform == "darwin":
+        if platform == PLATFORM_DARWIN:
             # -Fn = machine-readable, one field per line; the cwd path is the
             # 'n'-prefixed line of the 'cwd' fd record.
             proc = run(
@@ -196,11 +202,11 @@ def detect_editor(
         found = which(name) or next((c for c in candidates if isfile(c)), None)
         if found:
             return Editor(name=name, path=found, supports_line=True)
-    if platform == "darwin":
+    if platform == PLATFORM_DARWIN:
         return Editor(name="open", path=which("open") or "/usr/bin/open", supports_line=False)
-    if platform == "win32":
+    if platform == PLATFORM_WIN32:
         # No argv — the caller routes this to os.startfile.
-        return Editor(name="startfile", path="startfile", supports_line=False)
+        return Editor(name=_EDITOR_STARTFILE, path=_EDITOR_STARTFILE, supports_line=False)
     opener = which("xdg-open")
     if opener:
         return Editor(name="xdg-open", path=opener, supports_line=False)
@@ -214,7 +220,7 @@ def build_open_argv(
 
     Returns None for the Windows ``startfile`` sentinel, which has no argv form.
     """
-    if editor.name == "startfile":
+    if editor.name == _EDITOR_STARTFILE:
         return None
     if editor.supports_line:
         target = path
@@ -224,3 +230,24 @@ def build_open_argv(
                 target += f":{col}"
         return [editor.path, "-g", target]
     return [editor.path, path]
+
+
+def open_in_editor(editor: Editor, path: str, line: int | None, col: int | None) -> bool:
+    """Spawn *editor* on *path* at the optional *line*/*col*. Returns whether
+    the launch was started.
+
+    Fail-soft: any (OSError, ValueError) from the spawn is logged and
+    swallowed, returning False rather than raising, so a missing/broken
+    editor install never surfaces as a 500. Detached — the editor outlives
+    this call; the caller doesn't wait on it.
+    """
+    try:
+        argv = build_open_argv(editor, path, line, col)
+        if argv is None:  # Windows startfile sentinel
+            os.startfile(path)  # type: ignore[attr-defined]
+        else:
+            subprocess.Popen(argv, start_new_session=True)
+        return True
+    except (OSError, ValueError):
+        _logger.warning("failed to open %s in %s", path, editor.name, exc_info=True)
+        return False

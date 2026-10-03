@@ -166,23 +166,23 @@ class TestRunWithHeartbeat:
 
 class TestCheckProcessResult:
     def test_zero_exit_ok(self, tmp_path):
-        from quodeq.analysis._process import _check_process_result
+        from quodeq.analysis._process import check_process_result
         proc = MagicMock()
         proc.returncode = 0
-        _check_process_result(proc, tmp_path / "err.log")  # should not raise
+        check_process_result(proc, tmp_path / "err.log")  # should not raise
 
     def test_nonzero_exit_raises(self, tmp_path):
-        from quodeq.analysis._process import _check_process_result, AnalysisError
+        from quodeq.analysis._process import check_process_result, AnalysisError
         proc = MagicMock()
         proc.returncode = 1
         err_file = tmp_path / "err.log"
         err_file.write_text("something went wrong")
         with pytest.raises(AnalysisError, match="code 1"):
-            _check_process_result(proc, err_file)
+            check_process_result(proc, err_file)
 
     def test_nonzero_no_stderr(self, tmp_path):
-        from quodeq.analysis._process import _check_process_result, AnalysisError
+        from quodeq.analysis._process import check_process_result, AnalysisError
         proc = MagicMock()
         proc.returncode = 2
         with pytest.raises(AnalysisError, match="code 2"):
-            _check_process_result(proc, tmp_path / "missing.log")
+            check_process_result(proc, tmp_path / "missing.log")

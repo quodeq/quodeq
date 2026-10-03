@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BRAND_NAME } from '../strings/brand.js';
+import { KEY } from '../vocab/keyboard.js';
 import {
   LOGO_VIEWBOX,
   LOGO_PATH_TRANSFORM,
@@ -129,8 +130,8 @@ function LogoShell({ press, classes, needleWobble, handlers }) {
 function useKeyNav(stopAuto, stepPhrase) {
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'ArrowLeft') { stopAuto(); stepPhrase(-1); }
-      if (e.key === 'ArrowRight') { stopAuto(); stepPhrase(1); }
+      if (e.key === KEY.ARROW_LEFT) { stopAuto(); stepPhrase(-1); }
+      if (e.key === KEY.ARROW_RIGHT) { stopAuto(); stepPhrase(1); }
     }
     // Browser-only: keyboard navigation for rotating phrases
     window.addEventListener('keydown', onKey);

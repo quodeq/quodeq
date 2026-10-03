@@ -2,17 +2,29 @@ import {
   TAU, getThemeColors, scoreRGB, rgba,
   drawGlow, drawParticles,
 } from '../core/galaxyCore.js';
+import { HIT_TARGET_TYPE } from '../core/galaxyHitTypes.js';
+import { withinRadius } from '../core/hitTest.js';
 import { newCueBatch, collectSeverityCue, drawCueBatch } from './galaxyFolderCues.js';
 import { CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
+import { fillBackgroundGradient } from './galaxyStarfield.js';
 import {
-  BACKGROUND, STAR, NEBULA, NEBULA_SCENE_BLOBS, NEBULA_FOLDER_BLOBS,
+  STAR, NEBULA, NEBULA_SCENE_BLOBS, NEBULA_FOLDER_BLOBS,
   VIOLATION_ORBS, LABEL_ALPHA, FOLDER_NEBULA, FOLDER_NEBULA_DASH,
   FOLDER_STAR, FOLDER_LABEL,
 } from './galaxyTuning.js';
+import { SCORE_SCALE_MAX, PERCENT } from '../../../../constants.js';
 
 export { starShapeFor } from './galaxyFolderCues.js';
 // Re-exported so the folder canvas's draw surface stays in one module.
 export { drawStarfield } from './galaxyStarfield.js';
+
+// Added to a folder star's label-collision importance so a folder outranks
+// any ordinary file (whose importance is only violations + radius, orders of
+// magnitude smaller) when two labels compete for the same space.
+const FOLDER_IMPORTANCE_BOOST = 1000;
+
+// Dimmer than GalaxyView's CONSTELLATION.lineAlpha: the folder view's lines are denser.
+const FOLDER_CONSTELLATION_LINE_ALPHA = 0.25;
 
 /**
  * Paint the canvas background gradient and return the theme colours every
@@ -26,12 +38,7 @@ export { drawStarfield } from './galaxyStarfield.js';
 export function drawScene(ctx, params) {
   const { W, H, canvasRef } = params;
   const tc = getThemeColors(canvasRef.current?.parentElement);
-
-  // Background gradient
-  const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * BACKGROUND.gradientRadiusFraction);
-  grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-
+  fillBackgroundGradient(ctx, tc, { W, H });
   return { tc };
 }
 
@@ -73,7 +80,7 @@ function drawNebulaBlobs(ctx, spec, centre, radius, col, alpha) {
 export function drawNebula(ctx, curNode, frame) {
   if (!curNode) return;
   const { W, H, t } = frame;
-  const nbCol = scoreRGB((curNode.complianceRate || 0) * 10);
+  const nbCol = scoreRGB((curNode.complianceRate || 0) * SCORE_SCALE_MAX);
   const { r: nr, g: ng, b: nb } = nbCol;
   const nbR = Math.max(W, H) * NEBULA.sceneRadiusFraction;
   const nbGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, nbR);
@@ -88,22 +95,26 @@ export function drawNebula(ctx, curNode, frame) {
 }
 
 /**
- * Draw constellation lines between stars.
+ * Draw constellation lines between stars. They share one style, so all
+ * segments go into one path and one stroke() per frame.
  */
 export function drawConstellationLines(ctx, activeScene, tc, w2s) {
-  const { r: mr, g: mg, b: mb } = tc.textMuted;
-  activeScene.lines.forEach(l => {
-    const sa = w2s(activeScene.rootStars[l.a].x, activeScene.rootStars[l.a].y);
-    const sb = w2s(activeScene.rootStars[l.b].x, activeScene.rootStars[l.b].y);
-    ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
-    ctx.strokeStyle = `rgba(${mr},${mg},${mb},0.25)`;
-    ctx.lineWidth = 0.8; ctx.stroke();
-  });
+  const { lines, rootStars } = activeScene;
+  if (lines.length === 0) return;
+  const muted = tc.textMuted;
+  ctx.beginPath();
+  for (const l of lines) {
+    const sa = w2s(rootStars[l.a].x, rootStars[l.a].y);
+    const sb = w2s(rootStars[l.b].x, rootStars[l.b].y);
+    ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
+  }
+  ctx.strokeStyle = rgba(muted, FOLDER_CONSTELLATION_LINE_ALPHA);
+  ctx.lineWidth = 0.8; ctx.stroke();
 }
 
 /**
  * Draw a folder star's nebula, texture blobs, and dashed cluster border.
- * Mutates `s._clusterHitR` (the hit-test radius the click handler reads).
+ * Mutates `s.clusterHitR` (the hit-test radius the click handler reads).
  */
 function drawFolderNebula(ctx, star, view) {
   const { s, i, sc, sr } = star;
@@ -136,7 +147,7 @@ function drawFolderNebula(ctx, star, view) {
   ctx.strokeStyle = `rgba(${cr},${cg},${cb},${FOLDER_NEBULA.borderAlpha * nebulaFade})`;
   ctx.lineWidth = 1;
   ctx.setLineDash(FOLDER_NEBULA_DASH); ctx.stroke(); ctx.setLineDash([]);
-  s._clusterHitR = borderR;
+  s.clusterHitR = borderR;
 
   if (!zoomed) {
     ctx.beginPath(); ctx.arc(sc.x, sc.y, sr * FOLDER_NEBULA.innerRingRadiusRatio, 0, TAU);
@@ -190,7 +201,7 @@ function collectStarLabel(s, sc, sr, cam, showLabels) {
   const lh = fontSize + FOLDER_LABEL.heightPadPx;
   const lx = sc.x;
   const ly = sc.y - sr - FOLDER_LABEL.offsetPx * fs;
-  const importance = (s.isFolder ? 1000 : 0) + (s.violations || 0) + (s.radius || 0);
+  const importance = (s.isFolder ? FOLDER_IMPORTANCE_BOOST : 0) + (s.violations || 0) + (s.radius || 0);
   return { s, sc, sr, fs, label, fontSize, lx, ly, lw, lh, importance, col: s.col };
 }
 
@@ -200,12 +211,10 @@ function hitTestStar({ s, i, sc, sr }, params) {
   const fly = flyRef.current;
   const mx = mouseRef.current.x, my = mouseRef.current.y;
   if (animRef.current || fly || mx < 0) return null;
-  const dx = mx - sc.x, dy = my - sc.y;
-  const d2 = dx * dx + dy * dy;
-  const clusterR = s.isFolder && s._clusterHitR > 0 ? s._clusterHitR : 0;
+  const clusterR = s.isFolder && s.clusterHitR > 0 ? s.clusterHitR : 0;
   const starHitR = Math.max(sr * 2, FOLDER_STAR.hitRadiusMinPx);
-  if (d2 < starHitR * starHitR || (clusterR > 0 && d2 < clusterR * clusterR)) {
-    return { type: s.isFolder ? 'folder' : 'file', starIdx: i, data: s };
+  if (withinRadius(mx, my, sc.x, sc.y, starHitR) || (clusterR > 0 && withinRadius(mx, my, sc.x, sc.y, clusterR))) {
+    return { type: s.isFolder ? HIT_TARGET_TYPE.FOLDER : HIT_TARGET_TYPE.FILE, starIdx: i, data: s };
   }
   return null;
 }
@@ -278,7 +287,7 @@ export function drawLabels(ctx, pendingLabels, tc) {
     } else if (lb.s.isFolder) {
       ctx.font = `${subSize}px ${CANVAS_FONT_FAMILY}`;
       ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.rateAlpha);
-      ctx.fillText((lb.s.complianceRate * 100).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
+      ctx.fillText((lb.s.complianceRate * PERCENT).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     }
   });
 }

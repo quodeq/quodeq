@@ -1,8 +1,14 @@
 import { t } from '../../../../strings/index.js';
+import { MAP_VIEW_MODE } from '../../mapVocab.js';
+import { PERCENT } from '../../../../constants.js';
 
 const RATE_HIGH = 0.9;
 const RATE_MEDIUM = 0.7;
 const RATE_LOW = 0.4;
+
+// Cell background tint: how much of the severity/compliance colour shows
+// through before it fades to transparent.
+const CELL_BG_MIX_PCT = 22;
 
 const SEVERITY_STATE_KEYS = {
   critical: 'map.stateCritical',
@@ -15,10 +21,10 @@ const SEVERITY_STATE_KEYS = {
 // the same lookup read through different fields, and the compliance entry is
 // the no-violations fallback.
 const BUCKETS = {
-  critical: { color: 'var(--color-sev-critical-text)', background: 'color-mix(in srgb, var(--color-sev-critical-text) 22%, transparent)', borderColor: 'var(--color-sev-critical-border)' },
-  major: { color: 'var(--color-sev-major-text)', background: 'color-mix(in srgb, var(--color-sev-major-text) 22%, transparent)', borderColor: 'var(--color-sev-major-border)' },
-  minor: { color: 'var(--color-sev-minor-text)', background: 'color-mix(in srgb, var(--color-sev-minor-text) 22%, transparent)', borderColor: 'var(--color-sev-minor-border)' },
-  compliance: { color: 'var(--color-compliance)', background: 'color-mix(in srgb, var(--color-compliance) 22%, transparent)', borderColor: 'var(--color-compliance-border)' },
+  critical: { color: 'var(--color-sev-critical-text)', background: `color-mix(in srgb, var(--color-sev-critical-text) ${CELL_BG_MIX_PCT}%, transparent)`, borderColor: 'var(--color-sev-critical-border)' },
+  major: { color: 'var(--color-sev-major-text)', background: `color-mix(in srgb, var(--color-sev-major-text) ${CELL_BG_MIX_PCT}%, transparent)`, borderColor: 'var(--color-sev-major-border)' },
+  minor: { color: 'var(--color-sev-minor-text)', background: `color-mix(in srgb, var(--color-sev-minor-text) ${CELL_BG_MIX_PCT}%, transparent)`, borderColor: 'var(--color-sev-minor-border)' },
+  compliance: { color: 'var(--color-compliance)', background: `color-mix(in srgb, var(--color-compliance) ${CELL_BG_MIX_PCT}%, transparent)`, borderColor: 'var(--color-compliance-border)' },
 };
 
 // The compliance-rate ladder, best first: a rate at or above the threshold
@@ -78,18 +84,18 @@ function complianceRateBorderColor(rate) {
 
 export function nodeBorderColor(node, viewMode) {
   switch (viewMode) {
-    case 'violations': return severityBorderColor(worstSeverity(node.severity));
-    case 'compliance': return complianceRateBorderColor(node.complianceRate);
-    case 'health': return complianceRateBorderColor(node.complianceRate);
+    case MAP_VIEW_MODE.VIOLATIONS: return severityBorderColor(worstSeverity(node.severity));
+    case MAP_VIEW_MODE.COMPLIANCE: return complianceRateBorderColor(node.complianceRate);
+    case MAP_VIEW_MODE.HEALTH: return complianceRateBorderColor(node.complianceRate);
     default: return severityBorderColor(worstSeverity(node.severity));
   }
 }
 
 export function nodeColor(node, viewMode) {
   switch (viewMode) {
-    case 'violations': return severityColor(worstSeverity(node.severity));
-    case 'compliance': return complianceRateColor(node.complianceRate);
-    case 'health': return healthColor(node.complianceRate);
+    case MAP_VIEW_MODE.VIOLATIONS: return severityColor(worstSeverity(node.severity));
+    case MAP_VIEW_MODE.COMPLIANCE: return complianceRateColor(node.complianceRate);
+    case MAP_VIEW_MODE.HEALTH: return healthColor(node.complianceRate);
     default: return severityColor(worstSeverity(node.severity));
   }
 }
@@ -101,8 +107,8 @@ export function nodeColor(node, viewMode) {
  * sighted user gets, so every focusable node label carries this too.
  */
 export function nodeStateText(node, viewMode) {
-  if (viewMode === 'compliance' || viewMode === 'health') {
-    return t('map.stateCompliance', { pct: Math.round((node.complianceRate || 0) * 100) });
+  if (viewMode === MAP_VIEW_MODE.COMPLIANCE || viewMode === MAP_VIEW_MODE.HEALTH) {
+    return t('map.stateCompliance', { pct: Math.round((node.complianceRate || 0) * PERCENT) });
   }
   const worst = worstSeverity(node.severity || {});
   return worst ? t(SEVERITY_STATE_KEYS[worst]) : t('map.stateClean');
@@ -110,9 +116,9 @@ export function nodeStateText(node, viewMode) {
 
 export function nodeSize(node, viewMode) {
   switch (viewMode) {
-    case 'violations': return node.violations || 1;
-    case 'compliance': return node.compliance || 1;
-    case 'health': return (node.violations + node.compliance) || 1;
+    case MAP_VIEW_MODE.VIOLATIONS: return node.violations || 1;
+    case MAP_VIEW_MODE.COMPLIANCE: return node.compliance || 1;
+    case MAP_VIEW_MODE.HEALTH: return (node.violations + node.compliance) || 1;
     default: return node.violations || 1;
   }
 }

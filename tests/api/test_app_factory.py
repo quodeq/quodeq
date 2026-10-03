@@ -125,7 +125,8 @@ class TestMainFunction:
         """
         mock_run = MagicMock()
         with patch("quodeq.api.app.create_app") as mock_create, \
-             patch("quodeq.api.app.signal.signal") as mock_signal:
+             patch("quodeq.api.app.signal.signal") as mock_signal, \
+             patch("quodeq.api.app._start_background_work"):
             mock_app = MagicMock()
             mock_app.run = mock_run
             mock_app.config = {"_provider": MagicMock()}
@@ -143,6 +144,7 @@ class TestMainFunction:
         mock_configure = MagicMock()
         with patch("quodeq.api.app.create_app") as mock_create, \
              patch("quodeq.api.app.signal.signal"), \
+             patch("quodeq.api.app._start_background_work"), \
              patch("quodeq.shared.text_io.configure_stdio_utf8", mock_configure):
             mock_app = MagicMock()
             mock_app.config = {"_provider": MagicMock()}

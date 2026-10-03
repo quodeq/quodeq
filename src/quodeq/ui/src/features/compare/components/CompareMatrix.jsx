@@ -1,5 +1,5 @@
 /**
- * CompareMatrix — a numbers-only score grid (the v4a pick): the fleet's
+ * CompareMatrix — a numbers-only score grid: the fleet's
  * SCORE_MATRIX (projects x dimensions) and the dimension screen's
  * PRINCIPLE_MATRIX (projects x principles) share this one table.
  *
@@ -15,14 +15,15 @@
  * so everything stays on screen. Horizontal scroll remains only as a last
  * resort at widths where even the minimum group cannot fit.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import { t } from '../../../strings/index.js';
 import { OVERALL, computeMatrixExtremes, sortMatrixRows } from './compareMatrixModel.js';
 import { useMatrixColumnChunks } from './useMatrixColumnChunks.js';
 import CompareMatrixTable from './CompareMatrixTable.jsx';
 import { score1, prefixOf, stemOf } from '../compareFormatters.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
 
 
 // Column headers hold 3-character numbers; full dimension or principle
@@ -143,13 +144,13 @@ function makeScoreCell(hoverClass, extremes, setHoverKey) {
 function buildMatrixCellHelpers(sort, setSort, hoverKey, setHoverKey, extremes) {
   // desc -> asc -> back to the caller's order.
   const toggleSort = (key) => setSort((cur) => {
-    if (cur?.key !== key) return { key, dir: 'desc' };
-    if (cur.dir === 'desc') return { key, dir: 'asc' };
+    if (cur?.key !== key) return { key, dir: SORT_DIR.DESC };
+    if (cur.dir === SORT_DIR.DESC) return { key, dir: SORT_DIR.ASC };
     return null;
   });
   const sortMark = (key) => {
     if (sort?.key !== key) return '';
-    return sort.dir === 'desc' ? ' ↓' : ' ↑';
+    return sort.dir === SORT_DIR.DESC ? ' ↓' : ' ↑';
   };
   const hoverClass = (key) => (hoverKey === key ? ' compare-matrix__hovercol' : '');
   const headerCell = makeHeaderCell(hoverClass, sort, toggleSort, sortMark);
@@ -162,22 +163,21 @@ export default function CompareMatrix({ ariaLabel, header, note, columns, matrix
   const [hoverKey, setHoverKey] = useState(null);
   const { wrapRef, chunks } = useMatrixColumnChunks(columns, matrixRows.length >= 2 && columns.length >= 1);
 
-  const displayRows = sortMatrixRows(matrixRows, sort);
+  // None of these depend on hoverKey, and hover re-renders on every cell
+  // entered, so compute them only when the data or the sort changes. They
+  // sit above the guard below: hooks must run on every render.
+  const displayRows = useMemo(() => sortMatrixRows(matrixRows, sort), [matrixRows, sort]);
+  const shortLabels = useMemo(() => makeShortLabels(columns), [columns]);
+  const extremes = useMemo(() => computeMatrixExtremes(columns, matrixRows), [columns, matrixRows]);
 
   // Two projects make a comparison; a single column is still a grid worth
   // having (overall beside the one dimension the scope shares).
   if (matrixRows.length < 2 || columns.length < 1) return null;
 
-  const shortLabels = makeShortLabels(columns);
-  const extremes = computeMatrixExtremes(columns, matrixRows);
   const { hoverClass, headerCell, scoreCell } = buildMatrixCellHelpers(sort, setSort, hoverKey, setHoverKey, extremes);
 
   return (
-    <section className="compare-panel" aria-label={ariaLabel}>
-      <div className="compare-panel__head">
-        <SectionLabel>{header}</SectionLabel>
-        <span className="compare-panel__note">{note}</span>
-      </div>
+    <ComparePanel ariaLabel={ariaLabel} header={header} note={note}>
       <div className="compare-matrix" ref={wrapRef}>
         {chunks.map((chunkCols, ci) => (
           <CompareMatrixTable
@@ -196,6 +196,6 @@ export default function CompareMatrix({ ariaLabel, header, note, columns, matrix
           />
         ))}
       </div>
-    </section>
+    </ComparePanel>
   );
 }

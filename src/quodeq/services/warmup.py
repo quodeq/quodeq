@@ -15,9 +15,12 @@ from collections import deque
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared.fault_isolation import run_isolated
+
 _logger = logging.getLogger(__name__)
 
 _FAILURE_BACKOFF_S = 60.0
+_SHUTDOWN_JOIN_TIMEOUT_S = 10  # bound on reset_for_tests' wait for the worker to exit
 
 
 def _enumerate_projects(reports_dir: str) -> list[tuple[str, str]]:
@@ -41,11 +44,13 @@ def _project_display_name(reports_dir: str, project_id: str) -> str:
     return info.get("displayName") or info.get("name") or project_id
 
 
-def _warm_project(reports_dir: str, project_id: str) -> None:
-    """Compute-and-cache one project's summary and accumulated payloads.
+def warm_project(reports_dir: str, project_id: str) -> None:
+    """Compute-and-cache one project's card summary and dashboard payload.
 
-    Both go through the single-flight read-through helpers, so this is a
-    version-check no-op on a warm cache and dedupes with on-demand requests.
+    What the engine does per queued project; callable inline for tests and
+    budgets. The card goes through the single-flight read-through helper and
+    the payload through the stamp memo, so this is a version-check no-op on
+    a warm process and dedupes with on-demand requests.
     """
     from quodeq.services.wiring import find_children  # noqa: PLC0415
     from quodeq.services._fs_metadata import warm_project_summary  # noqa: PLC0415
@@ -53,8 +58,8 @@ def _warm_project(reports_dir: str, project_id: str) -> None:
 
     reports_root = Path(reports_dir)
     warm_project_summary(reports_root, project_id)
-    # Parents bypass the accumulated cache entirely (scoring/__init__.py),
-    # so warming them would recompute on every boot for nothing. Skip.
+    # A parent's payload is never memoized (its stamp cannot see children),
+    # so warming it would recompute on every boot for nothing. Skip.
     if not find_children(reports_root, project_id):
         get_project_scores(reports_root, project_id)
 
@@ -67,7 +72,7 @@ class WarmupEngine:
         warm_fn: Callable[[str, str], None] | None = None,
         list_fn: Callable[[str], list[tuple[str, str]]] | None = None,
     ) -> None:
-        self._warm_fn = warm_fn or _warm_project
+        self._warm_fn = warm_fn or warm_project
         self._list_fn = list_fn or _enumerate_projects
         self._cond = threading.Condition()
         self._shutdown = threading.Event()
@@ -96,7 +101,7 @@ class WarmupEngine:
             self._reports_dir = reports_dir
             try:
                 listing = sorted(self._list_fn(reports_dir), key=lambda t: t[1], reverse=True)
-            except Exception:  # noqa: BLE001 - never block server start
+            except (OSError, ValueError):
                 _logger.warning("warm-up enumeration failed", exc_info=True)
                 listing = []
             for project_id, _date in listing:
@@ -117,6 +122,35 @@ class WarmupEngine:
             self._queued.add(project_id)
             self._pending.append(project_id)
             self._cond.notify()
+
+    def prioritise(self, project_id: str) -> None:
+        """Move a queued project to the head of the queue.
+
+        The scores route calls this for the project on screen, so background
+        warm-up of the other projects never runs ahead of it. A no-op before
+        ``start``, for the project being warmed now, and for an id not queued.
+        """
+        with self._cond:
+            if project_id == self._current or project_id not in self._pending:
+                return
+            self._pending.remove(project_id)
+            self._pending.appendleft(project_id)
+
+    def enqueue_pending(self, entries: list) -> None:
+        """Re-enqueue every entry still marked ``summary_pending``.
+
+        Self-healing: the projects route calls this on every page it
+        returns, bounding the re-enqueue to page size instead of the full
+        project count.
+        """
+        for entry in entries:
+            if getattr(entry, "summary_pending", False):
+                self.enqueue(entry.id)
+
+    def generation(self) -> int:
+        """How many projects the worker has finished; moves on every completion."""
+        with self._cond:
+            return self._done
 
     def snapshot(self) -> dict | None:
         """Return warm-up progress for the API, or None before ``start``."""
@@ -140,7 +174,7 @@ class WarmupEngine:
             thread_to_join = self._thread
             self._cond.notify()  # Wake up worker if it's waiting
         if thread_to_join is not None:
-            thread_to_join.join(timeout=10)
+            thread_to_join.join(timeout=_SHUTDOWN_JOIN_TIMEOUT_S)
         # Clear all state after worker has stopped
         with self._cond:
             self._pending.clear()
@@ -152,35 +186,54 @@ class WarmupEngine:
             self._current_name = None
             self._done = 0
 
+    def _process_queued_item(self, project_id: str, reports_dir: str) -> None:
+        """Resolve one queued project's display name and warm its caches.
+
+        This is the sole statement ``run_isolated`` wraps in ``_worker``'s
+        loop body: anything beyond the narrowed display-name fallback below
+        (a bug in ``_project_display_name`` or a ``_warm_fn`` failure) must
+        not kill the daemon thread, so it propagates for ``run_isolated`` to
+        log with a traceback and absorb. Every path through here -- success,
+        the narrowed fallback, or a re-raised failure -- still releases the
+        item's queue/progress state in ``finally``.
+        """
+        try:
+            # Fetch display name outside the lock (file I/O shouldn't block others)
+            try:
+                current_name = _project_display_name(reports_dir, project_id)
+            except (OSError, ValueError):
+                current_name = project_id
+            with self._cond:
+                self._current_name = current_name
+            self._warm_fn(reports_dir, project_id)
+        except Exception:
+            with self._cond:
+                self._failed_at[project_id] = time.monotonic()
+            raise
+        finally:
+            with self._cond:
+                self._queued.discard(project_id)
+                self._current = None
+                self._current_name = None
+                self._done += 1
+
     def _worker(self) -> None:
         while True:
             with self._cond:
+                # enqueue and reset_for_tests notify under the lock, so an idle
+                # worker sleeps until there is work instead of polling.
                 while not self._pending and not self._shutdown.is_set():
-                    self._cond.wait(timeout=0.1)
+                    self._cond.wait()
                 if self._shutdown.is_set():
                     break
                 project_id = self._pending.popleft()
                 self._current = project_id
                 reports_dir = self._reports_dir or ""
-            # Fetch display name outside the lock (file I/O shouldn't block others)
-            try:
-                current_name = _project_display_name(reports_dir, project_id)
-            except Exception:  # noqa: BLE001 - bad metadata shouldn't crash worker
-                current_name = project_id
-            with self._cond:
-                self._current_name = current_name
-            try:
-                self._warm_fn(reports_dir, project_id)
-            except Exception:  # noqa: BLE001 - log and continue with the queue
-                _logger.warning("warm-up failed for project %s", project_id, exc_info=True)
-                with self._cond:
-                    self._failed_at[project_id] = time.monotonic()
-            finally:
-                with self._cond:
-                    self._queued.discard(project_id)
-                    self._current = None
-                    self._current_name = None
-                    self._done += 1
+            run_isolated(
+                lambda: self._process_queued_item(project_id, reports_dir),
+                label=f"score warmup for project {project_id!r}",
+                log=_logger,
+            )
 
 
 engine = WarmupEngine()

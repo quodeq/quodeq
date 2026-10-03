@@ -14,6 +14,7 @@ import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
 import { resolveProviderSettings } from '../../../utils/effectiveProviderSettings.js';
 import { useReEvalInfo } from './useReEvalInfo.js';
 import { useDimensionSelection } from './useDimensionSelection.js';
+import { PROJECT_LOCATION } from '../../../models/project.js';
 
 // The chips pre-select from the same resolution the start payload and the
 // Settings screen use, so the form can never claim a budget the run
@@ -38,7 +39,7 @@ function useReEvalScope(project) {
 
 // Local-project-only data: the scan preview and the pre-run estimates.
 function useReEvalScan(project, info) {
-  const isLocal = info?.location === 'local';
+  const isLocal = info?.location === PROJECT_LOCATION.LOCAL;
   const { scanData } = useScanData(isLocal ? project : null);
   const { estimates, loading: estimatesLoading } = useScanEstimates(project, isLocal && !info?.pathMissing);
   return { isLocal, scanData, estimates, estimatesLoading };

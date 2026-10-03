@@ -8,6 +8,10 @@ from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.analysis.mcp.findings_server import CompiledContext
 
 
+def _message_and_dup(receipt):
+    return receipt.message, receipt.status == "duplicate"
+
+
 class TestFindingsRouter:
     def test_enriches_req_refs_from_compiled(self, tmp_path: Path) -> None:
         findings_file = tmp_path / "findings.jsonl"
@@ -16,7 +20,7 @@ class TestFindingsRouter:
         }
         with open(findings_file, "w") as fh:
             router = mcp_findings.FindingsRouter(fh, CompiledContext(compiled_refs=compiled_refs))
-            msg, dup = router.receive({"p": "Confidentiality", "t": "violation", "d": "security", "w": "Hardcoded key", "req": "S-CON-1"})
+            msg, dup = _message_and_dup(router.receive({"p": "Confidentiality", "t": "violation", "d": "security", "w": "Hardcoded key", "req": "S-CON-1"}))
         assert not dup
         assert "Finding #1" in msg
         written = json.loads(findings_file.read_text().strip())
@@ -223,8 +227,8 @@ class TestFindingsRouterMultiDimension:
             context=CompiledContext(compiled_reqs=reqs, req_to_dim=req_to_dim),
         )
 
-        msg1, dup1 = router.receive({"req": "S-CON-1", "t": "violation", "file": "a.py", "line": 1, "w": "test"})
-        msg2, dup2 = router.receive({"req": "M-MOD-1", "t": "violation", "file": "b.py", "line": 2, "w": "test2"})
+        msg1, dup1 = _message_and_dup(router.receive({"req": "S-CON-1", "t": "violation", "file": "a.py", "line": 1, "w": "test"}))
+        msg2, dup2 = _message_and_dup(router.receive({"req": "M-MOD-1", "t": "violation", "file": "b.py", "line": 2, "w": "test2"}))
 
         lines = [json.loads(l) for l in fh.getvalue().strip().split("\n")]
         assert lines[0]["d"] == "security"

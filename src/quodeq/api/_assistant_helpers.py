@@ -1,17 +1,19 @@
 """Request plumbing for assistant routes: repo/context construction, busy check.
 
-Split into three modules plus this thin facade:
-  - _assistant_hygiene.py: ``run_assistant_hygiene``, ``_session_ttl_days``,
+A thin facade over three modules:
+  - _assistant_hygiene.py: ``run_assistant_hygiene``, ``session_ttl_days``,
     ``SharedSourceUnavailable``.
   - _assistant_location.py: ``resolve_run_location``,
     ``resolve_shared_run_location``, ``repo_attach_info``,
-    ``resolve_repo_root``.
-  - _assistant_events.py: ``event_frames``, ``_POLL_SECONDS``, ``_IDLE_LIMIT``.
+    ``resolve_repo_root``, ``get_repository``.
+  - _assistant_events.py: ``event_frames``, ``POLL_SECONDS``, ``IDLE_LIMIT``.
 
-The moved names stay imported here (re-exported) so callers across the
-codebase and tests can keep patching/importing "quodeq.api._assistant_helpers.
-<name>" — the split modules look several of them up on this module at call
-time rather than binding their own copies, so a patch here still lands.
+Their names are re-exported here, so callers and tests can import or patch
+"quodeq.api._assistant_helpers.<name>". None of the three modules imports
+through this facade (each imports its own dependencies directly), so a
+patch on one of those names here only reaches code that, like this module,
+reads it via the facade at call time; see each module's docstring for its
+own patch target.
 """
 from __future__ import annotations
 
@@ -20,43 +22,37 @@ from typing import Callable
 
 from flask import Flask, current_app
 
-from quodeq.assistant import AssistantRepository, AssistantStore
 from quodeq.assistant.tools import ActionContext, ToolContext, default_findings_repo_factory
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services.standards_prefs import load_visible_standard_ids
 from quodeq.services.shared_repo import (
+    RepoFormat,
     read_state,
     shared_evaluations_root,
     shared_score_cache_path,
 )
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.env import get_evaluations_dir
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
+from quodeq.core.types.project_source import ProjectSource, session_source
 
 from quodeq.api._assistant_hygiene import (  # noqa: F401 — re-export/patch target
     SharedSourceUnavailable,
-    _session_ttl_days,
+    session_ttl_days,
     run_assistant_hygiene,
 )
 from quodeq.api._assistant_location import (  # noqa: F401 — re-export/patch target
+    get_repository,
     repo_attach_info,
     resolve_repo_root,
     resolve_run_location,
     resolve_shared_run_location,
 )
 from quodeq.api._assistant_events import (  # noqa: F401 — re-export/patch target
-    _IDLE_LIMIT,
-    _POLL_SECONDS,
+    IDLE_LIMIT,
+    POLL_SECONDS,
     event_frames,
 )
-
-
-def get_repository(app: Flask) -> AssistantStore:
-    if not hasattr(app, "_assistant_repository"):
-        app._assistant_repository = AssistantRepository(
-            Path(app.config["ASSISTANT_DB_PATH"])
-        )
-    return app._assistant_repository
+from quodeq.api.routes_common import standards_compiled_dir
 
 
 def build_action_context(app: Flask) -> ActionContext:
@@ -70,7 +66,7 @@ def build_action_context(app: Flask) -> ActionContext:
     return ActionContext(
         evaluations_dir=Path(app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()),
         evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
-        compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+        compiled_dir=standards_compiled_dir(app),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
     )
 
@@ -87,13 +83,13 @@ def _resolve_shared_source(session: dict) -> tuple[Path, Path | None]:
     must stop an already-open session's reads too, same as every
     /api/shared/* route enforces at request time.
     """
-    if (session.get("source") or SESSION_SOURCE_LOCAL) != SESSION_SOURCE_SHARED:
+    if session_source(session) != ProjectSource.SHARED:
         return Path(get_evaluations_dir()), None
     settings = read_settings()
     if not settings.url:
         raise SharedSourceUnavailable("shared repository not configured")
     state = read_state(settings.url)
-    if state not in ("ok", "empty"):
+    if state not in (RepoFormat.OK, RepoFormat.EMPTY):
         raise SharedSourceUnavailable(f"shared repository unavailable: {state}")
     return shared_evaluations_root(settings.url), shared_score_cache_path(settings.url)
 
@@ -103,13 +99,13 @@ def build_tool_context(
 ) -> ToolContext:
     """Build a ToolContext from a session row.
 
-    Plan 1 naming note: the session row's ``run_id`` column holds the UI's
-    ``runDir`` and ``project_uuid`` holds the UI's ``repoRoot`` — the
-    create-session route maps those request fields onto these columns.
-    Plan 3 revisits this naming with a schema v2 if needed.
+    The session row's ``run_id`` column holds the UI's ``runDir`` and
+    ``project_uuid`` holds the UI's ``repoRoot`` — the create-session route
+    maps those request fields onto these columns. This naming may be
+    revisited with a schema v2 if needed.
     """
     run_dir = session.get("run_id")
-    source = session.get("source") or SESSION_SOURCE_LOCAL
+    source = session_source(session)
     reports_dir, score_cache_path = _resolve_shared_source(session)
     repo_root = (
         Path(session["project_uuid"]) if session.get("project_uuid") else None)
@@ -122,7 +118,7 @@ def build_tool_context(
     # only when session-creation-time resolution failed, and it recomputes the
     # identical repo_attach_info check rather than a looser one, so it is a
     # self-healing retry rather than a widening of trust.
-    if repo_root is None and source != SESSION_SOURCE_SHARED and session.get("project_id"):
+    if repo_root is None and source != ProjectSource.SHARED and session.get("project_id"):
         resolved = repo_root_resolver(session["project_id"])
         repo_root = Path(resolved) if resolved else None
     return ToolContext(
@@ -131,11 +127,12 @@ def build_tool_context(
         run_dir=Path(run_dir) if run_dir else None,
         repo_root=repo_root,
         evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
-        compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+        compiled_dir=standards_compiled_dir(app),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
+        repo_is_git=repo_root is not None and (repo_root / ".git").exists(),
         project_id=session.get("project_id"),
         reports_dir=reports_dir,
-        read_only=(source == SESSION_SOURCE_SHARED),
+        read_only=(source == ProjectSource.SHARED),
         score_cache_path=score_cache_path,
         visible_standard_ids=load_visible_standard_ids(repo_root),
         findings_repo_factory=default_findings_repo_factory,

@@ -34,7 +34,7 @@ def test_match_many_embeds_the_batch_once(tmp_path: Path) -> None:
 def test_match_many_trips_the_budget_once_for_the_batch(tmp_path: Path, monkeypatch) -> None:
     """A single over-budget match_many call trips the breaker once; a later
     call short-circuits without invoking the embedder again."""
-    monkeypatch.setattr("quodeq.context.precedent_corpus._EMBED_BUDGET_S", 0.0)
+    monkeypatch.setattr("quodeq.context.precedent_corpus.EMBED_BUDGET_S", 0.0)
     calls: list[list[str]] = []
 
     def embed(texts):

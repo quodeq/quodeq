@@ -22,18 +22,29 @@ def app(tmp_path: Path) -> Flask:
     run_dir = tmp_path / "run-1"
     run_dir.mkdir()
     provider.get_log_run_dir = lambda job_id: run_dir if job_id == "job-1" else None
+    provider.in_memory_job = lambda _job_id: None
     app.config["_provider"] = provider
     app.config["_run_dir"] = run_dir
     register_run_events_routes(app)
     return app
 
 
-def _write_finding(event_log: EventLogWriter, p: str, line: int = 1) -> None:
+def _write_finding(
+    event_log: EventLogWriter, p: str, line: int = 1, *, verdict: str = "violation",
+) -> None:
     payload = JudgmentPayload(
-        practice_id=p, verdict="violation", dimension="dim",
+        practice_id=p, verdict=verdict, dimension="dim",
         file="x.py", line=line, reason="r", severity="medium", snippet="s", title="t",
     )
     event_log.emit(JudgmentCreatedEvent(payload=payload))
+
+
+def _finding_frames(body: str) -> list[dict]:
+    blocks = [b for b in body.split("\n\n") if "event: finding" in b]
+    return [
+        json.loads(next(l for l in b.splitlines() if l.startswith("data: "))[len("data: "):])
+        for b in blocks
+    ]
 
 
 def test_route_returns_404_for_unknown_job(app: Flask):
@@ -43,7 +54,7 @@ def test_route_returns_404_for_unknown_job(app: Flask):
 
 
 def test_unresolvable_job_reports_gone_code_not_not_found(app: Flask):
-    """finding 6509: job_id resolves to no run dir -> 410, and the JSON
+    """job_id resolves to no run dir -> 410, and the JSON
     ``code`` field must say GONE, not the hardcoded NOT_FOUND that used
     to be returned regardless of the actual HTTP status."""
     client = app.test_client()
@@ -113,6 +124,30 @@ def test_route_honors_last_event_id_header(app: Flask, monkeypatch: pytest.Monke
     assert data["practice_id"] == "P2"
 
 
+def test_route_does_not_emit_a_compliance_judgment_as_a_finding(app: Flask, monkeypatch: pytest.MonkeyPatch):
+    """events.jsonl holds every judgment, passing checks included. The feed
+    used to show them all as violations (42 in the report, 417 on screen)."""
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
+    run_dir: Path = app.config["_run_dir"]
+    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+    _write_finding(event_log, "P1", line=1, verdict="compliance")
+    _write_finding(event_log, "P2", line=2)
+    body = app.test_client().get("/api/evaluations/job-1/events").get_data(as_text=True)
+    assert [f["practice_id"] for f in _finding_frames(body)] == ["P2"]
+
+
+def test_route_emits_a_finding_reported_twice_once(app: Flask, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
+    run_dir: Path = app.config["_run_dir"]
+    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
+    event_log = EventLogWriter(run_dir / "events.jsonl")
+    _write_finding(event_log, "P1", line=1)
+    _write_finding(event_log, "P1", line=1)
+    body = app.test_client().get("/api/evaluations/job-1/events").get_data(as_text=True)
+    assert len(_finding_frames(body)) == 1
+
+
 # ---------------------------------------------------------------------------
 # #14 -- path traversal via job_id in get_log_run_dir filesystem scan
 # ---------------------------------------------------------------------------
@@ -144,3 +179,100 @@ def test_get_log_run_dir_rejects_traversal_in_run_id(tmp_path: Path):
         result.resolve() != outside_resolved
         and result.resolve().is_relative_to(reports_resolved)
     )
+
+
+# ---------------------------------------------------------------------------
+# Preparing window: the run dir does not exist yet when the UI opens the stream
+# ---------------------------------------------------------------------------
+
+class _FakeJob:
+    def __init__(self, status: str = "running") -> None:
+        self.status = status
+
+
+def _preparing_provider(tmp_path: Path):
+    """A provider whose job is running but has no run dir on the first lookup.
+
+    The second ``get_log_run_dir`` call creates and returns the run dir with
+    a terminal status.json, the way the runner's report_path marker lands a
+    moment after the UI opened the stream.
+    """
+    provider = MagicMock()
+    run_dir = tmp_path / "late-run"
+    job = _FakeJob()
+    calls = [0]
+
+    def get_log_run_dir(_job_id):
+        calls[0] += 1
+        if calls[0] == 1:
+            return None
+        if not run_dir.is_dir():
+            run_dir.mkdir()
+            (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
+            event_log = EventLogWriter(run_dir / "events.jsonl")
+            _write_finding(event_log, "P1", line=1)
+        return run_dir
+
+    provider.get_log_run_dir = get_log_run_dir
+    provider.in_memory_job = lambda _job_id: job
+    provider.is_job_complete = lambda _job_id: job.status == "done"
+    return provider, job
+
+
+def test_route_waits_for_preparing_job_run_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """A running job with no run dir yet must get a 200 event-stream, not a
+    410: a non-200 closes the browser's EventSource for good and the
+    Evaluate screen then never shows a live finding for that run."""
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
+    app = Flask(__name__)
+    provider, _job = _preparing_provider(tmp_path)
+    app.config["_provider"] = provider
+    register_run_events_routes(app)
+
+    resp = app.test_client().get("/api/evaluations/job-late/events")
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/event-stream"
+    body = resp.get_data(as_text=True)
+    assert "event: finding" in body
+    assert "event: status" in body
+    assert "event: done" in body
+
+
+def test_route_closes_when_preparing_job_ends_without_run_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    """A job that fails before creating its run dir must end the stream with
+    ``event: done`` instead of holding the connection open."""
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
+    app = Flask(__name__)
+    provider = MagicMock()
+    job = _FakeJob()
+    provider.get_log_run_dir = lambda _job_id: None
+    provider.in_memory_job = lambda _job_id: job
+    calls = [0]
+
+    def is_job_complete(_job_id):
+        calls[0] += 1
+        job.status = "failed"
+        return True
+
+    provider.is_job_complete = is_job_complete
+    app.config["_provider"] = provider
+    register_run_events_routes(app)
+
+    resp = app.test_client().get("/api/evaluations/job-dead/events")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "event: done" in body
+    assert "event: finding" not in body
+
+
+def test_route_still_rejects_unknown_job_when_nothing_is_running(tmp_path: Path):
+    app = Flask(__name__)
+    provider = MagicMock()
+    provider.get_log_run_dir = lambda _job_id: None
+    provider.in_memory_job = lambda _job_id: None
+    app.config["_provider"] = provider
+    register_run_events_routes(app)
+    resp = app.test_client().get("/api/evaluations/bogus/events")
+    assert resp.status_code == 410

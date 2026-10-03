@@ -29,10 +29,12 @@ def provider_env_exports(
 ) -> dict[str, str]:
     """Return env vars carrying user-entered credentials for *provider_id*.
 
-    The API key is exported under the provider's ``api_key_env``. A base URL
-    is only exported when the provider's configured ``api_base`` is an env
-    template (``${VAR}``, e.g. the ``custom`` provider) — fixed endpoints
-    are not overridable per-run.
+    A provider with a ``credential_env`` entry (``{"key": ..., "base": ...}``,
+    e.g. ``omlx``) exports both under those fixed names. Otherwise the API
+    key is exported under the provider's ``api_key_env``, and a base URL only
+    when the provider's configured ``api_base`` is an env template
+    (``${VAR}``, e.g. the ``custom`` provider) — fixed endpoints are not
+    overridable per-run.
     """
     if not provider_id:
         return {}
@@ -43,6 +45,9 @@ def provider_env_exports(
     cfg = configs.get(provider_id)
     if not isinstance(cfg, dict):
         return {}
+    credential_env = cfg.get("credential_env")
+    if isinstance(credential_env, dict):
+        return _generic_credential_exports(credential_env, api_key, api_base)
     exports: dict[str, str] = {}
     key_env = cfg.get("api_key_env")
     if api_key and isinstance(key_env, str) and key_env:
@@ -55,4 +60,19 @@ def provider_env_exports(
         and base_template.endswith("}")
     ):
         exports[base_template[2:-1]] = api_base
+    return exports
+
+
+def _generic_credential_exports(
+    credential_env: dict, api_key: str | None, api_base: str | None,
+) -> dict[str, str]:
+    """Export *api_key*/*api_base* under a provider's fixed ``credential_env``
+    names (``key``/``base``), whichever are present."""
+    exports: dict[str, str] = {}
+    key_name = credential_env.get("key")
+    if api_key and isinstance(key_name, str) and key_name:
+        exports[key_name] = api_key
+    base_name = credential_env.get("base")
+    if api_base and isinstance(base_name, str) and base_name:
+        exports[base_name] = api_base
     return exports

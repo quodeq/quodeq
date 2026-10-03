@@ -14,16 +14,17 @@ from pathlib import Path
 
 _logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
-_BUSY_TIMEOUT_MS = 3000
+_RUN_INDEX_BUSY_TIMEOUT_MS = 3000  # kept at its historical value; the other sqlite stores use 5000 (SQLITE_BUSY_TIMEOUT_MS)
+
 # Bounded wait for the one lock SQLite will not route through busy_timeout --
 # see _connect_retrying. The writer being waited on is a schema DDL that takes
 # milliseconds, so this ceiling is never approached in practice; it is kept
 # short so a wedged peer degrades the caller rather than stalling it.
 # It bounds when the *next* retry starts, not total wall time: a peer holding
 # a SHARED lock sends the attempt through busy_timeout instead of failing
-# fast, so the worst case is this deadline plus one full _BUSY_TIMEOUT_MS
+# fast, so the worst case is this deadline plus one full _RUN_INDEX_BUSY_TIMEOUT_MS
 # (~5.3s) before the raise.
 _WAL_SWITCH_DEADLINE_S = 2.0
 _WAL_SWITCH_SLEEP_S = 0.02
@@ -50,13 +51,38 @@ CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at DESC);
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 """
 
+# v2: the date ``list_runs`` had to parse from a run's files because the run
+# has no usable ``started_at`` (no ``status.json``, or one from before the
+# field). Written once, so the per-run file read is paid once per run. A
+# finished run with no date anywhere is remembered as undated (NULL) too,
+# since nothing will add one later.
+_RUN_DATES_VERSION = 2
+_SCHEMA_V2 = """
+CREATE TABLE IF NOT EXISTS run_dates (
+    project_uuid TEXT NOT NULL,
+    run_id       TEXT NOT NULL,
+    date_iso     TEXT,
+    date_label   TEXT NOT NULL,
+    PRIMARY KEY (project_uuid, run_id)
+);
+"""
 
-def _apply_schema_v1(db: sqlite3.Connection) -> None:
+
+def _apply_schema(db: sqlite3.Connection) -> None:
+    """Create the full current schema on a fresh (or wiped) index."""
     with db:
-        db.executescript(_SCHEMA_V1)
+        db.executescript(_SCHEMA_V1 + _SCHEMA_V2)
         have_version = db.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]
         if have_version == 0:
             db.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
+
+
+def _migrate(db: sqlite3.Connection, version: int) -> None:
+    """Bring an index at *version* (< SCHEMA_VERSION) up to date, additively."""
+    with db:
+        if version < _RUN_DATES_VERSION:
+            db.executescript(_SCHEMA_V2)
+        db.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
 
 
 def _read_schema_version(db: sqlite3.Connection) -> int | None:
@@ -84,7 +110,7 @@ def _connect_with_pragmas(db_path: Path) -> sqlite3.Connection:
     # _connect_retrying for the case it cannot absorb.
     db = sqlite3.connect(str(db_path))
     try:
-        db.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
+        db.execute(f"PRAGMA busy_timeout={_RUN_INDEX_BUSY_TIMEOUT_MS}")
         db.execute("PRAGMA journal_mode=WAL")
     except sqlite3.DatabaseError:
         _close_quietly(db)
@@ -185,7 +211,7 @@ def _open_or_rebuild(db_path: Path) -> sqlite3.Connection:
 
     version = _read_schema_version(db)
     if version is None:
-        _apply_schema_v1(db)
+        _apply_schema(db)
         return db
     if version > SCHEMA_VERSION:
         # Downgrade: a newer quodeq migrated the index forward. It's a derived
@@ -197,6 +223,8 @@ def _open_or_rebuild(db_path: Path) -> sqlite3.Connection:
         )
         _close_quietly(db)
         db = _recreate_index_db(db_path)
-        _apply_schema_v1(db)
+        _apply_schema(db)
         return db
+    if version < SCHEMA_VERSION:
+        _migrate(db, version)
     return db

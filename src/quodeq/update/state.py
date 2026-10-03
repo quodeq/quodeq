@@ -1,23 +1,18 @@
 """Shared, on-disk update state at ~/.quodeq/update_state.json.
 
 Read/written by three separate processes (dashboard, menubar, CLI), so it is
-the single source of truth. Resolution mirrors shared/env.py: an explicit
-QUODEQ_UPDATE_STATE_PATH wins, else <QUODEQ_DIR or ~/.quodeq>/update_state.json.
-Basing the fallback on QUODEQ_DIR means the test suite's autouse
-_isolate_quodeq_home fixture isolates this file automatically.
+the single source of truth. QUODEQ_UPDATE_STATE_PATH overrides the location;
+otherwise it sits in QUODEQ_DIR (default ~/.quodeq).
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
-from quodeq.shared.json_state import read_json_state, state_file_path, write_json_state
+from quodeq.shared.json_state import JsonStateFile
 
 _logger = logging.getLogger(__name__)
-
-_STATE_FILENAME = "update_state.json"
 
 
 @dataclass
@@ -39,20 +34,21 @@ class UpdateState:
     disclosed: bool = False
 
 
+_STATE_FILE = JsonStateFile(
+    UpdateState, "QUODEQ_UPDATE_STATE_PATH", "update_state.json", "update", _logger,
+)
+
+
 def get_update_state_path(env: dict[str, str] | None = None) -> str:
-    """Resolve the state file path. *env* overrides ``os.environ`` for tests."""
-    return state_file_path("QUODEQ_UPDATE_STATE_PATH", _STATE_FILENAME, env)
+    """Where the update state file lives (*env* stands in for ``os.environ``)."""
+    return _STATE_FILE.path(env)
 
 
 def read_state(env: dict[str, str] | None = None) -> UpdateState:
-    """Load the state, falling back to defaults on a missing or corrupt file.
-
-    Unknown keys are dropped so an older process can read a file written by a
-    newer one.
-    """
-    return read_json_state(Path(get_update_state_path(env)), UpdateState)
+    """The last check's results and the user's update choices; defaults if the file is unusable."""
+    return _STATE_FILE.read(get_update_state_path(env))
 
 
 def write_state(state: UpdateState, env: dict[str, str] | None = None) -> None:
     """Persist the state atomically. Failures are logged, never raised."""
-    write_json_state(state, Path(get_update_state_path(env)), "update", _logger)
+    _STATE_FILE.write(state, get_update_state_path(env))

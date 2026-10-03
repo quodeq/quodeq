@@ -10,11 +10,17 @@ from collections.abc import Mapping
 from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
+from werkzeug.exceptions import SecurityError
 
+from quodeq.api._constants import CODE_FORBIDDEN
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.api.helpers import json_error
+from quodeq.api.routes_common import is_local_request
+from quodeq.shared import request_metrics
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.dashboard_ports import alt_port_origins
+from quodeq.shared.log_throttle import LogThrottle
 
 _logger = logging.getLogger(__name__)
 
@@ -30,7 +36,7 @@ _RATE_LIMIT_EXEMPT_PATHS = frozenset({
     "/api/findings/restore",
     "/api/findings/delete",
 })
-_LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
+_SAFE_HTTP_METHODS = ("GET", "HEAD", "OPTIONS")  # never state-changing: skip CSRF + most rate limiting
 _BEARER_PREFIX = "Bearer "
 _MIN_BEARER_HEADER_LEN = len(_BEARER_PREFIX) + SECRET_SUFFIX_CHARS
 
@@ -52,7 +58,7 @@ _WEBVIEW_UA_MARKER = "QuodeqDesktop"
 _ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
 
 # UA prefix the webview puts ahead of the token (see
-# _webview_window_about._webview_user_agent). Must match there.
+# _webview_window_about.webview_user_agent). Must match there.
 _WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
 
 
@@ -87,7 +93,7 @@ def _is_trusted_webview(user_agent: str, env: Mapping[str, str] | None = None) -
     # isascii() for the same reason _webview_token_from_ua guards the
     # candidate: compare_digest raises TypeError if EITHER str is non-ASCII,
     # and this one comes from the environment, which an operator can set by
-    # hand. _get_webview_token() only ever produces token_urlsafe() output,
+    # hand. get_webview_token() only ever produces token_urlsafe() output,
     # so a non-ASCII value here is a misconfiguration, not a match.
     if not expected or not expected.isascii():
         return False
@@ -103,7 +109,7 @@ def _is_trusted_webview(user_agent: str, env: Mapping[str, str] | None = None) -
 # directive. Rejects quotes, whitespace, and other characters that could
 # inject extra CSP directives or sources via a spoofed Host header.
 # The IPv6 branch matters here: ::1 is a first-class local address elsewhere
-# in this app (_LOCALHOST_ADDRS below, dashboard/_networking.py,
+# in this app (routes_common.LOCALHOST_ADDRS, dashboard/_networking.py,
 # dashboard/_webview_window_native_ops.py's reload allowlist), so a client
 # reaching this dashboard over IPv6 loopback is a real access path, not a
 # hypothetical.
@@ -121,17 +127,12 @@ _ALT_PORT_ORIGINS = alt_port_origins()
 # Cooldown between consecutive "CSP same-origin ws computation failed" log
 # lines. This except block sits in after_request, so it runs on every
 # response; if the computation starts failing under some sustained condition
-# we still want the FIRST occurrence surfaced immediately (was previously
-# silent), but must not turn a per-request code path into a per-request log
-# line -- that would make the failure itself a new source of log-volume
-# noise. Module-level, best-effort (no lock): a rare double-log right at the
-# window boundary under concurrent requests is harmless: it's a diagnostic
-# throttle, not a correctness guarantee.
+# we still want the FIRST occurrence surfaced immediately, but must not turn a
+# per-request code path into a per-request log line -- that would make the
+# failure itself a new source of log-volume noise. The LogThrottle instance
+# lives per-app (created in configure_security); shared/log_throttle.py has
+# the lock-free rationale.
 _CSP_WS_FAILURE_LOG_INTERVAL_S = 60.0
-# None, not 0.0: time.monotonic() is seconds-since-boot, so a 0.0 sentinel
-# would silently drop the first failure on any machine up for less than the
-# interval (a desktop app launched at login).
-_last_csp_ws_failure_log_at: float | None = None
 
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
@@ -147,11 +148,11 @@ def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
         return None
     if api_key:
         auth = request.headers.get("Authorization", "")
-        if not hmac.compare_digest(auth, f"{_BEARER_PREFIX}{api_key}"):
-            return jsonify({"error": "Unauthorized", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
+        # compare_digest raises TypeError on non-ASCII str input.
+        if not auth.isascii() or not hmac.compare_digest(auth, f"{_BEARER_PREFIX}{api_key}"):
+            return json_error("Unauthorized", HTTPStatus.UNAUTHORIZED, "UNAUTHORIZED")
     else:
-        remote = request.remote_addr or ""
-        if remote not in _LOCALHOST_ADDRS:
+        if not is_local_request():
             return jsonify({
                 "error": "Set QUODEQ_API_KEY to allow remote access",
                 "code": "UNAUTHORIZED",
@@ -161,23 +162,28 @@ def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
 
 def _check_csrf() -> Response | tuple[Response, int] | None:
     """Verify Origin header on state-changing requests."""
-    if request.method in ("GET", "HEAD", "OPTIONS"):
+    if request.method in _SAFE_HTTP_METHODS:
         return None
     origin = request.headers.get("Origin")
     if not origin:
-        return jsonify({"error": "Origin header required", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+        return json_error("Origin header required", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)
     allowed = {f"http://{request.host}", f"https://{request.host}"}
     if origin not in allowed:
-        return jsonify({"error": "Origin not allowed", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+        return json_error("Origin not allowed", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)
     return None
 
 
 def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] | None:
     """Enforce rate limiting on state-changing requests and sensitive GET endpoints."""
-    if request.method in ("GET", "HEAD", "OPTIONS") and request.path not in _RATE_LIMITED_GET_PATHS:
+    if request.method in _SAFE_HTTP_METHODS and request.path not in _RATE_LIMITED_GET_PATHS:
         return None
     if request.path in _RATE_LIMIT_EXEMPT_PATHS:
         return None
+    return _count_attempt(store)
+
+
+def _count_attempt(store: RateLimitStore) -> Response | tuple[Response, int] | None:
+    """Record one attempt for this client; a 429 once it is over the cap."""
     ip = request.remote_addr or "unknown"
     now = time.monotonic()
     if hasattr(store, "check_and_record"):
@@ -189,7 +195,7 @@ def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] 
         if not limited:
             store.record(ip, now)
     if limited:
-        return jsonify({"error": "Too many requests", "code": "RATE_LIMITED"}), HTTPStatus.TOO_MANY_REQUESTS
+        return json_error("Too many requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED")
     return None
 
 
@@ -216,27 +222,21 @@ def _actor(api_key: str | None) -> str:
     return ""
 
 
-def _log_csp_ws_failure(exc: Exception) -> None:
+def _log_csp_ws_failure(exc: Exception, throttle: LogThrottle) -> None:
     """Surface a same-origin ws CSP computation failure, rate-limited.
 
     Runs inside ``after_request`` on every response, so this must never
     raise and must never become an unbounded log source on its own: only
     the exception's type name is logged (no header/request content, so
     nothing attacker-controlled reaches the log line), and repeats within
-    ``_CSP_WS_FAILURE_LOG_INTERVAL_S`` are dropped. A failing handler is the
-    handler's problem (stdlib handleError contract); this module does not
-    control its logger's handlers, and ``_add_security_headers`` already
-    logs unguarded on every request, so a guard here never covered the
-    real risk.
+    *throttle*'s interval are dropped. A failing handler is the handler's
+    problem (stdlib handleError contract); this module does not control
+    its logger's handlers, and ``_add_security_headers`` already logs
+    unguarded on every request, so a guard here never covered the real
+    risk.
     """
-    global _last_csp_ws_failure_log_at
-    now = time.monotonic()
-    if (
-        _last_csp_ws_failure_log_at is not None
-        and now - _last_csp_ws_failure_log_at < _CSP_WS_FAILURE_LOG_INTERVAL_S
-    ):
+    if not throttle.should_emit(time.monotonic()):
         return
-    _last_csp_ws_failure_log_at = now
     _logger.warning(
         "CSP same-origin ws/wss connect-src computation failed (%s); "
         "omitting that entry for this response (further repeats "
@@ -257,24 +257,31 @@ def configure_security(
     *env* is captured once here, at app-creation time, rather than read per
     request; ``None`` keeps the per-request lookup against ``os.environ``.
     """
+    csp_ws_failure_throttle = LogThrottle(_CSP_WS_FAILURE_LOG_INTERVAL_S)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
-        return _check_auth(api_key) or _check_csrf() or _check_rate_limit(rate_limit_store)
+        denied = _check_auth(api_key)
+        if denied is not None:
+            # A failed auth always counts, whatever the method or path, so
+            # key guessing hits the limit. Passing requests are unaffected.
+            return _count_attempt(rate_limit_store) or denied
+        return _check_csrf() or _check_rate_limit(rate_limit_store)
 
     @app.after_request
     def _add_security_headers(response: Response) -> Response:
         _logger.info(
-            "API: %s %s%s -> %d", request.method, request.path, _actor(api_key), response.status_code
+            "API: %s %s%s -> %d%s", request.method, request.path, _actor(api_key), response.status_code,
+            request_metrics.log_suffix(),
         )
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
         # The primary bind port isn't known here; add same-origin ws explicitly.
         try:
             self_ws = _same_origin_ws_sources(request.host)
-        except Exception as exc:
+        except SecurityError as exc:
             self_ws = ""
-            _log_csp_ws_failure(exc)
+            _log_csp_ws_failure(exc, csp_ws_failure_throttle)
         is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""), env)
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (

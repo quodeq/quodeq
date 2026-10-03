@@ -5,25 +5,15 @@ for ``report_finding``, ``get_next_files``, and ``mark_file_done``.
 """
 from __future__ import annotations
 
-# report_finding's "t" and "severity" enums -- the gates in this package
-# (scope_gate.py, provenance_gate.py, precedent_downweight.py, enricher.py)
-# read and write the same finding dict, so they import these rather than
-# retyping the values the schema declares valid.
-FINDING_TYPE_VIOLATION = "violation"
-FINDING_TYPE_COMPLIANCE = "compliance"
-SEVERITY_CRITICAL = "critical"
-SEVERITY_MAJOR = "major"
-SEVERITY_MINOR = "minor"
+# Moved to core.evidence.markers so data/fs can read the vocabulary directly
+# (data may only import core); re-exported here for existing importers.
+from quodeq.core.evidence.markers import (  # noqa: F401 -- re-exported
+    FileDoneStatus,
+    JSONL_MARKER_FILE_DONE,
+)
+from quodeq.core.types.finding_type import FindingType
+from quodeq.core.types.severity import Severity
 
-# mark_file_done's "status" vocabulary. router.py writes these into the JSONL
-# file_done markers; _loop_guards.py reads them back to count analysed vs
-# abandoned files, so both sides import these rather than retyping them.
-FILE_DONE_STATUS_OK = "ok"
-FILE_DONE_STATUS_ERROR = "error"
-# Accepted by the router but deliberately absent from the tool schema's enum
-# below: "skipped" is written by the server for files the worker could never
-# dispatch, not something a worker is told to report.
-FILE_DONE_STATUS_SKIPPED = "skipped"
 
 REPORT_FINDING_NAME = "report_finding"
 REPORT_FINDING_DESC = (
@@ -34,12 +24,12 @@ REPORT_FINDING_SCHEMA = {
     "type": "object",
     "properties": {
         "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'M-MOD-1', 'S-CON-3'). Server auto-fills principle name and dimension from this."},
-        "t": {"type": "string", "enum": [FINDING_TYPE_VIOLATION, FINDING_TYPE_COMPLIANCE], "description": "Finding type"},
+        "t": {"type": "string", "enum": [t.value for t in FindingType], "description": "Finding type"},
         "file": {"type": "string", "description": "File path relative to repo root"},
         "line": {"type": "integer", "description": "Line number"},
         "end_line": {"type": "integer", "description": "Last line of the violation pattern (omit if single line)"},
         "scope": {"type": "string", "enum": ["file", "class", "module"], "description": "Set when the finding affects an entire file/class/module rather than specific lines"},
-        "severity": {"type": "string", "enum": [SEVERITY_CRITICAL, SEVERITY_MAJOR, SEVERITY_MINOR], "description": "Severity level"},
+        "severity": {"type": "string", "enum": [s.value for s in Severity], "description": "Severity level"},
         "vt": {"type": "string", "description": "Violation type taxonomy code: a short, stable, kebab-case class of the violation (e.g. 'code-injection', 'hardcoded-secret', 'missing-error-handling'). Reuse the exact same code for every finding of the same kind."},
         "w": {"type": "string", "description": "Short description of the finding"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
@@ -49,7 +39,7 @@ REPORT_FINDING_SCHEMA = {
     "required": ["req", "t", "file", "line", "severity", "w", "reason"],
 }
 
-_DEFAULT_FILE_BATCH_SIZE = 5
+DEFAULT_FILE_BATCH_SIZE = 5
 GET_NEXT_FILES_NAME = "get_next_files"
 GET_NEXT_FILES_DESC = (
     "Get your next batch of files to analyse from the queue. "
@@ -67,6 +57,9 @@ GET_NEXT_FILES_SCHEMA = {
 }
 
 MARK_FILE_DONE_NAME = "mark_file_done"
+# The statuses a worker model may send. SKIPPED is server-written only (files
+# the worker cannot dispatch), so the tool schema does not offer it.
+_MODEL_FILE_DONE_STATUSES = (FileDoneStatus.OK, FileDoneStatus.ERROR)
 MARK_FILE_DONE_DESC = (
     "Call this exactly once after you have finished analysing a file, "
     "successfully or not. Pass status='ok' if you analysed the file end-to-end "
@@ -79,7 +72,7 @@ MARK_FILE_DONE_SCHEMA = {
     "type": "object",
     "properties": {
         "file": {"type": "string", "description": "Repo-relative file path that was just analysed"},
-        "status": {"type": "string", "enum": [FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR], "description": "ok if analysis completed, error if abandoned"},
+        "status": {"type": "string", "enum": [s.value for s in _MODEL_FILE_DONE_STATUSES], "description": "ok if analysis completed, error if abandoned"},
         "reason": {"type": "string", "description": "Short stable code when status=error: token_limit | parse_error | retry_exhausted | subprocess_error | timeout"},
     },
     "required": ["file", "status"],

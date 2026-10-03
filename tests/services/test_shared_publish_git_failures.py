@@ -213,3 +213,15 @@ def test_push_falls_back_to_explicit_refspec_when_origin_head_push_fails(tmp_pat
     subprocess.run(["git", "clone", url, str(verify)], check=True, capture_output=True)
     assert (verify / "quodeq.json").exists()
     assert (verify / "evaluations" / "proj-uuid-1" / "run-1" / "status.json").exists()
+
+
+def test_failed_rebase_abort_is_warned(tmp_path, monkeypatch, caplog):
+    """A rebase --abort that fails leaves the clone wedged; the publish says so."""
+    def failing_git(args, *, cwd=None, timeout=300):
+        return False, "abort refused" if args == ["rebase", "--abort"] else "rejected"
+
+    monkeypatch.setattr(shared_publish, "run_git", failing_git)
+    caplog.set_level("WARNING", logger=shared_publish.__name__)
+    with pytest.raises(PublishError):
+        shared_publish.push_with_rebase_fallback(tmp_path)
+    assert "abort refused" in caplog.text

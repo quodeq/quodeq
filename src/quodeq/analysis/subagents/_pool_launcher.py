@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -10,11 +11,13 @@ from typing import Any
 from quodeq.analysis.runner_markers import emit_marker
 from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
+from quodeq.analysis.subagents._config_kwargs import shared_analysis_config_kwargs
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.config.analysis_env import non_scout_providers, subagent_model_override
 from quodeq.shared.constants import CC_PHASE_DEADLINE_EXTENDED, DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
+from quodeq.core.utils.numbers import clamp
 
 _MAX_FILES_PER_AGENT = 30
 _MAX_FILES_PER_AGENT_CAP = 50
@@ -52,7 +55,7 @@ def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
     if queue_size <= 0:
         return DEFAULT_TIME_LIMIT
     needed = queue_size * _SECONDS_PER_FILE_AUTOSCALE
-    return min(_MAX_AUTO_POOL_BUDGET, max(DEFAULT_TIME_LIMIT, needed))
+    return clamp(needed, DEFAULT_TIME_LIMIT, _MAX_AUTO_POOL_BUDGET)
 
 
 def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
@@ -82,16 +85,16 @@ def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
     if options.on_deadline_extended is not None:
         try:
             options.on_deadline_extended(new_iso)
-        except Exception as exc:  # noqa: BLE001 — a status write must not kill the launch
+        except (OSError, TypeError, ValueError) as exc:
             log_warning(f"deadline extension notify failed: {exc}")
 
 
-def _compute_files_per_agent(total_files: int) -> int:
+def compute_files_per_agent(total_files: int) -> int:
     """Compute adaptive max files per agent. Capped to avoid turn limits."""
     return min(total_files, _MAX_FILES_PER_AGENT_CAP) if total_files > 0 else 0
 
 
-def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
+def default_subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override, or None to use the client's default.
 
     Checks SUBAGENT_MODEL first (set by dashboard/service layer),
@@ -122,7 +125,7 @@ def _resolve_pool_budget(
     Only the AUTO-SCALED budget may ratchet the deadline. An explicit
     time_limit is a run-wide HARD CAP: extending it here handed every
     dim's pool a fresh full budget, so a 1h run kept running for
-    "1h after the LAST dim launch" (observed: run 838d807e).
+    "1h after the LAST dim launch" (observed in a real run).
     """
     queue_size = len(params.all_files) if params.all_files is not None else 0
     time_limit = _resolve_time_limit(config.options.time_limit, queue_size)
@@ -143,16 +146,15 @@ def _build_pool_config(
 ) -> AnalysisConfig:
     """Build the per-launch AnalysisConfig for this pool."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model(env) or config.options.ai_model
+    subagent_model = config.options.subagent_model or default_subagent_model(env) or config.options.ai_model
     return AnalysisConfig(
-        analysis_budget=config.options.analysis_budget,
+        **shared_analysis_config_kwargs(config),
         compiled_dir=compiled_dir,
-        max_turns=config.options.max_turns,
-        max_duration=config.options.max_duration,
         ai_model=subagent_model,
         max_files_per_agent=params.max_files_per_agent,
         time_limit=time_limit,
         deadline_at=config.options.deadline_at,
+        run_deadline_at=config.options.run_deadline_at,
         # Carry the RunConfig + dimension so the API runner can construct a
         # per-file cache writer (synchronous cache.put on file_done='ok').
         run_config=config,
@@ -173,27 +175,33 @@ def _pool_paths(config: RunConfig, params: LaunchPoolParams) -> PoolPaths:
     )
 
 
-def _launch_pool(
+def launch_pool(
     config: RunConfig, dim_id: str, params: LaunchPoolParams,
     *, env: dict[str, str] | None = None,
+    pool_factory: Callable[..., Any] | None = None,
 ) -> tuple[Any, list[Any]]:
-    """Create and run a SubagentPool, returning its results."""
+    """Create and run a SubagentPool, returning its results.
+
+    *pool_factory* defaults to ``SubagentPool`` (tests pass a fake).
+    """
+    factory = pool_factory if pool_factory is not None else SubagentPool
     time_limit = _resolve_pool_budget(config, dim_id, params)
     base_ac = _build_pool_config(config, dim_id, params, time_limit, env)
-    pool = SubagentPool(
+    pool = factory(
         paths=_pool_paths(config, params),
         options=PoolOptions(
             n_agents=config.options.max_subagents,
             prompt=params.prompt,
             dimension=dim_id,
             scout_first=_use_scout_mode(env),
+            agent_failure_streak_limit=config.options.agent_failure_streak_limit,
         ),
         config=base_ac,
     )
     return pool, pool.run()
 
 
-def _collect_all_evidence(results: list[Any], cleanup_stream_fn: Any) -> int:
+def collect_all_evidence(results: list[Any], cleanup_stream_fn: Any) -> int:
     """Sum files-read counts across all subagent result stream files, cleaning up each."""
     total = 0
     for r in results:

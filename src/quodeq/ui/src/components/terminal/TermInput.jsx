@@ -1,3 +1,5 @@
+import { KEY } from '../../vocab/keyboard.js';
+
 /**
  * TermInput — terminal-style text input prefixed with a shell prompt
  * (e.g. `$ grep -r [input...]`).
@@ -12,6 +14,7 @@
  * @param {string}  [props.id]
  * @param {string}  [props.name]
  * @param {string}  [props.ariaLabel]
+ * @param {boolean} [props.disabled]
  */
 export default function TermInput({
   prompt = '$',
@@ -23,6 +26,7 @@ export default function TermInput({
   id,
   name,
   ariaLabel,
+  disabled = false,
 }) {
   return (
     <div className="term-input">
@@ -36,9 +40,10 @@ export default function TermInput({
         aria-label={ariaLabel || command || 'input'}
         placeholder={placeholder}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && onSubmit) onSubmit();
+          if (e.key === KEY.ENTER && onSubmit) onSubmit();
         }}
         spellCheck={false}
         autoComplete="off"

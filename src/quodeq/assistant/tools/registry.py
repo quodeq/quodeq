@@ -5,6 +5,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from quodeq.shared.fault_isolation import run_isolated
+
 _logger = logging.getLogger(__name__)
 
 
@@ -53,16 +55,33 @@ class ToolRegistry:
         ]
 
     def dispatch(self, name: str, arguments: dict[str, Any]) -> dict:
-        """Call tool ``name`` with ``arguments``; never raise, return an ok/error dict."""
-        spec = self._specs.get(name)
-        if spec is None:
-            return {"ok": False, "error": f"unknown tool: {name}"}
-        try:
-            return {"ok": True, "result": spec.handler(**arguments)}
-        except ToolError as exc:
-            return {"ok": False, "error": str(exc)}
-        except TypeError as exc:
-            return {"ok": False, "error": f"invalid arguments for {name}: {exc}"}
-        except Exception:  # noqa: BLE001 - a tool bug must not kill the turn
-            _logger.exception("tool %s crashed", name)
-            return {"ok": False, "error": f"tool {name} failed internally"}
+        """Call tool ``name`` with ``arguments``; never raise, return an ok/error dict.
+
+        ``run_isolated`` is this call's fault-isolation boundary (one model
+        tool call): a handler bug that is not one of ``_invoke_tool``'s own
+        routine, expected outcomes (unknown tool, ``ToolError``, bad
+        arguments) is logged with its traceback and turned into a generic
+        failure dict instead of killing the turn.
+        """
+        return run_isolated(
+            lambda: _invoke_tool(self._specs, name, arguments),
+            label=f"tool {name}",
+            log=_logger,
+            on_error=lambda _exc: {"ok": False, "error": f"tool {name} failed internally"},
+        )
+
+
+def _invoke_tool(specs: dict[str, ToolSpec], name: str, arguments: dict[str, Any]) -> dict:
+    """Call tool ``name`` with ``arguments``; unknown-tool, ``ToolError`` and
+    bad-argument ``TypeError`` are routine, expected outcomes, so they are
+    handled here, outside ``dispatch``'s ``run_isolated`` boundary, and never
+    logged as a tool crash."""
+    spec = specs.get(name)
+    if spec is None:
+        return {"ok": False, "error": f"unknown tool: {name}"}
+    try:
+        return {"ok": True, "result": spec.handler(**arguments)}
+    except ToolError as exc:
+        return {"ok": False, "error": str(exc)}
+    except TypeError as exc:
+        return {"ok": False, "error": f"invalid arguments for {name}: {exc}"}

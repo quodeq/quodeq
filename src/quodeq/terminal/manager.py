@@ -17,6 +17,7 @@ import threading
 from collections import deque
 
 from quodeq.terminal.backend import PtyBackend
+from quodeq.terminal.constants import PTY_READ_MAX_BYTES
 
 
 class TerminalManager:
@@ -53,7 +54,7 @@ class TerminalManager:
             self._backend = self._factory()
             self._backend.spawn(cwd=cwd, cols=cols, rows=rows)
 
-    def read(self, max_bytes: int = 65536) -> str:
+    def read(self, max_bytes: int = PTY_READ_MAX_BYTES) -> str:
         """Return decoded output, holding back a trailing partial character.
 
         May return "" even when bytes arrived (all of them belonged to a
@@ -62,9 +63,13 @@ class TerminalManager:
         backend = self._backend
         if backend is None:
             return ""
-        data = self._decoder.decode(backend.read(max_bytes))
-        if data:
-            self._append_scrollback(data)
+        raw = backend.read(max_bytes)  # blocks: never under the lock
+        with self._lock:
+            if backend is not self._backend:  # the session was replaced mid-read
+                return ""
+            data = self._decoder.decode(raw)
+            if data:
+                self._append_scrollback(data)
         return data
 
     def write(self, data: bytes) -> None:
@@ -83,7 +88,8 @@ class TerminalManager:
     def scrollback(self) -> str:
         """Replay buffer for a reconnecting client, capped at
         ``MAX_SCROLLBACK`` characters."""
-        return "".join(self._ring)
+        with self._lock:
+            return "".join(self._ring)
 
     def kill(self) -> None:
         """Close the PTY. Idempotent; the scrollback stays readable after."""

@@ -71,7 +71,7 @@ def test_create_returns_none_at_cap():
         assert reg.create() is not None
     assert reg.create() is None
     # killing one frees a slot
-    victim = reg.list()[0]["id"]
+    victim = reg.list()[0].id
     assert reg.kill(victim)
     assert reg.create() is not None
 
@@ -83,8 +83,8 @@ def test_list_reflects_sessions():
     listed = reg.list()
     assert len(listed) == 1
     item = listed[0]
-    assert item["id"] == a.id and item["name"] == a.name
-    assert item["alive"] is True and item["createdAt"] == a.created_at
+    assert item.id == a.id and item.name == a.name
+    assert item.alive is True and item.created_at == a.created_at
 
 
 def test_kill_removes_and_kills_only_target():
@@ -107,6 +107,29 @@ def test_kill_all_empties_registry():
     assert reg.list() == []
     assert all(s.manager.killed for s in sessions)
     assert reg.any_alive is False
+
+
+def test_kill_all_isolates_one_failing_session_so_the_rest_still_die(caplog):
+    """Each session's kill runs inside its own fault-isolation boundary, so a
+    bug in one PTY's teardown must not stop the others from being killed."""
+    import logging
+
+    reg = _registry()
+    a, b, c = (reg.create() for _ in range(3))
+
+    def _boom():
+        raise RuntimeError("teardown exploded")
+
+    a.manager.kill = _boom
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.terminal.sessions"):
+        reg.kill_all()
+
+    assert reg.list() == []
+    assert b.manager.killed and c.manager.killed
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert warnings[0].exc_info is not None
 
 
 def test_sessions_have_independent_managers_and_locks():

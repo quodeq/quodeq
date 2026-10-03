@@ -10,9 +10,11 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify
 
+from quodeq.api.helpers import optional_json_object_or_error
 from quodeq.api.standards_project import invalid_body, invalid_payload, project_root_or_error
+from quodeq.api.routes_common import standards_compiled_dir
 from quodeq.core.standards.visibility import DEFAULT_VISIBLE_STANDARDS, validate_visible_ids
 from quodeq.services.standards_prefs import (
     load_visible_standard_ids,
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 def _known_ids(app: Flask) -> set[str]:
     service = StandardsService(
         Path(app.config["STANDARDS_EVALUATORS_DIR"]),
-        Path(app.config["STANDARDS_COMPILED_DIR"]),
+        standards_compiled_dir(app),
         Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
     )
     return {m.id.strip().lower() for m in service.list_standards()}
@@ -61,7 +63,9 @@ def register_visibility_routes(app: Flask) -> None:
         root, err = project_root_or_error(project_id)
         if err is not None:
             return err
-        body = request.get_json(force=True, silent=True)
+        body = optional_json_object_or_error(force=True)
+        if not isinstance(body, dict):
+            return body
         raw = body.get("visibleStandardIds") if isinstance(body, dict) else None
         if raw is None:
             return invalid_body('Body must be {"visibleStandardIds": [...]}')

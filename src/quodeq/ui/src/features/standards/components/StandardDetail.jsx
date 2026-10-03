@@ -3,6 +3,7 @@ import RequirementForm from './RequirementForm.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
 import { applyNameChange } from '../../../models/standard.js';
+import { NODE_TYPE } from '../standardTreeModel.js';
 
 // Enough room for a couple of sentences without dominating the form.
 const DESCRIPTION_ROWS = 4;
@@ -97,11 +98,11 @@ function RootDetail({ standard, onUpdateField, editable, isNew }) {
 export default function StandardDetail({ standard, selectedNode, onUpdateField, editable, isNew, overrides, onChangeParam }) {
   if (!selectedNode || !standard) return null;
 
-  if (selectedNode.type === 'root') {
+  if (selectedNode.type === NODE_TYPE.ROOT) {
     return <RootDetail standard={standard} onUpdateField={onUpdateField} editable={editable} isNew={isNew} />;
   }
 
-  if (selectedNode.type === 'principle') {
+  if (selectedNode.type === NODE_TYPE.PRINCIPLE) {
     const principle = (standard.principles || [])[selectedNode.index];
     if (!principle) return null;
     return (
@@ -114,7 +115,7 @@ export default function StandardDetail({ standard, selectedNode, onUpdateField, 
     );
   }
 
-  if (selectedNode.type === 'requirement') {
+  if (selectedNode.type === NODE_TYPE.REQUIREMENT) {
     const principle = (standard.principles || [])[selectedNode.principleIndex];
     if (!principle) return null;
     const requirement = (principle.requirements || [])[selectedNode.reqIndex];

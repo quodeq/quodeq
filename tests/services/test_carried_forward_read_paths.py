@@ -8,7 +8,7 @@ parser makes carried findings reappear as each dimension completes.
 from quodeq.analysis._report_constants import VIOLATION_FIELDS
 from quodeq.analysis._report_findings import flatten_findings
 from quodeq.data.fs.report_parser._report_parsing import build_finding
-from quodeq.services.violations_parsing import _build_finding_entry
+from quodeq.services.violations_parsing import build_finding_entry
 
 
 def test_live_jsonl_path_carries_the_flag():
@@ -17,7 +17,7 @@ def test_live_jsonl_path_carries_the_flag():
         "line": 1, "severity": "minor", "w": "t", "reason": "r",
         "carried_forward": True,
     }
-    assert _build_finding_entry(obj, "security").carried_forward is True
+    assert build_finding_entry(obj, "security").carried_forward is True
 
 
 def test_live_jsonl_path_defaults_to_false():
@@ -25,7 +25,7 @@ def test_live_jsonl_path_defaults_to_false():
         "p": "P1", "t": "violation", "d": "security", "file": "a.py",
         "line": 1, "severity": "minor", "w": "t", "reason": "r",
     }
-    assert _build_finding_entry(obj, "security").carried_forward is False
+    assert build_finding_entry(obj, "security").carried_forward is False
 
 
 def test_report_json_path_carries_the_flag():
@@ -70,7 +70,7 @@ def test_live_jsonl_path_carries_scope_downgrade():
         "line": 1, "severity": "minor", "w": "t", "reason": "r",
         "scope_downgrade": marker,
     }
-    assert _build_finding_entry(obj, "security").scope_downgrade == marker
+    assert build_finding_entry(obj, "security").scope_downgrade == marker
 
 
 def test_live_jsonl_path_defaults_scope_downgrade_to_none():
@@ -78,7 +78,7 @@ def test_live_jsonl_path_defaults_scope_downgrade_to_none():
         "p": "P1", "t": "violation", "d": "security", "file": "a.py",
         "line": 1, "severity": "minor", "w": "t", "reason": "r",
     }
-    assert _build_finding_entry(obj, "security").scope_downgrade is None
+    assert build_finding_entry(obj, "security").scope_downgrade is None
 
 
 def test_report_json_path_carries_scope_downgrade():

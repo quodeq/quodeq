@@ -26,6 +26,9 @@ def app(tmp_path: Path) -> Flask:
         def is_job_complete(self, job_id: str) -> bool:
             return job_id.endswith("-done")
 
+        def in_memory_job(self, job_id: str):
+            return None  # no in-memory jobs: every run here is on disk
+
     provider = FakeProvider()
     app.config["_provider"] = provider
     register_log_stream_routes(app)

@@ -9,3 +9,9 @@
 # into quodeq's self-eval and clutter the map. It's scaffolding, so we
 # keep it out of the self-evaluation on purpose.
 benchmarks/
+
+# Provenance-gate test fixtures: deliberately vulnerable/deliberately safe
+# repos used to exercise the provenance gate in tests/analysis. They are
+# fixture data, not product code, and would otherwise show up as findings
+# in quodeq's self-evaluation.
+tests/analysis/fixtures/provenance_gate/

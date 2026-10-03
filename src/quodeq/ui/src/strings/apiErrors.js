@@ -25,31 +25,39 @@
 import { t } from './index.js';
 
 const CODE_KEYS = {
-  // Clone / repository registration. This copy previously lived as a
-  // hardcoded English switch in RepoScanStep; it moved here unchanged.
+  // Clone / repository registration: the POST /api/projects refusal and the
+  // clone job's slot error both resolve through these.
   AUTH_REQUIRED: 'apiError.cloneAuthRequired',
   NETWORK_ERROR: 'apiError.cloneNetwork',
   REPO_NOT_FOUND: 'apiError.cloneRepoNotFound',
   DEST_EXISTS: 'apiError.cloneDestExists',
   DISK_ERROR: 'apiError.cloneDiskError',
+  // The clone job itself: it could not start, or one already runs.
+  CLONE_START_FAILED: 'apiError.cloneStartFailed',
+  CLONE_IN_PROGRESS: 'apiError.cloneInProgress',
   INVALID_REPO_URL: 'apiError.invalidRepoUrl',
   INVALID_URL: 'apiError.invalidRepoUrl',
   INVALID_REPO: 'apiError.invalidRepoUrl',
   INVALID_CLONE_DEST: 'apiError.invalidCloneDest',
-  MISSING_CLONE_DEST: 'apiError.missingCloneDest',
   MISSING_REPO: 'apiError.missingRepo',
   PROJECT_EXISTS: 'apiError.projectExists',
   FOREIGN_REPO: 'apiError.foreignRepo',
+  // A file:// evaluations repository whose folder is not a git repository.
+  NOT_A_GIT_REPO: 'apiError.notAGitRepo',
   NOT_LOCAL: 'apiError.notLocal',
   PATH_MISSING: 'apiError.pathMissing',
   MISSING_PATH: 'apiError.pathMissing',
   NOT_DIR: 'apiError.notDirectory',
-  REGISTRATION_FAILED: 'apiError.registrationFailed',
+  // POST /api/evaluations with a git url: only the registered local copy can be evaluated.
+  URL_NOT_EVALUABLE: 'apiError.urlNotEvaluable',
 
   // Provider configuration.
   MISSING_API_KEY: 'apiError.missingApiKey',
   PROVIDER_UNAVAILABLE: 'apiError.providerUnavailable',
   MODEL_REQUIRED: 'apiError.modelRequired',
+  // POST /api/provider/key with no OS keyring and no plaintext opt-in; the
+  // envelope's envVar fills the copy's {envVar}.
+  KEYRING_UNAVAILABLE: 'apiError.keyringUnavailable',
 
   // Evaluation lifecycle.
   ALREADY_FINISHED: 'apiError.alreadyFinished',
@@ -65,7 +73,7 @@ const CODE_KEYS = {
   UNAUTHORIZED: 'apiError.unauthorized',
   FORBIDDEN: 'apiError.forbidden',
 
-  // Shared results repository: connect (PUT /api/shared/config), refresh,
+  // Evaluations repository: connect (PUT /api/shared/config), refresh,
   // publish (routes_shared_config.py), and the assistant's own gate for
   // starting a session against it (assistant_routes.py's _shared_source_error).
   NO_SHARED_REPO: 'apiError.noSharedRepo',
@@ -76,6 +84,11 @@ const CODE_KEYS = {
   REFRESH_FAILED: 'apiError.sharedRepoRefreshFailed',
   PUBLISH_IN_PROGRESS: 'apiError.publishInProgress',
   PUBLISH_START_FAILED: 'apiError.publishStartFailed',
+  CONNECT_IN_PROGRESS: 'apiError.connectInProgress',
+  CONNECT_START_FAILED: 'apiError.connectStartFailed',
+  CONNECT_FAILED: 'apiError.connectFailed',
+  // The pull job's export over QUODEQ_MAX_ZIP_SIZE_MB (routes_shared_pull.py).
+  PULL_TOO_LARGE: 'apiError.pullTooLarge',
 
   // Assistant workspace: diff/apply/discard on the isolated write worktree
   // (assistant_workspace_routes.py).
@@ -90,6 +103,31 @@ const CODE_KEYS = {
 
   // Confirmation gates: delete-all findings, delete project.
   CONFIRMATION_REQUIRED: 'apiError.confirmationRequired',
+
+  // Access ladder (routes_github_access.py): the pre-clone probe's verdict,
+  // the clone's own new codes, and GitHub sign-in.
+  ACCESS_AUTH_REQUIRED: 'apiError.accessAuthRequired',
+  ACCESS_NOT_FOUND: 'apiError.accessNotFound',
+  ACCESS_HOST_KEY: 'apiError.accessHostKey',
+  ACCESS_NETWORK: 'apiError.accessNetwork',
+  ACCESS_TIMEOUT: 'apiError.accessTimeout',
+  ACCESS_GIT_MISSING: 'apiError.accessGitMissing',
+  ACCESS_GIT_TOO_OLD: 'apiError.accessGitTooOld',
+  ACCESS_UNKNOWN: 'apiError.accessUnknown',
+  ACCESS_USE_HTTPS: 'apiError.accessUseHttps',
+  CLONE_UNKNOWN: 'apiError.cloneUnknown',
+  CLONE_TIMEOUT: 'apiError.cloneTimeout',
+  HOST_KEY_UNVERIFIED: 'apiError.hostKeyUnverified',
+  GIT_MISSING: 'apiError.gitMissing',
+  TOKEN_INVALID: 'apiError.tokenInvalid',
+  TOKEN_SCOPE: 'apiError.tokenScope',
+  TOKEN_REQUIRED: 'apiError.tokenRequired',
+  OFFLINE: 'apiError.githubOffline',
+  GITHUB_NOT_CONFIGURED: 'apiError.githubNotConfigured',
+  GITHUB_REFUSED: 'apiError.githubRefused',
+  NO_FLOW: 'apiError.noFlow',
+  FLOW_START_FAILED: 'apiError.flowStartFailed',
+  FLOW_FAILED: 'apiError.flowFailed',
 };
 
 /** The catalog key for a backend code, or null when the code is unmapped. */
@@ -106,6 +144,11 @@ export function apiErrorKey(code) {
   return Object.hasOwn(CODE_KEYS, normalized) ? CODE_KEYS[normalized] : null;
 }
 
+function envelopeVars(err) {
+  const body = err?.body;
+  return (body !== null && typeof body === 'object' && !Array.isArray(body)) ? body : undefined;
+}
+
 /**
  * Message to show for a failed API call.
  *
@@ -120,7 +163,22 @@ export function apiErrorKey(code) {
  */
 export function apiErrorMessage(err, fallbackKey) {
   const key = apiErrorKey(err?.code);
-  if (key) return t(key);
+  // The envelope's extra fields (err.body, see api/request.js) fill any
+  // {placeholder} in the mapped copy.
+  if (key) return t(key, envelopeVars(err));
   const message = err?.message;
   return (typeof message === 'string' && message !== '') ? message : t(fallbackKey);
+}
+
+const ACCESS_CODE_PREFIX = 'ACCESS_';
+
+/** The output tail the backend attached to a clone or probe failure, or ''. */
+export function apiErrorDetail(err) {
+  const detail = err?.body?.detail;
+  return typeof detail === 'string' ? detail : '';
+}
+
+/** True for a pre-clone probe verdict (ACCESS_<KIND>), which the access panel renders. */
+export function isAccessCode(code) {
+  return typeof code === 'string' && code.toUpperCase().startsWith(ACCESS_CODE_PREFIX);
 }

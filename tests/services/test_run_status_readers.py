@@ -102,7 +102,7 @@ class _ReadSpy:
 
 
 def test_tail_run_log_does_not_read_whole_file(tmp_path: Path, monkeypatch):
-    from quodeq.services._run_status_readers import _tail_run_log
+    from quodeq.services._run_status_readers import tail_run_log
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -124,7 +124,7 @@ def test_tail_run_log_does_not_read_whole_file(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr(Path, "open", counting_open)
 
-    tail = _tail_run_log(run_dir, max_lines=500)
+    tail = tail_run_log(run_dir, max_lines=500)
 
     assert len(tail) == 500
     assert tail == [f"line-{i}" for i in range(1500, 2000)]
@@ -136,29 +136,29 @@ def test_tail_run_log_does_not_read_whole_file(tmp_path: Path, monkeypatch):
 
 
 def test_tail_run_log_empty_file(tmp_path: Path):
-    from quodeq.services._run_status_readers import _tail_run_log
+    from quodeq.services._run_status_readers import tail_run_log
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "run.log").write_text("", encoding="utf-8")
 
-    assert _tail_run_log(run_dir, max_lines=500) == []
+    assert tail_run_log(run_dir, max_lines=500) == []
 
 
 def test_tail_run_log_fewer_lines_than_max(tmp_path: Path):
-    from quodeq.services._run_status_readers import _tail_run_log
+    from quodeq.services._run_status_readers import tail_run_log
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     log_path = run_dir / "run.log"
     log_path.write_text("\n".join(f"line-{i}" for i in range(10)) + "\n", encoding="utf-8")
 
-    tail = _tail_run_log(run_dir, max_lines=500)
+    tail = tail_run_log(run_dir, max_lines=500)
     assert tail == [f"line-{i}" for i in range(10)]
 
 
 def test_tail_run_log_no_trailing_newline(tmp_path: Path):
-    from quodeq.services._run_status_readers import _tail_run_log
+    from quodeq.services._run_status_readers import tail_run_log
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -166,12 +166,12 @@ def test_tail_run_log_no_trailing_newline(tmp_path: Path):
     # Truncated mid-line: no trailing \n on the last line.
     log_path.write_text("\n".join(f"line-{i}" for i in range(5)), encoding="utf-8")
 
-    tail = _tail_run_log(run_dir, max_lines=500)
+    tail = tail_run_log(run_dir, max_lines=500)
     assert tail == [f"line-{i}" for i in range(5)]
 
 
 def test_tail_run_log_crlf_line_endings(tmp_path: Path):
-    from quodeq.services._run_status_readers import _tail_run_log
+    from quodeq.services._run_status_readers import tail_run_log
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -180,22 +180,22 @@ def test_tail_run_log_crlf_line_endings(tmp_path: Path):
     # exercised on every platform, not just Windows CI.
     log_path.write_bytes(b"".join(f"line-{i}\r\n".encode() for i in range(5)))
 
-    tail = _tail_run_log(run_dir, max_lines=500)
+    tail = tail_run_log(run_dir, max_lines=500)
     assert tail == [f"line-{i}" for i in range(5)]
 
 
 def test_tail_run_log_missing_file(tmp_path: Path):
-    from quodeq.services._run_status_readers import _tail_run_log
+    from quodeq.services._run_status_readers import tail_run_log
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
 
-    assert _tail_run_log(run_dir, max_lines=500) == []
+    assert tail_run_log(run_dir, max_lines=500) == []
 
 
 def test_tail_run_log_line_longer_than_chunk_size(tmp_path: Path):
     """A single line bigger than the initial 8KB chunk must survive chunk growth intact."""
-    from quodeq.services._run_status_readers import _tail_run_log
+    from quodeq.services._run_status_readers import tail_run_log
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -204,5 +204,5 @@ def test_tail_run_log_line_longer_than_chunk_size(tmp_path: Path):
     lines = [f"line-{i}" for i in range(5)] + [long_line] + [f"line-{i}" for i in range(5, 10)]
     log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    tail = _tail_run_log(run_dir, max_lines=500)
+    tail = tail_run_log(run_dir, max_lines=500)
     assert tail == lines

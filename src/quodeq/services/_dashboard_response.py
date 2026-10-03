@@ -1,37 +1,38 @@
 """Serialization of the dashboard response.
 
-Split out of ``dashboard``: this is the wire boundary — everything here turns
+This is the wire boundary — everything here turns
 already-computed domain objects into the camelCase dict the UI consumes, and
 nothing here reads history or resolves runs. Declared in
 ``tests/tools/test_serialization_boundary.py``.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from typing import Any
 
+from quodeq.core.types.dashboard_view import DashboardView
 from quodeq.core.types import DimensionResult
 from quodeq.shared.serialization import to_camel_dict
 
-from quodeq.data.fs.report_parser.runs import RunInfo
-from quodeq.services._dashboard_history import _DashboardPayload
+from quodeq.services.dashboard_trend import run_info_payload
+from quodeq.services.wiring import RunInfo
+from quodeq.services._dashboard_history import DashboardPayload
 
 
 @dataclass(frozen=True, slots=True)
-class _DimensionAnnotations:
+class DimensionAnnotations:
     """Selected-run values stamped onto each serialized dimension.
 
     ``exit_reason`` is the run-level ``status.json`` exit reason (also reported
-    on ``selectedRun``); the two count maps are keyed by dimension name and
-    explain how many scan findings the dismissed filter alone, and dismissals
-    plus deletions together, hid from the response.
+    on ``selectedRun``). ``view`` is the payload shape asked for: the overview
+    drops each dimension's bodies. What the suppressions hid travels on each
+    dimension itself (``dismissed_count`` / ``suppressed_count``).
     """
     exit_reason: str | None = None
-    dismissed_counts: dict[str, int] = field(default_factory=dict)
-    suppressed_counts: dict[str, int] = field(default_factory=dict)
+    view: DashboardView = DashboardView.FULL
 
 
-def _attach_exit_reason_to_dim(
+def attach_exit_reason_to_dim(
     dim_dict: dict[str, Any], run_exit_reason: str | None,
 ) -> dict[str, Any]:
     """Add ``exitReason`` to a serialized dimension dict.
@@ -42,45 +43,17 @@ def _attach_exit_reason_to_dim(
     """
     per_dim = dim_dict.get("exit_reason") or dim_dict.get("exitReason")
     chosen = per_dim or run_exit_reason
-    if chosen is None:
-        # Drop the snake_case key if present, to keep the response clean.
-        if "exit_reason" in dim_dict:
-            out = dict(dim_dict)
-            out.pop("exit_reason", None)
-            return out
+    if chosen is None and "exit_reason" not in dim_dict:
         return dim_dict
+    # Copy, and drop the snake_case key if present to keep the response clean.
     out = dict(dim_dict)
     out.pop("exit_reason", None)
-    out["exitReason"] = chosen
+    if chosen is not None:
+        out["exitReason"] = chosen
     return out
 
 
-def _attach_dismissed_count_to_dim(
-    dim_dict: dict[str, Any], dismissed_counts: dict[str, int],
-    suppressed_counts: dict[str, int] | None = None,
-) -> dict[str, Any]:
-    """Add ``dismissedCount`` / ``suppressedCount`` to a dimension dict when > 0.
-
-    Both explain the gap between "what the scan found" and "what the view
-    shows". ``dismissedCount`` covers the dismissed filter alone;
-    ``suppressedCount`` covers dismissals *and* deletions, so it is the total
-    the UI reports. They differ sharply on projects with a triage history:
-    deletions suppress a whole principle across a file and accumulate over
-    many runs, so a scan can re-find several times what the report displays.
-    Omitted when nothing was filtered, mirroring the exitReason convention.
-    """
-    key = dim_dict.get("dimension") or ""
-    out = dim_dict
-    count = dismissed_counts.get(key, 0)
-    if count > 0:
-        out = {**out, "dismissedCount": count}
-    total = (suppressed_counts or {}).get(key, 0)
-    if total > 0:
-        out = {**out, "suppressedCount": total}
-    return out
-
-
-def _slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
+def slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
     """Serialize a history-context dimension without its finding bodies.
 
     The previousByDimension / stalePreviousByDimension / staleDimensions keys
@@ -95,43 +68,44 @@ def _slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
     return to_camel_dict(replace(dim, violations=[], compliance=[]))
 
 
-def _build_dashboard_result(
+def build_dashboard_result(
     project: str,
     runs: list[RunInfo],
     selected_run: RunInfo,
-    payload: _DashboardPayload,
-    annotations: _DimensionAnnotations,
+    payload: DashboardPayload,
+    annotations: DimensionAnnotations,
+    run_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Assemble the final dashboard response dict from pre-computed parts."""
+    """Assemble the final dashboard response dict from pre-computed parts.
+
+    *run_metadata* (commit SHA, per-dimension coverage) is merged into
+    ``selectedRun`` so the numbers are read next to what they cover."""
     exit_reason = annotations.exit_reason
+    selected_info = run_info_payload(selected_run)
     dim_dicts = [
-        _attach_dismissed_count_to_dim(
-            _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason),
-            annotations.dismissed_counts,
-            annotations.suppressed_counts,
-        )
+        attach_exit_reason_to_dim(to_camel_dict(d), exit_reason)
         for d in payload.dimensions_with_trend
     ]
+    if annotations.view is DashboardView.OVERVIEW:
+        # Absent, not empty: the client tells "no bodies shipped" from "no
+        # findings" by the key (to_camel_dict keeps empty lists).
+        for d in dim_dicts:
+            d.pop("violations", None)
+            d.pop("compliance", None)
     return {
         "project": project,
-        "availableRuns": [
-            {"runId": item.run_id, "dateISO": item.date_iso, "dateLabel": item.date_label, "status": item.status}
-            for item in runs
-        ],
-        "selectedRun": {
-            "runId": selected_run.run_id,
-            "dateISO": selected_run.date_iso,
-            "dateLabel": selected_run.date_label,
-            "exitReason": exit_reason,
-        },
+        "availableRuns": [{**run_info_payload(item), "status": item.status} for item in runs],
+        "selectedRun": {**selected_info, "exitReason": exit_reason, **(run_metadata or {})},
         "summary": {
             **to_camel_dict(payload.selected_summary),
-            "dateISO": selected_run.date_iso,
-            "dateLabel": selected_run.date_label,
+            "dateISO": selected_info["dateISO"],
+            "dateLabel": selected_info["dateLabel"],
         },
         "trend": payload.trend,
+        "partialRuns": payload.partial_runs,
         "dimensions": dim_dicts,
-        "previousByDimension": {k: _slim_history_dim(v) for k, v in payload.previous_by_dimension.items()},
-        "stalePreviousByDimension": {k: _slim_history_dim(v) for k, v in payload.stale_previous_by_dimension.items()},
-        "staleDimensions": [_slim_history_dim(d) for d in payload.stale_dimensions],
+        "previousByDimension": {k: slim_history_dim(v) for k, v in payload.previous_by_dimension.items()},
+        "stalePreviousByDimension": {k: slim_history_dim(v) for k, v in payload.stale_previous_by_dimension.items()},
+        "staleDimensions": [slim_history_dim(d) for d in payload.stale_dimensions],
+        "sinceBaseline": payload.since_baseline,
     }

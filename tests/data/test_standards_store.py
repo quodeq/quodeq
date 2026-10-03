@@ -57,8 +57,54 @@ class TestJailedPayloadIo:
 
         assert read_standard_payload(tmp_path / "nope.json") is None
 
+    def test_read_non_object_raises(self, tmp_path):
+        """A read failure must never look like "absent": that would let an
+        import silently overwrite a user's corrupt standard file."""
+        from quodeq.data.fs.standards_store import read_standard_payload
+
+        path = tmp_path / "bad.json"
+        path.write_text("[1, 2, 3]")
+        with pytest.raises(ValueError, match="not a JSON object"):
+            read_standard_payload(path)
+
+    def test_read_corrupt_json_still_raises(self, tmp_path):
+        from quodeq.data.fs.standards_store import read_standard_payload
+
+        path = tmp_path / "bad.json"
+        path.write_text("not json{{{")
+        with pytest.raises(json.JSONDecodeError):
+            read_standard_payload(path)
+
     def test_jail_rejects_escape(self, tmp_path):
         from quodeq.data.fs.standards_store import resolve_jailed_standard_path
 
         with pytest.raises(ValueError):
             resolve_jailed_standard_path(tmp_path, "../escape")
+
+
+class TestAtomicWrite:
+    def test_write_standard_payload_leaves_no_partial_file(self, tmp_path, monkeypatch):
+        """A failed write keeps the previous standard intact and leaves no temp file."""
+        import os
+
+        from quodeq.data.fs.standards_store import write_standard_payload
+
+        target = tmp_path / "s.json"
+        target.write_text('{"old": true}')
+
+        def _disk_full(fd, *_a, **_k):
+            os.close(fd)
+            raise OSError("disk full")
+
+        monkeypatch.setattr("quodeq.data.fs.run_artifacts.dump_json_and_replace", _disk_full)
+        with pytest.raises(OSError):
+            write_standard_payload(target, {"new": True})
+        assert json.loads(target.read_text()) == {"old": True}
+        assert [p.name for p in tmp_path.iterdir()] == ["s.json"]
+
+    def test_write_standard_payload_keeps_two_space_indent(self, tmp_path):
+        from quodeq.data.fs.standards_store import write_standard_payload
+
+        write_standard_payload(tmp_path / "s.json", {"a": 1})
+        # Text-mode read: the writer uses the platform newline, as write_text did.
+        assert (tmp_path / "s.json").read_text(encoding="utf-8") == '{\n  "a": 1\n}'

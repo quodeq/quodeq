@@ -1,0 +1,12 @@
+/* The access panel rendered under a refused clone, and its cards. */
+.access-panel { display: grid; gap: var(--space-3); margin-top: var(--space-3); }
+.access-panel__heading { font-weight: 600; margin: 0; }
+.access-panel__help, .access-panel__hint, .access-card__desc, .access-card__hint, .access-card__waiting { margin: 0; color: var(--color-text-muted); }
+.access-panel__detail pre, .access-card__cmd { margin: 0; padding: var(--space-2); overflow-x: auto; background: var(--color-surface-alt); border-radius: var(--radius-sm); font-size: 0.85em; }
+.access-card { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.access-card--primary { border-color: var(--color-accent); }
+.access-card__title { margin: 0; font-size: 1em; }
+.access-card__code { font-size: 1.6em; letter-spacing: 0.1em; padding: var(--space-2) 0; display: block; }
+.access-card__row { display: flex; gap: var(--space-2); align-items: center; }
+.access-card__ok { margin: 0; color: var(--color-success); }
+.access-other-ways { display: grid; gap: var(--space-2); }

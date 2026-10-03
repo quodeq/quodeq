@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import quodeq.analysis.mcp.findings_server as findings_server_module
+import quodeq.analysis.mcp.precedent_signals as precedent_signals_module
 from quodeq.analysis.mcp.findings_server import _build_compiled_context, _build_router, main
 from quodeq.analysis.mcp.enricher import CompiledContext
 from quodeq.analysis.mcp.args import ServerArgs
@@ -106,17 +107,17 @@ def test_build_router_wires_load_precedent_corpus_with_project_and_run_dir(
     resolved (project_dir, run_dir) and stores its return value -- the
     None-when-flag-off tests above pass trivially against the field default,
     so this closes that gap."""
-    import quodeq.analysis.mcp.findings_server as findings_server_module
-
     sentinel = object()
     calls = []
+    # The server process resolves the precedent settings from its own env.
+    monkeypatch.setenv("QUODEQ_PRECEDENT_SIMILARITY", "0.9")
 
-    def fake_load_precedent_corpus(project_dir, run_dir):
-        calls.append((project_dir, run_dir))
+    def fake_load_precedent_corpus(project_dir, run_dir, *, settings):
+        calls.append((project_dir, run_dir, settings.similarity_threshold))
         return sentinel
 
     monkeypatch.setattr(
-        findings_server_module, "load_precedent_corpus", fake_load_precedent_corpus,
+        precedent_signals_module, "load_precedent_corpus", fake_load_precedent_corpus,
     )
 
     project_dir = tmp_path / "project"
@@ -126,7 +127,7 @@ def test_build_router_wires_load_precedent_corpus_with_project_and_run_dir(
 
     _build_router(io.StringIO(), findings_path, ctx, ServerArgs())
 
-    assert calls == [(project_dir, project_dir / "run-1")]
+    assert calls == [(project_dir, project_dir / "run-1", 0.9)]
     assert ctx.precedent_corpus is sentinel
 
 
@@ -145,7 +146,7 @@ def test_build_router_wires_the_strict_dismissed_reader(tmp_path: Path, monkeypa
         return {"fp"}
 
     monkeypatch.setattr(
-        findings_server_module, "load_precedent_fingerprints",
+        precedent_signals_module, "load_precedent_fingerprints",
         fake_load_precedent_fingerprints,
     )
     findings_path = tmp_path / "project" / "run-1" / "evidence" / "security_evidence.jsonl"
@@ -203,11 +204,11 @@ def _received_finding(tmp_path: Path):
     fh = io.StringIO()
     router = _build_router(fh, findings_path, CompiledContext(), ServerArgs())
 
-    _msg, dup = router.receive({
+    dup = router.receive({
         "p": "P1", "file": "x.py", "line": 1, "t": "violation",
         "severity": "medium", "d": "dim", "reason": "r", "snippet": "s",
         "w": "title",
-    })
+    }).status == "duplicate"
 
     events_log = tmp_path / "run-1" / "events.jsonl"
     return fh, dup, events_log

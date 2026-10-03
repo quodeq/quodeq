@@ -5,8 +5,15 @@ import { useExplorerQueries } from './useExplorerQueries.js';
 import { computeComplianceByPrinciple, buildEvalPrincipalFn } from '../../../utils/evalPrincipal.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { violationKey } from '../../../utils/violationKey.js';
+import { SEVERITY } from '../../../vocab/severity.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 export { computeComplianceByPrinciple, buildEvalPrincipalFn };
+
+// A principleGrades entry with no `isOverall` flag (older payloads) still
+// carries this word in its principle name for the synthetic dimension-wide
+// row; matched as a fallback wherever isOverall is checked.
+const OVERALL_PRINCIPLE_MARKER = 'Overall';
 
 export function computeAllViolations(evalData) {
   if (!evalData) return [];
@@ -16,7 +23,7 @@ export function computeAllViolations(evalData) {
       principle: p.name,
       file: v.file ? v.file.split(':')[0] : null,
       line: v.line || null,
-      severity: v.severity || 'minor',
+      severity: v.severity || SEVERITY.MINOR,
       reason: v.reason || v.code || '',
     }))
   );
@@ -30,7 +37,9 @@ function useDerivedExplorerStats(evalData, allViolations) {
   const topFiles = useMemo(() => evalData ? buildTopOffendingFiles([{ dimension: evalData.dimension, violations: allViolations }]) : [], [evalData, allViolations]);
   const severityCounts = useMemo(() => computeSeverityCounts(allViolations), [allViolations]);
   const uniquePrinciples = useMemo(() => new Set(allViolations.map((v) => v.principle).filter(Boolean)).size, [allViolations]);
-  const totalCompliant = useMemo(() => (evalData?.principles || []).reduce((sum, p) => sum + (p.compliance?.length || 0), 0), [evalData]);
+  // The flat list; a markdown eval has only the per-principle rows.
+  const totalCompliant = useMemo(() => evalData?.compliance?.length
+    || (evalData?.principles || []).reduce((sum, p) => sum + (p.compliance?.length || 0), 0), [evalData]);
   const complianceByPrinciple = useMemo(() => computeComplianceByPrinciple(evalData), [evalData]);
   return { topFiles, severityCounts, uniquePrinciples, totalCompliant, complianceByPrinciple };
 }
@@ -40,7 +49,7 @@ function mergeRescoreIntoEval(prev, dimData) {
   const rescPrinciples = dimData.principles || [];
   const rescMap = new Map(rescPrinciples.map(rp => [rp.principle, rp]));
   const updatedGrades = (prev.principleGrades || []).map((pg) => {
-    if (pg.isOverall || pg.principle?.includes('Overall')) {
+    if (pg.isOverall || pg.principle?.includes(OVERALL_PRINCIPLE_MARKER)) {
       return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
     }
     const match = rescMap.get(pg.principle);
@@ -82,7 +91,7 @@ function mergeRescoreIntoEval(prev, dimData) {
  * in useDashboard.js), which marks these stale too, so the cached page
  * refetches after user actions exactly like the Overview does.
  */
-export function useExplorerData(project, dimension, runId, refreshSignal, selectedSource = 'local') {
+export function useExplorerData(project, dimension, runId, refreshSignal, selectedSource = PROJECT_SOURCE.LOCAL) {
   const { evalQuery, scoresQuery } = useExplorerQueries(project, dimension, runId, refreshSignal, selectedSource);
 
   const evalData = useMemo(() => {
@@ -100,8 +109,8 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
   const isFetching = evalQuery.isFetching || scoresQuery.isFetching;
   const error = evalQuery.isError ? apiErrorMessage(evalQuery.error, 'explorer.loadFailed') : null;
 
-  const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
-  const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
+  const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes(OVERALL_PRINCIPLE_MARKER)), [evalData]);
+  const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes(OVERALL_PRINCIPLE_MARKER)), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
   const stats = useDerivedExplorerStats(evalData, allViolations);
   return {

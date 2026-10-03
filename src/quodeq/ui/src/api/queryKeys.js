@@ -18,19 +18,23 @@
  * (no source) still prefix-matches every subkey for the *local* source only;
  * pass the caller's source explicitly if it should also match shared entries.
  */
-import { DEFAULT_PROJECT_SOURCE } from '../constants.js';
+import { DEFAULT_PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { FINDING_TYPE } from '../vocab/findingType.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 // Stand-in job/run id for queries kept mounted with `enabled: false`:
 // react-query still wants a stable key, and routing the placeholder through
 // the factories below keeps it in the same cache subtree as the real entries.
 export const NO_JOB_ID = "_none_";
 
+const EVALUATION_SCOPE = "evaluation"; // query-key prefix for the evaluationKeys.* subtree below
+
 export const evaluationKeys = {
-  all: () => ["evaluation"],
-  evaluation: (jobId) => ["evaluation", jobId],
-  status: (jobId) => ["evaluation", jobId, "status"],
-  findings: (jobId) => ["evaluation", jobId, "findings"],
-  dimensions: (jobId) => ["evaluation", jobId, "dimensions"],
+  all: () => [EVALUATION_SCOPE],
+  evaluation: (jobId) => [EVALUATION_SCOPE, jobId],
+  status: (jobId) => [EVALUATION_SCOPE, jobId, "status"],
+  findings: (jobId) => [EVALUATION_SCOPE, jobId, "findings"],
+  dimensions: (jobId) => [EVALUATION_SCOPE, jobId, "dimensions"],
 };
 
 // The project-key layout: ["project", projectId, source, ...subkey]. Every
@@ -39,6 +43,8 @@ export const evaluationKeys = {
 const PROJECT_SCOPE = "project";
 const PROJECT_ID_INDEX = 1;
 const PROJECT_SOURCE_INDEX = 2;
+// The subkey segment that marks a dashboard-payload key, and its position.
+const DASHBOARD_KIND = "dashboard";
 
 /**
  * Build a project-scoped query key.
@@ -54,16 +60,38 @@ function projectScope(projectId, source, ...subkey) {
 export const projectKeys = {
   all: () => [PROJECT_SCOPE],
   project: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source),
-  scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || "latest"),
-  dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dashboard", run || "latest"),
+  scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || LATEST_RUN_ID),
+  // Detail /scores deferred, per finding kind (violation | compliance).
+  findingDetail: (projectId, asOf, kind, dimension, generation, scope = {}) => projectScope(
+    projectId, DEFAULT_PROJECT_SOURCE, "findingDetail", kind, asOf || LATEST_RUN_ID, dimension, generation,
+    scope.principle ?? null, scope.pathPrefix ?? null,
+  ),
+  complianceDetail: (projectId, asOf, dimension, generation, scope = {}) =>
+    projectKeys.findingDetail(projectId, asOf, FINDING_TYPE.COMPLIANCE, dimension, generation, scope),
+  // Detail /scores/<run> deferred: one run's lists, on either source. Takes
+  // the ref a run finding carries (api/complianceDetail.js) plus the kind
+  // and the request scope.
+  runFindingDetail: ({ project, run, dimension, generation, source = DEFAULT_PROJECT_SOURCE }, kind, scope = {}) =>
+    projectScope(
+      project, source, "runFindingDetail", kind, run, dimension, generation,
+      scope.principle ?? null, scope.pathPrefix ?? null,
+    ),
+  dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) =>
+    projectScope(projectId, source, DASHBOARD_KIND, run || LATEST_RUN_ID),
   runs: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runs"),
+  // The help page's worked example. Inside the project subtree so dismiss and
+  // formula invalidations reach it like every other per-run read.
+  gradeExplain: (projectId, run, dimension, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "gradeExplain", run || LATEST_RUN_ID, dimension),
+  // The run diff (baseline counts per requirement, since-baseline lists).
+  // In the project subtree so dismissals invalidate it with the rest.
+  runDiff: (projectId, run, against = null, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runDiff", run || LATEST_RUN_ID, against),
   info: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "info"),
   // Explorer (dimension detail) queries. Distinct from `scores`: that one is
   // GET /projects/<p>/scores?as_of= (full payload incl. trend/availableRuns),
   // runScores is the slim GET /projects/<p>/scores/<run> used for the rescore
   // merge. Both sit inside the project subtree on purpose, so every existing
   // mutation invalidation (dismiss/delete/formula reconcile) reaches them.
-  runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runScores", run || "latest"),
+  runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runScores", run || LATEST_RUN_ID),
   // Compare tab's slim per-project payload. Lives inside the project subtree
   // on purpose: dismiss/delete/formula invalidations must reach it, or the
   // fleet table would keep showing pre-dismissal scores.
@@ -71,7 +99,7 @@ export const projectKeys = {
   // Per-project enabled-standards set, fetched by Compare so every row is
   // filtered to that project's own visible dimensions (as Overview does).
   standardsVisibility: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "standardsVisibility"),
-  dimensionEval: (projectId, run, dimension, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dimensionEval", run || "latest", dimension),
+  dimensionEval: (projectId, run, dimension, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dimensionEval", run || LATEST_RUN_ID, dimension),
 };
 
 /**
@@ -102,34 +130,69 @@ export function samePlaceholderScope(previousQuery, projectId, source = DEFAULT_
   return key[PROJECT_ID_INDEX] === projectId && key[PROJECT_SOURCE_INDEX] === source;
 }
 
+/**
+ * True for every project-scoped query that reads one specific run (its
+ * dashboard, scores, dimension evals, ...), whichever project or source it
+ * belongs to. Run ids are unique across projects.
+ */
+export function isRunQueryKey(queryKey, runId) {
+  return Array.isArray(queryKey) && queryKey[0] === PROJECT_SCOPE && queryKey.includes(runId);
+}
+
+const SYSTEM_SCOPE = "system"; // query-key prefix for the systemKeys.* subtree below
+
 export const systemKeys = {
-  all: () => ["system"],
-  health: () => ["system", "health"],
-  ollama: () => ["system", "ollama"],
-  llamacpp: () => ["system", "llamacpp"],
-  omlx: () => ["system", "omlx"],
+  all: () => [SYSTEM_SCOPE],
+  health: () => [SYSTEM_SCOPE, "health"],
+  ollama: () => [SYSTEM_SCOPE, "ollama"],
+  llamacpp: () => [SYSTEM_SCOPE, "llamacpp"],
+  omlx: () => [SYSTEM_SCOPE, "omlx"],
 };
+
+const LIST_KEY = "list"; // the list subkey shared by the projects, standards and shared scopes
+const CLONE_KEY = "clone"; // the projects subkey of the clone job slot
+const PROJECTS_SCOPE = "projects"; // query-key prefix for the projectsKeys.* subtree
+
+export const projectsKeys = {
+  all: () => [PROJECTS_SCOPE],
+  list: () => [PROJECTS_SCOPE, LIST_KEY],
+  clone: () => [PROJECTS_SCOPE, CLONE_KEY],
+};
+
+const STANDARDS_SCOPE = "standards"; // query-key prefix for the standardsKeys.* subtree below
 
 export const standardsKeys = {
-  all: () => ["standards"],
-  list: () => ["standards", "list"],
-  library: () => ["standards", "library"],
-  cwes: () => ["standards", "cwes"],
-  overrides: (projectId) => ["standards", "overrides", projectId],
+  all: () => [STANDARDS_SCOPE],
+  list: () => [STANDARDS_SCOPE, LIST_KEY],
+  library: () => [STANDARDS_SCOPE, "library"],
+  cwes: () => [STANDARDS_SCOPE, "cwes"],
+  overrides: (projectId) => [STANDARDS_SCOPE, "overrides", projectId],
+  detail: (standardId) => [STANDARDS_SCOPE, "detail", standardId],
 };
+
+const SETTINGS_SCOPE = "settings"; // query-key prefix for the settingsKeys.* subtree below
 
 export const settingsKeys = {
-  all: () => ["settings"],
-  aiClients: () => ["settings", "aiClients"],
-  clientModels: (clientId) => ["settings", "clientModels", clientId],
-  knownModels: (providerId) => ["settings", "knownModels", providerId],
-  ollamaModels: () => ["settings", "ollamaModels"],
-  llamacppModels: () => ["settings", "llamacppModels"],
-  omlxModels: () => ["settings", "omlxModels"],
+  all: () => [SETTINGS_SCOPE],
+  aiClients: () => [SETTINGS_SCOPE, "aiClients"],
+  clientModels: (clientId) => [SETTINGS_SCOPE, "clientModels", clientId],
+  knownModels: (providerId) => [SETTINGS_SCOPE, "knownModels", providerId],
+  ollamaModels: () => [SETTINGS_SCOPE, "ollamaModels"],
+  llamacppModels: () => [SETTINGS_SCOPE, "llamacppModels"],
+  omlxModels: () => [SETTINGS_SCOPE, "omlxModels"],
 };
 
+const SHARED_SCOPE = "shared"; // query-key prefix for the sharedKeys.* subtree below
+
 export const sharedKeys = {
-  all: () => ["shared"],
-  status: () => ["shared", "status"],
-  list: () => ["shared", "list"],
+  all: () => [SHARED_SCOPE],
+  status: () => [SHARED_SCOPE, "status"],
+  list: () => [SHARED_SCOPE, LIST_KEY],
+};
+
+// The grade-formula editor's rescore-progress poll. Outside the `project`
+// scope on purpose: when a pass lands the editor drops projectKeys.all(),
+// and that must not also refetch the poll that noticed it.
+export const gradeFormulaKeys = {
+  rescore: () => ["gradeFormula", "rescore"],
 };

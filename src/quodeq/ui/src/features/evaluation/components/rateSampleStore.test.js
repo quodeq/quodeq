@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { recordRateSample, getRateSamples, _resetRateSamples, createRateSampleStore } from './rateSampleStore.js';
+import { recordRateSample, getRateSamples, forgetJob, _resetRateSamples, createRateSampleStore } from './rateSampleStore.js';
 import { RATE_WINDOW_MS } from './buildJobStatCells.js';
 
 test('rateSampleStore: records and returns samples for a job', () => {
@@ -62,4 +62,19 @@ test('createRateSampleStore: windowMs is injectable independent of RATE_WINDOW_M
   const buf = store.getRateSamples('j1');
   assert.equal(buf.length, 1);
   assert.equal(buf[0].taken, 2);
+});
+
+test('forgetJob: drops one job and leaves the others', () => {
+  _resetRateSamples();
+  recordRateSample('j1', 1000, 10);
+  recordRateSample('j2', 1000, 20);
+  forgetJob('j1');
+  assert.deepEqual(getRateSamples('j1'), []);
+  assert.equal(getRateSamples('j2').length, 1);
+});
+
+test('forgetJob: unknown job is a no-op', () => {
+  const store = createRateSampleStore();
+  assert.doesNotThrow(() => store.forgetJob('nope'));
+  assert.deepEqual(store.getRateSamples('nope'), []);
 });

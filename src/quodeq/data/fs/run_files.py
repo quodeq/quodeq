@@ -1,9 +1,8 @@
 """Run-directory file mechanics: evaluation counts, status state, evidence
 and queue reads, scratch cleanup, fingerprints.
 
-services/cache, services/_accumulated_data, services/score_run and
-services/evaluation_mixin used to do these reads (and the discard-time
-unlinks) inline. The mechanics live here; the services keep the guard
+Used by services/cache, services/_accumulated_data, services/score_run and
+services/evaluation_mixin: the mechanics live here; the services keep the guard
 decisions (terminal-state sets, staleness rules, what counts as scratch).
 Everything is best-effort and never raises — an error degrades to "no
 signal" (or a logged skip), not a broken caller.
@@ -16,45 +15,82 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
+from quodeq.core.run.state import RunState, parse_run_state
+from quodeq.data.fs.run_artifacts import read_json_object
+from quodeq.shared.constants import EVIDENCE_DIRNAME, JSON_SUFFIX, MANIFEST_FILENAME
+
 _logger = logging.getLogger(__name__)
 
-_FINGERPRINT_DIRS = ("evaluation", "evidence")
+_FINGERPRINT_DIRS = ("evaluation", EVIDENCE_DIRNAME)
+# Files whose contents feed read_run_data for a single run. A completed run is
+# not immutable: dismissing a finding or applying a grade formula rewrites the
+# SQL grade tables that overlay_sql_grades reads back, so the fingerprint has
+# to cover the database (and its write-ahead log, which absorbs writes long
+# before a checkpoint touches the main file) alongside the JSON.
 _FINGERPRINT_FILES = ("evaluation.db", "evaluation.db-wal", "events.jsonl")
 _EVIDENCE_SUFFIX = "_evidence.jsonl"
 
 
-def count_eval_files(run_dir: Path) -> int | None:
+def count_eval_files(run_dir: Path, *, strict: bool = False) -> int | None:
     """Number of ``evaluation/*.json`` files, or None when the dir is absent.
 
     None vs 0 matters: callers anchored on the directory existing (unit
     tests that pre-seed caches) must treat "no directory" as "no signal".
+
+    *strict*: when the directory exists but listing it raises OSError (e.g.
+    a permissions problem), the default swallows that to None -- "no
+    signal", like every other read in this module. ``strict=True``
+    re-raises instead, for callers where an unreadable (as opposed to
+    absent) eval dir must not silently look like "nothing to see here".
     """
     eval_dir = run_dir / "evaluation"
     if not eval_dir.is_dir():
         return None
     try:
-        return sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
+        return sum(1 for p in eval_dir.iterdir() if p.suffix == JSON_SUFFIX)
     except OSError:
+        if strict:
+            raise
         return None
 
 
-def read_run_state(run_dir: Path) -> str | None:
-    """The ``state`` string from ``status.json``, or None when absent,
-    corrupt, non-dict, or non-string.
+def read_run_state(run_dir: Path) -> RunState | None:
+    """The run's current ``RunState``, from ``status.json``.
 
-    Unlike ``run_status_store.read_status`` this never raises (no schema
-    check): it feeds cache guards, where any read problem must degrade to
-    "no signal".
+    None when the file is absent, corrupt, non-dict, or its ``state`` value
+    is not a recognized (current or legacy) spelling. Unlike
+    ``run_status_store.read_status`` this never raises (no schema check): it
+    feeds cache guards and status readers, where any read problem must
+    degrade to "no signal".
     """
-    path = run_dir / "status.json"
-    if not path.is_file():
+    data = read_run_status_json(run_dir)
+    state = data.get("state") if isinstance(data, dict) else None
+    if not isinstance(state, str):
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        return parse_run_state(state)
+    except ValueError:
         return None
-    state = data.get("state") if isinstance(data, dict) else None
-    return state if isinstance(state, str) else None
+
+
+def read_run_manifest(run_dir: Path) -> dict | None:
+    """Parsed ``evidence/manifest.json`` for one run.
+
+    None when absent, corrupt, or not a JSON object -- mirrors
+    ``project_files.read_repository_info``'s contract.
+    """
+    return read_json_object(run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME)
+
+
+def has_fingerprint_files(evidence_dir: Path) -> bool:
+    """True when *evidence_dir* holds any ``*_fingerprint.json`` file.
+
+    Raises OSError when the directory exists but cannot be listed (e.g. a
+    permissions problem): callers that need to distinguish "no
+    fingerprints" from "couldn't check" must see the failure, not a silent
+    False.
+    """
+    return any(f.name.endswith("_fingerprint.json") for f in evidence_dir.iterdir())
 
 
 def list_dimension_evidence(run_dir: Path) -> list[tuple[str, Path, int]] | None:
@@ -64,22 +100,18 @@ def list_dimension_evidence(run_dir: Path) -> list[tuple[str, Path, int]] | None
     distinguish "run produced nothing at all" from "no evidence files". A
     file that vanishes between glob and stat reports size 0.
     """
-    evidence_dir = run_dir / "evidence"
+    evidence_dir = run_dir / EVIDENCE_DIRNAME
     if not evidence_dir.is_dir():
         return None
     out: list[tuple[str, Path, int]] = []
     for path in evidence_dir.glob(f"*{_EVIDENCE_SUFFIX}"):
-        try:
-            size = path.stat().st_size
-        except OSError:
-            size = 0
-        out.append((path.name[: -len(_EVIDENCE_SUFFIX)], path, size))
+        out.append((path.name[: -len(_EVIDENCE_SUFFIX)], path, evidence_file_size(path)))
     return out
 
 
 def dimension_queue_file(run_dir: Path, dim_id: str) -> Path:
     """The dim's dispatch-queue path (``evidence/<dim>_queue.json``)."""
-    return run_dir / "evidence" / f"{dim_id}_queue.json"
+    return run_dir / EVIDENCE_DIRNAME / f"{dim_id}_queue.json"
 
 
 def queue_file_exists(run_dir: Path, dim_id: str) -> bool:
@@ -89,7 +121,7 @@ def queue_file_exists(run_dir: Path, dim_id: str) -> bool:
 
 def dimension_evidence_file(run_dir: Path, dim_id: str) -> Path:
     """The dim's raw evidence path (``evidence/<dim>_evidence.jsonl``)."""
-    return run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
+    return run_dir / EVIDENCE_DIRNAME / f"{dim_id}_evidence.jsonl"
 
 
 def evidence_file_size(path: Path) -> int:
@@ -118,11 +150,8 @@ def dimension_report_exists(evaluation_dir: Path, dim_id: str) -> bool:
 
 
 def read_run_status_json(run_dir: Path) -> dict:
-    """Parse ``status.json`` in *run_dir*, or ``{}`` on any read/parse error."""
-    try:
-        return json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return {}
+    """Parse ``status.json`` in *run_dir*, or ``{}`` on any read/parse/shape error."""
+    return read_json_object(run_dir / "status.json") or {}
 
 
 def read_queue_state(queue_path: Path) -> dict | None:
@@ -143,10 +172,7 @@ def read_queue_files_count(queue_path: Path) -> int:
     0 when the file is absent, corrupt, or not batch-shaped — this feeds
     coverage counters, never correctness.
     """
-    try:
-        data = json.loads(queue_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0
+    data = read_queue_state(queue_path)
     taken = data.get("taken") if isinstance(data, dict) else None
     if not isinstance(taken, list):
         return 0
@@ -220,3 +246,47 @@ def run_fingerprint(run_dir: Path) -> str:
             continue
         parts.append(f"{name}:{stat.st_mtime_ns}:{stat.st_size}")
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
+_RUN_LOG_TAIL_LINES = 500  # lines of run.log the dashboard shows; enough context without a full read
+_TAIL_READ_INITIAL_CHUNK_BYTES = 8192  # doubles each pass until max_lines is satisfied
+
+
+def tail_run_log(run_dir: Path, max_lines: int = _RUN_LOG_TAIL_LINES) -> list[str]:
+    """Return the last *max_lines* lines from run.log.
+
+    Reads backward from the end in growing chunks instead of the whole file,
+    so a multi-MB in-progress log costs O(tail size) per call, not O(file
+    size). ``run.log`` is append-only in practice (no in-place rewrites), so
+    a stale byte count from a concurrent writer only risks re-reading a few
+    extra bytes on the next call, never corrupting output.
+    """
+    log_path = run_dir / "run.log"
+    if not log_path.is_file():
+        return []
+    try:
+        file_size = log_path.stat().st_size
+        chunk = _TAIL_READ_INITIAL_CHUNK_BYTES
+        data = b""
+        with log_path.open("rb") as fp:
+            read_to = file_size
+            while read_to > 0:
+                read_from = max(0, read_to - chunk)
+                fp.seek(read_from)
+                data = fp.read(read_to - read_from) + data
+                read_to = read_from
+                # +1: need max_lines *complete* lines, i.e. max_lines newlines
+                # before the final one (or we've hit the start of the file).
+                if data.count(b"\n") > max_lines or read_from == 0:
+                    break
+                chunk *= 2
+        text = data.decode("utf-8", errors="replace")
+    except OSError:
+        return []
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines = lines[:-1]  # trailing newline produces one empty split segment
+    # Text-mode writers on Windows produce CRLF; the old text-mode reader's
+    # universal newlines absorbed the \r, the byte-level split must drop it.
+    lines = [line.removesuffix("\r") for line in lines]
+    return lines[-max_lines:] if len(lines) > max_lines else lines

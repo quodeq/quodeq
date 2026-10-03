@@ -10,43 +10,34 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
-from quodeq.analysis.mcp._enricher_rules import apply_downweight, resolve_principle
+from quodeq.analysis.mcp.finding_admission import (
+    admission_of, apply_admission, catalog_from_reqs, dedup_identity, is_unplaceable, refusal_of,
+)
+from quodeq.analysis.mcp._enricher_rules import (
+    apply_path_role_downweight, apply_shape_downweight, resolve_principle,
+)
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.precedent_downweight import (
-    UNSET_SCORE,
-    MaybeScore,
+    PRECEDENT_TIER_EXACT, UNSET_SCORE, MaybeScore,
     apply_precedent_downweight,
     precedent_scores as _compute_precedent_scores,
     notify_precedent_match,
 )
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
-from quodeq.analysis.mcp.schemas import FINDING_TYPE_VIOLATION
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
-from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import PrecedentCorpus
-from quodeq.context.project_shape import Deployment, ProjectShape
+from quodeq.context.project_shape import ProjectShape
 from quodeq.context.trust_model import TrustModel
+from quodeq.core.admission import StandardCatalog, Unmapped
 from quodeq.core.observability import NULL_LOG, LogSink
-
+from quodeq.shared.lru import LRUDict
 _FINDING_SCHEMA_VERSION = 1
+_FILE_CACHE_CAPACITY = 512  # source files one enricher keeps; recency evicts past this
 # These downweights set `confidence`, a UI/triage signal ONLY: confidence drives
 # the dashboard's "Low confidence" grouping and does NOT affect the grade (it is
 # excluded from the scoring fields -- see _report_constants.VIOLATION_FIELDS and
 # #640). Severity, set by the analysis LLM and enforced by the provenance gate
 # (#639), is the lever that moves the score.
-_NON_PROD_DOWNWEIGHT = 50
-_SHAPE_DOWNWEIGHT = 40
-
-_HOSTED_SERVICE_KEYWORDS: tuple[str, ...] = (
-    "concurrent caller", "concurrent callers", "concurrent request",
-    "concurrent requests", "thread block", "blocks the thread",
-    "blocks thread", "blocks the event loop", "blocks the request thread",
-    "distributed state", "distributed system", "distributed lock",
-    "multi-tenant", "multitenant", "tenant isolation",
-    "rate limit", "rate-limit", "rate limiting",
-    "ddos", "denial of service", "denial-of-service",
-    "horizontal scaling", "horizontal scale",
-)
 
 
 @runtime_checkable
@@ -73,50 +64,9 @@ class CompiledContext:
     # composition root can record a dismissal for it (#1208). Never for the
     # semantic tier. Optional: None keeps precedent a confidence-only signal.
     on_precedent_match: Callable[[dict], None] | None = None
-
-
-def _apply_path_role_downweight(finding: dict[str, object]) -> None:
-    """Lower confidence to 50 when the finding lives on a non-prod path.
-
-    Skipped when the LLM emitted an explicit confidence below 100 and for
-    compliance findings (downweighting "code is fine" makes no sense).
-    """
-    if finding.get("t") != FINDING_TYPE_VIOLATION:
-        return
-    role = path_role(finding.get("file"))
-    if role not in NON_PROD_ROLES:
-        return
-    apply_downweight(finding, _NON_PROD_DOWNWEIGHT)
-
-
-def _shape_irrelevant_to_hosted_service(shape: ProjectShape | None) -> bool:
-    """True when the project clearly isn't a hosted multi-tenant service."""
-    if shape is None:
-        return False
-    if shape.deployment in (Deployment.DESKTOP, Deployment.LIBRARY):
-        return True
-    if shape.deployment is Deployment.CLI and shape.is_single_user:
-        return True
-    return False
-
-
-def _apply_shape_downweight(
-    finding: dict[str, object], shape: ProjectShape | None,
-) -> None:
-    """Downweight findings that assume a hosted service when the project isn't one."""
-    if finding.get("t") != FINDING_TYPE_VIOLATION:
-        return
-    if not _shape_irrelevant_to_hosted_service(shape):
-        return
-    haystack_parts: list[str] = []
-    for key in ("reason", "w", "title"):
-        val = finding.get(key)
-        if isinstance(val, str):
-            haystack_parts.append(val.lower())
-    haystack = " ".join(haystack_parts)
-    if not any(kw in haystack for kw in _HOSTED_SERVICE_KEYWORDS):
-        return
-    apply_downweight(finding, _SHAPE_DOWNWEIGHT)
+    # Every standard of the run, for admission. None builds a one-dimension
+    # catalog from compiled_reqs/compiled_refs.
+    catalog: StandardCatalog | None = None
 
 
 def _default_read_file(path: Path) -> str:
@@ -148,23 +98,31 @@ class FindingEnricher:
         self._precedent_corpus = context.precedent_corpus
         self._on_precedent_match = context.on_precedent_match
         self._log = log
+        self._catalog = context.catalog or catalog_from_reqs(
+            context.dimension, context.compiled_reqs, context.compiled_refs)
+        # The Unmapped of the finding enrich() last built, None when it was
+        # placed or there was no standard to place it in.
+        self.last_unmapped: Unmapped | None = None
         base_reader: Callable[[Path], str] = file_reader or _default_read_file
-        self._file_cache: dict[Path, str] = {}
+        self._file_cache: LRUDict[Path, str] = LRUDict(_FILE_CACHE_CAPACITY)
 
         def _cached_read_file(path: Path) -> str:
             cached = self._file_cache.get(path)
             if cached is None:
                 cached = base_reader(path)
-                self._file_cache[path] = cached
+                self._file_cache.put(path, cached)
             return cached
 
         self._read_file: Callable[[Path], str] = _cached_read_file
 
     def dedup_key(self, args: dict) -> tuple:
         """Compute the deduplication key for a raw finding args dict."""
-        req = args.get("req")
-        p = resolve_principle(args.get("p"), req, self._reqs)
-        return (p, args.get("file"), args.get("line"), args.get("t"))
+        placed = admission_of(args, self._catalog, self._dimension)
+        if is_unplaceable(placed):
+            ident = args.get("req") or resolve_principle(args.get("p"), None, self._reqs)
+        else:
+            ident = dedup_identity(args, placed)
+        return (ident, args.get("file"), args.get("line"), args.get("t"))
 
     def _resolve_finding_dimension(
         self, finding: dict, args: dict, req: str | None,
@@ -210,10 +168,14 @@ class FindingEnricher:
         if args.get("vt"):
             finding["vt_raw"] = str(args["vt"])
 
-        # Same rule as dedup_key's resolve_principle, but the write is the
-        # finding's own: the requirement's principle is written even when it
-        # is None, so "this requirement declares no principle" stays
-        # distinguishable from "no principle field at all" downstream.
+        placed = admission_of(args, self._catalog, self._dimension)
+        self.last_unmapped = None
+        if not is_unplaceable(placed):
+            apply_admission(finding, args, placed, self._dimension, self._log)
+            self.last_unmapped = refusal_of(placed, self._catalog)
+            return finding
+
+        # No loaded standard: keep what the model sent, as before admission.
         if not args.get("p") and req and req in self._reqs:
             finding["p"] = self._reqs[req]["principle"]
 
@@ -234,8 +196,8 @@ class FindingEnricher:
         this ran embeds a different text than the corpus holds.
         """
         enrich_code(finding, self._work_dir, self._read_file)
-        _apply_path_role_downweight(finding)
-        _apply_shape_downweight(finding, self._project_shape)
+        apply_path_role_downweight(finding)
+        apply_shape_downweight(finding, self._project_shape)
 
     def _after_precedent(
         self, finding: dict, precedent_score: MaybeScore = UNSET_SCORE,
@@ -247,7 +209,7 @@ class FindingEnricher:
         a later run does NOT come back through here -- cache replay bypasses
         enrich() entirely and writes straight to the per-dim JSONL, and a
         deterministic checker never comes through here at all. Those two sinks
-        (dimension_runner._write_findings, checks.runner) call the same helper
+        (dimension_runner.write_findings, checks.runner) call the same helper
         for the same reason. Every call site is required: this one gates what
         the model just emitted, the others gate what a warm cache is about to
         replay and what a checker just computed, and skipping any one leaves a
@@ -259,7 +221,7 @@ class FindingEnricher:
             score=precedent_score, log=self._log,
         )
         apply_severity_gates(finding, self._trust_model)
-        if tier == "exact":
+        if tier == PRECEDENT_TIER_EXACT:
             notify_precedent_match(self._on_precedent_match, finding, log=self._log)
 
     def enrich(self, args: dict, *, precedent_score: MaybeScore = UNSET_SCORE) -> dict:

@@ -1,35 +1,51 @@
 import { useCallback } from 'react';
 import { saveGradeFormula, resetGradeFormula } from '../../api/index.js';
 import { defaultGradeThresholdsStore } from '../../utils/gradeThresholds.js';
+import { RESCORE_STATE } from '../../vocab/rescoreState.js';
 import { useGradeFormulaState } from './hooks/useGradeFormulaState.js';
 import { useGradePreview } from './hooks/useGradePreview.js';
+import { useRescoreProgress } from './hooks/useRescoreProgress.js';
 import { t } from '../../strings/index.js';
+import { pluralKey } from '../../utils/plural.js';
 
 // Singular and plural are separate whole sentences, not a stem plus an "s":
 // the verb agreement moves too ("shows" vs "show"), and plenty of languages
 // inflect more of the sentence than English does.
-function noticeFor(d) {
-  return d.failed > 0
-    ? t(d.failed === 1 ? 'gradeFormula.partialRescoreOne' : 'gradeFormula.partialRescoreMany', { count: d.failed })
+function noticeFor(rescore) {
+  return rescore.failed > 0
+    ? t(pluralKey(rescore.failed, 'gradeFormula.partialRescoreOne', 'gradeFormula.partialRescoreMany'), { count: rescore.failed })
     : null;
 }
 
+// Once the server's pass for the latest apply has landed (or given up) while
+// the editor is open: warn about runs that kept the old grades and refresh
+// the preview, whose "before" side reads the rewritten grades. The app-level
+// tracker drops the stale score caches whether or not the editor is open.
+function settleRescore(payload, { failWith, notePartialRescore, requestPreview }) {
+  const { rescore } = payload;
+  if (rescore.state === RESCORE_STATE.ERROR) failWith(t('gradeFormula.rescoreFailed'));
+  else notePartialRescore(noticeFor(rescore));
+  requestPreview(payload.current);
+}
+
 /**
- * Grade-formula editor state: server params, dirty draft, debounced preview.
+ * Grade-formula editor state: server params, dirty draft, debounced preview,
+ * background-rescore progress.
  * projectId: project used for the live preview (may be null).
  * thresholdsStore: grade-thresholds store apply/reset push the applied
  * boundaries into; defaults to the app-wide store, injectable so tests
  * don't leak grading state into the rest of the process.
  *
- * Split into hooks/useGradeFormulaState.js (server/draft/preview/busy/error
- * state + the initial load) and hooks/useGradePreview.js (the debounced
- * preview request + update()) -- this file composes the two and owns
- * apply/resetToDefaults.
+ * Composes hooks/useGradeFormulaState.js (server/draft/preview/busy/error
+ * state + the initial load), hooks/useGradePreview.js (the debounced preview
+ * request + update()) and hooks/useRescoreProgress.js (the page's view of
+ * the app-level rescore tracker in rescore/, which polls after an
+ * apply/reset: the server answers with 202 and finishes in the background), and owns apply/resetToDefaults.
  */
 export default function useGradeFormula(projectId, thresholdsStore = defaultGradeThresholdsStore) {
   const {
     saved, draft, isCustom, defaults, preview, busy, error, partialNotice,
-    debounceRef, loaded, invalidateScoreQueries,
+    debounceRef, loaded, resumeFrom,
     adoptServerFormula, beginRequest, endRequest, failWith, notePartialRescore,
     updateDraft, showPreview,
   } = useGradeFormulaState();
@@ -37,6 +53,11 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
   const isDirty = saved && draft && JSON.stringify(saved) !== JSON.stringify(draft);
 
   const { requestPreview, update } = useGradePreview({ projectId, draft, updateDraft, showPreview, debounceRef, loaded });
+
+  const { rescoreProgress, track } = useRescoreProgress(
+    (payload) => settleRescore(payload, { failWith, notePartialRescore, requestPreview }),
+    resumeFrom,
+  );
 
   // Apply and reset differ only in which endpoint they call, what they log
   // and what they return; everything the server sends back is adopted the
@@ -47,9 +68,7 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
       const d = await run();
       adoptServerFormula(d.current, d.isCustom);
       thresholdsStore.set(d.current.gradeThresholds);
-      notePartialRescore(noticeFor(d));
-      invalidateScoreQueries();
-      requestPreview(d.current);
+      track(d);
       return d;
     } catch (err) {
       console.warn(logLabel, err);
@@ -58,8 +77,7 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
     } finally {
       endRequest();
     }
-  }, [requestPreview, invalidateScoreQueries, thresholdsStore,
-      beginRequest, endRequest, failWith, adoptServerFormula, notePartialRescore]);
+  }, [track, thresholdsStore, beginRequest, endRequest, failWith, adoptServerFormula]);
 
   const apply = useCallback(async () => {
     const d = await submitFormula(
@@ -67,7 +85,7 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
       'gradeFormula.applyFailed',
       '[useGradeFormula] apply failed:',
     );
-    return d ? d.applied : null;
+    return d ? d.rescore : null;
   }, [draft, submitFormula]);
 
   const resetToDefaults = useCallback(async () => {
@@ -78,5 +96,8 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
     );
   }, [submitFormula]);
 
-  return { draft, defaults, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults };
+  return {
+    draft, defaults, isCustom, isDirty, preview, busy, error, partialNotice, rescoreProgress,
+    update, apply, resetToDefaults,
+  };
 }

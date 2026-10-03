@@ -7,16 +7,27 @@ import platform
 import subprocess
 import urllib.request
 import urllib.error
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from quodeq.config.llm_bridge_env import ollama_base_url
+from quodeq.llm_bridge._constants import LOCAL_SERVER_PROBE_TIMEOUT_S
+from quodeq.llm_bridge._local_server import concurrency_result, server_address
+from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
+_T = TypeVar("_T")
 
-_TIMEOUT_S = 3
+# The /health body's own status word (llama-server and omlx both send it);
+# not a quodeq vocabulary.
+HEALTH_OK = "ok"
 _MAX_PARALLEL_AGENTS = 5
 _SYSCTL_TIMEOUT_S = 3
 _NVIDIA_SMI_TIMEOUT_S = 5
+# KV-cache/context overhead beyond a model's raw weight size, applied when
+# sizing how many concurrent agents fit in GPU memory.
+_CONTEXT_OVERHEAD_FACTOR = 1.3
 _MIB_TO_BYTES = 1024 * 1024
 # Per-context host-memory budget when a backend reports no real VRAM/size
 # data (llamacpp's /v1/models and omlx alike): assume the loaded model
@@ -41,6 +52,26 @@ def _safe_request(url: str) -> urllib.request.Request:
     return urllib.request.Request(url)
 
 
+_PROBE_ERRORS = (urllib.error.URLError, ConnectionRefusedError, OSError,
+                 ValueError, KeyError, TypeError, AttributeError)
+
+
+def _get_json(url: str, parse: Callable[[Any], _T], failure: str, fallback: _T) -> _T:
+    """GET *url* and return ``parse(body)``.
+
+    A refused connection, an unsafe URL, a body that is not JSON or a body
+    *parse* cannot read is logged as the *failure* warning (a ``%s`` format
+    taking the exception) and answers *fallback*.
+    """
+    try:
+        req = _safe_request(url)
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
+            return parse(json.loads(resp.read()))
+    except _PROBE_ERRORS as exc:
+        _log.warning(failure, exc)
+        return fallback
+
+
 def get_ollama_status(base_url: str | None = None) -> dict:
     """Check if the Ollama server is running.
 
@@ -48,69 +79,57 @@ def get_ollama_status(base_url: str | None = None) -> dict:
     import) so a variable set after this module loads is still honoured.
     """
     base_url = _resolved_base(base_url)
-    try:
-        req = _safe_request(f"{base_url}/api/version")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-            return {
-                "running": True,
-                "version": data.get("version", "unknown"),
-                "address": base_url.replace("http://", ""),
-            }
-    except (urllib.error.URLError, ConnectionRefusedError, OSError,
-            ValueError, KeyError, TypeError, AttributeError) as exc:
-        _log.warning("Ollama status check failed: %s", exc)
-        return {"running": False, "error": "Connection failed"}
+    return _get_json(
+        f"{base_url}/api/version",
+        lambda data: {
+            "running": True,
+            "version": data.get("version", "unknown"),
+            "address": server_address(base_url),
+        },
+        "Ollama status check failed: %s",
+        {"running": False, "error": "Connection failed"},
+    )
+
+
+def _model_list(data: Any) -> list[dict]:
+    return [
+        {
+            "name": m["name"],
+            "size": m.get("size", 0),
+            "quantization": m.get("details", {}).get("quantization_level", ""),
+            "family": m.get("details", {}).get("family", ""),
+        }
+        for m in data.get("models", [])
+    ]
 
 
 def list_ollama_models(base_url: str | None = None) -> list[dict]:
     """List installed Ollama models."""
     base_url = _resolved_base(base_url)
-    try:
-        req = _safe_request(f"{base_url}/api/tags")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-            models = data.get("models", [])
-            return [
-                {
-                    "name": m["name"],
-                    "size": m.get("size", 0),
-                    "quantization": m.get("details", {}).get("quantization_level", ""),
-                    "family": m.get("details", {}).get("family", ""),
-                }
-                for m in models
-            ]
-    except (urllib.error.URLError, ConnectionRefusedError, OSError,
-            ValueError, KeyError, TypeError, AttributeError) as exc:
-        _log.warning("Could not list Ollama models: %s", exc)
-        return []
+    return _get_json(f"{base_url}/api/tags", _model_list, "Could not list Ollama models: %s", [])
+
+
+def _first_running_model(data: Any) -> dict | None:
+    models = data.get("models", [])
+    if not models:
+        return None
+    m = models[0]
+    return {"name": m["name"], "size": m.get("size", 0), "size_vram": m.get("size_vram", 0)}
 
 
 def get_running_model_info(base_url: str | None = None) -> dict | None:
     """Get info about the currently loaded model (from /api/ps)."""
     base_url = _resolved_base(base_url)
-    try:
-        req = _safe_request(f"{base_url}/api/ps")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-            models = data.get("models", [])
-            if models:
-                m = models[0]
-                return {
-                    "name": m["name"],
-                    "size": m.get("size", 0),
-                    "size_vram": m.get("size_vram", 0),
-                }
-    except (urllib.error.URLError, ConnectionRefusedError, OSError,
-            ValueError, KeyError, TypeError, AttributeError) as exc:
-        _log.warning("Could not get running Ollama model info: %s", exc)
-    return None
+    return _get_json(
+        f"{base_url}/api/ps", _first_running_model,
+        "Could not get running Ollama model info: %s", None,
+    )
 
 
 def estimate_max_agents(
     model_size: float,
     gpu_memory: float,
-    overhead_factor: float = 1.3,
+    overhead_factor: float = _CONTEXT_OVERHEAD_FACTOR,
 ) -> dict:
     """Estimate max parallel agents from model size and GPU memory."""
     if model_size <= 0 or gpu_memory <= 0:
@@ -127,7 +146,7 @@ def estimate_max_agents(
     }
 
 
-def _detect_memory() -> float:
+def detect_memory() -> float:
     """Detect total GPU/unified memory in bytes via platform dispatch.
 
     Currently supports:
@@ -141,11 +160,11 @@ def _detect_memory() -> float:
     """
     system = platform.system()
     try:
-        if system == "Darwin":
+        if system == SYSTEM_DARWIN:
             # macOS: unified memory — total system RAM is the GPU budget
             out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=_SYSCTL_TIMEOUT_S)
             return float(out.strip())
-        if system == "Linux":
+        if system == SYSTEM_LINUX:
             # Try nvidia-smi for discrete GPU
             out = subprocess.check_output(
                 ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
@@ -160,7 +179,7 @@ def _detect_memory() -> float:
 
 
 # Keep backward-compatible alias
-_get_gpu_memory = _detect_memory
+_get_gpu_memory = detect_memory
 
 
 def run_concurrency_test(
@@ -188,17 +207,10 @@ def run_concurrency_test(
     gpu_memory = _get_gpu_memory()
 
     if vram_per_context <= 0 or gpu_memory <= 0:
-        return {
-            "recommended": 1,
-            "vram_per_context": vram_per_context,
-            "gpu_memory": gpu_memory,
-            "reason": "Could not detect VRAM" if gpu_memory <= 0 else "Could not determine model size",
-        }
+        return concurrency_result(
+            1, vram_per_context, gpu_memory,
+            "Could not detect VRAM" if gpu_memory <= 0 else "Could not determine model size",
+        )
 
     result = estimate_max_agents(model_size=vram_per_context, gpu_memory=gpu_memory)
-
-    return {
-        "recommended": result["estimate"],
-        "vram_per_context": vram_per_context,
-        "gpu_memory": gpu_memory,
-    }
+    return concurrency_result(result["estimate"], vram_per_context, gpu_memory)

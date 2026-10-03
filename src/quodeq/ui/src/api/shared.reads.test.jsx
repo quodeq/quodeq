@@ -117,59 +117,5 @@ describe('shared repo API client', () => {
       await shared.publishProject('proj/1');
       expect(calls[0].url).toBe('/api/projects/proj%2F1/publish');
     });
-
-    it('pullSharedProject POSTs /shared/projects/<id>/pull without action', async () => {
-      await shared.pullSharedProject('proj1');
-      expect(calls[0].url).toBe('/api/shared/projects/proj1/pull');
-      expect(calls[0].opts.method).toBe('POST');
-      expect(JSON.parse(calls[0].opts.body)).toEqual({});
-    });
-
-    it('pullSharedProject POSTs /shared/projects/<id>/pull with action', async () => {
-      await shared.pullSharedProject('proj1', 'copy');
-      expect(calls[0].url).toBe('/api/shared/projects/proj1/pull');
-      expect(calls[0].opts.method).toBe('POST');
-      expect(JSON.parse(calls[0].opts.body)).toEqual({ action: 'copy' });
-    });
-
-    it('pullSharedProject encodes the project id', async () => {
-      await shared.pullSharedProject('proj/1', 'copy');
-      expect(calls[0].url).toBe('/api/shared/projects/proj%2F1/pull');
-    });
-
-    // The online Projects tab's "pull local copy" footer action needs to
-    // detect a 409 collision (same contract as the manual import flow) and
-    // offer an inline "copy" confirm -- it can only do that if the thrown
-    // Error carries status/kind/existingProjectId, which the generic
-    // request() helper does not attach.
-    it('pullSharedProject throws an Error carrying status/kind/existingProjectId on a 409 collision', async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => ({
-        ok: false,
-        status: 409,
-        json: async () => ({
-          error: 'Project already exists',
-          code: 'PROJECT_EXISTS',
-          kind: 'same_uuid',
-          existingProjectId: 'abc-123',
-          projectName: 'demo-repo',
-        }),
-      })));
-      await expect(shared.pullSharedProject('proj1')).rejects.toMatchObject({
-        status: 409,
-        code: 'PROJECT_EXISTS',
-        kind: 'same_uuid',
-        existingProjectId: 'abc-123',
-        projectName: 'demo-repo',
-      });
-    });
-
-    it('pullSharedProject passes an abort signal and maps a timeout to a clear error', async () => {
-      await shared.pullSharedProject('proj1');
-      expect(calls[0].opts.signal).toBeInstanceOf(AbortSignal);
-      const timeoutErr = new Error('signal timed out');
-      timeoutErr.name = 'TimeoutError';
-      vi.stubGlobal('fetch', vi.fn(async () => { throw timeoutErr; }));
-      await expect(shared.pullSharedProject('proj1')).rejects.toThrow(/timed out/i);
-    });
   });
 });

@@ -8,6 +8,10 @@ from quodeq.data.events.writer import EventLogWriter
 from quodeq.core.events.models import EventType
 
 
+def _message_and_dup(receipt):
+    return receipt.message, receipt.status == "duplicate"
+
+
 def _args(p="P1", file="x.py", line=1, t="violation"):
     return {"p": p, "file": file, "line": line, "t": t,
             "severity": "medium", "d": "dim", "reason": "r",
@@ -19,7 +23,7 @@ def test_router_writes_jsonl_and_event_log(tmp_path: Path):
     event_log = EventLogWriter(tmp_path / "events.jsonl")
     router = FindingsRouter(fh, event_log=event_log)
 
-    msg, dup = router.receive(_args())
+    msg, dup = _message_and_dup(router.receive(_args()))
     assert dup is False
     assert "Finding #1 recorded." in msg
 
@@ -35,7 +39,7 @@ def test_router_writes_jsonl_and_event_log(tmp_path: Path):
 def test_router_without_event_log_only_writes_jsonl(tmp_path: Path):
     fh = io.StringIO()
     router = FindingsRouter(fh)
-    msg, dup = router.receive(_args())
+    msg, dup = _message_and_dup(router.receive(_args()))
     assert dup is False
     assert fh.getvalue().count("\n") == 1
 
@@ -46,7 +50,7 @@ def test_router_dedup_skips_event_log(tmp_path: Path):
     router = FindingsRouter(fh, event_log=event_log)
 
     router.receive(_args())
-    msg, dup = router.receive(_args())
+    msg, dup = _message_and_dup(router.receive(_args()))
     assert dup is True
     assert fh.getvalue().count("\n") == 1
     # Only one event emitted (duplicate suppressed)
@@ -59,12 +63,15 @@ def test_router_swallows_event_log_errors_to_preserve_jsonl_durability(tmp_path:
 
     class _FailingEventLog:
         def emit(self, event):
-            raise RuntimeError("simulated event log failure")
+            # OSError, not an arbitrary Exception: _emit_event's catch
+            # narrows to (OSError, ValueError, KeyError, TypeError), the
+            # shapes a real event-log write/serialization can raise.
+            raise OSError("simulated event log failure")
 
     fh = io.StringIO()
     router = FindingsRouter(fh, event_log=_FailingEventLog())
 
-    msg, dup = router.receive(_args())
+    msg, dup = _message_and_dup(router.receive(_args()))
 
     assert fh.getvalue().count("\n") == 1
     assert dup is False

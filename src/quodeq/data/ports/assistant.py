@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL
+from quodeq.core.types.project_source import ProjectSource
+
+# events_after's default page size. Mirrored by the concrete SQLite
+# implementation (quodeq.data.sqlite.assistant_repository), which imports it
+# from here rather than keeping its own copy.
+DEFAULT_EVENTS_LIMIT = 500
 
 
 @dataclass(frozen=True)
@@ -42,7 +47,7 @@ class AssistantStore(Protocol):
     # -- sessions -----------------------------------------------------------
 
     def create_session(self, *, session_id: str, provider: str,
-                       model: str | None = None, source: str = SESSION_SOURCE_LOCAL,
+                       model: str | None = None, source: str = ProjectSource.LOCAL,
                        scope: SessionScope | None = None) -> dict:
         """Create a session row and return it."""
         ...
@@ -91,7 +96,9 @@ class AssistantStore(Protocol):
 
         With ``expected`` the write is a compare-and-set
         (``WHERE id=? AND status=?``), so a caller can atomically claim a
-        transition. Without ``expected`` the write is unconditional.
+        transition, so two concurrent applies of the same action can't both
+        win and double-run the side effect. Without ``expected`` the write
+        is unconditional (back-compat for the rollback path).
         """
         ...
 
@@ -102,7 +109,7 @@ class AssistantStore(Protocol):
         ...
 
     def events_after(self, session_id: str, after_seq: int,
-                     limit: int = 500) -> list[tuple[int, dict]]:
+                     limit: int = DEFAULT_EVENTS_LIMIT) -> list[tuple[int, dict]]:
         """Frames strictly after *after_seq*, ordered by sequence."""
         ...
 

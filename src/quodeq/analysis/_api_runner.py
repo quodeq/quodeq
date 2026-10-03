@@ -3,43 +3,33 @@
 Calls LLM APIs directly via the raw OpenAI client and writes findings as
 JSONL evidence -- the same format the CLI runner produces via MCP.
 
-``_Finding`` (in ``_api_schema``) is a lenient short-key variant of the
-canonical ``Judgment`` (``quodeq.core.events.models``). Local models drop
-required fields and balk at long field names under load -- this type's short
-keys (``req``/``t``/``w``) and Field descriptions are tuned for that
-constraint. The downstream wire-dict → Judgment lift happens via
-``quodeq.core.finding_mappings.wire_dict_to_judgment`` after
-``FindingEnricher`` maps ``req`` to ``practice_id``.
+The model's reply is parsed with the lenient short-key schema in
+``_api_schema``; the findings router enriches each one before it is written.
 
 Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from quodeq.analysis._api_call import (
-    ApiRunnerConfig,
-    _call_api,
-)
+from quodeq.analysis._api_call import ApiRunnerConfig, call_api
 from quodeq.analysis._api_enrichment import (
-    _derive_run_paths,
-    _infer_end_line,
-    _resolve_file_paths,
+    derive_run_paths,
+    infer_end_line,
+    resolve_file_paths,
 )
 from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.mcp.precedent_signals import precedent_signals
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
-from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
+from quodeq.analysis.mcp.schemas import FileDoneStatus
+from quodeq.analysis.mcp.finding_admission import run_catalog
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_refs, load_compiled_requirements
-from quodeq.data.sqlite.findings_queries import (
-    dismissed_source_stamp,
-    read_dismissed_snippets_strict,
-)
-from quodeq.services.precedent_dismiss import precedent_match_hook
 from quodeq.shared.log_sink import LoggerSink
 
 if TYPE_CHECKING:
@@ -54,25 +44,6 @@ def _repo_signals(work_dir: Path | None) -> dict[str, object]:
     if work_dir is None:
         return {"project_shape": None, "trust_model": None}
     return {"project_shape": detect_shape(work_dir), "trust_model": resolve_trust_model(work_dir)}
-
-
-def _precedent_signals(project_dir: Path | None, run_dir: Path | None) -> dict[str, object]:
-    """The already-dismissed findings the router downweights against.
-
-    The strict reader raises on a failed open, so the per-run memo skips the
-    run instead of remembering it as having no dismissals.
-    """
-    if not project_dir:
-        return {"precedent_fingerprints": set(), "precedent_corpus": None,
-                "on_precedent_match": precedent_match_hook(None, log=LoggerSink(_log))}
-    return {
-        "precedent_fingerprints": load_precedent_fingerprints(
-            project_dir, read_dismissed=read_dismissed_snippets_strict,
-            source_stamp=dismissed_source_stamp,
-        ),
-        "precedent_corpus": load_precedent_corpus(project_dir, run_dir) if run_dir else None,
-        "on_precedent_match": precedent_match_hook(project_dir, log=LoggerSink(_log)),
-    }
 
 
 def _build_router_context(
@@ -94,14 +65,15 @@ def _build_router_context(
         return None
     try:
         return CompiledContext(
+            catalog=run_catalog(compiled_dir, [dimension] if dimension else []),
             compiled_refs=load_compiled_refs(compiled_dir, dimension) or {},
             compiled_reqs=load_compiled_requirements(compiled_dir, dimension) or {},
             dimension=dimension,
             work_dir=work_dir,
             **_repo_signals(work_dir),
-            **_precedent_signals(project_dir, run_dir),
+            **precedent_signals(project_dir, run_dir, log=LoggerSink(_log)),
         )
-    except Exception as exc:  # noqa: BLE001 - degrade gracefully to raw findings on enrichment setup failure
+    except (OSError, json.JSONDecodeError) as exc:
         _log.warning("Could not build enrichment context: %s -- writing raw", exc)
         return None
 
@@ -127,7 +99,7 @@ def _build_cache_writer(
     path is actually enabled.
 
     When ``classify_files_via_cache`` has already stashed this dimension's
-    ClassifyResult (read back via ``RunConfig.classify_cache``, finding 5398), its
+    ClassifyResult (read back via ``RunConfig.classify_cache``), its
     ``miss_hashes`` is passed through so the writer reuses the hash classify
     already computed instead of re-hashing every dispatched file, together
     with its ``miss_stamps`` so the writer can tell a stale hash from a
@@ -185,7 +157,7 @@ def _mark_source_files_done(
     """
     if not source_file_paths:
         return
-    status = "error" if was_lossy else "ok"
+    status = FileDoneStatus.ERROR if was_lossy else FileDoneStatus.OK
     reason = None
     if fatal_exc is not None:
         reason = f"fatal provider error ({fatal_exc.reason}): {fatal_exc}"
@@ -239,15 +211,15 @@ def _run_call_and_enrich(
     """
     fatal_exc: FatalProviderError | None = None
     try:
-        findings, was_lossy = _call_api(request.prompt, config)
+        findings, was_lossy = call_api(request.prompt, config)
     except FatalProviderError as exc:
         fatal_exc, findings, was_lossy = exc, [], True
 
     if request.source_file_paths:
-        findings = _resolve_file_paths(findings, request.source_file_paths)
-    _infer_end_line(findings)
+        findings = resolve_file_paths(findings, request.source_file_paths, log=LoggerSink(_log))
+    infer_end_line(findings)
 
-    project_dir, run_dir = _derive_run_paths(request.jsonl_file)
+    project_dir, run_dir = derive_run_paths(request.jsonl_file)
     ctx = _build_router_context(
         request.compiled_dir, request.dimension, request.work_dir, project_dir, run_dir,
     )

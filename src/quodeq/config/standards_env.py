@@ -5,8 +5,8 @@ evaluators directory field; it is resolved here and passed in.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
+from quodeq.shared.env_resolve import resolve_env
 
 
 def evaluators_dir(env: dict[str, str] | None = None) -> Path:
@@ -14,5 +14,7 @@ def evaluators_dir(env: dict[str, str] | None = None) -> Path:
 
     Honors QUODEQ_EVALUATORS_DIR; unset means ~/.quodeq/evaluators.
     """
-    default = Path.home() / ".quodeq" / "evaluators"
-    return Path((os.environ if env is None else env).get("QUODEQ_EVALUATORS_DIR", str(default)))
+    override = resolve_env(env).get("QUODEQ_EVALUATORS_DIR")
+    if override is not None:
+        return Path(override)
+    return Path.home() / ".quodeq" / "evaluators"

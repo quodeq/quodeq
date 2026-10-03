@@ -4,22 +4,28 @@ from __future__ import annotations
 import sqlite3
 
 from quodeq.data.sqlite._migrations_additive import (
-    _upgrade_v5_to_v6,
-    _upgrade_v6_to_v7,
-    _upgrade_v7_to_v8,
-    _upgrade_v8_to_v9,
+    FINDINGS_TABLE,
+    add_missing_column,
+    table_exists,
+    upgrade_v5_to_v6,
+    upgrade_v6_to_v7,
+    upgrade_v7_to_v8,
+    upgrade_v8_to_v9,
+    upgrade_v9_to_v10,
 )
-from quodeq.data.sqlite._migrations_ddl import _V4_REBUILD_DDL
+from quodeq.data.sqlite._migrations_ddl import V4_REBUILD_DDL
+from quodeq.data.sqlite.errors import SqliteStoreUnreadableError
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
 
-class SchemaVersionError(sqlite3.DatabaseError):
+class SchemaVersionError(SqliteStoreUnreadableError):
     """Raised when the on-disk DB has a newer schema than this binary supports.
 
-    Subclasses ``sqlite3.DatabaseError`` (not bare ``RuntimeError``) so the
-    existing ``except sqlite3.DatabaseError`` guards around evaluation.db reads
-    degrade gracefully when an older binary opens a newer-schema DB, instead of
-    letting the error escape and crash the read.
+    An unreadable-store error (so services fall back to the JSON reports)
+    that is also a ``sqlite3.DatabaseError``, so the driver-level guards
+    around evaluation.db reads degrade gracefully when an older binary
+    opens a newer-schema DB, instead of letting the error escape and crash
+    the read.
     """
 
 
@@ -38,9 +44,7 @@ def _upgrade_v1_to_v2(conn: sqlite3.Connection) -> None:
     name: confidence" and bricks the run (see _upgrade_v4_to_v5 for the same
     guard on exit_reason).
     """
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
-    if "confidence" not in columns:
-        conn.execute("ALTER TABLE findings ADD COLUMN confidence INTEGER NOT NULL DEFAULT 100")
+    add_missing_column(conn, FINDINGS_TABLE, "confidence", "INTEGER NOT NULL DEFAULT 100")
 
 
 def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
@@ -53,6 +57,8 @@ def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
     OperationalError the scoring/dashboard read seams don't catch, permanently
     bricking the run. IF NOT EXISTS makes the re-run a no-op and self-heal.
     """
+    # Frozen v3 snapshot, overlaps _schema.py by design (see _migrations_ddl).
+    # jscpd:ignore-start
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS principle_grades (
             dimension        TEXT NOT NULL,
@@ -67,6 +73,7 @@ def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_principle_grades_dimension ON principle_grades(dimension);
     """)
+    # jscpd:ignore-end
 
 
 def _recover_v4_rebuild_state(conn: sqlite3.Connection) -> None:
@@ -119,10 +126,7 @@ def _invalidate_projection_checkpoint(conn: sqlite3.Connection) -> None:
     does. Skip gracefully in that case; without a checkpoint, ensure_projected
     rebuilds from scratch anyway.
     """
-    has_run_meta = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_meta'"
-    ).fetchone() is not None
-    if has_run_meta:
+    if table_exists(conn, "run_meta"):
         conn.execute(
             "DELETE FROM run_meta WHERE key IN "
             "('projection_checkpoint', 'projection_event_log_size', 'actions_log_projected_size')"
@@ -147,7 +151,7 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
     this function returns.
     """
     _recover_v4_rebuild_state(conn)
-    conn.executescript(_V4_REBUILD_DDL)
+    conn.executescript(V4_REBUILD_DDL)
     _invalidate_projection_checkpoint(conn)
 
 
@@ -163,19 +167,14 @@ def _upgrade_v4_to_v5(conn: sqlite3.Connection) -> None:
     scripts never did. Skip the ALTER in that case; if a future caller
     needs the table they will get the fresh DDL on a new DB.
     """
-    has_dim_scores = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='dimension_scores'"
-    ).fetchone() is not None
-    if has_dim_scores:
+    if table_exists(conn, "dimension_scores"):
         # Idempotency: the ALTER and the PRAGMA user_version bump in
         # apply_evaluation_schema commit separately (autocommit), so a crash
         # in between leaves the column added but the version still 4. Re-running
         # the bare ALTER would then raise "duplicate column name: exit_reason"
         # -- a plain OperationalError the scoring/dashboard read seams don't
         # catch, permanently bricking the run. Skip if the column already exists.
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(dimension_scores)")}
-        if "exit_reason" not in columns:
-            conn.execute("ALTER TABLE dimension_scores ADD COLUMN exit_reason TEXT")
+        add_missing_column(conn, "dimension_scores", "exit_reason", "TEXT")
 
 
 _UPGRADES = {
@@ -183,10 +182,11 @@ _UPGRADES = {
     2: _upgrade_v2_to_v3,
     3: _upgrade_v3_to_v4,
     4: _upgrade_v4_to_v5,
-    5: _upgrade_v5_to_v6,
-    6: _upgrade_v6_to_v7,
-    7: _upgrade_v7_to_v8,
-    8: _upgrade_v8_to_v9,
+    5: upgrade_v5_to_v6,
+    6: upgrade_v6_to_v7,
+    7: upgrade_v7_to_v8,
+    8: upgrade_v8_to_v9,
+    9: upgrade_v9_to_v10,
 }
 
 

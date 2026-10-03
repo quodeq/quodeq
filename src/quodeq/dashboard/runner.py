@@ -17,13 +17,14 @@ if TYPE_CHECKING:
 
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
-from quodeq.dashboard._networking import _choose_ui_port
+from quodeq.dashboard._networking import choose_ui_port
 from quodeq.dashboard._probes import ApiProbes, DashboardHooks
 from quodeq.dashboard import _server as _server_mod
 from quodeq.dashboard._server import (
-    _ensure_action_api,
-    _ensure_action_api_forced,
+    ensure_action_api,
+    ensure_action_api_forced,
 )
+from quodeq.shared.constants import ENV_TRUTHY, PLATFORM_DARWIN
 from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
@@ -60,7 +61,7 @@ def _resolve_paths_and_build(
     reports_dir = resolve_path(str(config.reports_dir))
     repo_root = resolve_path(str(config.repo_root))
 
-    chosen_port = _choose_ui_port(config.server.port)
+    chosen_port = choose_ui_port(config.server.port)
     if chosen_port != config.server.port:
         log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
@@ -109,12 +110,12 @@ def _start_action_api(
     action_api_host = config.server.api_host or _get_default_host()
     action_api_port = config.server.api_port or config.server.port
     if config.server.api_forced:
-        return _ensure_action_api_forced(
+        return ensure_action_api_forced(
             action_api_host, action_api_port, static_dist=api_config.static_dist,
             evaluations_dir=api_config.evaluations_dir, probes=probes,
         )
     hooks.kill_stale(action_api_host, action_api_port)
-    return _ensure_action_api(
+    return ensure_action_api(
         action_api_host, action_api_port, api_config=api_config, probes=probes,
     )
 
@@ -158,7 +159,7 @@ def _maybe_spawn_menubar() -> None:
 
         if control.is_supported() and state.is_enabled():
             control.spawn()
-    except Exception:
+    except ImportError:
         logging.getLogger(__name__).debug("menubar spawn skipped", exc_info=True)
 
 
@@ -169,14 +170,14 @@ def _prepare_frozen_macos_launch() -> bool:
     move-to-Applications prompt when running from the DMG or a translocated
     path. True means the app relaunched from /Applications: exit this process.
     """
-    if not (getattr(sys, "frozen", False) and sys.platform == "darwin"):
+    if not (getattr(sys, "frozen", False) and sys.platform == PLATFORM_DARWIN):
         return False
     try:
         from quodeq.update import first_launch, selfupdate
 
         selfupdate.cleanup_stale_staging()
         return first_launch.offer_move_to_applications()
-    except Exception:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover - defensive
         logging.getLogger(__name__).debug("frozen macOS app preparation failed", exc_info=True)
         return False
 
@@ -187,7 +188,7 @@ def _kick_update_check() -> None:
         from quodeq.update.checker import check_async
 
         check_async()
-    except Exception:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover - defensive
         logging.getLogger(__name__).debug("async update check failed", exc_info=True)
 
 
@@ -197,7 +198,7 @@ def _resolve_environ(
     """Apply config-derived variables to *env* (``os.environ`` by default) and return it."""
     environ: MutableMapping[str, str] = resolve_env_mut(env)
     if config.build.verbose:
-        environ["QUODEQ_VERBOSE"] = "1"
+        environ["QUODEQ_VERBOSE"] = ENV_TRUTHY
     return environ
 
 

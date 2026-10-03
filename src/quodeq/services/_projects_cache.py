@@ -6,8 +6,8 @@ edits feel stale. The cache holds ``ProjectEntry`` entities — serialization
 to the camelCase wire shape happens at the route.
 
 Two independent tiers:
-  * The full/unpaginated payload (``list()`` with no offset/limit) keeps its
-    original single-flight, whole-list caching, unchanged, and used by every
+  * The full/unpaginated payload (``list()`` with no offset/limit) uses
+    single-flight, whole-list caching, used by every
     non-paginated caller (``active_evaluation``, the shared-repo route,
     direct provider callers).
   * A paginated request (offset and/or limit given) instead caches a cheap
@@ -25,8 +25,27 @@ from typing import Any
 
 from quodeq.core.types import ProjectEntry
 from quodeq.services import _fs_project_index, fs_projects
+from quodeq.services.warmup import engine as warmup_engine
 
 _DEFAULT_TTL_S = 5
+
+# (built_at, warm-up generation or None). A tier holding a pending summary is
+# also tied to the warm-up generation, so the UI's poll sees each filled grade
+# as soon as a project finishes warming, without rebuilding the list per poll.
+_Stamp = tuple[float, int | None]
+_COLD: _Stamp = (0.0, None)
+
+
+def _stamp_for(entries: list[ProjectEntry]) -> _Stamp:
+    pending = any(getattr(e, "summary_pending", False) for e in entries)
+    return (time.monotonic(), warmup_engine.generation() if pending else None)
+
+
+def _is_fresh(stamp: _Stamp, ttl_s: int) -> bool:
+    built_at, generation = stamp
+    if time.monotonic() - built_at >= ttl_s:
+        return False
+    return generation is None or generation == warmup_engine.generation()
 
 
 class ProjectsCache:
@@ -40,13 +59,13 @@ class ProjectsCache:
     def __init__(self, ttl_s: int = _DEFAULT_TTL_S) -> None:
         self._ttl_s = ttl_s
         self._payload: dict[str, Any] | None = None
-        self._stamp: float = 0.0
+        self._stamp: _Stamp = _COLD
         self._lock = threading.Lock()
         self._index: list[ProjectEntry] | None = None
         self._index_stamp: float = 0.0
         self._index_lock = threading.Lock()
         self._hydrated: dict[str, ProjectEntry] = {}
-        self._hydrated_stamp: float = 0.0
+        self._hydrated_stamp: _Stamp = _COLD
         self._hydrate_lock = threading.Lock()
 
     def list(self, reports_dir: str, *, offset: int = 0, limit: int = 0) -> dict[str, Any]:
@@ -55,28 +74,22 @@ class ProjectsCache:
         return self._list_all(reports_dir)
 
     def _list_all(self, reports_dir: str) -> dict[str, Any]:
-        if self._is_fresh():
-            return self._payload  # type: ignore[return-value]
+        if (payload := self._fresh_payload()) is not None:
+            return payload
         # Single-flight: requests racing a cold cache wait for the one build
         # in progress instead of each starting their own. The client retries
         # a slow startup request, and the build can take minutes right after
         # an upgrade invalidates the score caches — without this lock those
         # retries multiplied the whole recompute.
         with self._lock:
-            if self._is_fresh():
-                return self._payload  # type: ignore[return-value]
+            if (payload := self._fresh_payload()) is not None:
+                return payload
             projects = fs_projects.build_project_list(Path(reports_dir))
-            # Entities, not wire dicts: the route serializes per request (WS6).
+            # Entities, not wire dicts: the route owns serialization per request.
             # The cached part is the expensive disk walk; camelCase mapping is
             # cheap and belongs at the boundary.
             self._payload = {"projects": projects}
-            # While any summary is still pending (warm-up in flight), leave the
-            # cache cold so the UI's poll sees each newly filled grade. The
-            # build is a pure cache read now, so re-running it is cheap.
-            if any(getattr(p, "summary_pending", False) for p in projects):
-                self._stamp = 0.0
-            else:
-                self._stamp = time.monotonic()
+            self._stamp = _stamp_for(projects)
             return self._payload
 
     def _list_page(self, reports_dir: str, offset: int, limit: int) -> dict[str, Any]:
@@ -86,11 +99,11 @@ class ProjectsCache:
         return {"projects": self._hydrate(reports_dir, window)}
 
     def _get_index(self, reports_dir: str) -> list[ProjectEntry]:
-        if self._index_fresh():
-            return self._index  # type: ignore[return-value]
+        if (index := self._fresh_index()) is not None:
+            return index
         with self._index_lock:
-            if self._index_fresh():
-                return self._index  # type: ignore[return-value]
+            if (index := self._fresh_index()) is not None:
+                return index
             self._index = _fs_project_index.build_project_index(Path(reports_dir))
             self._index_stamp = time.monotonic()
             # A regenerated index may have dropped or renamed ids -- a stale
@@ -116,10 +129,10 @@ class ProjectsCache:
             # truncated or empty page with no error signal (a real race under
             # Flask's default threaded=True).
             #
-            # The index already ran _auto_detect_parents over the WHOLE
+            # The index already ran auto_detect_parents over the WHOLE
             # project set (a windowed re-run couldn't see out-of-window
             # sibling candidates for the path-prefix match), so its .parent
-            # is authoritative. _build_project_entry, which built the cached
+            # is authoritative. build_project_entry, which built the cached
             # entry, only ever reads the raw, unenriched "parent" field off
             # repository_info.json -- propagate the index's value onto each
             # hydrated result rather than silently returning that raw one.
@@ -133,30 +146,42 @@ class ProjectsCache:
         built = _fs_project_index.build_project_entries(Path(reports_dir), missing)
         for entry in built:
             self._hydrated[entry.id] = entry
-        # Same "stay cold while pending" rule as the full-payload tier: a
-        # still-pending summary must not be cached past the warm-up filling it.
-        if any(getattr(e, "summary_pending", False) for e in built):
-            self._hydrated_stamp = 0.0
-        else:
-            self._hydrated_stamp = time.monotonic()
+        # Same rule as the full-payload tier: a still-pending summary must not
+        # be cached past the warm-up filling it.
+        self._hydrated_stamp = _stamp_for(built)
 
     def invalidate(self) -> None:
         """Drop all cached data; next ``list`` call re-reads from disk."""
         with self._lock:
             self._payload = None
-            self._stamp = 0.0
+            self._stamp = _COLD
         with self._index_lock:
             self._index = None
             self._index_stamp = 0.0
         with self._hydrate_lock:
             self._hydrated = {}
-            self._hydrated_stamp = 0.0
+            self._hydrated_stamp = _COLD
 
-    def _is_fresh(self) -> bool:
-        return self._payload is not None and (time.monotonic() - self._stamp) < self._ttl_s
+    def _fresh_payload(self) -> dict[str, Any] | None:
+        """Return the cached payload if still fresh, else None.
 
-    def _index_fresh(self) -> bool:
-        return self._index is not None and (time.monotonic() - self._index_stamp) < self._ttl_s
+        Snapshots ``_payload``/``_stamp`` into locals *before* calling
+        ``time.monotonic()`` -- a concurrent ``invalidate()`` landing inside
+        that call can zero the instance's own ``_stamp``/``_payload``, but
+        the snapshot already taken is immune, so the freshness check and the
+        returned value always agree with each other.
+        """
+        payload, stamp = self._payload, self._stamp
+        if payload is not None and _is_fresh(stamp, self._ttl_s):
+            return payload
+        return None
+
+    def _fresh_index(self) -> list[ProjectEntry] | None:
+        """Same snapshot-before-check shape as ``_fresh_payload``, for the index tier."""
+        index, stamp = self._index, self._index_stamp
+        if index is not None and time.monotonic() - stamp < self._ttl_s:
+            return index
+        return None
 
     def _hydrated_fresh(self) -> bool:
-        return (time.monotonic() - self._hydrated_stamp) < self._ttl_s
+        return _is_fresh(self._hydrated_stamp, self._ttl_s)

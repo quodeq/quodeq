@@ -1,5 +1,8 @@
 // src/quodeq/ui/src/utils/reportBuilder/shared.js
-import { SEVERITY_ORDER } from '../formatters.js';
+import { KNOWN_SEVERITIES } from '../constants.js';
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../../vocab/severity.js';
+import { FINDING_TYPE } from '../../vocab/findingType.js';
+import { roundOneDecimal } from '../rounding.js';
 
 const SNIPPET_MAX_LINES = 5;
 // Short run-id shown in report headers ("**Run:** 3f9c1a2b").
@@ -26,7 +29,7 @@ export function formatDate() {
  */
 export function formatScore(value) {
   if (value == null) return '\u2014';
-  return `${Math.round(parseFloat(value) * 10) / 10}/10`;
+  return `${roundOneDecimal(parseFloat(value))}/10`;
 }
 
 /**
@@ -55,7 +58,7 @@ export function formatViolationEntry(v) {
     const fileRef = v.line != null ? `${v.file}:${v.line}` : v.file;
     lines.push(`- **File:** \`${fileRef}\``);
   }
-  lines.push(`- **Severity:** ${v.severity || 'minor'}`);
+  lines.push(`- **Severity:** ${v.severity || SEVERITY.MINOR}`);
   if (v.reason && v.reason !== title) lines.push(`- **Why:** ${v.reason}`);
   const refs = (v.reqRefs || []).filter((r) => r.url);
   if (refs.length > 0) {
@@ -83,20 +86,20 @@ export function formatPrincipleTable(principleGrades) {
     '|-----------|-------|-------|',
   ];
   for (const pg of principleGrades) {
-    lines.push(`| ${pg.principle || '—'} | ${pg.score || '—'} | ${pg.grade || '—'} |`);
+    lines.push(`| ${pg.principle || '—'} | ${pg.score ?? '—'} | ${pg.grade || '—'} |`);
   }
   return lines.join('\n');
 }
 
 /**
  * Buckets violations by severity, with every known severity present as an
- * empty array so callers can iterate SEVERITY_ORDER without guarding.
+ * empty array so callers can iterate KNOWN_SEVERITIES without guarding.
  */
 export function groupBySeverity(violations) {
   const groups = {};
-  for (const sev of SEVERITY_ORDER) groups[sev] = [];
+  for (const sev of KNOWN_SEVERITIES) groups[sev] = [];
   for (const v of violations) {
-    const s = (v.severity || 'minor').toLowerCase();
+    const s = (v.severity || SEVERITY.MINOR).toLowerCase();
     (groups[s] || (groups[s] = [])).push(v);
   }
   return groups;
@@ -120,7 +123,7 @@ export function buildViolationsSection({ total, bySeverity, severityFilter }) {
     lines.push('');
     return lines;
   }
-  for (const sev of SEVERITY_ORDER) {
+  for (const sev of KNOWN_SEVERITIES) {
     if (!severityMatches(severityFilter, sev)) continue;
     const vs = bySeverity?.[sev] || [];
     if (vs.length === 0) continue;
@@ -151,7 +154,7 @@ export function runSuffix(runId) {
  * @returns {boolean}
  */
 export function severityMatches(severityFilter, severity) {
-  return !severityFilter || severityFilter === 'all' || severityFilter === severity;
+  return !severityFilter || severityFilter === SEVERITY_FILTER_ALL || severityFilter === severity;
 }
 
 /**
@@ -162,7 +165,7 @@ export function severityMatches(severityFilter, severity) {
  * @returns {boolean}
  */
 export function showsCompliance(severityFilter) {
-  return severityMatches(severityFilter, 'compliance');
+  return severityMatches(severityFilter, FINDING_TYPE.COMPLIANCE);
 }
 
 /**

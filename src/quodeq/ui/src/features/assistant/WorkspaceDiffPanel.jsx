@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { t } from '../../strings/index.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
-import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';
+import { useWorkspaceDiff, WORKSPACE_OUTCOME } from './hooks/useWorkspaceDiff.js';
+import { DIALOG_VARIANT } from '../../vocab/dialogVariant.js';
 
 export function classifyDiffLine(line) {
   if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) return 'wsdiff-file';
@@ -11,13 +12,44 @@ export function classifyDiffLine(line) {
   return 'wsdiff-ctx';
 }
 
+// Diff lines mounted at once. The backend caps a diff at 2 MB of text but not
+// by line count, so one diff can mean tens of thousands of spans. Past this
+// the panel asks before mounting more. Not virtualized: what is shown stays
+// one <pre>, so select, copy and find keep working.
+export const DIFF_LINE_RENDER_CAP = 2000;
+
+// Lines to show for this diff. The expansion is remembered per diff string,
+// so a Refresh that brings a new diff starts from the cap again.
+function useDiffLineWindow(diff) {
+  const lines = useMemo(() => {
+    if (diff === null) return [];
+    const split = diff.split('\n');
+    // A trailing newline in the diff text produces one extra empty element
+    // at the end of split(); that is not a real line, so drop it. Without
+    // this a 2000-line diff (which always ends with a newline) reads
+    // "Showing 2000 of 2001 lines" and shows a needless Show more button.
+    if (diff.endsWith('\n')) split.pop();
+    return split;
+  }, [diff]);
+  const [expanded, setExpanded] = useState({ diff: null, count: DIFF_LINE_RENDER_CAP });
+  const limit = expanded.diff === diff ? expanded.count : DIFF_LINE_RENDER_CAP;
+  const shownCount = Math.min(lines.length, limit);
+  const rendered = useMemo(() => lines.slice(0, shownCount).map((line, i) => (
+    // eslint-disable-next-line react/no-array-index-key
+    <span key={i} className={classifyDiffLine(line)}>{line}{'\n'}</span>
+  )), [lines, shownCount]);
+  const isFinalPage = shownCount + DIFF_LINE_RENDER_CAP >= lines.length;
+  const showMore = () => setExpanded({ diff, count: shownCount + DIFF_LINE_RENDER_CAP });
+  return { rendered, shownCount, totalCount: lines.length, showMore, isFinalPage };
+}
+
 function WorkspaceDiffOutcome({ outcome }) {
   return (
     <div className="workspace-diff">
       <p className="workspace-diff-outcome" role="status" aria-live="polite">
-        {outcome.kind === 'applied' && t('assistant.outcomeApplied')}
-        {outcome.kind === 'discarded' && t('assistant.outcomeDiscarded')}
-        {outcome.kind === 'pr' && (outcome.prUrl
+        {outcome.kind === WORKSPACE_OUTCOME.APPLIED && t('assistant.outcomeApplied')}
+        {outcome.kind === WORKSPACE_OUTCOME.DISCARDED && t('assistant.outcomeDiscarded')}
+        {outcome.kind === WORKSPACE_OUTCOME.PR && (outcome.prUrl
           ? <>{t('assistant.prCreated')} <a href={outcome.prUrl} target="_blank" rel="noreferrer">{outcome.prUrl}</a></>
           : (outcome.message || t('assistant.outcomeBranchKept')))}
       </p>
@@ -26,15 +58,17 @@ function WorkspaceDiffOutcome({ outcome }) {
 }
 
 function WorkspaceDiffBody({ diff, truncated, error, empty }) {
-  const diffLines = useMemo(() => {
-    if (diff === null) {
-      return [];
-    }
-    return diff.split('\n').map((line, i) => (
-      // eslint-disable-next-line react/no-array-index-key
-      <span key={i} className={classifyDiffLine(line)}>{line}{'\n'}</span>
-    ));
-  }, [diff]);
+  const { rendered, shownCount, totalCount, showMore, isFinalPage } = useDiffLineWindow(diff);
+  const capped = shownCount < totalCount;
+  const preRef = useRef(null);
+
+  const handleShowMore = () => {
+    const wasFinalPage = isFinalPage;
+    showMore();
+    // The button that triggered this unmounts once the diff is no longer
+    // capped. Move focus to the diff itself so it does not fall to <body>.
+    if (wasFinalPage) preRef.current?.focus();
+  };
 
   return (
     <>
@@ -47,9 +81,18 @@ function WorkspaceDiffBody({ diff, truncated, error, empty }) {
       {diff === null && !error && <p aria-live="polite">{t('assistant.loadingDiff')}</p>}
       {empty && <p className="workspace-diff-empty">{t('assistant.noChanges')}</p>}
       {diff !== null && !empty && (
-        <pre className="workspace-diff-body">
-          {diffLines}
-        </pre>
+        <>
+          {/* Pre-mounted so a screen reader announces the count change on
+              every Show more, including the last one, instead of hearing
+              nothing when the note would otherwise unmount. */}
+          <p className="workspace-diff-warning" aria-live="polite">
+            {capped ? t('assistant.diffShowingLines', { shown: shownCount, total: totalCount }) : ''}
+          </p>
+          <pre className="workspace-diff-body" ref={preRef} tabIndex={-1}>{rendered}</pre>
+          {capped && (
+            <button type="button" onClick={handleShowMore}>{t('assistant.diffShowMore')}</button>
+          )}
+        </>
       )}
     </>
   );
@@ -75,7 +118,7 @@ function WorkspaceDiffActions({ diff, empty, busy, prOpen, setPrOpen, prTitle, s
             const ok = await confirmDialog({
               title: t('assistant.discardConfirmTitle'),
               message: t('assistant.discardConfirmMessage'),
-              variant: 'danger',
+              variant: DIALOG_VARIANT.DANGER,
             });
             if (!ok) return;
             discard();

@@ -1,5 +1,5 @@
 import { ViolationsCellBody } from './severityCells.jsx';
-import TrendBadge from '../../../components/TrendBadge.jsx';
+import CompareDeltaBadge from './CompareDeltaBadge.jsx';
 import CompareTrendLine from './CompareTrendLine.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
@@ -11,6 +11,7 @@ import { nf, score1 } from '../compareFormatters.js';
 /* Score, 30-day spark + delta, violations split by severity, ratio and
    freshness — everything a row shows once it has a score. */
 function ProjectRowStats({ row }) {
+  const ratioTip = t('compare.ratioTip', { pass: nf(row.totalCompliance), checks: nf(row.totalCompliance + row.totalViolations) });
   return (
     <>
       {/* Number + grade colour only — the tier word ("good",
@@ -20,25 +21,19 @@ function ProjectRowStats({ row }) {
       </span>
       <span className="compare-row__trend">
         {row.spark.length > 1 && <CompareTrendLine scores={row.spark} />}
-        {row.delta != null ? (
-          <TrendBadge delta={row.delta} />
-        ) : row.lastDelta != null ? (
-          <span className="compare-delta--old" title={t('compare.oldDeltaTip')}>
-            <TrendBadge delta={row.lastDelta} />
-          </span>
-        ) : null}
+        <CompareDeltaBadge delta={row.delta} lastDelta={row.lastDelta} />
       </span>
       {/* Severity split on wide views; small tiers swap it for the
           bare total (see the small-view tiers in compare.css). */}
       <span
         className="compare-row__viol"
-        title={t('compare.ratioTip', { pass: nf(row.totalCompliance), checks: nf(row.totalCompliance + row.totalViolations) })}
+        title={ratioTip}
       >
         <ViolationsCellBody total={row.totalViolations} severity={row.severity} />
       </span>
       <span
         className="compare-row__ratio"
-        title={t('compare.ratioTip', { pass: nf(row.totalCompliance), checks: nf(row.totalCompliance + row.totalViolations) })}
+        title={ratioTip}
       >
         {complianceRatio(row.totalViolations, row.totalCompliance)}
       </span>

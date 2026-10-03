@@ -1,4 +1,4 @@
-"""Bounded-read behavior for the run index (findings 5396, 5397, 5390).
+"""Bounded-read behavior for the run index.
 
 Split from test_run_index.py (already at 408 lines) rather than growing it.
 """

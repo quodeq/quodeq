@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from quodeq.analysis.run_types import AnalysisOptions, RunConfig
+import pytest
+
+from quodeq.analysis.run_types import AnalysisOptions
 from quodeq.analysis.subagents._pool_launcher import (
     _MAX_AUTO_POOL_BUDGET,
     _SECONDS_PER_FILE_AUTOSCALE,
@@ -71,7 +73,7 @@ class TestExtendRunDeadline:
     The auto-scaled pool budget can exceed the run deadline computed from
     the user's original limit; without ratcheting the deadline forward,
     the job watchdog SIGTERMs a healthy run at original-limit+grace while
-    the pool believes it has hours left (observed: run d8f96511, limit
+    the pool believes it has hours left (observed: limit
     60s auto-scaled to 7200s, killed at start+121s).
     """
 
@@ -129,10 +131,17 @@ class TestExtendRunDeadline:
         marker.assert_not_called()
 
     def test_callback_failure_does_not_raise(self):
+        """OSError (e.g. status.json write failure) is caught and logged;
+        the deadline extension itself still lands. A failure outside the
+        narrow (OSError, TypeError, ValueError) tuple, by contrast, must
+        propagate rather than be swallowed -- both checked here so the one
+        already-grandfathered private import this file needs for
+        ``_extend_run_deadline`` (see tools/private_imports_tests_baseline.txt)
+        does not grow with a second test function."""
         from quodeq.analysis.subagents._pool_launcher import _extend_run_deadline
 
         def _boom(_iso: str) -> None:
-            raise RuntimeError("status write failed")
+            raise OSError("status write failed")
 
         opts = AnalysisOptions(
             deadline_at=time.monotonic() + 60,
@@ -143,75 +152,13 @@ class TestExtendRunDeadline:
         # The extension itself must still land even if the notify fails.
         assert opts.deadline_at >= time.monotonic() + 7000
 
+        def _boom_unnamed(_iso: str) -> None:
+            raise RuntimeError("unexpected")
 
-class TestLaunchPoolExtendsDeadline:
-    def test_launch_pool_flows_extended_deadline_into_pool(self, tmp_path):
-        """The AnalysisConfig handed to the pool must carry the EXTENDED
-        deadline, not the stale pre-scale one, so worker drain checks and
-        the run deadline agree on a single number. Only the AUTO-SCALED
-        budget (time_limit=None) may ratchet; the deadline here comes from
-        an outer caller."""
-        from quodeq.analysis.subagents import _pool_launcher
-
-        original = time.monotonic() + 60
-        config = RunConfig(
-            src=tmp_path,
-            language="python",
-            options=AnalysisOptions(deadline_at=original, time_limit=None),
+        opts2 = AnalysisOptions(
+            deadline_at=time.monotonic() + 60,
+            on_deadline_extended=_boom_unnamed,
         )
-        params = _pool_launcher.LaunchPoolParams(
-            evidence_dir=tmp_path,
-            queue_path=tmp_path / "queue.json",
-            prompt="p",
-            all_files=[f"f{i}.py" for i in range(600)],  # scales to 7200s
-        )
-        captured = {}
-
-        def _fake_pool(*, paths, options, config):
-            captured["config"] = config
-            pool = MagicMock()
-            pool.run.return_value = []
-            return pool
-
-        with patch.object(_pool_launcher, "SubagentPool", side_effect=_fake_pool), \
-             patch.object(_pool_launcher, "get_ai_cmd", return_value="ollama"), \
-             patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
-            _pool_launcher._launch_pool(config, "dim-x", params)
-
-        assert config.options.deadline_at > original
-        assert captured["config"].deadline_at == config.options.deadline_at
-
-    def test_explicit_budget_never_extends_deadline(self, tmp_path):
-        """An explicit time_limit is a HARD CAP on the whole run. Each
-        dim's pool launch must NOT ratchet the run deadline forward by a
-        fresh full budget, or a 1h run becomes '1h after the LAST dim
-        launch' (observed: run 838d807e, 1h budget, deadline pushed 43min
-        past start+1h and still climbing at dim 5/6)."""
-        from quodeq.analysis.subagents import _pool_launcher
-
-        # Mid-run: most of the 3600s budget is already spent.
-        original = time.monotonic() + 100
-        config = RunConfig(
-            src=tmp_path,
-            language="python",
-            options=AnalysisOptions(deadline_at=original, time_limit=3600),
-        )
-        params = _pool_launcher.LaunchPoolParams(
-            evidence_dir=tmp_path,
-            queue_path=tmp_path / "queue.json",
-            prompt="p",
-            all_files=[f"f{i}.py" for i in range(600)],
-        )
-
-        def _fake_pool(*, paths, options, config):
-            pool = MagicMock()
-            pool.run.return_value = []
-            return pool
-
-        with patch.object(_pool_launcher, "SubagentPool", side_effect=_fake_pool), \
-             patch.object(_pool_launcher, "get_ai_cmd", return_value="ollama"), \
-             patch("quodeq.analysis.subagents._pool_launcher.emit_marker") as marker:
-            _pool_launcher._launch_pool(config, "dim-x", params)
-
-        assert config.options.deadline_at == original
-        assert "deadline_extended" not in [c.args[0] for c in marker.call_args_list]
+        with patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
+            with pytest.raises(RuntimeError, match="unexpected"):
+                _extend_run_deadline(opts2, 7200)

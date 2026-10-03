@@ -16,6 +16,10 @@ Quodeq evaluates code across six dimensions derived from the ISO/IEC 25010 softw
 - **Clean Architecture** layer separation, dependency rules, import direction, boundary enforcement.
 - **DDD Design** domain modeling, bounded contexts, aggregates, value objects, ubiquitous language.
 
+### Accessibility (opt-in)
+
+- **Accessibility** WCAG 2.2 A and AA as applied to software by EN 301 549: text alternatives, contrast, text scaling, focus, target size, screen reader semantics and platform settings, for Android, iOS and web.
+
 These ship **disabled by default**. Open *Standards* and click the `icon:eye` eye on the dimension card to enable them. Once visible, they appear in Evaluate and Overview alongside the ISO six.
 
 ### Showing and hiding dimensions

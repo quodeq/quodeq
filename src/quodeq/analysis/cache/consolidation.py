@@ -17,6 +17,8 @@ import logging
 from pathlib import Path
 
 from quodeq.analysis.cache.backend import CacheBackend
+from quodeq.core.run.state import RunState
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ def _run_reached_done(run_dir: Path) -> bool:
         data = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    return isinstance(data, dict) and data.get("state") == "done"
+    return isinstance(data, dict) and data.get("state") == RunState.DONE
 
 
 def _collect_keys(evidence_dir: Path) -> set[str]:
@@ -61,6 +63,16 @@ def _collect_keys(evidence_dir: Path) -> set[str]:
             if isinstance(data, dict):
                 keys.update(str(value) for value in data.values())
     return keys
+
+
+def _consolidate_one(cache: CacheBackend, key: str) -> bool:
+    """Flip *key*'s cache entry to consolidated. Returns whether it was flipped."""
+    entry = cache.get(key)
+    if entry is None or entry.consolidated:
+        return False
+    entry.consolidated = True
+    cache.put(key, entry)
+    return True
 
 
 def mark_run_consolidated(
@@ -92,19 +104,16 @@ def mark_run_consolidated(
             cache = LocalFileBackend()
         flipped = 0
         for key in sorted(keys):
-            try:
-                entry = cache.get(key)
-                if entry is None or entry.consolidated:
-                    continue
-                entry.consolidated = True
-                cache.put(key, entry)
+            did_flip = run_isolated(
+                lambda key=key: _consolidate_one(cache, key),
+                label=f"consolidate cache entry {key}", log=_logger,
+            )
+            if did_flip:
                 flipped += 1
-            except Exception as exc:  # noqa: BLE001 — one bad entry must not stop the rest
-                _logger.warning("Could not consolidate cache entry %s: %s", key, exc)
         _logger.info(
             "cache: consolidated %d entries for run %s", flipped, run_dir.name,
         )
-    except Exception:  # noqa: BLE001 — post-scan side effect, never propagates
+    except (OSError, ValueError):  # post-scan side effect, never propagates
         _logger.warning(
             "Consolidation pass failed for %s (evaluation results are safe)",
             run_dir, exc_info=True,

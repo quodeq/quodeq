@@ -17,7 +17,7 @@ from __future__ import annotations
 # no longer evaluates; the run-fingerprint could never invalidate them, so this
 # bump rebuilds them once against the latest run's configured-dimension set.
 # "4": earlier writers persisted in-progress runs' PARTIAL run_keys sets (the
-# per-run version path had no completeness gate), which load_run_keys froze
+# per-run version path had no completeness gate), which the persisted run_keys froze
 # forever; the gate now persists only terminal runs, and this bump purges the
 # non-version-keyed run_keys table once so stranded partial snapshots rebuild.
 # "5": dismiss/delete rescoring switched basis from the legacy report-JSON
@@ -36,4 +36,28 @@ from __future__ import annotations
 # fingerprint) (#1165). Cached run_keys rows hold line keys only, so the
 # per-run scoped version could not see a fingerprinted dismissal touch a run;
 # this bump purges them so they rebuild with both key shapes.
-CACHE_WRITER_EPOCH = "7"
+# "8": run_scalars rows now store each dimension's counts (violations,
+# severities, open types) next to its score; rows written by the prior writer
+# have none, which History rendered as 0 majors and 0 types for every finished
+# run. This bump retires them so they rebuild with the counts.
+# "9": run_scalars rows gained a companion table, run_principle_scalars, with
+# each dimension's principle scores and grades at the same version. Rows
+# written by the prior writer have no principle rows, and a reader cannot tell
+# that from a dimension without principles. This bump retires them so every
+# cached run carries its principles.
+# "10": run_scalars rows gained files_read, which the accumulated walk reads
+# to skip coverage-0 stubs when it picks a dimension's winning run from rows.
+# A NULL on an older row would read as "unknown, trusted", so they are retired.
+# "12": run_scalars rows gained dismissed_count and suppressed_count, which
+# the Overview dashboard shows next to each gauge now that it serves the
+# selected run from rows. A NULL on an older row would read as "nothing
+# hidden" for a run whose findings were suppressed, so they are retired.
+CACHE_WRITER_EPOCH = "12"
+
+# Shape of the ``run_keys`` rows, versioned apart from the epoch because the key
+# sets are the costly part of a rebuild and most epoch bumps change only score
+# rows. Bump it (not only the epoch) when the stored key sets change meaning, as
+# epochs "4" (partial snapshots) and "7" (fingerprint keys) did; the table is
+# purged once. A cache from epoch "7" or later already holds shape "1".
+RUN_KEYS_SHAPE_VERSION = "1"
+RUN_KEYS_SHAPE_SINCE_EPOCH = 7

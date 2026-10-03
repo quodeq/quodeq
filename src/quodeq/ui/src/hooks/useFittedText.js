@@ -18,6 +18,10 @@
 import { useLayoutEffect, useState } from 'react';
 import { fitMiddleTruncate, fitEndTruncate, cssFontFromElement } from '../utils/pretext.js';
 
+// 'middle' (the other options.mode value) preserves both ends; 'end'
+// preserves the head — see the JSDoc above.
+const TRUNCATE_MODE_END = 'end';
+
 /**
  * @param {React.RefObject<HTMLElement>} ref
  * @param {string | null | undefined} text
@@ -42,7 +46,7 @@ export default function useFittedText(ref, text, options = {}) {
       return undefined;
     }
 
-    const fitter = options.mode === 'end' ? fitEndTruncate : fitMiddleTruncate;
+    const fitter = options.mode === TRUNCATE_MODE_END ? fitEndTruncate : fitMiddleTruncate;
 
     const compute = () => {
       const font = options.font || cssFontFromElement(el);

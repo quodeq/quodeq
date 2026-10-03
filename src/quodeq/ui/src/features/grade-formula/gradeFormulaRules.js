@@ -15,6 +15,10 @@
  * unchanged. `draft` is the PRE-patch state; the other floor's current
  * value is what an incoming edit clamps against, matching the sliders'
  * previous inline behaviour.
+ *
+ * @param {Object} draft - the pre-patch grade-formula draft state.
+ * @param {Object} patch - the incoming patch to merge into the draft.
+ * @returns {Object} the patch, clamped when it touches either floor.
  */
 export function clampFloors(draft, patch) {
   if (!draft || !patch) return patch;

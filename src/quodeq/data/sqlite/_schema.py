@@ -1,7 +1,7 @@
-"""DDL strings for evaluation.db. Constants only — no logic."""
+"""SQL strings for evaluation.db. Constants only — no logic."""
 from __future__ import annotations
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 _DDL_BODY = """
 CREATE TABLE findings (
@@ -107,4 +107,74 @@ CREATE TABLE principle_grades (
 CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
-EVALUATION_DDL = f"PRAGMA user_version = {SCHEMA_VERSION};\n" + _DDL_BODY
+
+# The one INSERT for a findings row. Both writers (the repository and the
+# projection's state store) bind the same named columns, so the column list
+# lives next to the table it has to match.
+INSERT_FINDING_SQL = """
+INSERT OR IGNORE INTO findings (
+    schema_version, practice_id, dimension, requirement, verdict, severity,
+    file, line, end_line, title, reason, snippet,
+    violation_type, violation_type_raw, context, scope, req_refs_json, dedup_key, confidence,
+    provenance_downgrade, scope_downgrade_json
+) VALUES (
+    :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
+    :file, :line, :end_line, :title, :reason, :snippet,
+    :violation_type, :violation_type_raw, :context, :scope, :req_refs_json, :dedup_key, :confidence,
+    :provenance_downgrade, :scope_downgrade_json
+)
+"""
+
+# state_store.py clears this table from three call sites (clear_all,
+# write_grades, clear_grades); one literal avoids drift on a rename.
+DELETE_DIMENSION_SCORES_SQL = "DELETE FROM dimension_scores"
+
+
+# A finding the standard cannot place is kept here, never in ``findings`` with
+# an empty principle: findings are graded by principle, and an empty one used
+# to be scored as a principle of its own. The trigger makes that impossible.
+UNMAPPED_TABLE_DDL = """
+CREATE TABLE IF NOT EXISTS unmapped_findings (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    dimension       TEXT NOT NULL DEFAULT '',
+    requirement     TEXT,
+    principle_hint  TEXT NOT NULL DEFAULT '',
+    verdict         TEXT NOT NULL,
+    severity        TEXT NOT NULL DEFAULT '',
+    file            TEXT NOT NULL DEFAULT '',
+    line            INTEGER NOT NULL DEFAULT 0,
+    title           TEXT NOT NULL DEFAULT '',
+    reason          TEXT NOT NULL DEFAULT '',
+    snippet         TEXT NOT NULL DEFAULT '',
+    unmapped_reason TEXT NOT NULL,
+    dedup_key       TEXT NOT NULL UNIQUE,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_unmapped_dimension ON unmapped_findings(dimension);
+"""
+
+PRINCIPLE_TRIGGERS_DDL = """
+CREATE TRIGGER IF NOT EXISTS findings_require_principle
+BEFORE INSERT ON findings WHEN NEW.practice_id = '' BEGIN
+    SELECT RAISE(ABORT, 'findings.practice_id must name a principle; unplaced findings go to unmapped_findings');
+END;
+CREATE TRIGGER IF NOT EXISTS findings_keep_principle
+BEFORE UPDATE OF practice_id ON findings WHEN NEW.practice_id = '' BEGIN
+    SELECT RAISE(ABORT, 'findings.practice_id must name a principle');
+END;
+"""
+
+INSERT_UNMAPPED_SQL = """
+INSERT OR IGNORE INTO unmapped_findings (
+    dimension, requirement, principle_hint, verdict, severity, file, line,
+    title, reason, snippet, unmapped_reason, dedup_key
+) VALUES (
+    :dimension, :requirement, :principle_hint, :verdict, :severity, :file, :line,
+    :title, :reason, :snippet, :unmapped_reason, :dedup_key
+)
+"""
+
+EVALUATION_DDL = (
+    f"PRAGMA user_version = {SCHEMA_VERSION};\n" + _DDL_BODY + UNMAPPED_TABLE_DDL + PRINCIPLE_TRIGGERS_DDL
+)

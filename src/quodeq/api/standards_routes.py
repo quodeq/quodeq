@@ -16,6 +16,7 @@ from quodeq.api.standards_import_routes import register_import_routes
 from quodeq.api.standards_overrides_routes import register_overrides_routes
 from quodeq.api.standards_read_routes import register_read_routes
 from quodeq.api.standards_visibility_routes import register_visibility_routes
+from quodeq.api.routes_common import standards_compiled_dir
 from quodeq.services.standards import StandardsService
 from quodeq.services.standards_library import StandardsLibraryClient, UrllibJsonClient
 
@@ -31,7 +32,7 @@ def _get_service(app: Flask) -> StandardsService:
     if not hasattr(app, "_standards_service"):
         app._standards_service = StandardsService(
             evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
-            compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+            compiled_dir=standards_compiled_dir(app),
             dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
         )
     return app._standards_service

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useSharedProjects } from './useSharedProjects.js';
 import { usePublish } from './usePublish.js';
 import { useMergedProjects } from './useMergedProjects.js';
+import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
 
 /**
  * Groups projects into parent/child buckets so subprojects render nested
@@ -11,7 +12,7 @@ import { useMergedProjects } from './useMergedProjects.js';
 export function computeProjectTree(projects) {
   const lookup = {};
   for (const p of projects) {
-    const id = p.id || p.name || p;
+    const id = projectIdOrSelf(p);
     const name = p.name || p;
     lookup[id] = p;
     lookup[name] = p;
@@ -43,7 +44,7 @@ function useProjectsWithPublished(projects, sharedConfigured, publishedAtByProje
   return useMemo(() => {
     if (!sharedConfigured || Object.keys(publishedAtByProject).length === 0) return projects;
     return projects.map((p) => {
-      const id = p.id || p.name || p;
+      const id = projectIdOrSelf(p);
       const publishedAt = publishedAtByProject[id];
       return publishedAt ? { ...p, publishedAt } : p;
     });
@@ -58,7 +59,7 @@ function useProjectTree(projectsWithPublished) {
   const childIdSet = useMemo(() => {
     const set = new Set();
     for (const list of Object.values(children)) {
-      for (const c of list) set.add(c.id || c.name || c);
+      for (const c of list) set.add(projectIdOrSelf(c));
     }
     return set;
   }, [children]);
@@ -79,7 +80,7 @@ function useLocalEntryById(allEntries, sharedConfigured) {
     for (const e of allEntries) {
       if (e.local) {
         map.set(
-          e.local.id || e.local.name || e.local,
+          projectIdOrSelf(e.local),
           sharedConfigured ? e : { ...e, chips: null },
         );
       }
@@ -103,7 +104,7 @@ function useFilteredEntries(locationFilteredEntries, query, children) {
     return locationFilteredEntries.filter((e) => {
       if (matches(e.displayName, e.name)) return true;
       if (!e.local) return false;
-      const localId = e.local.id || e.local.name || e.local;
+      const localId = projectIdOrSelf(e.local);
       const childList = children[localId];
       return !!childList && childList.some((c) => matches(c.displayName, c.name));
     });
@@ -158,8 +159,7 @@ function useEntryLists(projectsWithPublished, shared, filters) {
 /**
  * The full merge/filter pipeline that backs ProjectsPage's render: shared
  * project sync, publish state, the local/shared merge (unfiltered and
- * location-filtered), subproject nesting, and the query filter. Extracted
- * verbatim (same hooks, same deps, same order) from ProjectsPage's body.
+ * location-filtered), subproject nesting, and the query filter.
  */
 export function useProjectsPageData({ projects, filters }) {
   const { shared, sharedConfigured, publishedAtByProject, publishState, publishingProject, publishError, publishErrorProject, publish } = useSharedAndPublish(projects);
@@ -192,7 +192,7 @@ export function useProjectsPageData({ projects, filters }) {
   // Child (subproject) entries render nested under their root via
   // ProjectCardGroup/ProjectChildren, not as their own top-level card.
   const visibleEntries = entries.filter(
-    (e) => !(e.local && childIdSet.has(e.local.id || e.local.name || e.local)),
+    (e) => !(e.local && childIdSet.has(projectIdOrSelf(e.local))),
   );
 
   return { shared, children, localEntryById, publishActions, isEmpty, visibleEntries };

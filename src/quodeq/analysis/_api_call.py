@@ -7,25 +7,30 @@ from __future__ import annotations
 import functools
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
+from typing import Any, TYPE_CHECKING
 
 import httpx
 import openai
 
-from quodeq.analysis._api_response import _finish_call, _repair_snippetless
-from quodeq.analysis._api_schema import _SYSTEM_PROMPT
-from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
-from quodeq.config.analysis_env import (
-    api_read_timeout_override, context_size_override, max_output_tokens_override,
+from quodeq.analysis._api_response import finish_call, repair_snippetless
+from quodeq.analysis._api_schema import SYSTEM_PROMPT
+from quodeq.analysis._drop_stats import DropStatsCounter
+from quodeq.analysis.errors import (
+    REASON_PAYMENT, REASON_QUOTA, FatalProviderError, classify_fatal_provider_message,
 )
 from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL, OLLAMA_DEFAULT_PORT
 from quodeq.shared.url_validation import validate_url_safe
 
+if TYPE_CHECKING:
+    from quodeq.analysis.run_types import RunConfig
+
 _log = logging.getLogger(__name__)
 
 _OLLAMA_DEFAULT_BASE = f"{OLLAMA_DEFAULT_BASE_URL}/v1"
-_OLLAMA_DEFAULT_API_KEY = "ollama"
+_OLLAMA_PUBLIC_PLACEHOLDER_KEY = "ollama"
 _OPENAI_API_HOST = "api.openai.com"
 _LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
 # Cloud calls get a finite timeout too: with max_retries=0 a stalled response
@@ -38,6 +43,10 @@ _CLOUD_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
 # capped response arrives with finish_reason=length and takes the existing
 # lossy path (error marker, re-dispatch next run), so nothing is silently lost.
 _DEFAULT_LOCAL_MAX_TOKENS = 8192
+
+# Distinct base URLs the one-warning-per-base cache below remembers; a run
+# configures a handful of providers at most.
+_WARN_CACHE_MAX_BASES = 8
 
 
 @dataclass(frozen=True)
@@ -52,9 +61,24 @@ class ApiRunnerConfig:
     context_size: int = 0
     n_subagents: int = 1
     """Pool size this call competes with; scales the local read timeout."""
+    # Operator overrides, resolved from the environment by the caller that
+    # builds this config (``_api_batch.build_batch_api_config``), never here.
+    max_tokens_override: int | None = None
+    """QUODEQ_MAX_OUTPUT_TOKENS: replaces the local default cap; 0 disables it."""
+    read_timeout_s: int | None = None
+    """QUODEQ_API_READ_TIMEOUT: a positive value replaces the read budget outright."""
+    repair_enabled: bool = True
+    """False (QUODEQ_DISABLE_FINDING_REPAIR) skips the snippet repair re-ask."""
+    run_config: "RunConfig | None" = None
+    """The run's RunConfig, so ``finish_call`` records drops on its shared
+    drop counter. ``None`` (legacy/direct callers) falls back to the
+    module-default counter. Filled by ``build_batch_api_config``."""
+    drop_counter: "DropStatsCounter | None" = None
+    """Checked before ``run_config.drop_counter`` -- lets a caller that leaves
+    ``run_config`` unset (the fallback/consolidated builders) still reach it."""
 
 
-@functools.lru_cache(maxsize=8)
+@functools.lru_cache(maxsize=_WARN_CACHE_MAX_BASES)
 def _warn_ollama_ctx_noop(api_base: str) -> None:
     """One warning per base URL: Ollama's /v1 endpoint ignores num_ctx
     (top-level and nested options alike, verified on 0.33.1), so a configured
@@ -73,14 +97,14 @@ def _resolve_max_tokens(config: ApiRunnerConfig, *, is_openai: bool) -> int | No
     """Output budget for one completion call.
 
     Explicit config wins; otherwise local calls get a default cap and cloud
-    calls stay uncapped. QUODEQ_MAX_OUTPUT_TOKENS overrides the local default
-    (0 disables the cap).
+    calls stay uncapped. ``max_tokens_override`` (QUODEQ_MAX_OUTPUT_TOKENS)
+    replaces the local default (0 disables the cap).
     """
     if config.max_tokens is not None:
         return config.max_tokens
     if is_openai:
         return None
-    override = max_output_tokens_override()
+    override = config.max_tokens_override
     if override is not None:
         return override or None
     return _DEFAULT_LOCAL_MAX_TOKENS
@@ -94,10 +118,11 @@ def _resolve_timeout(config: ApiRunnerConfig, *, is_openai: bool) -> httpx.Timeo
     a fixed budget times out queued-but-healthy calls, and each timeout burns
     the whole budget for zero findings. Scale the read budget linearly with N.
     Cloud backends parallelize, so their budget stays fixed.
-    QUODEQ_API_READ_TIMEOUT (whole seconds) overrides the read budget outright.
+    ``read_timeout_s`` (QUODEQ_API_READ_TIMEOUT, whole seconds) overrides the
+    read budget outright.
     """
     base = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
-    override = api_read_timeout_override()
+    override = config.read_timeout_s
     if override is not None and override > 0:
         read = float(override)
     else:
@@ -126,10 +151,10 @@ def _classify_fatal_api_error(exc: Exception) -> tuple[str, str] | None:
         return "auth", "permission denied (403)"
     if isinstance(exc, openai.APIStatusError):
         if exc.status_code == HTTPStatus.PAYMENT_REQUIRED:
-            return "payment", "out of credits (402 payment required)"
+            return REASON_PAYMENT, "out of credits (402 payment required)"
         if exc.status_code == HTTPStatus.TOO_MANY_REQUESTS:
             reason = classify_fatal_provider_message(str(exc))
-            if reason in ("quota", "payment"):
+            if reason in (REASON_QUOTA, REASON_PAYMENT):
                 return reason, "quota/credits exhausted (429)"
     return None
 
@@ -147,8 +172,6 @@ def _build_create_kwargs(prompt: str, config: ApiRunnerConfig) -> tuple[dict, bo
     if not is_openai:
         extra_body["chat_template_kwargs"] = {"enable_thinking": False}
     ctx_size = config.context_size
-    if ctx_size <= 0:
-        ctx_size = context_size_override() or 0
     if ctx_size > 0:
         # Kept for proxies (LiteLLM-style) that forward it to Ollama's native
         # API; direct Ollama ignores it on /v1, hence the warning.
@@ -160,7 +183,7 @@ def _build_create_kwargs(prompt: str, config: ApiRunnerConfig) -> tuple[dict, bo
     create_kwargs: dict = dict(
         model=config.model,
         messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
         temperature=config.temperature,
@@ -210,7 +233,19 @@ def _handle_call_exception(exc: Exception, config: ApiRunnerConfig, start: float
         )
 
 
-def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
+def _resolve_drop_counter(config: ApiRunnerConfig) -> DropStatsCounter | None:
+    """Config's own counter, then run_config's, then None (module default)."""
+    if config.drop_counter is not None:
+        return config.drop_counter
+    return config.run_config.drop_counter if config.run_config is not None else None
+
+
+def call_api(
+    prompt: str,
+    config: ApiRunnerConfig,
+    *,
+    client_factory: Callable[..., Any] | None = None,
+) -> tuple[list[dict], bool]:
     """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
 
     ``was_lossy`` is True when we failed to REACH the model (network/timeout)
@@ -219,13 +254,17 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     some findings were malformed returns ``(good_findings, False)`` -- the
     call succeeded end-to-end. Dropped malformed findings are logged (count)
     but do not set ``was_lossy``. Findings dropped only for a missing
-    ``snippet`` get one repair re-ask (see ``_repair_snippetless``) before
-    they count as dropped; QUODEQ_DISABLE_FINDING_REPAIR turns that off.
+    ``snippet`` get one repair re-ask (see ``repair_snippetless``) before
+    they count as dropped; ``config.repair_enabled`` False
+    (QUODEQ_DISABLE_FINDING_REPAIR) turns that off.
     See ``run_api_analysis`` for the marker contract.
 
     The OpenAI client owns an httpx connection pool whose sockets count
     against the process FD limit; the ``with`` block closes it so a long
     scan (one call per file) doesn't exhaust the FD soft cap.
+
+    *client_factory* builds the OpenAI-compatible client (``openai.OpenAI``
+    by default); tests pass a fake.
     """
     if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
         validate_url_safe(config.api_base, allow_private=True)
@@ -234,9 +273,9 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     timeout = _resolve_timeout(config, is_openai=is_openai)
     _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
     start = time.monotonic()
-    with openai.OpenAI(
+    with (client_factory or openai.OpenAI)(
         base_url=config.api_base,
-        api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
+        api_key=config.api_key or _OLLAMA_PUBLIC_PLACEHOLDER_KEY,
         timeout=timeout,
         # Disable the SDK's internal timeout retries: each waits the full read
         # budget, compounding one timeout into minutes of dead wall time.
@@ -244,7 +283,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     ) as client:
         try:
             response = client.chat.completions.create(**create_kwargs)
-        except Exception as exc:
+        except (openai.OpenAIError, httpx.HTTPError) as exc:
             _handle_call_exception(exc, config, start)
             return [], True
 
@@ -252,6 +291,10 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         finish_reason = getattr(choice, "finish_reason", None)
         text = (choice.message.content or "") if choice else ""
         # Finishing inside the with block keeps the client open for the
-        # snippet repair re-ask _finish_call may make through this partial.
-        reask = functools.partial(_repair_snippetless, client, create_kwargs, config.model)
-        return _finish_call(config.model, finish_reason, text, start, reask=reask)
+        # snippet repair re-ask finish_call may make through this partial.
+        reask = (
+            functools.partial(repair_snippetless, client, create_kwargs, config.model)
+            if config.repair_enabled else None
+        )
+        counter = _resolve_drop_counter(config)
+        return finish_call(config.model, finish_reason, text, start, reask=reask, counter=counter)

@@ -1,6 +1,6 @@
-"""Machine-readable error-code coverage for GET /api/ai-clients/<id>/cmd-path-check
-(usability cycle 1, task 6 sweep): the one bare jsonify() tools/check_error_codes.py
-(the zero-tolerance gate added in task 6) found under routes_discovery.py.
+"""Machine-readable error-code coverage for GET /api/ai-clients/<id>/cmd-path-check:
+tools/check_error_codes.py's zero-tolerance gate found one bare jsonify()
+under routes_discovery.py.
 
 The endpoint always answers 200 with ``{"ok", "error", "code"}``: ``code`` is
 None alongside a None ``error`` when the path is valid, and INVALID_INPUT

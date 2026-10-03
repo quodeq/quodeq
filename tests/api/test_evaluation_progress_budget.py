@@ -69,7 +69,7 @@ class _Provider(ActionProvider):
     def get_log_run_dir(self, job_id):
         return self._run_dir if job_id == "job-1" else None
 
-    def cancel_evaluation(self, job_id, reports_dir=None, *, discard_partial=False):
+    def cancel_evaluation(self, job_id, reports_dir=None, *, discard_partial=False, wait_for_exit=False):
         return False
 
     def list_evaluations(self, *, limit=0, reports_dir=None, states=None):

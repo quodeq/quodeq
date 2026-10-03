@@ -7,16 +7,15 @@
 // module), never a third copy.
 //
 // Detection is jscpd, configured once in `.jscpd.json` at the repo root
-// (5 lines / 50 tokens, formats python+javascript+jsx, tests, snapshots,
+// (5 lines / 40 tokens, formats python+javascript+jsx, tests, snapshots,
 // fixtures, node_modules and dist excluded). jscpd is a devDependency of
 // this package, so it runs via `npx --no-install`; if it is missing the
 // gate says how to install it instead of passing silently.
 //
-// This is a node port of the former tools/check_clones.py: that Python
-// ratchet lived in the `test` CI job's tests/tools suite, which runs on
-// three OSes with only `uv sync` (no node_modules), so `npx --no-install
-// jscpd` always failed there. jscpd is a UI devDependency, so the gate
-// belongs in the node-only `ui` CI job instead.
+// This runs under node rather than Python because jscpd is a UI
+// devDependency: the `test` CI job's tests/tools suite runs on three OSes
+// with only `uv sync` (no node_modules), so `npx --no-install jscpd` would
+// fail there. The gate belongs in the node-only `ui` CI job instead.
 //
 // Existing clones are grandfathered in tools/clones_baseline.json (a JSON
 // array of span keys) so the gate runs green today while blocking NEW ones.
@@ -55,15 +54,15 @@ const HINT =
   'module) instead of copy-pasting. Regenerate the baseline only with ' +
   'justification: npm run lint:clones:update';
 
-// The baseline was burned to zero in maintainability cycle 3 (PR 5): every
-// grandfathered clone is now a shared helper. NEVER raise this without a
+// The baseline was burned to zero: every grandfathered clone is now a
+// shared helper. NEVER raise this without a
 // justification reviewed in the PR that raises it -- at zero, any new clone
 // has to be extracted, not absorbed.
 const TOTAL_CEILING = 0;
 
-/** Map a jscpd file name (relative to *baseDir*) to a repo-relative one. */
+/** Map a jscpd file name (absolute, or relative to *baseDir*) to a repo-relative one. */
 function relative(name, baseDir, repoRoot) {
-  const absolute = path.normalize(path.join(baseDir, name));
+  const absolute = path.resolve(baseDir, name);
   return path.relative(repoRoot, absolute).split(path.sep).join('/');
 }
 
@@ -97,7 +96,9 @@ export function describe(clone) {
 }
 
 function jscpdArgs(outputDir) {
-  return ['--no-install', 'jscpd', '--config', CONFIG_PATH, '--reporters', 'json', '--output', outputDir, '--silent'];
+  // --absolute: jscpd 4 named files relative to its cwd, jscpd 5 relative to
+  // the scanned path. Absolute names make the mapping independent of either.
+  return ['--no-install', 'jscpd', '--config', CONFIG_PATH, '--absolute', '--reporters', 'json', '--output', outputDir, '--silent'];
 }
 
 /** Run jscpd from this package and return its parsed JSON report. */

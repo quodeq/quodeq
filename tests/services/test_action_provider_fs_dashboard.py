@@ -9,11 +9,12 @@ import pytest
 from quodeq.core.types import DimensionResult
 from quodeq.services._dashboard_stale import collect_stale_dimensions as _collect_stale_dimensions
 from quodeq.services.dashboard import (
-    _collect_previous_scores,
-    _enrich_dimensions_with_trend,
+    collect_previous_scores,
+    enrich_dimensions_with_trend,
     build_dashboard,
 )
 from quodeq.services.dashboard_trend import build_accumulated_trend as _build_accumulated_trend
+from quodeq.services.filesystem import FilesystemActionProvider
 from quodeq.data.fs.report_parser.runs import RunInfo
 
 
@@ -55,7 +56,7 @@ def _dim(name: str, grade: str = "Good", score: str = "7/10") -> DimensionResult
 
 
 # ---------------------------------------------------------------------------
-# _collect_previous_scores
+# collect_previous_scores
 # ---------------------------------------------------------------------------
 
 class TestCollectPreviousScores:
@@ -72,13 +73,13 @@ class TestCollectPreviousScores:
                 return [_dim("maintainability", "Good", "7/10")]
             return []
 
-        result = _collect_previous_scores(runs, selected_index, selected_dim_names, get_run_dimensions)
+        result = collect_previous_scores(runs, selected_index, selected_dim_names, get_run_dimensions)
         assert "maintainability" in result
         assert result["maintainability"].overall_grade == "Good"
 
     def test_no_previous_when_single_run(self):
         runs = [RunInfo("run-1", "2026-03-01", "Mar 01, 2026")]
-        result = _collect_previous_scores(runs, 0, {"maintainability"}, lambda _: [])
+        result = collect_previous_scores(runs, 0, {"maintainability"}, lambda _: [])
         assert result == {}
 
 
@@ -105,20 +106,20 @@ class TestCollectStaleDimensions:
 
 
 # ---------------------------------------------------------------------------
-# _enrich_dimensions_with_trend
+# enrich_dimensions_with_trend
 # ---------------------------------------------------------------------------
 
 class TestEnrichDimensionsWithTrend:
     def test_adds_trend_when_previous_exists(self):
         selected = [_dim("maintainability", "Good", "8/10")]
         previous = {"maintainability": DimensionResult(dimension="maintainability", overall_score="6/10", run_id="run-1")}
-        result = _enrich_dimensions_with_trend(selected, previous)
+        result = enrich_dimensions_with_trend(selected, previous)
         assert result[0].trend == "up"
         assert result[0].previous_run_id == "run-1"
 
     def test_trend_none_without_previous(self):
         selected = [_dim("maintainability", "Good", "8/10")]
-        result = _enrich_dimensions_with_trend(selected, {})
+        result = enrich_dimensions_with_trend(selected, {})
         assert result[0].trend == "none"
 
 
@@ -167,3 +168,12 @@ class TestBuildDashboard:
         _setup_run(tmp_path, project, "run-1", [("maintainability", "7/10", "Good")])
         with pytest.raises(FileNotFoundError, match="Run not found"):
             build_dashboard(str(tmp_path), project, "nonexistent-run")
+
+
+def test_get_dashboard_overview_has_no_bodies(tmp_path):
+    _setup_run(tmp_path, "proj", "run1", [("security", "8.0", "A")])
+    provider = FilesystemActionProvider()
+    body = provider.get_dashboard_overview(str(tmp_path), "proj", "latest")
+    (dim,) = body["dimensions"]
+    assert "violations" not in dim and "compliance" not in dim
+    assert body["selectedRun"]["runId"] == "run1"

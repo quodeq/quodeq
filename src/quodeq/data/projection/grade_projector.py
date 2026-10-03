@@ -9,15 +9,18 @@ bugs at the cost of a few ms per call.
 """
 from __future__ import annotations
 
-import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types.finding import Finding
+from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.grade_formula_store import load_params
+from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_reports
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
+from quodeq.shared.constants import JSON_SUFFIX
 from quodeq.core.scoring.projector_scoring import (
     GRADE_ALGO_VERSION,
     PrincipleGradeScale,
@@ -37,16 +40,7 @@ def _read_source_file_count(run_dir: Path) -> int:
     ``classify_confidence_level``, matching the CLI's behaviour for runs
     without a known file count.
     """
-    eval_dir = run_dir / "evaluation"
-    if not eval_dir.is_dir():
-        return 0
-    for path in eval_dir.iterdir():
-        if path.suffix != ".json":
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
+    for _dimension, data in iter_readable_eval_reports(run_dir):
         if not isinstance(data, dict):
             continue  # a valid-JSON-but-non-dict file: skip, don't crash the loop
         count = data.get("sourceFileCount")
@@ -97,6 +91,42 @@ def _grade_all_principles(
     return principle_rows, principle_grades_by_dim
 
 
+@dataclass(frozen=True, slots=True)
+class GradeInputs:
+    """What the scorer reads from a run: active findings grouped by
+    (dimension, principle), dismissed counts, and the project size."""
+
+    violations_by: dict[tuple[str, str], list[Finding]]
+    compliance_by: dict[tuple[str, str], list[Finding]]
+    dismissed_counts: dict[tuple[str, str], int]
+    source_file_count: int
+
+
+def load_grade_inputs(run_dir: Path) -> GradeInputs:
+    """Read the run's findings from SQL, so dismissals (verdict='dismissed')
+    are already applied, and group them for scoring.
+
+    Every stored finding names its principle: projection places findings
+    through admission, and one the standard cannot place is kept in
+    ``unmapped_findings``, which is never graded.
+    """
+    with open_evaluation_db(run_dir) as conn:
+        dismissed_raw = conn.execute(_SELECT_DISMISSED_COUNTS).fetchall()
+        conn.row_factory = _dict_row
+        rows = conn.execute(_SELECT_NON_DISMISSED).fetchall()
+    violations_by: dict[tuple[str, str], list[Finding]] = {}
+    compliance_by: dict[tuple[str, str], list[Finding]] = {}
+    for f in (row_to_finding(r) for r in rows):
+        bucket = violations_by if f.verdict == FindingType.VIOLATION else compliance_by
+        bucket.setdefault((f.dimension or "", f.practice_id), []).append(f)
+    dismissed = {(dimension, practice_id): count for dimension, practice_id, count in dismissed_raw}
+    return GradeInputs(
+        violations_by=violations_by, compliance_by=compliance_by,
+        dismissed_counts=dismissed,
+        source_file_count=_read_source_file_count(run_dir),
+    )
+
+
 def compute_run_grades(
     run_dir: Path, params: ScoringParams,
 ) -> tuple[list[tuple[str, dict]], list[dict]]:
@@ -105,35 +135,14 @@ def compute_run_grades(
     principle_rows: ``[(dimension, principle_grade_dict), ...]``
     dimension_rows: ``[{"dimension":..., "score":..., "grade":...}, ...]``
 
-    Reads from SQL (so dismissals via verdict='dismissed' are applied
-    automatically) but never touches the grade tables. ``recompute_grades``
-    layers persistence on top; ``preview_scores`` uses the result directly.
+    ``recompute_grades`` layers persistence on top; ``preview_scores`` uses
+    the result directly.
     """
-    source_file_count = _read_source_file_count(run_dir)
-
-    with open_evaluation_db(run_dir) as conn:
-        # Fetch dismissed counts as plain tuples before switching row_factory.
-        dismissed_raw = conn.execute(_SELECT_DISMISSED_COUNTS).fetchall()
-        dismissed_counts = {(r[0], r[1]): r[2] for r in dismissed_raw}
-
-        conn.row_factory = _dict_row
-        rows = conn.execute(_SELECT_NON_DISMISSED).fetchall()
-
-    findings = [row_to_finding(r) for r in rows]
-
-    # Group by (dimension, principle) for violations vs compliance.
-    violations_by: dict[tuple[str, str], list[Finding]] = {}
-    compliance_by: dict[tuple[str, str], list[Finding]] = {}
-    for f in findings:
-        key = (f.dimension or "", f.practice_id or "")
-        bucket = violations_by if f.verdict == "violation" else compliance_by
-        bucket.setdefault(key, []).append(f)
-
-    # Compute per-principle grades, group results by dimension.
+    inputs = load_grade_inputs(run_dir)
     principle_rows, principle_grades_by_dim = _grade_all_principles(
-        violations_by, compliance_by, dismissed_counts, source_file_count, params,
+        inputs.violations_by, inputs.compliance_by, inputs.dismissed_counts,
+        inputs.source_file_count, params,
     )
-
     dimension_rows = [
         compute_dimension_score(dimension=dim, principle_grades=p_grades, params=params)
         for dim, p_grades in principle_grades_by_dim.items()
@@ -166,8 +175,40 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     for row in dimension_rows:
         row["exit_reason"] = exit_by_dim.get(str(row["dimension"]).lower())
 
+    # Coverage comes from the dimension report the CLI wrote; the grade
+    # tables carry it so the SQL read path can state density per 100 files.
+    coverage_by_dim = {
+        str(dim_id).lower(): report
+        for dim_id, report in iter_readable_eval_reports(run_dir)
+        if isinstance(report, dict)
+    }
+    for row in dimension_rows:
+        report = coverage_by_dim.get(str(row["dimension"]).lower(), {})
+        row["files_read"] = int(report.get("filesRead") or 0)
+        row["source_count"] = int(report.get("sourceFileCount") or 0)
+        row["coverage_pct"] = float(report.get("coveragePct") or 0.0)
+
     store = SQLiteStateStore(run_dir)
     store.batch_rewrite_grades(principle_rows, dimension_rows)
     # Stamp the math these tables now embody, so ensure_projected can tell a
-    # run graded with older scoring apart from one that is merely unchanged.
+    # run graded with older scoring apart from one that is merely unchanged,
+    # and the reports the coverage came from, so a report written after the
+    # last event re-derives the tables instead of leaving coverage at zero.
     store.save_grades_algo_version(GRADE_ALGO_VERSION)
+    store.save_coverage_stamp(report_stamp(run_dir))
+
+
+def report_stamp(run_dir: Path) -> str:
+    """Newest modification time (ns) among ``evaluation/*.json``, ``"0"`` when
+    there is none. Cheap to compute (stats only), so staleness checks can use it."""
+    eval_dir = run_dir / "evaluation"
+    if not eval_dir.is_dir():
+        return "0"
+    newest = 0
+    for path in eval_dir.iterdir():
+        if path.suffix == JSON_SUFFIX:
+            try:
+                newest = max(newest, path.stat().st_mtime_ns)
+            except OSError:
+                continue
+    return str(newest)

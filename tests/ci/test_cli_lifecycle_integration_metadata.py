@@ -23,14 +23,14 @@ def test_pipeline_records_provider_and_model_from_env(tmp_path: Path, monkeypatc
     evidence_dir.mkdir(parents=True)
     evaluation_dir.mkdir(parents=True)
 
-    with patch.object(cli, "_execute_pipeline", return_value=0), \
-         patch.object(cli, "_save_manifest"), \
-         patch.object(cli, "_build_run_config"), \
+    with patch.object(cli, "execute_pipeline", return_value=0), \
+         patch.object(cli, "save_manifest"), \
+         patch.object(cli, "build_run_config"), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
         args = argparse.Namespace(repo="local")
         inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
-        cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+        cli.run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     run_dir = evaluation_dir.parent
     status = read_status(run_dir)
@@ -57,14 +57,14 @@ def test_pipeline_records_ai_cmd_as_provider(tmp_path: Path, monkeypatch) -> Non
     evidence_dir.mkdir(parents=True)
     evaluation_dir.mkdir(parents=True)
 
-    with patch.object(cli, "_execute_pipeline", return_value=0), \
-         patch.object(cli, "_save_manifest"), \
-         patch.object(cli, "_build_run_config"), \
+    with patch.object(cli, "execute_pipeline", return_value=0), \
+         patch.object(cli, "save_manifest"), \
+         patch.object(cli, "build_run_config"), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
         args = argparse.Namespace(repo="local")
         inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
-        cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+        cli.run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     run_dir = evaluation_dir.parent
     status = read_status(run_dir)
@@ -95,14 +95,14 @@ def test_pool_deadline_extension_reaches_status_json(tmp_path: Path) -> None:
         cb(extended_iso)
         return 0
 
-    with patch.object(cli, "_execute_pipeline", side_effect=_fake_pipeline), \
-         patch.object(cli, "_save_manifest"), \
-         patch.object(cli, "_build_run_config", return_value=config), \
+    with patch.object(cli, "execute_pipeline", side_effect=_fake_pipeline), \
+         patch.object(cli, "save_manifest"), \
+         patch.object(cli, "build_run_config", return_value=config), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
         args = argparse.Namespace(repo="local", pool_budget=60)
         inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
-        cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+        cli.run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     status = read_status(evaluation_dir.parent)
     assert status is not None

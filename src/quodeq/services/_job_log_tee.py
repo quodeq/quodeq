@@ -1,5 +1,4 @@
-"""Stream-consumption and run.log tee logic for JobManager, split out of
-jobs.py as free functions.
+"""Stream-consumption and run.log tee logic for JobManager, as free functions.
 
 ``JobManager._consume_stream``/``_tee_run_log``/``_drain_pre_marker_buffer``
 become thin delegates that pass in the per-job state they exclusively own
@@ -19,12 +18,13 @@ from __future__ import annotations
 
 import codecs
 import io
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Iterator
 
 from quodeq.core.observability import LogSink
-from quodeq.services._job_model import JobStore, _CC_MARKER_PREFIX
+from quodeq.services._job_model import JobStore, CC_MARKER_PREFIX, MAX_LOG_LINES
 from quodeq.shared.run_log import RunLogWriter
 
 
@@ -33,14 +33,23 @@ class TeeContext:
     """Collaborators consume_stream/_read_and_tee_loop/tee_run_log share.
 
     All fields are owned and mutated by JobManager; see the module docstring
-    for the invariant governing who else may touch the dicts.
+    for the invariant governing who else may touch the dicts. Pre-marker
+    lines are capped at ``MAX_LOG_LINES`` per job, like the job log.
+    ``open_writer`` defaults to ``RunLogWriter`` (tests pass a fake); it is
+    declared last so existing positional constructions keep working.
     """
     store: JobStore
     reports_root: Path | None
     run_log_writers: dict[str, RunLogWriter]
-    pre_marker_buffer: dict[str, list[str]]
+    pre_marker_buffer: dict[str, deque[str]]
     log: LogSink
     flush_batch: Callable[[str, list[str]], bool]
+    open_writer: Callable[[Path], RunLogWriter] | None = None
+
+
+def _new_buffer() -> deque[str]:
+    """An empty pre-marker buffer, capped like the in-memory job log."""
+    return deque(maxlen=MAX_LOG_LINES)
 
 
 def _iter_line_batches(stream: Iterable[str]) -> Iterator[list[str]]:
@@ -104,7 +113,7 @@ def _read_and_tee_loop(
             # markers: they are structured IPC, not user-facing terminal
             # output, and leaking them makes the xterm pane noisy.
             for stripped in lines:
-                if not stripped.startswith(_CC_MARKER_PREFIX):
+                if not stripped.startswith(CC_MARKER_PREFIX):
                     tee_run_log(job_id, stripped, ctx)
     except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
         ctx.log.warning(f"Stream read error for job {job_id}: {exc}")
@@ -118,7 +127,7 @@ def consume_stream(
 ) -> None:
     if stream is None:
         return
-    ctx.pre_marker_buffer.setdefault(job_id, [])
+    ctx.pre_marker_buffer.setdefault(job_id, _new_buffer())
     try:
         if _read_and_tee_loop(job_id, stream, ctx):
             # Final drain: if the report_path marker arrived in the last
@@ -147,9 +156,22 @@ def _open_run_log_writer(job_id: str, ctx: TeeContext) -> RunLogWriter | None:
     run_dir = ctx.reports_root / job.output_project / job.output_run_id
     if not run_dir.is_dir():
         return None
-    writer = RunLogWriter(run_dir)
+    open_writer = ctx.open_writer if ctx.open_writer is not None else RunLogWriter
+    writer = open_writer(run_dir)
     ctx.run_log_writers[job_id] = writer
     return writer
+
+
+def _flush_pre_marker_buffer(job_id: str, writer: RunLogWriter, ctx: TeeContext) -> None:
+    """Write the job's buffered pre-marker lines to *writer*, then reset the buffer.
+
+    A write error propagates with the buffer left as is; each caller decides
+    what a failed flush means (``tee_run_log`` lets it surface,
+    ``drain_pre_marker_buffer`` logs it and still resets the buffer).
+    """
+    for pending in ctx.pre_marker_buffer.get(job_id, []):
+        writer.write(pending)
+    ctx.pre_marker_buffer[job_id] = _new_buffer()
 
 
 def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
@@ -166,11 +188,10 @@ def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
     if writer is None:
         return
     try:
-        for pending in ctx.pre_marker_buffer.get(job_id, []):
-            writer.write(pending)
+        _flush_pre_marker_buffer(job_id, writer, ctx)
     except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
         ctx.log.warning(f"Drain write error for job {job_id}: {exc}")
-    ctx.pre_marker_buffer[job_id] = []
+        ctx.pre_marker_buffer[job_id] = _new_buffer()
 
 
 def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
@@ -188,10 +209,7 @@ def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
         # Try to resolve run_dir from the job snapshot now.
         writer = _open_run_log_writer(job_id, ctx)
         if writer is None:
-            ctx.pre_marker_buffer.setdefault(job_id, []).append(line)
+            ctx.pre_marker_buffer.setdefault(job_id, _new_buffer()).append(line)
             return
-        # Flush any buffered pre-marker lines.
-        for pending in ctx.pre_marker_buffer.get(job_id, []):
-            writer.write(pending)
-        ctx.pre_marker_buffer[job_id] = []
+        _flush_pre_marker_buffer(job_id, writer, ctx)
     writer.write(line)

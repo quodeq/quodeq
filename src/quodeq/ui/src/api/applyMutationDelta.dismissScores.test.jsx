@@ -50,6 +50,14 @@ function securityDim() {
   };
 }
 
+// The run page's overview dashboard dimension: counts, no lists.
+function overviewDim() {
+  const { violations, ...rest } = securityDim();
+  return rest;
+}
+
+const overviewKey = (run) => projectKeys.dashboard(PROJECT, run, "local");
+
 function maintainabilityDim() {
   return {
     dimension: "maintainability",
@@ -66,10 +74,10 @@ function maintainabilityDim() {
 // invalidate path.
 
 describe("applyMutationDelta", () => {
-  it("A: patches the dimension score from the rescored dims", () => {
+  it("A: patches the overview dashboard's dimension score from the rescored dims", () => {
     const { client, store, setQueryData } = makeClient();
-    const key = projectKeys.dashboard(PROJECT, RUN);
-    seedDashboard(store, key, [securityDim(), maintainabilityDim()]);
+    const key = overviewKey(RUN);
+    seedDashboard(store, key, [overviewDim(), maintainabilityDim()]);
 
     const delta = {
       kind: "dismiss",
@@ -91,9 +99,9 @@ describe("applyMutationDelta", () => {
     expect(sec.overallGrade).toBe("B");
   });
 
-  it("B: removes the dismissed finding and decrements totals", () => {
+  it("B: removes the dismissed finding from the run findings and decrements totals", () => {
     const { client, store } = makeClient();
-    const key = projectKeys.dashboard(PROJECT, RUN);
+    const key = projectKeys.runScores(PROJECT, RUN);
     seedDashboard(store, key, [securityDim()]);
 
     applyMutationDelta(client, PROJECT, {
@@ -157,9 +165,50 @@ describe("applyMutationDelta", () => {
     expect(dim.overallGrade).toBe("B");
   });
 
-  it("E: invalidates (refetchType none) when dashboard cache is absent, no setQueryData", () => {
+  it("B2: the server's recounted totals win over the local decrement", () => {
+    const { client, store } = makeClient();
+    const key = projectKeys.runScores(PROJECT, RUN);
+    seedDashboard(store, key, [securityDim()]);
+    const totals = { violationCount: 1, severity: { critical: 0, major: 1, minor: 0 }, complianceCount: 4 };
+
+    applyMutationDelta(client, PROJECT, {
+      kind: "dismiss",
+      runId: RUN,
+      isLatest: false,
+      dismissed: { req: "R1", file: "a.py", line: 10 },
+      accumulated: null,
+      dimensions: [{ dimension: "security", overallScore: "6.5", overallGrade: "B", totals }],
+    });
+
+    const sec = store.get(JSON.stringify(key)).dimensions[0];
+    expect(sec.violations.map((v) => v.req)).toEqual(["R2"]);
+    expect(sec.totals).toEqual(totals);
+  });
+
+  it("B3: the overview dashboard (no lists) takes the recounted totals", () => {
+    const { client, store } = makeClient();
+    const key = overviewKey(RUN);
+    seedDashboard(store, key, [overviewDim()]);
+    const totals = { violationCount: 1, severity: { critical: 0, major: 1, minor: 0 } };
+
+    applyMutationDelta(client, PROJECT, {
+      kind: "dismiss",
+      runId: RUN,
+      isLatest: false,
+      dismissed: { req: "R1", file: "a.py", line: 10 },
+      accumulated: null,
+      dimensions: [{ dimension: "security", overallScore: "6.5", overallGrade: "B", totals }],
+    });
+
+    const sec = store.get(JSON.stringify(key)).dimensions[0];
+    expect(sec.violations).toBeUndefined();
+    expect(sec.totals).toEqual(totals);
+    expect(sec.overallGrade).toBe("B");
+  });
+
+  it("E: invalidates (refetchType none) when the overview cache is absent, no setQueryData", () => {
     const { client, setQueryData, invalidateQueries } = makeClient();
-    const dashKey = projectKeys.dashboard(PROJECT, RUN);
+    const dashKey = overviewKey(RUN);
 
     applyMutationDelta(client, PROJECT, {
       kind: "dismiss",
@@ -211,5 +260,25 @@ describe("applyMutationDelta", () => {
       ([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(scoresKey),
     );
     expect(invalidated).toBe(false);
+  });
+
+  it("patches the overview latest entry's score when the run is the latest", () => {
+    const { client, store } = makeClient();
+    const latestKey = overviewKey("latest");
+    seedDashboard(store, latestKey, [overviewDim()]);
+    const totals = { violationCount: 2, severity: { critical: 0, major: 1, minor: 1 } };
+
+    applyMutationDelta(client, PROJECT, {
+      kind: "dismiss",
+      runId: RUN,
+      isLatest: true,
+      dismissed: { req: "R1", file: "a.py", line: 10 },
+      accumulated: null,
+      dimensions: [{ dimension: "security", overallScore: "6.5", overallGrade: "B", totals }],
+    });
+
+    const sec = store.get(JSON.stringify(latestKey)).dimensions[0];
+    expect(sec.overallScore).toBe("6.5");
+    expect(sec.totals).toEqual(totals);
   });
 });

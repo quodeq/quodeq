@@ -150,33 +150,6 @@ button.eval-provider-badge--clickable:focus-visible {
   opacity: 0.6;
 }
 
-.evaluate-submit-btn {
-  padding: 16px 32px;
-  background: var(--color-accent);
-  border: none;
-  border-radius: var(--radius-lg);
-  color: var(--color-bg);
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.evaluate-submit-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-accent) 30%, transparent);
-}
-
-.evaluate-submit-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.evaluate-submit-btn--secondary {
-  font-size: 0.85rem;
-}
-
 .job-error {
   margin-top: 16px;
   padding: 12px 16px;
@@ -759,115 +732,6 @@ button.eval-provider-badge--clickable:focus-visible {
   color: var(--color-text);
 }
 
-.repo-input-wrapper {
-  display: flex;
-  gap: 10px;
-}
-
-.repo-input-wrapper input {
-  flex: 1;
-  padding: 14px 16px;
-  padding-right: 42px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  color: var(--color-text);
-  font-size: 1rem;
-  font-family: "SFMono-Regular", Consolas, monospace;
-}
-
-.repo-input-wrapper input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-soft);
-}
-
-.repo-input-wrapper {
-  position: relative;
-}
-
-.repo-input-wrapper .input-clear-btn {
-  position: absolute;
-  right: 120px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.input-with-clear {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.input-with-clear input {
-  flex: 1;
-  padding-right: 38px;
-}
-
-.input-with-clear .input-clear-btn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.input-clear-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  background: color-mix(in srgb, var(--color-text) 8%, transparent);
-  border: none;
-  border-radius: 50%;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: all 150ms ease;
-  opacity: 0.7;
-}
-
-.input-clear-btn:hover {
-  background: var(--color-danger-bg);
-  color: var(--color-danger-text);
-  opacity: 1;
-}
-
-.input-clear-btn svg {
-  flex-shrink: 0;
-}
-
-.browse-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  color: var(--color-text);
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.browse-btn:hover:not(:disabled) {
-  background: var(--color-surface-alt);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
-.browse-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.browse-btn svg {
-  flex-shrink: 0;
-}
-
 .discipline-select {
   width: 100%;
 }
@@ -881,26 +745,6 @@ button.eval-provider-badge--clickable:focus-visible {
   background: var(--color-surface);
 }
 
-.evaluate-form-large {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.evaluate-form-large .form-group label {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.scope-toggle-group {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
 .re-eval-toggle-row {
   display: flex;
   flex-direction: row;
@@ -911,68 +755,6 @@ button.eval-provider-badge--clickable:focus-visible {
   min-height: 22px;
 }
 
-.re-eval-toggle-row .scope-toggle-group {
-  margin-bottom: 0;
-}
-
-.clean-scan-toggle {
-  padding: 2px 8px;
-  background: transparent;
-  border: 1px dotted var(--color-border);
-  color: var(--color-text-muted);
-  font-size: 0.7rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, border-style 0.15s;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
-}
-
-.clean-scan-toggle:hover:not(:disabled) {
-  border-style: solid;
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  background: transparent;
-}
-
-.clean-scan-toggle:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.clean-scan-toggle--on {
-  background: var(--color-accent);
-  color: var(--color-on-accent, #fff);
-  border-color: var(--color-accent);
-}
-
-.clean-scan-toggle--on:hover:not(:disabled) {
-  background: var(--color-accent);
-  color: var(--color-on-accent, #fff);
-}
-
-.clean-scan-toggle__dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.85;
-}
-
-.clean-scan-confirm-actions {
-  flex-wrap: wrap;
-}
-
-.clean-scan-confirm-meta {
-  font-size: 0.7em;
-  opacity: 0.75;
-  margin-left: 4px;
-}
-
 .qd-confirm-message p {
   margin: 0 0 8px;
 }
@@ -981,73 +763,6 @@ button.eval-provider-badge--clickable:focus-visible {
   margin-bottom: 0;
 }
 
-.scope-compact-btn {
-  padding: 2px 8px;
-  background: transparent;
-  border: 1px dotted var(--color-border);
-  color: var(--color-text-muted);
-  font-size: 0.7rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, border-style 0.15s;
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
-}
-
-.scope-compact-btn:hover {
-  border-style: solid;
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  background: transparent;
-}
-
-.scope-display {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 0.75rem;
-  align-self: flex-end;
-  white-space: nowrap;
-}
-
-.scope-path {
-  color: var(--color-accent);
-  font-family: monospace;
-}
-
-.scope-change-btn {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0;
-}
-
-.scope-change-btn:hover {
-  color: var(--color-text);
-}
-
-.scope-branch-display {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  align-self: flex-end;
-}
-
-.scope-branch-label {
-  font-weight: var(--weight-medium);
-}
-
-.scope-branch-value {
-  color: var(--color-text);
-  font-family: monospace;
-  font-size: 0.75rem;
-}
 
 .form-hint {
   display: block;
@@ -1311,10 +1026,11 @@ button.eval-provider-badge--clickable:focus-visible {
   box-shadow: none;
 }
 /* High-specificity overrides so the terminal variant beats the colour
-   pills (dimension-chip-type--builtin / --quodeq / --custom / --community)
+   pills (dimension-chip-type--iso / --quodeq / --custom / --community)
    which are defined later in the stylesheet. */
 .dimension-chip-btn--terminal .dimension-chip-type,
-.dimension-chip-btn--terminal .dimension-chip-type--builtin,
+.dimension-chip-btn--terminal .dimension-chip-type--iso,
+.dimension-chip-btn--terminal .dimension-chip-type--wcag,
 .dimension-chip-btn--terminal .dimension-chip-type--quodeq,
 .dimension-chip-btn--terminal .dimension-chip-type--custom,
 .dimension-chip-btn--terminal .dimension-chip-type--community {
@@ -1327,13 +1043,6 @@ button.eval-provider-badge--clickable:focus-visible {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: var(--weight-regular);
-}
-
-/* Improve submit button */
-.evaluate-submit-btn {
-  padding: 12px 24px;
-  font-size: 0.9rem;
-  font-weight: 600;
 }
 
 /* --- Evaluate Page (Full Page) --- */
@@ -1359,15 +1068,6 @@ button.eval-provider-badge--clickable:focus-visible {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 1.1rem;
-}
-
-.evaluate-page-form {
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
 }
 
 .evaluate-field {
@@ -1424,11 +1124,6 @@ button.eval-provider-badge--clickable:focus-visible {
 .checkbox-row.large input {
   width: 18px;
   height: 18px;
-}
-
-.evaluate-page-form .evaluate-submit-btn {
-  align-self: flex-start;
-  margin-top: 8px;
 }
 
 .job-status-section {
@@ -1923,7 +1618,8 @@ button.eval-provider-badge--clickable:focus-visible {
   padding: 0 4px;
 }
 
-.vlive-counter-hidden {
+.vlive-counter-hidden,
+.vlive-counter-passed {
   color: var(--color-text-subtle);
 }
 
@@ -2523,7 +2219,8 @@ button.eval-provider-badge--clickable:focus-visible {
   margin-left: 4px;
 }
 
-.dimension-chip-type--builtin {
+.dimension-chip-type--iso,
+.dimension-chip-type--wcag {
   background: color-mix(in srgb, var(--color-accent) 20%, transparent);
   color: var(--color-accent);
 }

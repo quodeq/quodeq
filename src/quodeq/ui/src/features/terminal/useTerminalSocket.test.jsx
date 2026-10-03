@@ -69,20 +69,23 @@ it('fires onOpen on EVERY socket open so the pane can reset before scrollback re
 
 it('auto-reconnects after an unexpected close, with growing backoff', () => {
   vi.useFakeTimers();
+  // Backoff is jittered (see utils/backoff.js): pin the jitter factor to its
+  // floor (0.5) so the retry delays below are exact, not a range.
+  vi.spyOn(Math, 'random').mockReturnValue(0);
   const { result } = renderHook(() => useTerminalSocket({ active: true, onData: () => {} }));
   act(() => MockWS.instances[0]._open());
   // Server dies (e.g. restart): abnormal close, no app close code.
   act(() => MockWS.instances[0]._drop(1006));
   expect(result.current.status).toBe('reconnecting');
   expect(MockWS.instances.length).toBe(1);      // waits out the backoff first
-  act(() => vi.advanceTimersByTime(500));
-  expect(MockWS.instances.length).toBe(2);      // first retry after 500ms
-  // Retry fails too (server still down): next delay doubles to 1000ms.
+  act(() => vi.advanceTimersByTime(250));
+  expect(MockWS.instances.length).toBe(2);      // first retry after 250ms (500ms base, jittered to floor)
+  // Retry fails too (server still down): next delay doubles to 1000ms base.
   act(() => MockWS.instances[1]._drop(1006));
-  act(() => vi.advanceTimersByTime(500));
+  act(() => vi.advanceTimersByTime(499));
   expect(MockWS.instances.length).toBe(2);      // not yet
-  act(() => vi.advanceTimersByTime(500));
-  expect(MockWS.instances.length).toBe(3);      // second retry after 1000ms
+  act(() => vi.advanceTimersByTime(1));
+  expect(MockWS.instances.length).toBe(3);      // second retry after 500ms (1000ms base, jittered to floor)
   // Server is back: a successful open resets the backoff and the status.
   act(() => MockWS.instances[2]._open());
   expect(result.current.status).toBe('open');

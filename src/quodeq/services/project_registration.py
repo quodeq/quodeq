@@ -1,38 +1,36 @@
 """Use case: register a project (resolve identity, clone if needed, scan).
 
-Extracted from ``evaluation_mixin`` so the API layer has a public entry
-point instead of importing private helpers.
-
-Split into two sibling modules plus this orchestrator:
+The API layer's public entry point for registration. This orchestrator
+works with two sibling modules:
   - _registration_url.py: credential-stripping and origin-remote reads.
   - _registration_scan.py: the zero-run scan fallback and parent-project scan.
 """
 from __future__ import annotations
 
 import functools
-import shutil
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.wiring import (
+    list_project_dirs,
     read_repository_info,
     read_scan_json,
+    remove_project_dir,
     validate_remote_url,
     write_repository_info,
 )
 from quodeq.services._fs_clone import CloneError
 from quodeq.services.fs_project_helpers import find_existing_project
-from quodeq.services._registration_scan import _zero_run_scan_fallback
-from quodeq.services._registration_url import _strip_credentials
+from quodeq.services._registration_scan import zero_run_scan_fallback
 from quodeq.services._project_registration_steps import (
-    _MaterializeRequest,
-    _materialize_and_scan,
-    _resolve_project_slot,
+    MaterializeRequest,
+    materialize_and_scan,
+    resolve_project_slot,
 )
 from quodeq.services._repo_index import RepoIdentity, add_repo_index_entry
-from quodeq.services.base import CreateProjectResult, NewProjectSpec
+from quodeq.services.base import CreateProjectResult, CreateProjectStatus, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 
 
@@ -68,13 +66,15 @@ def register_project(
 
     For URL inputs, clones the repo before scanning. Either ``spec.clone_dest``
     (a user-chosen parent directory) or ``spec.ephemeral=True`` must be set
-    when ``spec.repo`` is a URL. Ephemeral clones land under
-    ``~/.quodeq/clones/<uuid>/`` by default; pass *clones_dir* to use a
-    different (already-resolved) base directory instead of re-reading
-    QUODEQ_CLONES_DIR here.
+    when ``spec.repo`` is a URL. Ephemeral clones land under *clones_dir*
+    (only consulted when ``spec.ephemeral`` is set). This function never
+    reads QUODEQ_CLONES_DIR itself: the caller (the provider composing this
+    call -- ``FilesystemActionProvider``/``FsEvaluationMixin`` in
+    ``filesystem.py``/``evaluation_mixin.py``) resolves the default and
+    passes an already-resolved path.
 
     For local path inputs, scans in place; ``clone_dest`` and ``ephemeral``
-    are ignored.
+    are ignored, and *clones_dir* is never consulted.
 
     Returns the project's UUID.
     """
@@ -82,15 +82,17 @@ def register_project(
     _validate_clone_target(spec.repo, is_url, spec.ephemeral, spec.clone_dest)
     reports_path = Path(reports_dir)
 
-    project_uuid, project_dir, project_name, repo_resolved = _resolve_project_slot(
+    project_uuid, project_dir, project_name, repo_resolved = resolve_project_slot(
         spec.repo, spec.discipline, reports_path, spec.scope_path,
     )
 
-    _materialize_and_scan(_MaterializeRequest(
+    materialize_and_scan(MaterializeRequest(
         repo=spec.repo, repo_resolved=repo_resolved, project_name=project_name,
         project_uuid=project_uuid, project_dir=project_dir, reports_path=reports_path,
         scope_path=spec.scope_path, is_url=is_url, ephemeral=spec.ephemeral,
-        clone_dest=spec.clone_dest, clones_dir=clones_dir, log=log,
+        clone_dest=spec.clone_dest, clones_dir=clones_dir,
+        git_env=spec.git_env, clone_url=spec.clone_url, log=log,
+        progress=spec.progress, on_phase=spec.on_phase,
     ))
 
     _sync_repo_index_on_create(
@@ -114,18 +116,13 @@ def _sync_repo_index_on_create(
 def _rollback_new_dirs(reports_root: str, before: set[str], *, log: LogSink = NULL_LOG) -> None:
     """Delete any project directories created since *before* was captured."""
     reports_path = Path(reports_root)
-    if not reports_path.is_dir():
-        return
-    after = {p.name for p in reports_path.iterdir() if p.is_dir()}
-    for new in after - before:
-        try:
-            shutil.rmtree(reports_path / new)
-        except OSError as exc:
-            log.warning(f"registration rollback could not remove {reports_path / new}: {exc}")
+    for new in list_project_dirs(reports_path) - before:
+        if not remove_project_dir(reports_path / new):
+            log.warning(f"registration rollback could not remove {reports_path / new}")
 
 
 def _rollback_and_report(
-    rollback: Callable[[], None], status: str, message: str = "", **extra,
+    rollback: Callable[[], None], status: CreateProjectStatus, message: str = "", **extra,
 ) -> CreateProjectResult:
     """Run *rollback*, then build the failure result."""
     rollback()
@@ -135,7 +132,7 @@ def _rollback_and_report(
 def _snapshot_project_dirs(reports_path: Path) -> set[str]:
     """Names of project dirs present before registration, so a failed
     scan/clone can be rolled back to exactly what existed before."""
-    return {p.name for p in reports_path.iterdir() if p.is_dir()} if reports_path.is_dir() else set()
+    return list_project_dirs(reports_path)
 
 
 def register_project_with_rollback(
@@ -151,7 +148,7 @@ def register_project_with_rollback(
     """
     existing = find_existing_project(reports_dir, spec.repo, spec.scope_path)
     if existing is not None:
-        return CreateProjectResult(status="duplicate", existing_project_id=existing)
+        return CreateProjectResult(status=CreateProjectStatus.DUPLICATE, existing_project_id=existing)
 
     reports_root_path = Path(reports_dir)
     before = _snapshot_project_dirs(reports_root_path)
@@ -160,23 +157,23 @@ def register_project_with_rollback(
     try:
         project_uuid = register_project(reports_dir, spec, clones_dir=clones_dir, log=log)
     except (FileNotFoundError, ValueError) as exc:
-        return _rollback_and_report(rollback, "invalid_repo", str(exc))
+        return _rollback_and_report(rollback, CreateProjectStatus.INVALID_REPO, str(exc))
     except CloneError as exc:
         return _rollback_and_report(
-            rollback, "clone_failed", str(exc), clone_error_kind=exc.kind,
+            rollback, CreateProjectStatus.CLONE_FAILED, str(exc),
+            clone_error_kind=exc.kind, clone_stderr=exc.stderr,
         )
-    except Exception as exc:
-        # error_response (route layer) swallows the traceback Flask's own 500
-        # handler would have logged; record it before converting to a
-        # generic, no-detail result (the exception text can carry filesystem
-        # paths or backend internals that must not reach the remote caller).
-        log.error(f"Registration failed for repo={_strip_credentials(spec.repo)!r}: {exc}")
-        return _rollback_and_report(rollback, "internal_error")
+    except Exception:
+        # An unhandled failure: clean up any partial project directory, then
+        # let it propagate. The app-wide handler in api/_error_handlers.py
+        # logs the traceback and answers it with the coded INTERNAL_ERROR.
+        rollback()
+        raise
 
     # scan.json is now always present after register_project succeeds.
     project_dir = reports_root_path / project_uuid
-    scan_data = read_scan_json(project_dir) or _zero_run_scan_fallback()
-    return CreateProjectResult(status="created", project_id=project_uuid, scan_data=scan_data)
+    scan_data = read_scan_json(project_dir) or zero_run_scan_fallback()
+    return CreateProjectResult(status=CreateProjectStatus.CREATED, project_id=project_uuid, scan_data=scan_data)
 
 
 def mark_onboarding_complete(project_dir: Path) -> None:
@@ -188,5 +185,5 @@ def mark_onboarding_complete(project_dir: Path) -> None:
     data = read_repository_info(project_dir)
     if data is None or data.get("onboardingCompletedAt"):
         return
-    data["onboardingCompletedAt"] = datetime.now(timezone.utc).isoformat()
+    data["onboardingCompletedAt"] = utc_now_iso()
     write_repository_info(project_dir, data)

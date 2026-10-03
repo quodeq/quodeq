@@ -1,7 +1,6 @@
 """Structured-error-contract tests for the standards routes.
 
-Covers usability findings 6332, 6331, 6144, 6143, 7283, 7287: malformed
-JSON and validation-error bodies must go through this module's own
+Malformed JSON and validation-error bodies must go through this module's own
 ``error_response`` shape and surface the real reason, the CWE cache TTL
 env var must be documented and validated, and ``limit``/``offset`` on
 GET /api/standards must be validated rather than silently coerced.

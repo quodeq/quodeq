@@ -1,11 +1,11 @@
 """MCP/tool/model command-line argument construction for the AI CLI runner.
 
-Split out of _command.py: env-driven tool/base-arg defaults, the base-args
+Env-driven tool/base-arg defaults, the base-args
 and MCP-config args builders (config-file / config-arg / cli-register
 dispatch), the model/budget/turns/prompt args builder, and the RunConfig
 cache-fingerprint resolvers those builders (and _command.py's own
 ``_build_mcp_server_args``) share. None of these names are mock.patch
-targets -- ``_build_ai_cmd`` (in _command.py) receives ``provider_cfg``
+targets -- ``build_ai_cmd`` (in _command.py) receives ``provider_cfg``
 already resolved and passes it straight through.
 """
 from __future__ import annotations
@@ -15,46 +15,49 @@ from pathlib import Path
 
 from quodeq.analysis._config import (
     AnalysisConfig,
-    _AgentParams,
-    _MCP_TOOL_GET_NEXT_FILES,
-    _MCP_TOOL_MARK_FILE_DONE,
-    _MCP_TOOL_REPORT_FINDING,
+    AgentParams,
+    MCP_TOOL_GET_NEXT_FILES,
+    MCP_TOOL_MARK_FILE_DONE,
+    MCP_TOOL_REPORT_FINDING,
 )
-from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
+from quodeq.analysis.cache import model_id_from
+from quodeq.analysis._mcp_config import codex_mcp_config_arg, create_mcp_config
 from quodeq.config.analysis_env import ai_tools, base_ai_args
 from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE,
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.models import normalize_model_id
-from quodeq.shared.utils import get_ai_cmd_path
 
 
-def _get_ai_tools(env: Mapping[str, str] | None = None) -> str:
+def get_ai_tools(env: Mapping[str, str] | None = None) -> str:
     """Return AI tools from QUODEQ_AI_TOOLS env var (default: "Glob,Grep,Read")."""
     return ai_tools(env)
 
 
-def _get_base_ai_args(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
+def get_base_ai_args(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
     """Return base AI CLI args from QUODEQ_AI_BASE_ARGS env var."""
     return tuple(base_ai_args(env).split())
 
 
-def _cmd_binary(cmd: str) -> str:
+def cmd_binary(cmd: str, ai_cmd_path: str | None = None) -> str:
     """Return the binary to spawn for provider *cmd*.
 
-    AI_CMD_PATH (validated at the API boundary, see
-    api._evaluation_helpers._validate_ai_cmd_path) redirects the spawn to an
-    alternate install or wrapper while *cmd* keeps keying the provider config.
+    *ai_cmd_path* (AI_CMD_PATH, resolved by the caller and validated at the
+    API boundary, see api._evaluation_helpers.validate_ai_cmd_path) redirects
+    the spawn to an alternate install or wrapper while *cmd* keeps keying the
+    provider config.
     """
-    return get_ai_cmd_path() or cmd
+    return ai_cmd_path or cmd
 
 
-def _build_base_args(
+def build_base_args(
     cmd: str, provider_cfg: dict, env: Mapping[str, str] | None = None,
+    *, ai_cmd_path: str | None = None,
 ) -> list[str]:
     """Build the initial args list: binary, subcommand, base args, and tools."""
-    args: list[str] = [_cmd_binary(cmd)]
+    args: list[str] = [cmd_binary(cmd, ai_cmd_path)]
     subcommand = provider_cfg.get("cmd_subcommand", "")
     if subcommand:
         args.append(subcommand)
@@ -63,37 +66,38 @@ def _build_base_args(
     if base_args_str:
         args.extend(base_args_str.split())
     else:
-        args.extend(_get_base_ai_args(env))
+        args.extend(get_base_ai_args(env))
 
     if provider_cfg.get("supports_tools", True):
-        args.extend(["--tools", _get_ai_tools(env)])
+        args.extend(["--tools", get_ai_tools(env)])
     return args
 
 
-def _build_agent_params(config: AnalysisConfig, work_dir: Path | None) -> _AgentParams:
+def _build_agent_params(config: AnalysisConfig, work_dir: Path | None) -> AgentParams:
     """Build the per-agent MCP config parameters, incl. cache fingerprint inputs."""
-    return _AgentParams(
+    return AgentParams(
         queue_path=config.queue_path,
         agent_id=config.agent_id,
         work_dir=config.work_dir or work_dir,
         # The cache fingerprint inputs travel the config-file path too:
         # without them the JSON-config MCP variant emits defaults and its
         # cache writes diverge from the classify_files_via_cache keys.
-        model_id=_resolve_model_id(config),
-        language=_resolve_language(config),
-        # The standards ROOT, not compiled_dir -- see _resolve_standards_dir
-        # and _AgentParams.standards_dir.
-        standards_dir=_resolve_standards_dir(config),
+        model_id=resolve_model_id(config),
+        language=resolve_language(config),
+        # The standards ROOT, not compiled_dir -- see resolve_standards_dir
+        # and AgentParams.standards_dir.
+        standards_dir=resolve_standards_dir(config),
+        cache_root=config.cache_root,
     )
 
 
 def _build_config_file_mcp_args(
-    config: AnalysisConfig, provider_cfg: dict, agent_params: _AgentParams,
+    config: AnalysisConfig, provider_cfg: dict, agent_params: AgentParams,
 ) -> tuple[list[str], Path | None]:
     """Build the config-file MCP variant's args: --mcp-config, strict-mode,
     allowed tools, and permission mode."""
     options = {"tools": provider_cfg["mcp_server_tools"]} if "mcp_server_tools" in provider_cfg else {}
-    mcp_config_path = _create_mcp_config(
+    mcp_config_path = create_mcp_config(
         config.jsonl_file, config.compiled_dir, config.dimension, agent_params, **options,
     )
     mcp_flag = provider_cfg.get("mcp_config_flag", "--mcp-config")
@@ -105,13 +109,13 @@ def _build_config_file_mcp_args(
     args.extend(provider_cfg.get("mcp_strict_args", ["--strict-mcp-config"]))
 
     if provider_cfg.get("supports_tools", True):
-        allowed = _MCP_TOOL_REPORT_FINDING
+        allowed = MCP_TOOL_REPORT_FINDING
         if config.queue_path:
-            allowed += f",{_MCP_TOOL_GET_NEXT_FILES}"
+            allowed += f",{MCP_TOOL_GET_NEXT_FILES}"
         # mark_file_done is always exposed by the findings server (see
         # handlers.handle_tools_list) and drives cache writes, so allow it
         # unconditionally rather than leaving it to bypassPermissions.
-        allowed += f",{_MCP_TOOL_MARK_FILE_DONE}"
+        allowed += f",{MCP_TOOL_MARK_FILE_DONE}"
         args.extend(["--allowedTools", allowed])
     # bypassPermissions is intentional: the CLI analysis tool runs in a
     # sandboxed, non-interactive subprocess where MCP tool calls (e.g.
@@ -124,8 +128,9 @@ def _build_config_file_mcp_args(
     return args, mcp_config_path
 
 
-def _build_mcp_args(
+def build_mcp_args(
     config: AnalysisConfig, provider_cfg: dict, work_dir: Path | None,
+    *, log: LogSink = NULL_LOG,
 ) -> tuple[list[str], Path | None]:
     """Build MCP-related args and return the config path (if any)."""
     if config.jsonl_file is None:
@@ -138,13 +143,17 @@ def _build_mcp_args(
         # --allowed-mcp-server-names) or the registered server stays blocked.
         return list(provider_cfg.get("mcp_permission_args", [])), None
     if mcp_style not in {MCP_STYLE_CONFIG_FILE, MCP_STYLE_CONFIG_ARG}:
+        log.warning(
+            f"unknown mcp_style {mcp_style!r} for provider {config.ai_cmd or 'unknown'}; "
+            "no MCP args emitted"
+        )
         return [], None
 
     agent_params = _build_agent_params(config, work_dir)
     if mcp_style == MCP_STYLE_CONFIG_ARG:
         return [
             MCP_CONFIG_ARG_FLAG,
-            _codex_mcp_config_arg(
+            codex_mcp_config_arg(
                 config.jsonl_file, config.compiled_dir, config.dimension, agent_params,
             ),
         ], None
@@ -152,7 +161,7 @@ def _build_mcp_args(
     return _build_config_file_mcp_args(config, provider_cfg, agent_params)
 
 
-def _build_model_budget_prompt_args(
+def build_model_budget_prompt_args(
     prompt: str, config: AnalysisConfig, provider_cfg: dict, model: str,
 ) -> list[str]:
     """Build model, budget, turns, and prompt args."""
@@ -173,26 +182,19 @@ def _build_model_budget_prompt_args(
     return args
 
 
-def _resolve_model_id(config: AnalysisConfig) -> str:
+def resolve_model_id(config: AnalysisConfig) -> str:
     """Pick the most specific model identifier available for cache keys.
 
-    Mirrors ``cache.dimension_helpers._model_id_from`` when a RunConfig is
-    carried; otherwise falls back to ``AnalysisConfig.ai_model``; otherwise
-    ``"unknown"``.
+    Uses the carried RunConfig's options (the same rule the cache keys use);
+    without them, ``AnalysisConfig.ai_model``; otherwise ``"unknown"``.
     """
     rc = config.run_config
-    if rc is not None:
-        opts = getattr(rc, "options", None)
-        if opts is not None:
-            return (
-                getattr(opts, "subagent_model", None)
-                or getattr(opts, "ai_model", None)
-                or "unknown"
-            )
+    if rc is not None and getattr(rc, "options", None) is not None:
+        return model_id_from(rc)
     return config.ai_model or "unknown"
 
 
-def _resolve_language(config: AnalysisConfig) -> str:
+def resolve_language(config: AnalysisConfig) -> str:
     """Return the RunConfig language for cache fingerprints, or "" if unset.
 
     The empty string, not None, is what "language not provided" looks like
@@ -204,7 +206,7 @@ def _resolve_language(config: AnalysisConfig) -> str:
     return ""
 
 
-def _resolve_standards_dir(config: AnalysisConfig) -> Path | None:
+def resolve_standards_dir(config: AnalysisConfig) -> Path | None:
     """Return the standards ROOT (``RunConfig.standards_dir``) for the
     subprocess's cache-writer keying, or None when no RunConfig is carried.
 

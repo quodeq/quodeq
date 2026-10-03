@@ -1,5 +1,6 @@
 import { useAssistantDrawer } from '../features/assistant/AssistantDrawerProvider.jsx';
 import useAssistantProvider from '../features/settings/hooks/useAssistantProvider.js';
+import { DRAWER_PANEL } from '../features/assistant/drawerPanelsModel.js';
 import { QMarkIcon } from './QMarkIcon.jsx';
 import { t } from '../strings/index.js';
 
@@ -13,7 +14,7 @@ export function AssistantLauncherButton() {
 
   // Highlighted whenever the assistant panel is open/selected (both launchers
   // can be highlighted at once when both panels are open).
-  const on = openPanels.includes('assistant');
+  const on = openPanels.includes(DRAWER_PANEL.ASSISTANT);
   return (
     <button
       type="button"
@@ -21,7 +22,7 @@ export function AssistantLauncherButton() {
       aria-pressed={on}
       aria-label={t('common.assistantShortcut')}
       title={t('common.assistantShortcut')}
-      onClick={() => toggleTopbar('assistant')}
+      onClick={() => toggleTopbar(DRAWER_PANEL.ASSISTANT)}
     >
       {/* 11px, not the 12px of the stroke icons: the Q fills its tight
           viewBox edge-to-edge while stroke icons carry built-in padding, so

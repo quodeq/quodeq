@@ -1,12 +1,13 @@
 """Source-file gathering and compiled-standards text for the API prompt.
 
-Split out of subprocess.py: repository scanning that selects which source
-files get inlined into a direct-API prompt, and rendering compiled standards
-JSON into the compact grouped-JSON text sent to API models. None of these
-functions are mock.patch targets.
+Repository scanning that selects which source files get inlined into a
+direct-API prompt, and rendering compiled standards JSON into the compact
+grouped-JSON text sent to API models. None of these functions are
+mock.patch targets.
 """
 from __future__ import annotations
 
+import functools
 import json as _json
 import logging
 import os
@@ -29,7 +30,21 @@ def _load_skip_dirs() -> frozenset[str]:
         return frozenset({"node_modules", ".git", "__pycache__", "venv", ".venv", "dist", "build"})
 
 
-_SKIP_DIRS = _load_skip_dirs()
+@functools.cache
+def skip_dirs() -> frozenset[str]:
+    """Skip dirs from detection.json (shared with manifest builder), read once."""
+    return _load_skip_dirs()
+
+
+_SKIP_DIRS_OLD_NAME = "SKIP_DIRS"  # __getattr__ shim for the old module-level constant
+
+
+def __getattr__(name: str):
+    if name == _SKIP_DIRS_OLD_NAME:
+        return skip_dirs()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 # Code files first, style/markup last
 _CODE_EXTS = frozenset({".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs", ".rb", ".php", ".c", ".cpp", ".h", ".cs", ".swift", ".kt"})
 _MARKUP_EXTS = frozenset({".html", ".css", ".scss", ".vue", ".svelte"})
@@ -38,13 +53,13 @@ _MARKUP_EXTS = frozenset({".html", ".css", ".scss", ".vue", ".svelte"})
 def _walk_source_files(work_dir: Path, exts: frozenset[str]) -> Iterator[Path]:
     """Source files under *work_dir*, never descending into skip dirs or dot dirs."""
     for root, dirs, files in os.walk(work_dir):
-        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.startswith(".")]
+        dirs[:] = [d for d in dirs if d not in skip_dirs() and not d.startswith(".")]
         for name in files:
             if not name.startswith(".") and os.path.splitext(name)[1] in exts:
                 yield Path(root, name)
 
 
-def _gather_source_files(work_dir: Path) -> list[Path]:
+def gather_source_files(work_dir: Path) -> list[Path]:
     """Collect source files from work_dir for API prompt assembly.
 
     Prioritizes code files over markup/styles and caps total size to
@@ -63,7 +78,7 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
 
     # Env-derived caps: read once per call, not once per candidate file.
     size_cap = dispatch_policy.api_file_size_cap()
-    char_budget = _api_prompt_char_budget()
+    char_budget = api_prompt_char_budget()
     # Filter out empty files and oversized files (skip dirs/dotdirs already pruned above)
     filtered = [f for f, size in stat_cache.items() if 0 < size < size_cap]
     # Prioritize code files over markup
@@ -88,7 +103,7 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     return selected
 
 
-def _api_prompt_char_budget(env: dict[str, str] | None = None) -> int:
+def api_prompt_char_budget(env: dict[str, str] | None = None) -> int:
     """Max bytes of file content to inline per model call.
 
     *env* lets subprocess.py pass the process environment explicitly; the
@@ -99,7 +114,7 @@ def _api_prompt_char_budget(env: dict[str, str] | None = None) -> int:
     return max_api_prompt_chars(env)
 
 
-def _max_standards_chars(env: dict[str, str] | None = None) -> int:
+def standards_char_budget(env: dict[str, str] | None = None) -> int:
     """Max chars of standards text to include in an API prompt.
 
     Read per call (not at import) so QUODEQ_MAX_STANDARDS_CHARS can be
@@ -110,7 +125,17 @@ def _max_standards_chars(env: dict[str, str] | None = None) -> int:
     return max_standards_chars(env)
 
 
-def _load_standards_text(
+_TRUNCATION_MARKER = "\n\n[... standards truncated for context limits ...]"  # tells the model the list is partial
+
+
+def _truncate(text: str, limit: int) -> str:
+    """Cut *text* to *limit* characters and append the truncation marker when it is longer."""
+    if len(text) > limit:
+        return text[:limit] + _TRUNCATION_MARKER
+    return text
+
+
+def load_standards_text(
     compiled_dir: Path | None,
     dimension: str | None,
     overrides: dict | None = None,
@@ -128,39 +153,44 @@ def _load_standards_text(
     supplied, placeholder templates in requirement text are resolved before
     the text is sent to the model.
 
-    Truncates to *max_chars* (default :func:`_max_standards_chars`) to keep
+    Truncates to *max_chars* (default :func:`standards_char_budget`) to keep
     prompts within context limits.
     """
-    limit = max_chars if max_chars is not None else _max_standards_chars()
+    limit = max_chars if max_chars is not None else standards_char_budget()
     if not compiled_dir or not dimension:
         return ""
     json_path = compiled_dir / f"{dimension}.json"
     if json_path.exists():
         try:
             data = _json.loads(json_path.read_text(encoding="utf-8"))
-            text = _render_standards_grouped(data, overrides=overrides)
+            text = render_standards_grouped(data, overrides=overrides)
             if text:
                 if len(text) > limit:
                     _log.info("Truncating %s standards from %d to %d chars for API prompt",
                               dimension, len(text), limit)
-                    text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
-                return text
+                return _truncate(text, limit)
         except (OSError, _json.JSONDecodeError) as exc:
-            _log.debug("compiled standards file skipped: %s", exc)
+            _log.warning(
+                "compiled standards file skipped for dimension %s (%s): %s",
+                dimension, json_path, exc,
+            )
     md_path = compiled_dir / f"{dimension}.md"
     if md_path.exists():
         try:
-            text = md_path.read_text(encoding="utf-8")
-            if len(text) > limit:
-                text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
-            return text
-        except OSError as exc:
-            _log.debug("standards text file unreadable: %s", exc)
+            return _truncate(md_path.read_text(encoding="utf-8"), limit)
+        except (OSError, UnicodeDecodeError) as exc:
+            _log.warning("standards text file unreadable: %s", exc)
     return ""
 
 
-def _render_standards_grouped(data: dict, overrides: dict | None = None) -> str:
+def render_standards_grouped(data: object, overrides: dict | None = None) -> str:
     """Render standards as a compact JSON array grouped by principle.
+
+    *data* is the parsed compiled-standards JSON, which comes from a file on
+    disk and is not guaranteed to have the expected shape; anything other
+    than a dict with a list ``principles`` renders as an empty string, and
+    malformed principles or requirements within it are skipped rather than
+    raising.
 
     The explicit structure helps local models give attention to ALL principle
     groups instead of fixating on the first ones in a flat list.
@@ -172,16 +202,28 @@ def _render_standards_grouped(data: dict, overrides: dict | None = None) -> str:
     """
     from quodeq.core.standards.overrides import resolve_requirement_text  # noqa: PLC0415
 
-    principles = data.get("principles", [])
-    if not principles:
+    if not isinstance(data, dict):
+        return ""
+    principles = data.get("principles")
+    if not isinstance(principles, list) or not principles:
         return ""
     checklist = []
     for p in principles:
+        if not isinstance(p, dict):
+            continue
+        requirements = []
+        raw_requirements = p.get("requirements")
+        if not isinstance(raw_requirements, list):
+            raw_requirements = []
+        for r in raw_requirements:
+            if not isinstance(r, dict) or not isinstance(r.get("id"), str):
+                continue
+            requirements.append({
+                "id": r["id"],
+                "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"])),
+            })
         checklist.append({
             "principle": p.get("name", "Unknown"),
-            "requirements": [
-                {"id": r["id"], "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"]))}
-                for r in p.get("requirements", [])
-            ],
+            "requirements": requirements,
         })
     return _json.dumps(checklist, separators=(",", ":"))

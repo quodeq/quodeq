@@ -140,3 +140,18 @@ class TestCircuitBreakerError:
     def test_default_reason(self):
         exc = CircuitBreakerError()
         assert exc.reason == REASON_CIRCUIT_BREAKER
+
+
+def test_trip_records_the_breaker_as_the_cancel_cause(tmp_path: Path):
+    """The dim runner releases only a cancel the breaker itself requested, so
+    the trip must leave its name on the token. An unlabelled cancel reads as
+    a signal and would hold the run."""
+    jsonl = tmp_path / "evidence.jsonl"
+    jsonl.touch()
+    watcher = FailureStreakWatcher(jsonl, threshold=2)
+    watcher.start()
+    for i in range(2):
+        _append(jsonl, {"_marker": "file_done", "file": f"f{i}.py", "status": "error", "reason": "parse_error"})
+    watcher.wait_for_trip(timeout=5.0)
+    watcher.stop_and_join(timeout=5.0)
+    assert cancellation.cancel_reason() == REASON_CIRCUIT_BREAKER

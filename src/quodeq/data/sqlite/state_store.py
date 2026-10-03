@@ -13,11 +13,14 @@ if TYPE_CHECKING:
 
 from quodeq.core.events.models import Judgment
 from quodeq.core.dismissals import DismissedKeys
+from quodeq.core.types.finding_type import FindingType
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
+from quodeq.data.sqlite._schema import DELETE_DIMENSION_SCORES_SQL, INSERT_FINDING_SQL
 from quodeq.data.sqlite.row_mappers import judgment_to_row
-from quodeq.data.sqlite._state_store_meta import _StateStoreMetaMixin
+from quodeq.data.sqlite._state_store_meta import StateStoreMetaMixin
+from quodeq.data.sqlite._state_store_unmapped import UnmappedFindingsMixin
 
 _logger = logging.getLogger(__name__)
 
@@ -38,19 +41,6 @@ _CHECKPOINT_KEY = "projection_checkpoint"
 _PROJECTED_SIZE_KEY = "projection_event_log_size"
 _ACTIONS_SIZE_KEY = "actions_log_projected_size"
 
-_INSERT_FINDING = """
-INSERT OR IGNORE INTO findings (
-    schema_version, practice_id, dimension, requirement, verdict, severity,
-    file, line, end_line, title, reason, snippet, violation_type, violation_type_raw, context,
-    scope, req_refs_json, dedup_key, confidence, provenance_downgrade,
-    scope_downgrade_json
-) VALUES (
-    :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
-    :file, :line, :end_line, :title, :reason, :snippet, :violation_type, :violation_type_raw, :context,
-    :scope, :req_refs_json, :dedup_key, :confidence, :provenance_downgrade,
-    :scope_downgrade_json
-)
-"""
 
 # Compliance rows are never dismissed, so they are not read back.
 _SELECT_VERDICT_ROWS = (
@@ -59,7 +49,7 @@ _SELECT_VERDICT_ROWS = (
 )
 
 
-class SQLiteStateStore(_StateStoreMetaMixin):
+class SQLiteStateStore(StateStoreMetaMixin, UnmappedFindingsMixin):
     """Writes projected event state into evaluation.db."""
 
     def __init__(self, run_dir: Path) -> None:
@@ -73,12 +63,16 @@ class SQLiteStateStore(_StateStoreMetaMixin):
         The projection applies the dismissed state and then saves the
         projected size; without this, every call opens/configures/closes its
         own connection (measured: ~21s of pure connection churn for a 100-run
-        project back when the replay ran one UPDATE per event).
+        project back when the replay ran one UPDATE per event). Findings
+        recorded inside the block are committed once, on normal exit; if the
+        block raises, nothing it recorded since the last explicit commit is
+        kept, and the replay re-reads those events next time.
         """
         with open_evaluation_db(self._run_dir) as conn:
             self._held = conn
             try:
                 yield conn
+                conn.commit()
             finally:
                 self._held = None
 
@@ -98,8 +92,9 @@ class SQLiteStateStore(_StateStoreMetaMixin):
         """
         row = judgment_to_row(payload)
         with self._db() as conn:
-            conn.execute(_INSERT_FINDING, row)
-            conn.commit()
+            conn.execute(INSERT_FINDING_SQL, row)
+            if self._held is None:  # a held batch commits once, in connection()
+                conn.commit()
 
     def clear_all(self) -> None:
         """Reset everything the projection owns for this run.
@@ -109,7 +104,8 @@ class SQLiteStateStore(_StateStoreMetaMixin):
         """
         with self._db() as conn:
             conn.execute("DELETE FROM findings")
-            conn.execute("DELETE FROM dimension_scores")
+            conn.execute("DELETE FROM unmapped_findings")
+            conn.execute(DELETE_DIMENSION_SCORES_SQL)
             conn.execute(
                 "DELETE FROM run_meta WHERE key IN (?, ?, ?)",
                 (_CHECKPOINT_KEY, _PROJECTED_SIZE_KEY, _ACTIONS_SIZE_KEY),
@@ -132,7 +128,7 @@ class SQLiteStateStore(_StateStoreMetaMixin):
             for fid, req, practice_id, file, line, snippet, verdict in rows:
                 hidden = dismissed.matches(
                     req=req, principle=practice_id, file=file, line=line, snippet=snippet)
-                wanted = "dismissed" if hidden else "violation"
+                wanted = "dismissed" if hidden else FindingType.VIOLATION
                 if wanted != verdict:
                     changes.append((wanted, fid))
             if changes:
@@ -219,11 +215,11 @@ class SQLiteStateStore(_StateStoreMetaMixin):
             principle_rows: Sequence of ``(dimension, principle_grade_dict)``
                 as returned by ``compute_run_grades``.
             dimension_rows: Sequence of dimension score dicts
-                (``{"dimension": ..., "score": ..., "grade": ...}``).
+                (``{"dimension", "score", "grade", "exit_reason", "files_read",
+                "source_count", "coverage_pct"}``; the coverage keys default to 0).
         """
         with self._db() as conn:
-            conn.execute("DELETE FROM dimension_scores")
-            conn.execute("DELETE FROM principle_grades")
+            _delete_grades(conn)
             # One prepared statement per table instead of one Python/SQLite
             # round-trip per row; rows land in the order given.
             conn.executemany(
@@ -238,10 +234,11 @@ class SQLiteStateStore(_StateStoreMetaMixin):
             )
             conn.executemany(
                 "INSERT INTO dimension_scores "
-                "(dimension, score, grade, exit_reason, completed_at) "
-                "VALUES (?, ?, ?, ?, datetime('now'))",
+                "(dimension, score, grade, exit_reason, files_read, source_count, coverage_pct, "
+                "completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
                 [
-                    (d["dimension"], d["score"], d["grade"], d.get("exit_reason"))
+                    (d["dimension"], d["score"], d["grade"], d.get("exit_reason"),
+                     d.get("files_read", 0), d.get("source_count", 0), d.get("coverage_pct", 0.0))
                     for d in dimension_rows
                 ],
             )
@@ -250,19 +247,19 @@ class SQLiteStateStore(_StateStoreMetaMixin):
     def clear_grades(self) -> None:
         """Empty both grade tables. Findings are left alone."""
         with self._db() as conn:
-            conn.execute("DELETE FROM dimension_scores")
-            conn.execute("DELETE FROM principle_grades")
+            _delete_grades(conn)
             conn.commit()
 
     def read_dimension_scores(self) -> list[dict]:
         """Return every ``dimension_scores`` row as a dict, ordered by dimension."""
         with self._db() as conn:
             rows = conn.execute(
-                "SELECT dimension, score, grade, exit_reason "
+                "SELECT dimension, score, grade, exit_reason, files_read, source_count, coverage_pct "
                 "FROM dimension_scores ORDER BY dimension"
             ).fetchall()
         return [
-            {"dimension": r[0], "score": r[1], "grade": r[2], "exit_reason": r[3]}
+            {"dimension": r[0], "score": r[1], "grade": r[2], "exit_reason": r[3],
+             "files_read": r[4], "source_count": r[5], "coverage_pct": r[6]}
             for r in rows
         ]
 
@@ -285,3 +282,9 @@ class SQLiteStateStore(_StateStoreMetaMixin):
         """Compute the run-level score from non-null dimension scores (weighted when params enable dimension weights)."""
         rows = self.read_dimension_scores()
         return compute_run_score(rows, params=params if params is not None else DEFAULT_PARAMS)
+
+
+def _delete_grades(conn: sqlite3.Connection) -> None:
+    """Delete every row of both grade tables (no commit)."""
+    conn.execute(DELETE_DIMENSION_SCORES_SQL)
+    conn.execute("DELETE FROM principle_grades")

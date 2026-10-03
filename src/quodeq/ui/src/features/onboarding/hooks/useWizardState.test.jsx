@@ -11,11 +11,11 @@ describe('useWizardState', () => {
     expect(result.current.state.standardIds.size).toBe(0);
   });
 
-  it('initial state for existing project starts at repo-scan with isFirstProject=false', () => {
+  it('initial state for existing project starts at analyze with isFirstProject=false', () => {
     const { result } = renderHook(() =>
-      useWizardState({ initial: { step: 'repo-scan', isFirstProject: false } }),
+      useWizardState({ initial: { step: 'analyze', isFirstProject: false } }),
     );
-    expect(result.current.state.step).toBe('repo-scan');
+    expect(result.current.state.step).toBe('analyze');
     expect(result.current.state.isFirstProject).toBe(false);
   });
 
@@ -59,6 +59,21 @@ describe('useWizardState', () => {
     act(() => result.current.toggleStandard('std-a'));
     act(() => result.current.toggleStandard('std-a'));
     expect(result.current.state.standardIds.size).toBe(0);
+  });
+
+  it('starts on the url source', () => {
+    const { result } = renderHook(() => useWizardState());
+    expect(result.current.state.repo.source).toBe('url');
+  });
+
+  it('seedStandards sets the default pick only while nothing is picked; pickStandards replaces it', () => {
+    const { result } = renderHook(() => useWizardState({ initial: { isFirstProject: true } }));
+    act(() => result.current.seedStandards(['security', 'performance']));
+    expect(Array.from(result.current.state.standardIds)).toEqual(['security', 'performance']);
+    act(() => result.current.seedStandards(['reliability']));
+    expect(Array.from(result.current.state.standardIds)).toEqual(['security', 'performance']);
+    act(() => result.current.pickStandards(['reliability']));
+    expect(Array.from(result.current.state.standardIds)).toEqual(['reliability']);
   });
 
   it('leaves the state alone for a prototype-named action type', () => {

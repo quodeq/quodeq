@@ -3,8 +3,9 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../api/index.js', () => ({
-  getCompareSummary: vi.fn(),
+  getFleetCompare: vi.fn(),
   getDimensionEval: vi.fn(),
+  sharedGetFleetCompare: vi.fn(),
 }));
 vi.mock('../../../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
@@ -12,12 +13,11 @@ vi.mock('../../../api/standards.js', () => ({
 }));
 vi.mock('../../../api/shared.js', () => ({
   sharedListProjects: vi.fn(),
-  sharedGetCompareSummary: vi.fn(),
 }));
 
-import { getCompareSummary, getDimensionEval } from '../../../api/index.js';
-import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
-import { PROJECTS, summary, renderPage, iso } from './_comparePage.fixtures.jsx';
+import { getDimensionEval, getFleetCompare, sharedGetFleetCompare } from '../../../api/index.js';
+import { sharedListProjects } from '../../../api/shared.js';
+import { PROJECTS, fleetOf, summary, renderPage, iso } from './_comparePage.fixtures.jsx';
 
 /**
  * Split from ComparePage.test.jsx: the local-fleet table, matrix, and
@@ -38,12 +38,12 @@ async function drillIntoSecurity() {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  getCompareSummary.mockImplementation((id) => Promise.resolve(
-    id === 'alpha' ? summary(7.4, 7.0) : summary(5.9, 5.5),
-  ));
+  getFleetCompare.mockImplementation(fleetOf((id) => (
+    id === 'alpha' ? summary(7.4, 7.0) : summary(5.9, 5.5)
+  )));
   // Default: no shared repository configured — the local-only flow.
   sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
-  sharedGetCompareSummary.mockRejectedValue(new Error('unexpected shared fetch'));
+  sharedGetFleetCompare.mockRejectedValue(new Error('unexpected shared fetch'));
 });
 
 describe('ComparePage', () => {
@@ -89,11 +89,9 @@ describe('ComparePage', () => {
   });
 
   it('collapses never-evaluated projects into a single line', async () => {
-    getCompareSummary.mockImplementation((id) => (id === 'alpha'
-      ? Promise.resolve(summary(7.4, 7.0))
-      : Promise.resolve({
-        summary: {}, dimensions: [], trend: [], runsCount: 0, lastRun: null,
-      })));
+    getFleetCompare.mockImplementation(fleetOf((id) => (id === 'alpha'
+      ? summary(7.4, 7.0)
+      : { summary: {}, dimensions: [], trend: [], runsCount: 0, lastRun: null })));
     renderPage();
     await screen.findByText('alpha');
     // Once beta settles with no data it leaves the table for the collapsed
@@ -192,7 +190,7 @@ describe('ComparePage', () => {
   });
 
   it('hides dimensions the user has disabled, like the Overview', async () => {
-    getCompareSummary.mockImplementation(() => Promise.resolve({
+    getFleetCompare.mockImplementation(fleetOf(() => ({
       ...summary(7.0, 7.0),
       dimensions: [
         ...summary(7.0, 7.0).dimensions,
@@ -203,7 +201,7 @@ describe('ComparePage', () => {
           principles: [],
         },
       ],
-    }));
+    })));
     // Same browser-local set the Overview filters by (and the Standards
     // screen's stars write) — the whole point of the shared source of truth.
     localStorage.setItem('quodeq-visible-standards', JSON.stringify(['security']));
@@ -267,11 +265,10 @@ describe('ComparePage', () => {
   });
 
   it('marks projects whose summary failed', async () => {
-    getCompareSummary.mockImplementation((id) => (
-      id === 'beta'
-        ? Promise.reject(new Error('boom'))
-        : Promise.resolve(summary(7.4, 7.0))
-    ));
+    getFleetCompare.mockImplementation(fleetOf((id) => {
+      if (id === 'beta') throw new Error('boom');
+      return summary(7.4, 7.0);
+    }));
     renderPage();
     expect(await screen.findByText('failed to load scores', undefined, { timeout: 4000 })).toBeInTheDocument();
     // The healthy project still renders its data (row + scope card).

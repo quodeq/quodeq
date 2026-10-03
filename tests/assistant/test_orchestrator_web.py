@@ -52,7 +52,7 @@ def test_web_enabled_ignored_for_cloud_api_provider(setup):
 
 def test_web_enabled_threads_to_cli_config(setup, monkeypatch):
     repo, ctx = setup
-    monkeypatch.setattr("quodeq.assistant.orchestrator.get_provider_configs",
+    monkeypatch.setattr("quodeq.assistant._turn_grants.get_provider_configs",
                         lambda: {"claude": {"type": "cli"}})
     seen = {}
 

@@ -38,6 +38,47 @@ def test_skipped_when_opted_out() -> None:
     assert stream.getvalue() == ""
 
 
+class _BrokenPipe(io.StringIO):
+    """A stream whose write() fails like a closed stdout pipe would."""
+
+    def isatty(self) -> bool:
+        return True
+
+    def write(self, _s: str) -> int:
+        raise BrokenPipeError("write failed")
+
+
+def test_broken_pipe_during_print_is_swallowed() -> None:
+    stream = _BrokenPipe()
+    status = {"update_available": True, "current": "1.4.0", "latest": "1.5.0",
+              "action_command": "pipx upgrade quodeq", "is_security": False, "disclosed": True}
+    with patch("quodeq.cli.get_status", return_value=status), \
+         patch("quodeq.cli.check_async"):
+        cli.maybe_emit_cli_notice(stream=stream, env={})  # must not raise
+
+
+class _NonUtf8Stream(io.StringIO):
+    """A stream whose write() fails like stdout would if it couldn't be
+    reconfigured to UTF-8 and the "→" glyph can't be encoded."""
+
+    def isatty(self) -> bool:
+        return True
+
+    def write(self, s: str) -> int:
+        if "→" in s:  # "→"
+            raise UnicodeEncodeError("ascii", s, s.index("→"), s.index("→") + 1, "ordinal not in range(128)")
+        return len(s)
+
+
+def test_unicode_encode_error_during_print_is_swallowed() -> None:
+    stream = _NonUtf8Stream()
+    status = {"update_available": True, "current": "1.4.0", "latest": "1.5.0",
+              "action_command": "pipx upgrade quodeq", "is_security": False, "disclosed": True}
+    with patch("quodeq.cli.get_status", return_value=status), \
+         patch("quodeq.cli.check_async"):
+        cli.maybe_emit_cli_notice(stream=stream, env={})  # must not raise
+
+
 def test_disclosure_prints_once_then_marks() -> None:
     stream = _TTY()
     status = {"update_available": False, "current": "1.4.0", "latest": None,

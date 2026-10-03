@@ -5,8 +5,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.observability import NULL_LOG, LogSink
 
-def _infer_end_line(findings: list[dict]) -> None:
+
+def infer_end_line(findings: list[dict]) -> None:
     """Derive end_line from snippet line count when the model omits it.
 
     Small local models often skip end_line, which collapses the dashboard
@@ -26,11 +28,26 @@ def _infer_end_line(findings: list[dict]) -> None:
             f["end_line"] = line + n - 1
 
 
-def _resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[dict]:
-    """Resolve short filenames to full relative paths."""
+def resolve_file_paths(
+    findings: list[dict], source_paths: list[str], *, log: LogSink = NULL_LOG,
+) -> list[dict]:
+    """Resolve short filenames to full relative paths.
+
+    A basename shared by two or more source paths is ambiguous: mapping it
+    to either one risks pointing a finding at the wrong file, so it is left
+    as the model's short name instead, logged once per ambiguous name.
+    """
     name_to_path: dict[str, str] = {}
+    ambiguous: set[str] = set()
     for p in source_paths:
         name = Path(p).name
+        if name in ambiguous:
+            continue
+        if name in name_to_path and name_to_path[name] != p:
+            ambiguous.add(name)
+            del name_to_path[name]
+            log.debug(f"Ambiguous short filename {name!r} (multiple source paths): leaving unresolved")
+            continue
         name_to_path[name] = p
 
     for f in findings:
@@ -40,7 +57,7 @@ def _resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[d
     return findings
 
 
-def _derive_run_paths(jsonl_file: Path) -> tuple[Path | None, Path | None]:
+def derive_run_paths(jsonl_file: Path) -> tuple[Path | None, Path | None]:
     """``(project_dir, run_dir)`` derived from the evidence file location.
 
     *jsonl_file* is ``<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl``,

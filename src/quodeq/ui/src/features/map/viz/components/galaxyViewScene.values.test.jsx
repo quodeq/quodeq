@@ -45,7 +45,7 @@ function mkDim(name, type) {
   };
 }
 
-const STANDARD_TYPES = { clean: 'builtin', solid: 'builtin', secure: 'community' };
+const STANDARD_TYPES = { clean: 'iso', solid: 'iso', secure: 'community' };
 
 describe('galaxyViewScene value characterization', () => {
   let randomSpy;
@@ -121,8 +121,8 @@ describe('galaxyViewScene value characterization', () => {
 
 describe('galaxyViewLayout value characterization', () => {
   it('computeClusterPositions seeds distances inside the recorded range', () => {
-    expect(computeClusterPositions(['builtin'])).toEqual([[0, 0]]);
-    expect(computeClusterPositions(['builtin', 'quodeq', 'community'])
+    expect(computeClusterPositions(['iso'])).toEqual([[0, 0]]);
+    expect(computeClusterPositions(['iso', 'quodeq', 'community'])
       .map(([x, y]) => [round(x), round(y)])).toMatchSnapshot('cluster-positions');
   });
 

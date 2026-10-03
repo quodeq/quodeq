@@ -7,31 +7,42 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import _path_from_body, error_response, json_error, page_params
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, MESSAGE_INVALID_PROJECT_NAME, QUERY_FLAG_TRUE
+from quodeq.api.helpers import (
+    error_response,
+    json_error,
+    jsonify_error,
+    optional_json_object_or_response,
+    page_params,
+    path_from_body,
+    validate_segment,
+)
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
-from quodeq.api.routes_project_create import _create_project
+from quodeq.api.routes_project_create import handle_create_project
+from quodeq.api.routes_project_refresh import handle_refresh_project
 from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
 from quodeq.services.warmup import WarmupEngine, engine as warmup_engine
 from quodeq.services.wiring import is_valid_repo_url
 from quodeq.services.base import ActionProvider
 from quodeq.shared.utils import is_repo_url
-from quodeq.shared.validation import validate_canonical_absolute, validate_path_segment
+from quodeq.shared.validation import validate_canonical_absolute
 
 _logger = logging.getLogger(__name__)
 
 
-def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
+def handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle DELETE /api/projects/<project>."""
     project = request.view_args["project"]
-    if request.args.get("confirm") != "true":
+    if request.args.get("confirm") != QUERY_FLAG_TRUE:
         return json_error("Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED")
     _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.delete_project(reports_dir(), project)
     if not ok:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
+    provider.invalidate_projects_cache()
     return jsonify({"deleted": project})
 
 
@@ -52,7 +63,7 @@ def _validated_target_path(new_path: str) -> str | tuple[dict[str, Any], int]:
         # http://, always with the same reason -- never echo exception text.
         return error_response(
             "path must use https:// or git@; cleartext http:// repository URLs are rejected",
-            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
         )
     if looks_like_url:
         if not is_valid_repo_url(new_path):
@@ -69,17 +80,17 @@ def _validated_target_path(new_path: str) -> str | tuple[dict[str, Any], int]:
         # Fixed message, not str(exc): never echo exception text.
         return error_response(
             f"path must be an absolute, traversal-free directory, got {new_path!r}",
-            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
         )
     if not resolved.is_dir():
         return error_response(
             f"path must be an existing directory, got {new_path!r}",
-            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
         )
     return str(resolved)
 
 
-def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Response, int]:
+def handle_update_project_path(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle PATCH /api/projects/<project>/path.
 
     ``provider.update_project_path`` only ever returns a bare bool, so
@@ -87,36 +98,41 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     path-traversal attempt, a non-existent target) is validated by
     ``_validated_target_path`` and given its own message/code. Once that
     passes, a False from the provider can only mean the project itself is
-    not registered, so NOT_FOUND is reserved for that case (finding 5926).
+    not registered, so NOT_FOUND is reserved for that case.
     """
     project = request.view_args["project"]
-    data = request.get_json(silent=True) or {}
-    raw_path = _path_from_body(data)
+    data = optional_json_object_or_response(CODE_INVALID_INPUT)
+    if not isinstance(data, dict):
+        return data
+    raw_path = path_from_body(data)
     if isinstance(raw_path, tuple):
-        body, status = raw_path
-        return jsonify(body), status
+        return jsonify_error(raw_path)
     if not raw_path:
-        return json_error("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return json_error("Path is required", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     new_path = _validated_target_path(raw_path)
     if isinstance(new_path, tuple):
-        body, status = new_path
-        return jsonify(body), status
+        return jsonify_error(new_path)
 
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
     if not ok:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
+    provider.invalidate_projects_cache()
     return jsonify({"updated": project, "path": new_path})
+
+
+def handle_import_project(provider: ActionProvider) -> Response | tuple[Response, int]:
+    """Handle POST /api/projects/import, then drop the stale project cache."""
+    response = _import_project(reports_dir())
+    status = response[1] if isinstance(response, tuple) else response.status_code
+    if status < HTTPStatus.BAD_REQUEST:
+        provider.invalidate_projects_cache()
+    return response
 
 
 def _invalid_project_name(project: str) -> tuple[Response, int] | None:
     """The 400 every per-project route returns for a malformed name, else None."""
-    try:
-        validate_path_segment(project)
-    except ValueError:
-        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
-    return None
+    return validate_segment(project, message=MESSAGE_INVALID_PROJECT_NAME)
 
 
 def _list_projects(
@@ -139,9 +155,7 @@ def _list_projects(
     # Self-healing warm-up: anything still pending on the page being
     # returned goes (back) on the queue, bounding this to page size
     # instead of the full project count.
-    for entry in projects:
-        if getattr(entry, "summary_pending", False):
-            warmup.enqueue(entry.id)
+    warmup.enqueue_pending(projects)
     # Serialize at the boundary: providers hand back ProjectEntry
     # entities (or already-serialized dicts from remote providers).
     wire = [p if isinstance(p, dict) else to_camel_dict(p) for p in projects]
@@ -159,8 +173,7 @@ def _project_info(provider: ActionProvider, project: str) -> Response | tuple[Re
         return invalid
     info = provider.get_project_info(reports_dir(), project)
     if not info:
-        body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project info not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(info)
 
 
@@ -177,7 +190,7 @@ def register_project_list_routes(
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
         """Update the local filesystem path for a project."""
-        return _invalid_project_name(project) or _handle_update_project_path(provider)
+        return _invalid_project_name(project) or handle_update_project_path(provider)
 
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
@@ -192,12 +205,17 @@ def register_project_list_routes(
         and an optional ``action`` field (``replace`` or ``copy``) used to
         resolve a 409 collision returned from a prior call.
         """
-        return _import_project(reports_dir())
+        return handle_import_project(provider)
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its run data."""
-        return _invalid_project_name(project) or _handle_delete_project(provider)
+        return _invalid_project_name(project) or handle_delete_project(provider)
+
+    @app.post("/api/projects/<project>/refresh")
+    def refresh_project(project: str) -> Response | tuple[Response, int]:
+        """Update a project's working copy from its git remote."""
+        return _invalid_project_name(project) or handle_refresh_project(provider, project)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:
@@ -206,4 +224,4 @@ def register_project_list_routes(
     @app.post("/api/projects")
     def create_project() -> Response | tuple[Response, int]:
         """Register a new project (clone + scan) without starting an evaluation."""
-        return _create_project(provider)
+        return handle_create_project(provider)

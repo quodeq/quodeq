@@ -1,13 +1,14 @@
 import { useReducer, useCallback } from 'react';
 import { STEP_WELCOME } from '../wizardSteps.js';
+import { SCAN_SUB_STATE, REPO_SOURCE } from '../onboardingVocab.js';
 
 const DEFAULT_TIME_LIMIT_S = 600; // 10 minutes
 
 function initialState(initial = {}) {
   return {
     step: initial.step || STEP_WELCOME,
-    repoScanSubState: 'idle',
-    repo: { source: 'url', value: '', branch: null, scopePath: null },
+    repoScanSubState: SCAN_SUB_STATE.IDLE,
+    repo: { source: REPO_SOURCE.URL, value: '', branch: null, scopePath: null },
     projectId: null,
     scan: null,
     provider: { id: null, model: null, classification: null },
@@ -39,19 +40,22 @@ function toggleStandard(state, id) {
 const HANDLERS = {
   GO_TO_STEP: (state, action) => ({ ...state, step: action.step }),
   SET_REPO: (state, action) => ({ ...state, repo: { ...state.repo, ...action.repo } }),
-  SCAN_START: (state) => ({ ...state, repoScanSubState: 'scanning', scan: null, projectId: null }),
+  SCAN_START: (state) => ({ ...state, repoScanSubState: SCAN_SUB_STATE.SCANNING, scan: null, projectId: null }),
   SCAN_SUCCESS: (state, action) => ({
     ...state,
-    repoScanSubState: 'scanned',
+    repoScanSubState: SCAN_SUB_STATE.SCANNED,
     scan: action.scan,
     projectId: action.projectId,
   }),
-  SCAN_ERROR: (state, action) => ({ ...state, repoScanSubState: 'error', scanError: action.error }),
-  SCAN_RESET: (state) => ({ ...state, repoScanSubState: 'idle', scan: null, projectId: null, scanError: null }),
+  SCAN_ERROR: (state, action) => ({ ...state, repoScanSubState: SCAN_SUB_STATE.ERROR, scanError: action.error }),
+  SCAN_RESET: (state) => ({ ...state, repoScanSubState: SCAN_SUB_STATE.IDLE, scan: null, projectId: null, scanError: null }),
   SET_PROVIDER: (state, action) => ({ ...state, provider: { ...state.provider, ...action.provider } }),
   SET_PROVIDER_VIEW: (state, action) => ({ ...state, providerView: action.view }),
   SET_TIME_LIMIT: (state, action) => ({ ...state, totalTimeLimitS: action.seconds }),
   TOGGLE_STANDARD: (state, action) => ({ ...state, standardIds: toggleStandard(state, action.id) }),
+  PICK_STANDARDS: (state, action) => ({ ...state, standardIds: new Set(action.ids) }),
+  // The default pick once the standards load: never over a pick already made.
+  SEED_STANDARDS: (state, action) => (state.standardIds.size > 0 ? state : { ...state, standardIds: new Set(action.ids) }),
   LAUNCH_START: (state) => ({ ...state, launching: true }),
   LAUNCH_ERROR: (state, action) => ({ ...state, launching: false, launchError: action.error }),
   RESET: (state, action) => initialState(action.initial),
@@ -95,6 +99,8 @@ export function useWizardState(options = {}) {
   const setProviderView = useCallback((view) => dispatch({ type: 'SET_PROVIDER_VIEW', view }), []);
   const setTimeLimit = useCallback((seconds) => dispatch({ type: 'SET_TIME_LIMIT', seconds }), []);
   const toggleStandard = useCallback((id) => dispatch({ type: 'TOGGLE_STANDARD', id }), []);
+  const pickStandards = useCallback((ids) => dispatch({ type: 'PICK_STANDARDS', ids }), []);
+  const seedStandards = useCallback((ids) => dispatch({ type: 'SEED_STANDARDS', ids }), []);
   const startLaunch = useCallback(() => dispatch({ type: 'LAUNCH_START' }), []);
   const failLaunch = useCallback((error) => dispatch({ type: 'LAUNCH_ERROR', error }), []);
   const reset = useCallback((initial) => dispatch({ type: 'RESET', initial }), []);
@@ -111,6 +117,8 @@ export function useWizardState(options = {}) {
     setProviderView,
     setTimeLimit,
     toggleStandard,
+    pickStandards,
+    seedStandards,
     startLaunch,
     failLaunch,
     reset,

@@ -22,7 +22,10 @@ class _SpyBackend:
     def _check(self, op: str, key: str) -> None:
         self.calls.append((op, key))
         if self.fail:
-            raise RuntimeError(f"injected {op} failure")
+            # OSError, not an arbitrary Exception: TieredCache's remote-tier
+            # catches narrow to (OSError, ValueError), the shapes a real
+            # network/IO-backed remote backend raises.
+            raise OSError(f"injected {op} failure")
 
     def get(self, key: str) -> CacheEntry | None:
         self._check("get", key)
@@ -112,3 +115,11 @@ class TestRemoteFailureIsolation:
         remote = _SpyBackend(fail=True)
         cache = TieredCache(local=local, remote=remote)
         assert cache.has("0" * 64) is False
+
+    def test_remote_delete_failure_does_not_propagate(self, local: LocalFileBackend):
+        remote = _SpyBackend(fail=True)
+        cache = TieredCache(local=local, remote=remote)
+        e = _entry("e" * 64)
+        local.put(e.key, e)
+        cache.delete(e.key)  # must not raise
+        assert not local.has(e.key)

@@ -18,13 +18,13 @@ standards changes.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.entry import CacheEntry
 from quodeq.analysis.cache.key import CacheKey
 from quodeq.context.path_role import path_role
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 
 def _compatible_move(old_path: str, new_path: str) -> bool:
@@ -44,7 +44,7 @@ def _clone_for(src: CacheEntry, *, new_key: str, new_path: str, language: str) -
     return replace(
         src, key=new_key, file_path=new_path, findings=findings, language=language,
         provenance=provenance,
-        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        created_at=utc_now_iso(timespec=ISO_SECONDS),
     )
 
 

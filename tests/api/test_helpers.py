@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
+import pytest
 from flask import Flask
 
 from quodeq.api.helpers import (
@@ -67,6 +68,21 @@ class TestValidateEvaluationPayload:
 
     def test_valid_numerical(self):
         assert validate_evaluation_payload({"repo": "r", "numerical": True}) is None
+
+    @pytest.mark.parametrize("field", ["verifyFindings", "perDimension", "cleanScan", "incremental"])
+    def test_invalid_bool_field_is_rejected(self, field):
+        err = validate_evaluation_payload({"repo": "r", field: "false"})
+        assert field in err
+        assert "boolean" in err
+
+    @pytest.mark.parametrize("field", ["verifyFindings", "perDimension", "cleanScan", "incremental"])
+    @pytest.mark.parametrize("value", [True, False])
+    def test_valid_bool_field_is_accepted(self, field, value):
+        assert validate_evaluation_payload({"repo": "r", field: value}) is None
+
+    @pytest.mark.parametrize("field", ["verifyFindings", "perDimension", "cleanScan", "incremental"])
+    def test_null_bool_field_is_treated_as_absent(self, field):
+        assert validate_evaluation_payload({"repo": "r", field: None}) is None
 
     def test_combined_missing_and_invalid(self):
         err = validate_evaluation_payload({"discipline": 123})

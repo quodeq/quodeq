@@ -2,7 +2,7 @@
 
 ASSISTANT_SCHEMA_VERSION = 4
 
-# ``sessions.source`` defaults to 'local', i.e. shared.constants.SESSION_SOURCE_LOCAL;
+# ``sessions.source`` defaults to 'local', i.e. core.types.project_source.ProjectSource.LOCAL;
 # the literal stays inside the DDL (here and in migration 4) because SQL text
 # cannot reference the Python name.
 ASSISTANT_DDL = """

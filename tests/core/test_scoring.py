@@ -134,8 +134,7 @@ def test_numerical_high_confidence_with_violations():
     # base = 10/(1+0.12*5.5) ≈ 6.0 (1 crit @ 4.0 + 1 major @ 1.5)
     # Compliance carries no vt, but it is no longer dropped: it falls back to
     # grouping by `reason`, so the passing evidence yields a small positive lift
-    # above the violation base. (Before the taxonomy-fallback fix this asserted
-    # lift == 0.0 / final == 6.0, because untagged compliance was discarded.)
+    # above the violation base.
     assert ts001.base_score == 6.0
     assert ts001.dampening_multiplier > 0.0  # untagged compliance now counts (reason fallback)
     assert ts001.final_score == 6.2

@@ -7,6 +7,7 @@ small, isolated change rather than a refactor.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 
 from quodeq.analysis.cache.backend import CacheBackend, CacheStats
 from quodeq.analysis.cache.entry import CacheEntry
@@ -18,8 +19,11 @@ class TieredCache:
     """Composes a local backend with an optional remote backend.
 
     Read path: local hit returns immediately; on miss, remote is tried and
-    a remote hit warms the local tier before returning. Write path:
-    always writes local; remote write is best-effort and never raises.
+    a remote hit warms the local tier before returning. Write path: always
+    writes local; remote write is best-effort -- it absorbs the remote
+    backend's own I/O and decode failures (OSError, ValueError) and logs
+    them, so those never propagate. Anything else the remote backend raises
+    is a bug in it, not an expected failure mode, and propagates.
     """
 
     def __init__(self, local: CacheBackend, remote: CacheBackend | None = None) -> None:
@@ -29,7 +33,7 @@ class TieredCache:
     def get(self, key: str) -> CacheEntry | None:
         """Return the local hit, else try remote and warm the local tier with it.
 
-        A failing remote read is logged and reported as a miss.
+        A remote I/O or decode failure is logged and reported as a miss.
         """
         if hit := self._local.get(key):
             return hit
@@ -37,7 +41,7 @@ class TieredCache:
             return None
         try:
             hit = self._remote.get(key)
-        except Exception as exc:  # noqa: BLE001 — remote failures must never propagate
+        except (OSError, ValueError) as exc:  # absorbs remote I/O/decode failures; other exceptions propagate
             _logger.warning("remote cache get failed for %s: %s", key, exc)
             return None
         if hit is None:
@@ -52,29 +56,43 @@ class TieredCache:
             return
         try:
             self._remote.put(key, entry)
-        except Exception as exc:  # noqa: BLE001 — remote failures must never propagate
+        except (OSError, ValueError) as exc:  # absorbs remote I/O/decode failures; other exceptions propagate
             _logger.warning("remote cache put failed for %s: %s", key, exc)
 
     def has(self, key: str) -> bool:
-        """Report presence in either tier. A failing remote probe counts as absent."""
+        """Report presence in either tier. A remote I/O or decode failure counts as absent."""
         if self._local.has(key):
             return True
         if self._remote is None:
             return False
         try:
             return self._remote.has(key)
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError) as exc:  # absorbs remote I/O/decode failures; other exceptions propagate
             _logger.warning("remote cache has failed for %s: %s", key, exc)
             return False
 
     def delete(self, key: str) -> None:
-        """Drop *key* from both tiers. A failing remote delete is logged, not raised."""
+        """Drop *key* from both tiers. A remote I/O or decode failure is logged, not raised."""
         self._local.delete(key)
+        self._delete_remote(key)
+
+    def delete_many(self, keys: Iterable[str]) -> int:
+        """Drop every key: one local batch, then each key from remote best-effort.
+
+        Returns how many local entries were removed.
+        """
+        batch = list(keys)
+        removed = self._local.delete_many(batch)
+        for key in batch:
+            self._delete_remote(key)
+        return removed
+
+    def _delete_remote(self, key: str) -> None:
         if self._remote is None:
             return
         try:
             self._remote.delete(key)
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError) as exc:  # absorbs remote I/O/decode failures; other exceptions propagate
             _logger.warning("remote cache delete failed for %s: %s", key, exc)
 
     def stats(self) -> CacheStats:

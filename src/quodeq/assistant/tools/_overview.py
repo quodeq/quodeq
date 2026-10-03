@@ -8,15 +8,17 @@ and trimming the payload to what a chat needs.
 """
 from __future__ import annotations
 
+import logging
+
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_entries_visible
 from quodeq.services import get_accumulated
+from quodeq.services.accumulated import severity_counts_from_payload
 from quodeq.services.scoring import rescore_accumulated
+from quodeq.shared.log_sink import LoggerSink
 
-# Severity buckets recomputed for the filtered summary. Unknown/missing
-# severities are ignored rather than added as a fourth bucket.
-_SEVERITY_BUCKETS = ("critical", "major", "minor")
+_logger = logging.getLogger(__name__)
 
 
 def _build_filtered_summary(payload: dict, kept: list[dict], hidden: list) -> dict:
@@ -41,14 +43,7 @@ def _build_filtered_summary(payload: dict, kept: list[dict], hidden: list) -> di
     # value computed here could contradict the number on screen -- the
     # divergence this filtering exists to prevent. Counts are exact, so
     # they are recomputed rather than dropped.
-    severity = {bucket: 0 for bucket in _SEVERITY_BUCKETS}
-    total = 0
-    for d in kept:
-        for v in (d.get("violations") or []):
-            total += 1
-            level = (v.get("severity") or "").lower()
-            if level in severity:
-                severity[level] += 1
+    total, severity = severity_counts_from_payload(kept)
     return {
         "totalViolations": total,
         "dimensionCount": len(kept),
@@ -67,7 +62,9 @@ def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
             "Call get_context to confirm scope, then ask the user to open a "
             "project overview."
         )
-    payload = get_accumulated(str(ctx.reports_dir), ctx.project_id, as_of)
+    payload = get_accumulated(
+        str(ctx.reports_dir), ctx.project_id, as_of, log=LoggerSink(_logger),
+    )
     if payload is None:
         raise ToolError(f"no accumulated data for project: {ctx.project_id}")
     # Project-wide dismiss/delete rescore: the raw accumulated payload keeps
@@ -76,7 +73,7 @@ def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
     # project has no active dismissals/deletions).
     payload = rescore_accumulated(payload, ctx.reports_dir, ctx.project_id)
     raw_dims = payload.get("dimensions", []) or []
-    # Shared with _read_tools._visible_only: one implementation of "what
+    # Shared with _read_tools_violations.visible_only: one implementation of "what
     # counts as hidden" for every read surface.
     kept, hidden = partition_entries_visible(raw_dims, ctx.visible_standard_ids)
     dimensions = [

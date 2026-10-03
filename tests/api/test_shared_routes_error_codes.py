@@ -1,9 +1,8 @@
 """Error-code coverage for the shared-repository route modules.
 
-Task 2 of usability cycle 1 (findings 6104, 6105, 6106, 6111, 6001, 6002,
-6003, 6004): every error response under ``routes_shared_common.py`` and
+Every error response under ``routes_shared_common.py`` and
 ``routes_shared_config.py`` now carries a machine-readable ``code``, and the
-FOREIGN_REPO message names the fix (finding 6111). Shared fixtures come from
+FOREIGN_REPO message names the fix. Shared fixtures come from
 ``tests/api/_routes_shared_fixtures.py``; the state-setup helpers mirror
 ``tests/api/test_routes_shared_read.py``/``test_routes_shared_config.py``
 rather than duplicating their fixtures.
@@ -13,7 +12,6 @@ from __future__ import annotations
 import json
 
 from quodeq.data.fs.shared_repo import FORMAT_NAME, MARKER_FILENAME, shared_repo_path
-from quodeq.services.shared_connect import ConnectOutcome
 from quodeq.services.shared_settings import SharedSettings, write_settings
 from tests.api._routes_shared_fixtures import (  # noqa: F401 -- client/_clean_publish_status are pytest fixtures
     _ORIGIN,
@@ -21,7 +19,7 @@ from tests.api._routes_shared_fixtures import (  # noqa: F401 -- client/_clean_p
     client,
 )
 
-# --- _with_shared_root (routes_shared_common.py) -----------------------------
+# --- with_shared_root (routes_shared_common.py) -----------------------------
 
 
 def test_shared_root_unconfigured_has_no_shared_repo_code(client, monkeypatch, tmp_path):
@@ -53,7 +51,7 @@ def test_shared_root_missing_has_shared_repo_missing_code(client):
 
 
 def test_shared_root_foreign_message_tells_user_to_reconnect(client):
-    """Finding 6111: the FOREIGN_REPO message must give a next step, mirroring
+    """The FOREIGN_REPO message must give a next step, mirroring
     the "missing" branch's "reconnect it in Settings" wording."""
     url = "file:///dummy/foreign.git"
     repo = shared_repo_path(url)
@@ -75,15 +73,25 @@ def test_shared_root_foreign_message_tells_user_to_reconnect(client):
 
 
 def test_put_config_invalid_url_has_code(client, monkeypatch):
-    monkeypatch.setattr(
-        "quodeq.api.routes_shared_config.connect_shared_repo",
-        lambda url, **_kwargs: ConnectOutcome(status="invalid_url", url=url, detail="bad url"),
-    )
+    def _reject(url):
+        raise ValueError("bad url")
+
+    monkeypatch.setattr("quodeq.services.shared_connect_job.validate_remote_url", _reject)
     resp = client.put("/api/shared/config", json={"url": "not-a-url"}, headers=_ORIGIN)
     assert resp.status_code == 400
     body = resp.get_json()
     assert body["code"] == "INVALID_URL"
     assert body["error"] == "bad url"
+
+
+def test_put_config_start_failure_has_code(client, monkeypatch):
+    monkeypatch.setattr("quodeq.services.shared_connect_job.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.api.routes_shared_config.start_connect", lambda url, **_kw: "failed")
+    resp = client.put(
+        "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
+    )
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "CONNECT_START_FAILED"
 
 
 def test_shared_refresh_no_repo_configured_has_code(client, monkeypatch, tmp_path):

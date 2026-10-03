@@ -1,4 +1,5 @@
 import { request, BASE } from './request.js';
+import { URL_PROTOCOL } from '../constants.js';
 
 /**
  * The WebSocket URL for the embedded terminal, derived from the page origin
@@ -9,7 +10,7 @@ import { request, BASE } from './request.js';
  */
 export function terminalSocketUrl(loc = window.location, sessionId = null) {
   const u = new URL(`${BASE}/terminal/ws`, loc.href);
-  u.protocol = (loc.protocol === 'https:' || u.protocol === 'https:') ? 'wss:' : 'ws:';
+  u.protocol = (loc.protocol === URL_PROTOCOL.HTTPS || u.protocol === URL_PROTOCOL.HTTPS) ? 'wss:' : 'ws:';
   if (sessionId) u.searchParams.set('session', sessionId);
   return u.toString();
 }

@@ -1,6 +1,7 @@
-"""Per-project /api/shared mirrors: info, runs, dashboard, accumulated, scores and compare-summary."""
+"""Per-project /api/shared mirrors: info, runs, dashboard, accumulated, scores, compare-summary and the fleet compare."""
 from __future__ import annotations
 
+from quodeq.services.scoring.compliance_detail import DETAIL_FIELDS
 from tests.api._routes_shared_read_fixtures import app, client  # noqa: F401 -- pytest fixtures
 
 
@@ -9,6 +10,11 @@ from tests.api._routes_shared_read_fixtures import app, client  # noqa: F401 -- 
 def test_shared_project_info(client, shared_clone_fixture):
     resp = client.get("/api/shared/projects/proj-a/info")
     assert resp.status_code == 200
+    body = resp.get_json()
+    # Pins services/shared_listing.py's enrich_shared_info publishedBy/source
+    # merge so it stays byte-identical to the list route's per-project merge.
+    assert body.get("publishedBy") == "tester"
+    assert body.get("source") == "shared"
 
 
 def test_shared_project_info_not_found(client, shared_clone_fixture):
@@ -21,23 +27,21 @@ def test_shared_project_info_invalid_segment(client, shared_clone_fixture):
     assert resp.status_code == 400
 
 
-def test_shared_project_info_returns_sanitized_500_on_unexpected_error(
+def test_shared_project_info_returns_sanitized_500_on_a_read_failure(
     client, shared_clone_fixture, monkeypatch,
 ):
-    """Cluster 11: shared_project_info is reached via a publicly shared URL,
-    unlike most of this app's local-only UI. Before this fix it had no
-    try/except at all -- an unexpected exception from get_project_info would
-    propagate straight into Flask's raw error handling instead of the
-    sanitized {"error", "code"} contract its three siblings (shared_runs,
-    shared_scores, shared_compare_summary) already return. This locks the
-    same contract in for shared_project_info and confirms the raised
-    exception's own text never reaches the response body."""
+    """shared_project_info is reached via a publicly shared URL,
+    unlike most of this app's local-only UI. An OSError/sqlite3.Error/
+    ValueError from get_project_info (a read failure the route expects) must
+    still degrade to the sanitized {"error", "code"} contract its siblings
+    (shared_runs, shared_scores, shared_compare_summary) return, with the
+    raised exception's own text never reaching the response body."""
     import quodeq.services.fs_projects as fs_projects_mod
 
     secret_detail = "SECRET_DB_PATH=/private/leak/db.sqlite exploded"
 
     def _boom(*_args, **_kwargs):
-        raise RuntimeError(secret_detail)
+        raise OSError(secret_detail)
 
     monkeypatch.setattr(fs_projects_mod, "get_project_info", _boom)
 
@@ -50,8 +54,32 @@ def test_shared_project_info_returns_sanitized_500_on_unexpected_error(
 
     raw = resp.get_data(as_text=True)
     assert secret_detail not in raw
-    assert "RuntimeError" not in raw
+    assert "OSError" not in raw
     assert "Traceback" not in raw
+
+
+def test_shared_project_info_propagates_an_error_outside_the_narrowed_tuple(
+    client, shared_clone_fixture, monkeypatch,
+):
+    """A RuntimeError (not OSError/sqlite3.Error/ValueError) is a real bug in
+    get_project_info, not a read failure, so the route's own narrow tuple
+    does not catch it, and it is not wrapped into the route's own sanitized
+    JSON 500. It still escapes the route -- the app-wide fallback handler
+    (api/_error_handlers.py) is what turns it into a generic coded 500
+    instead of Flask's default HTML page."""
+    import quodeq.services.fs_projects as fs_projects_mod
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("unexpected bug")
+
+    monkeypatch.setattr(fs_projects_mod, "get_project_info", _boom)
+
+    resp = client.get("/api/shared/projects/proj-a/info")
+
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["code"] == "INTERNAL_ERROR"
+    assert "unexpected bug" not in resp.get_data(as_text=True)
 
 
 # --- GET /api/shared/projects/<project>/runs ----------------------------------
@@ -117,7 +145,7 @@ def test_shared_scores_not_found(client, shared_clone_fixture):
 
 
 def test_shared_scores_uses_isolated_score_cache(client, shared_clone_fixture):
-    """Task 9 integration: the shared clone's own score_cache.db is touched,
+    """The shared clone's own score_cache.db is touched,
     not the local (unconfigured, in this test) default score cache path."""
     from quodeq.data.fs.shared_repo import shared_score_cache_path
 
@@ -160,6 +188,29 @@ def test_shared_compare_summary_unconfigured_409(client, monkeypatch, tmp_path):
     assert resp.get_json()["error"] == "no shared repository configured"
 
 
+# --- GET /api/shared/fleet/compare --------------------------------------------
+
+def test_shared_fleet_compare(client, shared_clone_fixture):
+    """Every listed shared project in one response; unknown names land in errors."""
+    resp = client.get("/api/shared/fleet/compare?projects=proj-a,does-not-exist")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert [s["project"] for s in body["summaries"]] == ["proj-a"]
+    assert body["errors"] == {"does-not-exist": "Project not found"}
+    for dim in body["summaries"][0]["dimensions"]:
+        assert "violations" not in dim
+
+
+def test_shared_fleet_compare_requires_projects(client, shared_clone_fixture):
+    assert client.get("/api/shared/fleet/compare").status_code == 400
+    assert client.get("/api/shared/fleet/compare?projects=proj-a,%2e%2e").status_code == 400
+
+
+def test_shared_fleet_compare_unconfigured_409(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    assert client.get("/api/shared/fleet/compare?projects=proj-a").status_code == 409
+
+
 # --- GET /api/shared/projects/<project>/scores/<run_id> -----------------------
 
 def test_shared_run_scores(client, shared_clone_fixture):
@@ -167,9 +218,28 @@ def test_shared_run_scores(client, shared_clone_fixture):
     assert resp.status_code == 200
     body = resp.get_json()
     assert "dimensions" in body
-    for dim in body["dimensions"]:
-        for v in dim.get("violations", []):
-            assert set(v.keys()) == {"req", "file", "line"}
+    # Same deferred shape as the local /scores/<run>: identity and scalar
+    # fields stay, bodies are refilled by /compliance-detail?run=.
+    items = [v for dim in body["dimensions"] for v in dim.get("violations", [])]
+    assert items
+    for v in items:
+        assert v["detailDeferred"] is True
+        assert not DETAIL_FIELDS & set(v)
+        assert {"req", "file", "line"} <= set(v)
+
+
+def test_shared_compliance_detail_refills_a_runs_deferred_detail(client, shared_clone_fixture):
+    run = client.get("/api/shared/projects/proj-a/scores/run-1").get_json()
+    dim = next(d for d in run["dimensions"] if d.get("violations"))
+    resp = client.get(
+        f"/api/shared/projects/proj-a/compliance-detail?dimension={dim['dimension']}&kind=violation&run=run-1")
+    assert resp.status_code == 200
+    items = resp.get_json()["items"]
+    assert len(items) == len(dim["violations"])
+    assert all("detailDeferred" not in item for item in items)
+    assert client.get(
+        f"/api/shared/projects/proj-a/compliance-detail?dimension={dim['dimension']}&kind=violation&run=nope",
+    ).status_code == 404
 
 
 def test_shared_run_scores_not_found(client, shared_clone_fixture):

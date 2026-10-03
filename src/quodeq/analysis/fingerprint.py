@@ -1,10 +1,10 @@
 """Content hashing helpers — file, standards, prompts.
 
-Post-V2 (B6.2c): the V1 fingerprint persistence machinery
-(``build_fingerprint``, ``save_fingerprint``, ``load_fingerprint``,
-``find_previous_fingerprint``, ``_queue_taken_files``) is gone. V2's
-content-addressed cache replaces it: per-file entries keyed by a
-SHA-256 of every input that affects analysis output.
+The V1 fingerprint persistence machinery (``build_fingerprint``,
+``save_fingerprint``, ``load_fingerprint``, ``find_previous_fingerprint``,
+``_queue_taken_files``) is gone. The V2 content-addressed cache replaces
+it: per-file entries keyed by a SHA-256 of every input that affects
+analysis output.
 
 What survives here are the hash primitives V2 uses to build cache
 keys (and that priority scoring uses to detect file changes).
@@ -28,6 +28,9 @@ from quodeq.data.fs.standards_prefs import load_project_overrides
 from quodeq.shared.lru import LRUDict
 
 _HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
+_FILE_HASH_CACHE_MAX_ENTRIES = 4096  # file hashes churn most of the three maps
+_OVERRIDE_CACHE_MAX_ENTRIES = 1024  # override hashes: far fewer distinct keys
+_PARAMS_CACHE_MAX_ENTRIES = 1024  # per-dimension params state: far fewer distinct keys
 
 
 def hash_file(path: Path) -> str | None:
@@ -71,12 +74,12 @@ def _compute_dimension_params(compiled: Path, project_root: Path | None) -> tupl
     """(params_hash, effective_params) for one compiled dimension file."""
     try:
         data = json.loads(compiled.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001 - keying must never abort analysis
-        # Deliberately wider than OSError/ValueError/UnicodeDecodeError:
-        # deeply nested JSON overflows the C decoder's call stack and raises
-        # RecursionError, a RuntimeError subclass that would otherwise escape.
-        # This sits on the per-dimension cache-keying path, so any escape here
-        # fails the run rather than degrading to an unkeyed hash.
+    except (OSError, ValueError, UnicodeDecodeError, RecursionError):
+        # RecursionError is included deliberately: deeply nested JSON
+        # overflows the C decoder's call stack and raises it (a RuntimeError
+        # subclass) instead of json.JSONDecodeError. This sits on the
+        # per-dimension cache-keying path, so any escape here fails the run
+        # rather than degrading to an unkeyed hash.
         return "", {}
     overrides = load_project_overrides(project_root) if project_root else {}
     try:
@@ -113,21 +116,19 @@ class FileStat:
 class HashCache:
     """Lock-guarded, bounded LRU cache backing the fingerprint hash memoizers.
 
-    Three independent maps -- file hashes (compiled standards, prompts),
-    override hashes, per-dimension params state -- each keyed by a
-    ``(path, size, mtime_ns)`` stat tuple (the dimension-params key adds a
-    second file's stat), so an edited input misses on its own. The
-    module-default instance below is shared by the long-lived dashboard/API
-    server (cache maintenance, ``dimension_params_state``), not just one
-    ``quodeq evaluate`` process, so every map is a capped LRU: a run's hot
-    working set stays resident while stale keys from past runs age out.
-
+    Three independent maps -- file hashes (compiled standards, prompts), override
+    hashes, per-dimension params state -- each keyed by a ``(path, size, mtime_ns)``
+    stat tuple (the dimension-params key adds a second file's stat), so an edited
+    input misses on its own. The module-default instance below is shared by the
+    long-lived dashboard/API server (cache maintenance, ``dimension_params_state``),
+    not just one ``quodeq evaluate`` process, so every map is a capped LRU: a run's
+    hot working set stays resident while stale keys from past runs age out.
     Instantiable so tests get isolated caches with small capacities.
     """
 
     def __init__(
-        self, *, file_capacity: int = 4096,
-        override_capacity: int = 1024, params_capacity: int = 1024,
+        self, *, file_capacity: int = _FILE_HASH_CACHE_MAX_ENTRIES,
+        override_capacity: int = _OVERRIDE_CACHE_MAX_ENTRIES, params_capacity: int = _PARAMS_CACHE_MAX_ENTRIES,
     ) -> None:
         self._lock = threading.Lock()
         self._file_hashes: LRUDict[_StatKey, str | None] = LRUDict(file_capacity)

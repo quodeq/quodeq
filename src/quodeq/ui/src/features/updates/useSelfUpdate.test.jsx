@@ -70,4 +70,54 @@ describe('useSelfUpdate API injection', () => {
       warn.mockRestore();
     }
   });
+
+  it('reports failed and not starting when the start request rejects', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const getUpdateStatus = vi.fn();
+      const startSelfUpdate = vi.fn().mockRejectedValue(new Error('start refused'));
+      const apiValue = { getUpdateStatus, startSelfUpdate };
+      const status = { self_update: { phase: 'idle', supported: true, percent: 0 } };
+
+      const { result } = renderHook(() => useSelfUpdate(status, vi.fn()), {
+        wrapper: ({ children }) => <ApiProvider value={apiValue}>{children}</ApiProvider>,
+      });
+      expect(result.current.failed).toBe(false);
+
+      act(() => { result.current.begin(); });
+
+      await waitFor(() => expect(result.current.failed).toBe(true));
+      expect(result.current.starting).toBe(false);
+      expect(getUpdateStatus).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith('self-update start failed:', expect.any(Error));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('clears the start failure once a fetched status reports a non-error phase', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const getUpdateStatus = vi.fn().mockResolvedValue({ self_update: { phase: 'downloading' } });
+      const startSelfUpdate = vi.fn()
+        .mockRejectedValueOnce(new Error('start refused'))
+        .mockResolvedValueOnce({ ok: true });
+      const apiValue = { getUpdateStatus, startSelfUpdate };
+      const setStatus = vi.fn();
+      const status = { self_update: { phase: 'idle', supported: true, percent: 0 } };
+
+      const { result } = renderHook(() => useSelfUpdate(status, setStatus), {
+        wrapper: ({ children }) => <ApiProvider value={apiValue}>{children}</ApiProvider>,
+      });
+
+      act(() => { result.current.begin(); });
+      await waitFor(() => expect(result.current.failed).toBe(true));
+
+      act(() => { result.current.begin(); });
+      await waitFor(() => expect(setStatus).toHaveBeenCalledWith({ self_update: { phase: 'downloading' } }));
+      expect(result.current.failed).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });

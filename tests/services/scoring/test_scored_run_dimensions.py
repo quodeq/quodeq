@@ -135,9 +135,9 @@ def test_build_response_from_eval_files_validates_path_segments():
     validate project/run_id itself before that second join -- CodeQL
     py/path-injection build site."""
     with pytest.raises(ValueError):
-        scoring._build_response_from_eval_files(Path("/reports"), "proj", "../../etc/passwd")
+        scoring.build_response_from_eval_files(Path("/reports"), "proj", "../../etc/passwd")
     with pytest.raises(ValueError):
-        scoring._build_response_from_eval_files(Path("/reports"), "../etc", "run1")
+        scoring.build_response_from_eval_files(Path("/reports"), "../etc", "run1")
 
 
 def test_rescore_runs_by_dimension_validates_path_segments():
@@ -146,9 +146,9 @@ def test_rescore_runs_by_dimension_validates_path_segments():
     validation, so a traversal value must still be rejected before the join."""
     dims = [{"dimension": "security", "fromRunId": "../../etc/passwd"}]
     with pytest.raises(ValueError):
-        scoring._rescore_runs_by_dimension(dims, Path("/reports"), "proj", SuppressionKeys(set()))
+        scoring.rescore_runs_by_dimension(dims, Path("/reports"), "proj", SuppressionKeys(set()))
     with pytest.raises(ValueError):
-        scoring._rescore_runs_by_dimension(
+        scoring.rescore_runs_by_dimension(
             [{"dimension": "security", "fromRunId": "run1"}],
             Path("/reports"), "../etc", SuppressionKeys(set()),
         )

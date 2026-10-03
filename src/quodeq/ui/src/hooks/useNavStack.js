@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useTransition } from 'react';
 import { toHistoryEntry, handlePopState } from './navHistoryEntry.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
-const DEFAULT_PAGE = 'overview';
+const DEFAULT_PAGE = NAV_TAB.OVERVIEW;
 
 /** Default history adapter delegating to window.history. */
 const defaultHistoryAdapter = {
@@ -98,7 +99,7 @@ function makeNavReset(setNavStack, navStackRef, history, rememberEntry, startNav
   };
 }
 
-function makeNavTab(setNavStack, navStackRef, history, rememberEntry, startNavTransition) {
+function makeNavTab(setNavStack, navStackRef, history, rememberEntry) {
   return function navTab(page, params = {}) {
     const prev = navStackRef.current;
     const stepsBack = prev.length - 1;
@@ -106,11 +107,13 @@ function makeNavTab(setNavStack, navStackRef, history, rememberEntry, startNavTr
     // Spread params first so page/_tabKey stay authoritative and can't be
     // clobbered by a caller-supplied params key.
     const entry = { ...params, page, _tabKey: prevKey + 1 };
-    // Same transition rationale as navPush: tab targets (Violations on a
-    // large project, the keyed tab-fade remount) render heavy too.
-    startNavTransition(() => {
-      setNavStack([entry]);
-    });
+    // Synchronous on purpose, unlike navPush: a tab click must paint the
+    // target page's frame in the very next commit. Inside a transition React
+    // keeps the old page on screen until the new one has rendered in full,
+    // so a heavy tab (Map on a large project) left the click looking
+    // ignored. Pages keep their heavy body off this commit with
+    // DeferredMount, which is what keeps the click from freezing.
+    setNavStack([entry]);
     rememberEntry(0, entry);
     if (stepsBack > 0) history.go(-stepsBack);
   };
@@ -132,7 +135,7 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
   };
   const navSwapAt = makeNavSwapAt({ setNavStack, navStackRef, history, rememberEntry, replaceTop, startNavTransition });
   const navReset = makeNavReset(setNavStack, navStackRef, history, rememberEntry, startNavTransition);
-  const navTab = makeNavTab(setNavStack, navStackRef, history, rememberEntry, startNavTransition);
+  const navTab = makeNavTab(setNavStack, navStackRef, history, rememberEntry);
 
   return { navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab };
 }

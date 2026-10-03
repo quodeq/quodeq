@@ -71,7 +71,7 @@ class TestReadJson:
 
 class TestConfigure:
     def test_overrides_defaults(self):
-        with utils._get_config().override(ai_cmd_default="my-cli"):
+        with utils.get_config().override(ai_cmd_default="my-cli"):
             assert utils.get_ai_cmd() == "my-cli"
 
     def test_get_ai_cmd_env_override(self, monkeypatch):
@@ -157,4 +157,14 @@ class TestShowDiff:
         show_diff(f, "new\n")
         output = capsys.readouterr().out
         assert "-old" in output
+        assert "+new" in output
+
+    def test_unreadable_existing_file_diffs_against_empty(self, tmp_path, capsys):
+        """A non-UTF-8 existing file must not crash the diff: it degrades to
+        an empty "old" side (everything in *new_content* shows as added)."""
+        f = tmp_path / "test.txt"
+        f.write_bytes(b"\xff\xfe not utf-8")
+        show_diff(f, "new\n")
+        output = capsys.readouterr().out
+        assert "cannot read existing" in output
         assert "+new" in output

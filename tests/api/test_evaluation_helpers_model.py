@@ -6,7 +6,7 @@ from http import HTTPStatus
 import pytest
 from flask import Flask
 
-from quodeq.api._evaluation_helpers import _validate_ai_model
+from quodeq.api._evaluation_helpers import validate_ai_model
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ _CONFIGS = {
 
 class TestValidateAiModel:
     def test_api_type_without_model_is_rejected(self, app_ctx):
-        result = _validate_ai_model("ollama", None, _CONFIGS)
+        result = validate_ai_model("ollama", None, _CONFIGS)
         assert result is not None
         response, status = result
         assert status == HTTPStatus.BAD_REQUEST
@@ -34,13 +34,13 @@ class TestValidateAiModel:
         }
 
     def test_api_type_with_model_passes(self, app_ctx):
-        assert _validate_ai_model("ollama", "llama3", _CONFIGS) is None
+        assert validate_ai_model("ollama", "llama3", _CONFIGS) is None
 
     def test_cli_type_without_model_passes(self, app_ctx):
-        assert _validate_ai_model("claude", None, _CONFIGS) is None
+        assert validate_ai_model("claude", None, _CONFIGS) is None
 
     def test_no_ai_cmd_passes(self, app_ctx):
-        assert _validate_ai_model(None, None, _CONFIGS) is None
+        assert validate_ai_model(None, None, _CONFIGS) is None
 
     def test_unknown_provider_passes(self, app_ctx):
-        assert _validate_ai_model("mystery", None, _CONFIGS) is None
+        assert validate_ai_model("mystery", None, _CONFIGS) is None

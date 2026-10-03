@@ -88,7 +88,7 @@ describe("useDashboard shared project info", () => {
 describe("useDashboard frozen historical runs", () => {
   const OLD = () => Date.now() - 120_000; // well past the 60s staleTime
 
-  function seededClient({ runStatus = "complete" } = {}) {
+  function seededClient({ runStatus = "done" } = {}) {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 60_000 }, mutations: { retry: false } },
     });
@@ -137,7 +137,7 @@ describe("useDashboard frozen historical runs", () => {
 
   it("still refetches a stale in-progress run", async () => {
     const fakeApi = makeFakeApi();
-    const client = seededClient({ runStatus: "in_progress" });
+    const client = seededClient({ runStatus: "running" });
     renderHook(
       () => useDashboard({ selectedProject: "p1", selectedRun: "r1", keepPlaceholder: false }),
       { wrapper: wrapWith(client, fakeApi) },

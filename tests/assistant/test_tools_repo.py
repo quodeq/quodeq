@@ -56,10 +56,10 @@ def test_git_dir_blocked_case_insensitive(ctx):
     # the same file as ".git/config" on disk, so the jail must compare
     # lowercased names or a differently-cased path bypasses it.
     from quodeq.assistant.tools.registry import ToolError
-    from quodeq.assistant.tools._repo_tools import _jail
+    from quodeq.assistant.tools._repo_tools import jail
 
     with pytest.raises(ToolError, match="inside the .git directory"):
-        _jail(ctx, ".GIT/config")
+        jail(ctx, ".GIT/config")
 
 
 def test_list_repo_dir(ctx):

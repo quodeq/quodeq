@@ -1,6 +1,6 @@
 """Trend, severity, and score aggregation for the accumulated (cross-run) view.
 
-Split out of ``accumulated.py``. ``_build_accumulated_response`` is
+Split out of ``accumulated.py``. ``build_accumulated_response`` is
 the module's ``to_camel_dict`` wire-serialization call site — moving it here
 requires (and got) an update to ``DECLARED_WIRE_BOUNDARIES`` in
 ``tests/tools/test_serialization_boundary.py``.
@@ -12,9 +12,10 @@ from typing import Any
 
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
+from quodeq.core.scoring.report_grades import calculate_trend, most_frequent_grade, parse_numeric_score
 from quodeq.core.types import DimensionResult
+from quodeq.core.types.severity import SEVERITY_ORDER
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.services.wiring import calculate_trend, most_frequent_grade, parse_numeric_score
 
 
 def numeric_average(
@@ -30,7 +31,7 @@ def numeric_average(
     return dimension_weighted_average(pairs, params)
 
 
-def _compute_accumulated_trends(
+def compute_accumulated_trends(
     all_dimensions: list[DimensionResult],
     prev_occurrence: dict[str, DimensionResult],
 ) -> list[DimensionResult]:
@@ -51,7 +52,7 @@ def _compute_accumulated_trends(
     return result
 
 
-def _aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[str, int]:
+def aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[str, int]:
     """Sum violation/compliance counts and severity buckets across dimensions."""
     total_violations = total_compliance = critical = major = minor = 0
     for dim in all_dimensions:
@@ -68,7 +69,30 @@ def _aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[st
     }
 
 
-def _compute_accumulated_scores(
+def severity_counts_from_payload(dims: list[dict]) -> tuple[int, dict[str, int]]:
+    """Count total violations and per-severity buckets from *dims*' own
+    ``violations`` lists, not any baked totals field.
+
+    Unlike :func:`aggregate_severity_counts` (which sums the ``totals``
+    fields baked onto each ``DimensionResult`` at write time), this counts
+    the payload-shaped ``violations`` lists directly -- the same lists
+    ``get_report``/``get_violations`` serve. That keeps the count correct
+    even when a totals field and its list disagree (e.g. a hidden-standards
+    filter already dropped some dimensions from *dims* while their baked
+    totals were computed over the unfiltered set).
+    """
+    severity = {bucket: 0 for bucket in SEVERITY_ORDER}
+    total = 0
+    for d in dims:
+        for v in (d.get("violations") or []):
+            total += 1
+            level = (v.get("severity") or "").lower()
+            if level in severity:
+                severity[level] += 1
+    return total, severity
+
+
+def compute_accumulated_scores(
     all_dimensions: list[DimensionResult], prev_run_latest: list[DimensionResult],
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[float | None, float | None]:
@@ -79,7 +103,7 @@ def _compute_accumulated_scores(
 
 
 @dataclass(frozen=True)
-class _AccumulatedResult:
+class AccumulatedResult:
     all_dimensions: list[DimensionResult]
     dimensions_with_trend: list[DimensionResult]
     severity: dict[str, int]
@@ -87,8 +111,8 @@ class _AccumulatedResult:
     prev_avg_score: float | None
 
 
-def _build_accumulated_response(
-    project: str, result: _AccumulatedResult,
+def build_accumulated_response(
+    project: str, result: AccumulatedResult,
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any]:
     return {

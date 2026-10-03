@@ -10,7 +10,8 @@ import time
 
 import pytest
 
-from quodeq.services._external_jobs import ProcessControl
+from quodeq.services import _external_jobs
+from quodeq.services._external_jobs import ProcessControl, cancel_external_run
 from quodeq.services._external_jobs import _wait_for_exit as _wait_for_pid_exit
 from tests._timeouts import budget
 
@@ -103,8 +104,6 @@ _TEST_GRACE_S = 0.5
 @_skip_on_windows
 def test_cancel_external_run_escalates_to_sigkill_when_sigterm_ignored(tmp_path):
     """Process that traps and ignores SIGTERM is killed via SIGKILL escalation."""
-    from quodeq.services._external_jobs import cancel_external_run
-
     proc = _spawn_test_process(
         "import signal, time;"
         "signal.signal(signal.SIGTERM, lambda s, f: None);"
@@ -135,8 +134,6 @@ def test_cancel_external_run_escalates_to_sigkill_when_sigterm_ignored(tmp_path)
 @_skip_on_windows
 def test_cancel_external_run_returns_quickly_when_sigterm_honored(tmp_path):
     """SIGTERM-honoring process is reaped within the grace window without SIGKILL."""
-    from quodeq.services._external_jobs import cancel_external_run
-
     # No SIGTERM handler: Python's default behaviour terminates the process
     # promptly on SIGTERM.
     proc = _spawn_test_process("import time; time.sleep(60)")
@@ -175,17 +172,22 @@ def test_cancel_external_run_kills_child_processes_in_same_group(tmp_path):
     a subagent child still has a hung Ollama request and lives on, holding
     file locks and racing the next run. The cancel path must kill the group.
     """
-    from quodeq.services._external_jobs import cancel_external_run
-
     # Parent process spawns a long-sleeping child in the same session.
     # We print the child PID then sleep so the test can poll the child too.
+    # Written via temp-file-then-rename (matching the atomic-write pattern
+    # used across the codebase, e.g. quodeq.shared.json_state): a plain
+    # open(path, 'w').write(...) truncates/creates the file before the
+    # content is written, so a concurrent reader can observe the file
+    # existing but empty and crash on int(""). Renaming into place only
+    # after the write completes means the file is never visible half-written.
+    child_pid_path = str(tmp_path / "child.pid")
+    child_pid_tmp = child_pid_path + ".tmp"
     script = (
         "import os, sys, signal, subprocess, time;"
         "signal.signal(signal.SIGTERM, lambda s, f: None);"
         "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']);"
-        "open('"
-        + str(tmp_path / "child.pid")
-        + "', 'w').write(str(child.pid));"
+        "open('" + child_pid_tmp + "', 'w').write(str(child.pid));"
+        "os.replace('" + child_pid_tmp + "', '" + child_pid_path + "');"
         "time.sleep(60)"
     )
     proc = _spawn_test_process(script)
@@ -195,9 +197,14 @@ def test_cancel_external_run_kills_child_processes_in_same_group(tmp_path):
         run_dir.mkdir(parents=True)
         (run_dir / ".pid").write_text(str(proc.pid))
 
-        # Wait for the child PID file to appear.
+        # Wait for the child PID file to appear. Scaled through budget():
+        # this was a fixed 50 x 0.05s = 2.5s wall-clock wait, the only
+        # unscaled wait in this test, while a loaded-runner spawn of a
+        # nested Python subprocess can take longer than that under
+        # contention (see tests/_timeouts.py).
         child_pid_file = tmp_path / "child.pid"
-        for _ in range(50):
+        deadline = time.monotonic() + budget(2.5)
+        while time.monotonic() < deadline:
             if child_pid_file.exists():
                 break
             time.sleep(0.05)
@@ -252,3 +259,42 @@ class TestWaitForExit:
         control = ProcessControl(kill_tree=lambda *_a: None, pid_alive=_alive)
         assert _wait_for_pid_exit(control, 1234, 0.0, interval=0.001) is False
         assert calls == []
+
+
+class TestCancelGraceReadPerCall:
+    """QUODEQ_CANCEL_GRACE_S moved from an import-time module constant
+    (config.services_env.cancel_grace_s, read lazily per call) to a
+    per-call read, so no importlib.reload is needed any more: setting the
+    env and calling the public cancel path (cancel_external_run) is enough
+    to observe the fallback."""
+
+    def _observed_timeout(self, monkeypatch, tmp_path) -> float:
+        """Cancel a fake pid through the public path; return the grace value
+        _wait_for_exit was actually called with."""
+        run_dir = tmp_path / "proj" / "run"
+        run_dir.mkdir(parents=True)
+        (run_dir / ".pid").write_text(str(os.getpid()))
+
+        captured: dict[str, float] = {}
+
+        def fake_wait_for_exit(control, pid, timeout, interval=_external_jobs._POLL_INTERVAL_S):
+            captured["timeout"] = timeout
+            return True
+
+        monkeypatch.setattr(_external_jobs, "_wait_for_exit", fake_wait_for_exit)
+        control = ProcessControl(kill_tree=lambda *_a: None, pid_alive=lambda _pid: False, start_background=lambda fn, _n: fn())
+
+        result = cancel_external_run("proj", "run", tmp_path, control=control)
+        assert result is True
+        return captured["timeout"]
+
+    def test_invalid_value_falls_back_through_cancel_external_run(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_CANCEL_GRACE_S", "abc")
+        assert self._observed_timeout(monkeypatch, tmp_path) == 30.0
+
+    def test_valid_value_reaches_cancel_external_run(self, monkeypatch, tmp_path):
+        """Pins the per-call read: a valid override must reach the wait
+        loop, not just the fallback default (which a no-op resolver would
+        also produce)."""
+        monkeypatch.setenv("QUODEQ_CANCEL_GRACE_S", "2.5")
+        assert self._observed_timeout(monkeypatch, tmp_path) == 2.5

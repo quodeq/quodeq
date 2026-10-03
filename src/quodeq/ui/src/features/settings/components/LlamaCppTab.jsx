@@ -1,11 +1,12 @@
 import { useApi } from '../../../api/ApiContext.jsx';
 import { LocalApiTabLayout } from './LocalApiTabLayout.jsx';
-import HelpHint from '../../../components/HelpHint.jsx';
 import { useLlamaCppModels } from '../hooks/useLlamaCppModels.js';
 import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { useLlamaCppLog } from '../llamacpp-log/LlamaCppLogContext.js';
+import { warnAndRethrow, toggleLogWindow } from '../settingsHelpers.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 
 const LLAMACPP_MODEL_HINT = (
   <>
@@ -28,13 +29,12 @@ function LoadedModel({ models }) {
 function LlamaCppModelRow({ models }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label-row">
-          <span className="settings-label">{t('settings.loadedModel')}</span>
-          <HelpHint label={t('settings.loadedModelHelpAria')}>{LLAMACPP_MODEL_HINT}</HelpHint>
-        </span>
-        <span className="settings-description">{t('settings.loadedModelDesc')}</span>
-      </div>
+      <SettingsRowLabel
+        label={t('settings.loadedModel')}
+        hint={LLAMACPP_MODEL_HINT}
+        hintAria={t('settings.loadedModelHelpAria')}
+        description={t('settings.loadedModelDesc')}
+      />
       <LoadedModel models={models} />
     </div>
   );
@@ -46,10 +46,7 @@ export default function LlamaCppTab({ state, update }) {
   const { llamacppStatus, models, modelsError } = useLlamaCppModels({ state, update });
 
   const concurrency = useLocalApiTabTest({
-    probe: () => testLlamacppConcurrency(state.model || (models[0]?.name ?? '')).catch((err) => {
-      console.warn('llama.cpp concurrency test failed', err);
-      throw err;
-    }),
+    probe: warnAndRethrow(() => testLlamacppConcurrency(state.model || (models[0]?.name ?? '')), 'llama.cpp'),
     errorKey: 'settings.concurrencyTestFailedLlamacpp',
     update,
   });
@@ -60,7 +57,7 @@ export default function LlamaCppTab({ state, update }) {
       offlineMessage={<span>{tRich('settings.llamacppOffline')}</span>}
       onToggleConsole={
         llamacppLog.available
-          ? () => (llamacppLog.open ? llamacppLog.closeLog() : llamacppLog.openLog())
+          ? () => toggleLogWindow(llamacppLog)
           : undefined
       }
       consoleOpen={llamacppLog.open}

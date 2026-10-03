@@ -1,4 +1,4 @@
-"""Cluster 32: services best-effort handlers log through the injected LogSink."""
+"""services best-effort handlers log through the injected LogSink."""
 from __future__ import annotations
 
 import sqlite3
@@ -42,7 +42,7 @@ def test_get_dashboard_threads_log_into_enrichment(tmp_path, recording_log, monk
 
 
 def test_wait_for_terminal_status_logs_once_while_status_is_missing(tmp_path, recording_log) -> None:
-    ok = _run_discard._wait_for_terminal_status(
+    ok = _run_discard.wait_for_terminal_status(
         tmp_path, timeout_s=0.05, poll_interval_s=0.01, log=recording_log,
     )
     assert ok is False
@@ -60,13 +60,10 @@ def test_write_settings_logs_when_quodeq_dir_is_a_file(tmp_path, recording_log) 
     assert "shared settings write failed" in recording_log.debug_messages[0]
 
 
-def test_rollback_new_dirs_warns_when_rmtree_fails(tmp_path, recording_log, monkeypatch) -> None:
+def test_rollback_new_dirs_warns_when_removal_fails(tmp_path, recording_log, monkeypatch) -> None:
     (tmp_path / "new-project").mkdir()
 
-    def _denied(path, *_a, **_k):
-        raise OSError(13, "Permission denied", str(path))
-
-    monkeypatch.setattr(project_registration.shutil, "rmtree", _denied)
+    monkeypatch.setattr(project_registration, "remove_project_dir", lambda _path: False)
     project_registration._rollback_new_dirs(str(tmp_path), before=set(), log=recording_log)
     assert recording_log.warning_messages
     assert "rollback could not remove" in recording_log.warning_messages[0]
@@ -81,7 +78,7 @@ def test_rollback_and_report_runs_the_callable() -> None:
     assert result.message == "bad url"
 
 
-def test_cached_accumulated_logs_recheck_read_failure(monkeypatch, recording_log) -> None:
+def test_cached_project_summary_logs_recheck_read_failure(monkeypatch, recording_log) -> None:
     reads = {"n": 0}
 
     def _read(_conn, _project, _version):
@@ -94,11 +91,10 @@ def test_cached_accumulated_logs_recheck_read_failure(monkeypatch, recording_log
     def _fake_cache():
         yield object()
 
-    monkeypatch.setattr(_score_cache_fetch, "read_cached_accumulated", _read)
+    monkeypatch.setattr(_score_cache_fetch, "read_cached_project_summary", _read)
     monkeypatch.setattr(_score_cache_fetch, "open_score_cache", _fake_cache)
-    monkeypatch.setattr(_score_cache_fetch, "write_cached_accumulated", lambda *_a, **_k: None)
-    # signature: cached_accumulated(project, version, compute, cacheable=None, *, log=NULL_LOG)
-    result = _score_cache_fetch.cached_accumulated(
+    monkeypatch.setattr(_score_cache_fetch, "write_cached_project_summary", lambda *_a, **_k: None)
+    result = _score_cache_fetch.cached_project_summary(
         project="p", version="v1", compute=lambda: {"score": 1}, log=recording_log,
     )
     assert result == {"score": 1}
@@ -166,7 +162,7 @@ def test_save_repo_index_logs_when_tmp_cleanup_also_fails(tmp_path, recording_lo
     monkeypatch.setattr(_repo_index.os, "replace", _raise_replace)
     monkeypatch.setattr(_repo_index.os, "unlink", _raise_unlink)
 
-    _repo_index._save_repo_index(tmp_path, {"a": "b"}, log=recording_log)
+    _repo_index.save_repo_index(tmp_path, {"a": "b"}, log=recording_log)
 
     assert recording_log.warning_messages  # the pre-existing outer failure log
     assert recording_log.debug_messages  # the new inner cleanup-failure log
@@ -188,20 +184,9 @@ def test_job_manager_shutdown_logs_when_kill_tree_fails(recording_log, monkeypat
     assert manager._processes == {}
 
 
-def test_violation_location_logs_unparsable_line() -> None:
-    debug_messages: list[str] = []
-
-    class _Sink:
-        def info(self, message: str) -> None: ...
-        def warning(self, message: str) -> None: ...
-        def error(self, message: str) -> None: ...
-        def success(self, message: str) -> None: ...
-
-        def debug(self, message: str) -> None:
-            debug_messages.append(message)
-
-    location = violations._violation_location(
-        {"req": "REQ-1", "file": "main.py:not-a-number"}, log=_Sink())
+def test_violation_location_logs_unparsable_line(recording_log) -> None:
+    location = violations.violation_location(
+        {"req": "REQ-1", "file": "main.py:not-a-number"}, log=recording_log)
     assert location == ("main.py:not-a-number", 0)
-    (message,) = debug_messages
+    (message,) = recording_log.debug_messages
     assert "violation line could not be parsed" in message

@@ -7,10 +7,12 @@ import logging
 import sys
 from dataclasses import dataclass
 from http import HTTPStatus
+from typing import Callable
 
 import httpx
 
 from quodeq import __version__
+from quodeq.update.channel import CHANNEL_FROZEN, CHANNEL_WHEEL
 from quodeq.update.compare import normalize
 
 _logger = logging.getLogger(__name__)
@@ -55,7 +57,7 @@ _ASSET_PATTERNS = {
 
 
 def _pick_download_url(release: dict, channel: str, platform: str) -> str | None:
-    if channel != "frozen":
+    if channel != CHANNEL_FROZEN:
         return None
     pattern = _ASSET_PATTERNS.get(platform)
     if pattern is None:
@@ -70,7 +72,8 @@ def _pick_download_url(release: dict, channel: str, platform: str) -> str | None
 
 
 def fetch_latest(
-    channel: str, etag: str | None = None, platform: str | None = None
+    channel: str, etag: str | None = None, platform: str | None = None,
+    *, http_get: Callable[..., httpx.Response] | None = None,
 ) -> LatestInfo | None:
     """Ask GitHub for the latest release, returning None on any failure.
 
@@ -78,13 +81,16 @@ def fetch_latest(
     ``not_modified`` result. On the wheel channel the version is then corrected
     against PyPI, since a tag can exist before the upload lands; if that lookup
     fails the GitHub tag stands. *platform* defaults to ``sys.platform`` and
-    only selects which frozen-app asset becomes ``download_url``.
+    only selects which frozen-app asset becomes ``download_url``. *http_get*
+    defaults to ``httpx.get`` (tests pass a fake) and is used for both the
+    GitHub and PyPI requests.
     """
+    get = http_get if http_get is not None else httpx.get
     headers = {"User-Agent": _user_agent(), "Accept": "application/vnd.github+json"}
     if etag:
         headers["If-None-Match"] = etag
     try:
-        gh = httpx.get(_GH_LATEST_URL, headers=headers, timeout=_TIMEOUT)
+        gh = get(_GH_LATEST_URL, headers=headers, timeout=_TIMEOUT)
         if gh.status_code == HTTPStatus.NOT_MODIFIED:
             return LatestInfo(not_modified=True, etag=etag)
         if gh.status_code != HTTPStatus.OK:
@@ -93,7 +99,7 @@ def fetch_latest(
         if not isinstance(release, dict):
             return None
         new_etag = gh.headers.get("ETag")
-    except (httpx.HTTPError, ValueError):
+    except (httpx.HTTPError, httpx.InvalidURL, ValueError):
         return None
 
     version = normalize(str(release.get("tag_name") or "")) or None
@@ -105,9 +111,9 @@ def fetch_latest(
         etag=new_etag,
     )
 
-    if channel == "wheel":
+    if channel == CHANNEL_WHEEL:
         try:
-            pypi = httpx.get(_PYPI_URL, headers={"User-Agent": _user_agent()}, timeout=_TIMEOUT)
+            pypi = get(_PYPI_URL, headers={"User-Agent": _user_agent()}, timeout=_TIMEOUT)
             if pypi.status_code == HTTPStatus.OK:
                 pypi_data = pypi.json()
                 if not isinstance(pypi_data, dict):
@@ -115,6 +121,6 @@ def fetch_latest(
                 pypi_version = normalize(str(pypi_data.get("info", {}).get("version") or ""))
                 if pypi_version:
                     info.version = pypi_version
-        except (httpx.HTTPError, ValueError) as exc:
+        except (httpx.HTTPError, httpx.InvalidURL, ValueError) as exc:
             _logger.debug("PyPI version lookup failed, keeping the GitHub tag: %s", exc)
     return info

@@ -108,6 +108,16 @@ describe('AppMain mount smoke test', () => {
 
     expect(toggleTheme).toHaveBeenCalledTimes(1);
   });
+
+  // Pins today's production wiring: AppMain (not buildTopBarProps) reads
+  // window.location.origin and passes it down as serverUrl, so the server
+  // status dot's label still carries the real host.
+  it('passes window.location.origin through to the server status dot as serverUrl', () => {
+    renderAppMain(makeShell());
+
+    const dot = screen.getByRole('img', { name: /Server running · localhost:3000/ });
+    expect(dot).toBeInTheDocument();
+  });
 });
 
 // The startup loader has to mount in the shell's BODY row, never inside

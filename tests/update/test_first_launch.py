@@ -131,9 +131,10 @@ def test_relaunch_failure_returns_false(tmp_path: Path) -> None:
     assert tools == ["osascript", "ditto", "open"]
 
 
-def test_any_exception_is_swallowed(tmp_path: Path) -> None:
+def test_runner_os_error_is_swallowed(tmp_path: Path) -> None:
+    """A tool (osascript/ditto/open) that can't launch raises OSError."""
     def exploding_runner(argv, **kwargs):
-        raise RuntimeError("boom")
+        raise OSError("boom")
 
     moved = first_launch.offer_move_to_applications(
         Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=tmp_path, runner=exploding_runner
@@ -141,21 +142,113 @@ def test_any_exception_is_swallowed(tmp_path: Path) -> None:
     assert moved is False
 
 
-def test_previous_bundle_removal_failure_aborts_the_move(tmp_path: Path, monkeypatch) -> None:
-    runner = _runner()
+def test_runner_unicode_decode_error_is_swallowed(tmp_path: Path) -> None:
+    """A tool whose output isn't valid UTF-8 raises UnicodeDecodeError
+    (text=True, encoding="utf-8" on subprocess.run)."""
+    def exploding_runner(argv, **kwargs):
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    moved = first_launch.offer_move_to_applications(
+        Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=tmp_path, runner=exploding_runner
+    )
+    assert moved is False
+
+
+def test_runner_out_of_scope_error_propagates(tmp_path: Path) -> None:
+    """R-FT-7 — an error outside (OSError, UnicodeDecodeError) (e.g. a
+    programming bug) must now propagate instead of being swallowed."""
+    def exploding_runner(argv, **kwargs):
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        first_launch.offer_move_to_applications(
+            Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=tmp_path, runner=exploding_runner
+        )
+
+
+def _dmg_with_previous_install(tmp_path: Path) -> tuple[Path, Path]:
+    """A DMG bundle plus an /Applications copy of an earlier install."""
+    app = _fake_dmg_bundle(tmp_path)
+    (app / "Contents" / "marker").write_text("new")
     apps_dir = tmp_path / "Applications"
-    apps_dir.mkdir()
-    (apps_dir / "Quodeq.app").mkdir()  # a previous install is present
+    (apps_dir / "Quodeq.app").mkdir(parents=True)
+    (apps_dir / "Quodeq.app" / "marker").write_text("previous")
+    return app, apps_dir
 
-    def _denied(path, *_a, **_k):
-        raise OSError(13, "Permission denied", str(path))
 
-    monkeypatch.setattr(first_launch.shutil, "rmtree", _denied)
+def test_failed_copy_keeps_previous_bundle(tmp_path: Path) -> None:
+    app, apps_dir = _dmg_with_previous_install(tmp_path)
+    runner = _runner(ditto_rc=1)
+    moved = first_launch.offer_move_to_applications(
+        Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=apps_dir, runner=_spy_fs(runner, app),
+    )
+    assert moved is False
+    assert (apps_dir / "Quodeq.app" / "marker").read_text() == "previous"
+    assert sorted(p.name for p in apps_dir.iterdir()) == ["Quodeq.app"]
+    assert [Path(c[0]).name for c in runner.calls] == ["osascript", "ditto"]
+
+
+def test_failed_rename_restores_previous_bundle(tmp_path: Path, monkeypatch) -> None:
+    app, apps_dir = _dmg_with_previous_install(tmp_path)
+    runner = _runner()
+    real_rename = Path.rename
+
+    def _rename(self, target):
+        if self.name.endswith(".partial"):
+            raise OSError(13, "Permission denied", str(self))
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", _rename)
     with patch.object(first_launch._logger, "warning") as warning:
         moved = first_launch.offer_move_to_applications(
-            Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=apps_dir, runner=runner,
+            Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=apps_dir, runner=_spy_fs(runner, app),
         )
     assert moved is False
-    assert [Path(c[0]).name for c in runner.calls] == ["osascript"]  # ditto never ran
+    assert (apps_dir / "Quodeq.app" / "marker").read_text() == "previous"
+    assert sorted(p.name for p in apps_dir.iterdir()) == ["Quodeq.app"]
+    assert [Path(c[0]).name for c in runner.calls] == ["osascript", "ditto"]
     assert warning.called
-    assert "could not remove the previous bundle" in warning.call_args.args[0]
+
+
+def test_successful_copy_replaces_previous_bundle(tmp_path: Path) -> None:
+    app, apps_dir = _dmg_with_previous_install(tmp_path)
+    (apps_dir / "Quodeq.app.partial").mkdir()  # leftover from an interrupted move
+    runner = _runner()
+    moved = first_launch.offer_move_to_applications(
+        Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=apps_dir, runner=_spy_fs(runner, app),
+    )
+    assert moved is True
+    dest = apps_dir / "Quodeq.app"
+    assert (dest / "Contents" / "marker").read_text() == "new"
+    assert not (dest / "marker").exists()
+    assert sorted(p.name for p in apps_dir.iterdir()) == ["Quodeq.app"]
+    assert runner.calls[-1] == ["open", "-n", str(dest)]
+
+
+def _dmg_with_bundle_left_aside(tmp_path: Path) -> tuple[Path, Path]:
+    """A DMG bundle plus an earlier install left at Quodeq.app.previous, no Quodeq.app."""
+    app, apps_dir = _dmg_with_previous_install(tmp_path)
+    (apps_dir / "Quodeq.app").rename(apps_dir / "Quodeq.app.previous")
+    return app, apps_dir
+
+
+def test_bundle_left_aside_is_put_back_when_the_copy_fails(tmp_path: Path) -> None:
+    app, apps_dir = _dmg_with_bundle_left_aside(tmp_path)
+    runner = _runner(ditto_rc=1)
+    moved = first_launch.offer_move_to_applications(
+        Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=apps_dir, runner=_spy_fs(runner, app),
+    )
+    assert moved is False
+    assert (apps_dir / "Quodeq.app" / "marker").read_text() == "previous"
+    assert sorted(p.name for p in apps_dir.iterdir()) == ["Quodeq.app"]
+
+
+def test_bundle_left_aside_is_replaced_when_the_copy_succeeds(tmp_path: Path) -> None:
+    app, apps_dir = _dmg_with_bundle_left_aside(tmp_path)
+    runner = _runner()
+    moved = first_launch.offer_move_to_applications(
+        Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=apps_dir, runner=_spy_fs(runner, app),
+    )
+    assert moved is True
+    assert (apps_dir / "Quodeq.app" / "Contents" / "marker").read_text() == "new"
+    assert sorted(p.name for p in apps_dir.iterdir()) == ["Quodeq.app"]

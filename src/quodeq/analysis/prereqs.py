@@ -13,6 +13,7 @@ import urllib.request
 
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.analysis_env import provider_explicitly_configured
+from quodeq.config.provider import Provider, ProviderType
 from quodeq.config.llm_bridge_env import api_key, llamacpp_base_url, ollama_base_url
 from quodeq.shared.prereqs import SAFE_CMD_TOKEN_RE, run_version_cmd
 from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path
@@ -70,7 +71,7 @@ def _check_cli_binary_override(provider: str, override: str) -> None:
 
     This is an availability check, not a security boundary: AI_CMD_PATH
     reaches this process either from the operator's own environment or via
-    the dashboard API, where api._evaluation_helpers._validate_ai_cmd_path
+    the dashboard API, where api._evaluation_helpers.validate_ai_cmd_path
     enforces the spawn restrictions (provider-prefixed name, on-PATH dir).
     """
     if not _SAFE_CMD_PATH_RE.fullmatch(override):
@@ -88,7 +89,7 @@ def _check_cli_binary_override(provider: str, override: str) -> None:
         )
 
 
-def _check_cli_provider(provider: str) -> None:
+def _check_cli_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
     """Check that a CLI provider binary is available on PATH."""
     if not SAFE_CMD_TOKEN_RE.fullmatch(provider):
         raise RuntimeError(
@@ -97,7 +98,7 @@ def _check_cli_provider(provider: str) -> None:
             f"Choose a provider in the dashboard Settings:\n"
             f"  quodeq"
         )
-    override = get_ai_cmd_path()
+    override = get_ai_cmd_path(env)
     if override:
         _check_cli_binary_override(provider, override)
         return
@@ -129,7 +130,7 @@ def _probe_local_server(url: str, message: str) -> None:
 def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
     """Check that an API provider has basic connectivity (Ollama: server running)
     and that cloud providers have their required API key set."""
-    if provider == "ollama":
+    if provider == Provider.OLLAMA:
         _probe_local_server(
             f"{ollama_base_url(env)}/api/tags",
             "Ollama is configured as your AI provider but the server is not running.\n\n"
@@ -137,7 +138,7 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
             "  ollama serve\n\n"
             "Or install Ollama from https://ollama.com/download",
         )
-    elif provider == "llamacpp":
+    elif provider == Provider.LLAMACPP:
         _probe_local_server(
             f"{llamacpp_base_url(env)}/health",
             "llama.cpp is configured as your AI provider but llama-server is not running.\n\n"
@@ -164,13 +165,15 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
             )
 
 
-def check_evaluate_prereqs() -> None:
+def check_evaluate_prereqs(env: dict[str, str] | None = None) -> None:
     """Check all prerequisites for the evaluate command.
 
     Checks the configured AI provider instead of always assuming Claude.
-    If no provider is configured, tells the user to select one.
+    If no provider is configured, tells the user to select one. *env* is the
+    caller's resolved environment (None reads the process environment); every
+    provider, binary-override and API-key lookup below goes through it.
     """
-    if not _is_provider_explicitly_configured():
+    if not _is_provider_explicitly_configured(env):
         raise RuntimeError(
             "No AI provider configured.\n\n"
             "Quodeq needs an AI provider to evaluate your code. You can use:\n\n"
@@ -179,12 +182,16 @@ def check_evaluate_prereqs() -> None:
             f"{_SETTINGS_HINT}"
         )
 
-    provider = get_ai_cmd()
+    provider = get_ai_cmd(env)
     configs = get_provider_configs()
     provider_cfg = configs.get(provider, {})
-    provider_type = provider_cfg.get("type", "cli")
+    provider_type = provider_cfg.get("type", ProviderType.CLI)
 
-    if provider_type == "cli":
-        _check_cli_provider(provider)
-    elif provider_type == "api":
-        _check_api_provider(provider)
+    if provider_type == ProviderType.CLI:
+        _check_cli_provider(provider, env=env)
+    elif provider_type == ProviderType.API:
+        _check_api_provider(provider, env=env)
+    else:
+        raise RuntimeError(
+            f"Unknown provider type {provider_type!r} for {provider!r}. {_SETTINGS_HINT}"
+        )

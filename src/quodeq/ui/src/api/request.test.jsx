@@ -46,3 +46,40 @@ it('attaches the HTTP status to thrown errors so callers can branch on it', asyn
     },
   );
 });
+
+it('sends a FormData body with no Content-Type header, so the browser sets the multipart boundary', async () => {
+  const fetchMock = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ ok: true }),
+  }));
+  vi.stubGlobal('fetch', fetchMock);
+  const form = new FormData();
+  form.append('file', new Blob(['x']), 'x.zip');
+  await request('/x', { method: 'POST', body: form });
+  const [, opts] = fetchMock.mock.calls[0];
+  expect(opts.body).toBe(form);
+  expect(opts.headers['Content-Type']).toBeUndefined();
+});
+
+it('still sends the JSON Content-Type for a plain (non-FormData) body', async () => {
+  const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }));
+  vi.stubGlobal('fetch', fetchMock);
+  await request('/x', { method: 'POST', body: JSON.stringify({ a: 1 }) });
+  const [, opts] = fetchMock.mock.calls[0];
+  expect(opts.headers['Content-Type']).toBe('application/json');
+});
+
+it('timeout: null disables the internal abort, for uploads with no time cap', async () => {
+  vi.useFakeTimers();
+  const fetchMock = vi.fn((_u, opts) => new Promise((resolve, reject) => {
+    opts.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+    // Never resolves/rejects on its own within the test window.
+  }));
+  vi.stubGlobal('fetch', fetchMock);
+  const p = request('/x', { timeout: null });
+  p.catch(() => {});
+  await vi.advanceTimersByTimeAsync(120000);
+  expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(false);
+  vi.useRealTimers();
+});

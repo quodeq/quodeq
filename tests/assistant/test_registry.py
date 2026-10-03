@@ -1,3 +1,5 @@
+import logging
+
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext, build_registry
@@ -37,6 +39,43 @@ def test_dispatch_tool_error_and_bad_args():
     reg.register(ToolSpec("boom", "always fails", {"type": "object", "properties": {}}, boom))
     assert reg.dispatch("boom", {}) == {"ok": False, "error": "no run selected"}
     assert reg.dispatch("boom", {"bogus": 1})["ok"] is False  # TypeError contained
+
+
+def test_dispatch_contains_a_genuine_handler_crash(caplog):
+    """A bug in the handler itself (not ToolError/TypeError) is dispatch's
+    run_isolated boundary: it must not kill the turn, must come back as the
+    generic failure dict, and must be logged at WARNING with the traceback
+    so it's discoverable."""
+    def boom():
+        raise RuntimeError("db connection reset")
+
+    reg = ToolRegistry()
+    reg.register(ToolSpec("boom", "always fails", {"type": "object", "properties": {}}, boom))
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.assistant.tools.registry"):
+        out = reg.dispatch("boom", {})
+
+    assert out == {"ok": False, "error": "tool boom failed internally"}
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert warnings[0].exc_info is not None
+
+
+def test_dispatch_does_not_log_tool_error_or_bad_arguments(caplog):
+    """ToolError and a bad-arguments TypeError are routine, expected
+    outcomes handled by _invoke_tool -- outside dispatch's run_isolated
+    boundary -- so they must never be logged as a tool crash."""
+    def boom():
+        raise ToolError("no run selected")
+
+    reg = ToolRegistry()
+    reg.register(ToolSpec("boom", "always fails", {"type": "object", "properties": {}}, boom))
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.assistant.tools.registry"):
+        reg.dispatch("boom", {})
+        reg.dispatch("boom", {"bogus": 1})
+
+    assert caplog.records == []
 
 
 def test_openai_tools_shape_and_duplicate_rejected():

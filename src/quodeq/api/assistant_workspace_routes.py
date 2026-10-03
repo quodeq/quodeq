@@ -6,40 +6,70 @@ worktree/branch always comes from the session's stored row, never the client."""
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 
 from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
-from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
-from quodeq.api.helpers import json_error
+from quodeq.api._constants import (
+    CODE_INVALID_PARAM, CODE_NO_ACTIVE_WORKTREE, CODE_UNKNOWN_SESSION, MESSAGE_UNKNOWN_SESSION)
+from quodeq.api.assistant_routes import release_app_turn, claim_app_turn
+from quodeq.api.helpers import json_error, optional_json_object_or_response
 from quodeq.assistant.workspace_actions import (
-    PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
-from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
+    OutcomeKind, PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
+from quodeq.assistant.worktree import (
+    PrResult, PrResultReason, WorktreeError, WorktreeStatus, diff_stats, diff_text)
 
 _logger = logging.getLogger(__name__)
 
 _MAX_DIFF_CHARS = 2_000_000  # a diff this size is pathological; the UI never shows more
 
+_PR_MESSAGE_NO_GH = "Branch pushed. Install and authenticate the gh CLI, or open the PR from your git host."
+_PR_MESSAGE_CREATED = "PR created"
+
+
+def _pr_message(result: PrResult) -> str:
+    """The PR-result message text, rebuilt from ``result.reason`` plus
+    ``result.detail`` exactly as ``WorktreeManager.create_pr`` used to write
+    it before this shaping moved here. All 4 strings are wire-visible (the
+    UI shows them as-is), so they must stay byte-identical."""
+    if result.reason == PrResultReason.PUSH_FAILED:
+        return (f"Push failed: {result.detail}. The changes are back in the "
+                "worktree; apply them or open a PR manually.")
+    if result.reason == PrResultReason.GH_FAILED:
+        return f"gh pr create failed: {result.detail}"
+    if result.reason == PrResultReason.NO_GH:
+        return _PR_MESSAGE_NO_GH
+    return _PR_MESSAGE_CREATED
+
+
+def _pr_response(result: PrResult) -> dict:
+    """The route-owned camelCase wire body for a PR-creation attempt."""
+    return {"prUrl": result.pr_url, "branch": result.branch,
+            "pushed": result.pushed, "message": _pr_message(result)}
+
 
 def _lookup(app: Flask, sid: str):
-    """(repo, row, error_response); runs one-shot worktree/db hygiene first."""
+    """(repo, session, row, error_response); runs one-shot worktree/db hygiene first."""
     repo = get_repository(app)
-    if repo.get_session(sid) is None:
-        return None, None, json_error("unknown session", 404, "UNKNOWN_SESSION")
+    session = repo.get_session(sid)
+    if session is None:
+        return None, None, None, json_error(MESSAGE_UNKNOWN_SESSION, HTTPStatus.NOT_FOUND, CODE_UNKNOWN_SESSION)
     run_assistant_hygiene(app)
-    return repo, repo.get_worktree(sid), None
+    return repo, session, repo.get_worktree(sid), None
 
 
 def _worktree_summary(row) -> dict | None:
     if row is None:
         return None
-    active = row["status"] == "active" and Path(row["path"]).is_dir()
+    active = row["status"] == WorktreeStatus.ACTIVE and Path(row["path"]).is_dir()
     stats = []
     if active:
         try:
             stats = diff_stats(Path(row["path"]))
-        except WorktreeError:
+        except WorktreeError as exc:
+            _logger.warning("diff_stats failed for %s: %s", row["path"], exc, exc_info=True)
             stats = []
     return {"branch": row["branch"], "status": row["status"],
             "filesChanged": len(stats), "stats": stats,
@@ -47,23 +77,22 @@ def _worktree_summary(row) -> dict | None:
 
 
 def _workspace_status(app: Flask, sid: str):
-    repo, row, err = _lookup(app, sid)
+    repo, session, row, err = _lookup(app, sid)
     if err:
         return err
-    session = repo.get_session(sid)
     pending = [{"sessionId": r["session_id"], "branch": r["branch"]}
-               for r in repo.list_worktrees("active",
+               for r in repo.list_worktrees(WorktreeStatus.ACTIVE,
                                             project_id=session.get("project_id"))
                if r["session_id"] != sid]
     return jsonify({"worktree": _worktree_summary(row), "pending": pending})
 
 
 def _workspace_diff(app: Flask, sid: str):
-    repo, row, err = _lookup(app, sid)
+    repo, _session, row, err = _lookup(app, sid)
     if err:
         return err
-    if row is None or row["status"] != "active":
-        return json_error("no active worktree", 404, "NO_ACTIVE_WORKTREE")
+    if row is None or row["status"] != WorktreeStatus.ACTIVE:
+        return json_error("no active worktree", HTTPStatus.NOT_FOUND, CODE_NO_ACTIVE_WORKTREE)
     try:
         text = diff_text(Path(row["path"]))
         truncated = len(text) > _MAX_DIFF_CHARS
@@ -71,7 +100,7 @@ def _workspace_diff(app: Flask, sid: str):
                         "stats": diff_stats(Path(row["path"]))})
     except WorktreeError as exc:
         _logger.warning("workspace diff failed for %s: %s", sid, exc)
-        return json_error("failed to compute the workspace diff", 500, "WORKSPACE_DIFF_FAILED")
+        return json_error("failed to compute the workspace diff", HTTPStatus.INTERNAL_SERVER_ERROR, "WORKSPACE_DIFF_FAILED")
 
 
 def _workspace_target(app: Flask, sid: str):
@@ -80,11 +109,11 @@ def _workspace_target(app: Flask, sid: str):
     Folds the lookup and the "no worktree" 404 that apply, pr and discard all
     answer with before they touch the worktree.
     """
-    repo, row, err = _lookup(app, sid)
+    repo, _session, row, err = _lookup(app, sid)
     if err:
         return None, None, err
     if row is None:
-        return None, None, json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
+        return None, None, json_error("no worktree", HTTPStatus.NOT_FOUND, CODE_NO_ACTIVE_WORKTREE)
     return repo, row, None
 
 
@@ -93,12 +122,12 @@ def _turn_conflict(outcome):
 
     Shared by apply, pr and discard: same text, same status, same error code.
     """
-    if outcome.kind == "turn_busy":
+    if outcome.kind == OutcomeKind.TURN_BUSY:
         return json_error(
             "a turn or workspace action is in progress; wait for it to finish",
-            409, "TURN_IN_PROGRESS")
-    if outcome.kind == "not_active":
-        return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
+            HTTPStatus.CONFLICT, "TURN_IN_PROGRESS")
+    if outcome.kind == OutcomeKind.NOT_ACTIVE:
+        return json_error(f"worktree already {outcome.detail}", HTTPStatus.CONFLICT, "WORKTREE_CONFLICT")
     return None
 
 
@@ -106,14 +135,14 @@ def _workspace_apply(app: Flask, sid: str):
     repo, _row, err = _workspace_target(app, sid)
     if err:
         return err
-    outcome = apply_workspace(repo, sid, claim_turn=_try_claim_turn,
-                              release_turn=_release_turn)
+    outcome = apply_workspace(repo, sid, claim_turn=claim_app_turn,
+                              release_turn=release_app_turn)
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict
-    if outcome.kind == "failed":
+    if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace apply failed for %s: %s", sid, outcome.detail)
-        return json_error("failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
+        return json_error("failed to apply the workspace changes", HTTPStatus.CONFLICT, "WORKSPACE_APPLY_FAILED")
     return jsonify({"applied": True, "stats": outcome.stats})
 
 
@@ -121,17 +150,19 @@ def _workspace_pr(app: Flask, sid: str):
     repo, _row, err = _workspace_target(app, sid)
     if err:
         return err
-    req_body = request.get_json(silent=True) or {}
+    req_body = optional_json_object_or_response(CODE_INVALID_PARAM)
+    if not isinstance(req_body, dict):
+        return req_body
     draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
     outcome = create_workspace_pr(
-        repo, sid, draft, claim_turn=_try_claim_turn, release_turn=_release_turn)
+        repo, sid, draft, claim_turn=claim_app_turn, release_turn=release_app_turn)
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict
-    if outcome.kind == "failed":
+    if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace pr creation failed for %s: %s", sid, outcome.detail)
-        return json_error("failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
-    return jsonify(outcome.result)
+        return json_error("failed to create the pull request", HTTPStatus.INTERNAL_SERVER_ERROR, "WORKSPACE_PR_FAILED")
+    return jsonify(_pr_response(outcome.result))
 
 
 def _workspace_discard(app: Flask, sid: str):
@@ -142,16 +173,16 @@ def _workspace_discard(app: Flask, sid: str):
     # in-flight apply (overwriting "applied" with "discarded" while the
     # changes sat in the user's real tree) and pulled the worktree out
     # from under a running write turn.
-    outcome = discard_workspace(repo, sid, claim_turn=_try_claim_turn,
-                                release_turn=_release_turn)
+    outcome = discard_workspace(repo, sid, claim_turn=claim_app_turn,
+                                release_turn=release_app_turn)
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict
-    if outcome.kind == "gone":
-        return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
-    if outcome.kind == "failed":
+    if outcome.kind == OutcomeKind.GONE:
+        return json_error("no worktree", HTTPStatus.NOT_FOUND, CODE_NO_ACTIVE_WORKTREE)
+    if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace discard failed for %s: %s", sid, outcome.detail)
-        return json_error("failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
+        return json_error("failed to discard the workspace", HTTPStatus.INTERNAL_SERVER_ERROR, "WORKSPACE_DISCARD_FAILED")
     return jsonify({"discarded": True})
 
 

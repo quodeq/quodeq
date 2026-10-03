@@ -11,8 +11,6 @@ export function stripPrinciplePrefix(reason, principle) {
   }
   return reason;
 }
-export const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
-
 /**
  * Splits a `path:line` reference into its parts. An explicit `rawLine` wins
  * over a line embedded in the path.
@@ -44,7 +42,8 @@ export function angleFromDelta(d) {
 }
 
 /**
- * Format the ratio of compliance items to violations as a readable string.
+ * The ratio of violations to compliance items as "1:N" (N rounded to a
+ * whole number). The first number is always the violations.
  *
  * @param {number} violations - Number of violations
  * @param {number} compliance - Number of compliance items

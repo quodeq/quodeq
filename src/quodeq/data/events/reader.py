@@ -22,6 +22,9 @@ def _parse_event_line(
     try:
         # 1. Parse as raw dict first to determine the type
         raw_data = json.loads(line)
+        if not isinstance(raw_data, dict):
+            _logger.warning(f"Non-object event in {log_path} at line {line_num}")
+            return None
         event_type_str = raw_data.get("event_type")
 
         if not event_type_str:
@@ -59,7 +62,7 @@ def _parse_event_line(
         # Handles invalid Enum values or missing keys in raw_data
         _logger.error(f"Invalid event structure in {log_path} at line {line_num}: {e}")
         return None
-    except Exception as e:
+    except (TypeError, RecursionError) as e:
         _logger.error(f"Unexpected error reading {log_path} at line {line_num}: {e}")
         return None
 

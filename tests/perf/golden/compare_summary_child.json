@@ -1,0 +1,86 @@
+{
+  "commitsSinceLastRun": null,
+  "dimensions": [
+    {
+      "dimension": "security",
+      "evidenceDate": "<timestamp>",
+      "filesRead": 10,
+      "fromDateIso": "<timestamp>",
+      "fromDateLabel": "10 Feb 2026",
+      "fromRunId": "20260210T000000",
+      "openTypes": 5,
+      "overallGrade": "Exemplary",
+      "overallScore": "9.4/10",
+      "principles": [
+        {
+          "grade": "Exemplary",
+          "principle": "Confidentiality",
+          "score": "9.4/10"
+        }
+      ],
+      "quarantinedCount": 0,
+      "stale": false,
+      "totals": {
+        "complianceCount": 0,
+        "severity": {
+          "critical": 0,
+          "major": 5,
+          "minor": 0,
+          "unknown": 0
+        },
+        "violationCount": 5
+      },
+      "trend": "none"
+    }
+  ],
+  "lastRun": {
+    "dateLabel": "10 Feb 2026",
+    "runId": "20260210T000000",
+    "status": "done"
+  },
+  "project": "golden-child",
+  "runsCount": 1,
+  "scoring": {
+    "customFormula": false
+  },
+  "summary": {
+    "dimensionCount": 1,
+    "numericAverage": 9.4,
+    "overallGrade": "Exemplary",
+    "previousNumericAverage": null,
+    "severity": {
+      "critical": 0,
+      "major": 5,
+      "minor": 0
+    },
+    "totalCompliance": 0,
+    "totalViolations": 5
+  },
+  "trend": [
+    {
+      "accumulatedDimensionsCount": 1,
+      "critical": 0,
+      "dateISO": "<timestamp>",
+      "dateLabel": "10 Feb 2026",
+      "dimensionDetails": [
+        {
+          "dimension": "security",
+          "score": 9.4
+        }
+      ],
+      "dimensions": [
+        "security"
+      ],
+      "dimensionsCount": 1,
+      "majors": 5,
+      "numericAverage": 9.4,
+      "openTypes": 5,
+      "overallGrade": "Exemplary",
+      "runId": "20260210T000000",
+      "runNumericAverage": 9.4,
+      "runOverallGrade": "Exemplary",
+      "status": "done",
+      "violations": 5
+    }
+  ]
+}

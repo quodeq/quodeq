@@ -1,4 +1,4 @@
-"""Cluster 34: shared/ best-effort handlers log at debug instead of swallowing."""
+"""shared/ best-effort handlers log at debug instead of swallowing."""
 from __future__ import annotations
 
 import os

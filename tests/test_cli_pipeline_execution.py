@@ -84,7 +84,7 @@ class TestExecutePipeline:
     def test_pipeline_analysis_error(self, mock_run_full, tmp_path, capsys):
         # AnalysisError propagates from execute_pipeline so that the outer
         # RunLifecycleContext can write state=failed.  The caller
-        # (_run_pipeline_with_cleanup) is responsible for mapping it to exit 1.
+        # (run_pipeline_with_cleanup) is responsible for mapping it to exit 1.
         import pytest
 
         from quodeq.analysis.subprocess import AnalysisError

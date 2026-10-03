@@ -14,7 +14,7 @@ Categories of re-exported utilities
    (from ``text_io.py``)
 2. **Security helpers** -- ``SENSITIVE_PATTERNS``, ``sanitize_sensitive``
    (from ``_security.py``)
-3. **Config loading** -- ``Config`` dataclass, lazy singleton via ``_get_config()``
+3. **Config loading** -- ``Config`` dataclass, lazy singleton via ``get_config()``
    (from ``_config.py``)
 4. **Platform detection** -- ``IS_WIN32``
 5. **Repository URL helpers** -- ``is_repo_url``, ``project_name_from_repo``
@@ -40,13 +40,14 @@ from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive
 # Re-exports — Config loading
 # ---------------------------------------------------------------------------
 
-from quodeq.shared._config import ACTION_API_MODULE, Config, _get_config
+from quodeq.shared._config import ACTION_API_MODULE, Config, get_config
+from quodeq.shared.constants import PLATFORM_WIN32
 
 # ---------------------------------------------------------------------------
 # Platform detection
 # ---------------------------------------------------------------------------
 
-IS_WIN32: bool = sys.platform == "win32"
+IS_WIN32: bool = sys.platform == PLATFORM_WIN32
 """True when the current platform is Windows (win32)."""
 
 # ---------------------------------------------------------------------------
@@ -80,7 +81,7 @@ __all__ = [
     # Security helpers (re-exported from _security.py)
     "SENSITIVE_PATTERNS", "sanitize_sensitive",
     # Config
-    "Config", "ACTION_API_MODULE", "_get_config",
+    "Config", "ACTION_API_MODULE", "get_config",
     # Platform
     "IS_WIN32",
     # Repo URL helpers

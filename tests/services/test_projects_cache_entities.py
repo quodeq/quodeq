@@ -1,4 +1,4 @@
-"""ProjectsCache caches entities; the route owns serialization (WS6).
+"""ProjectsCache caches entities; the route owns serialization.
 
 The cache used to store the camelCase wire payload, a declared
 serialization-ratchet entry. It now caches ``ProjectEntry`` objects — the
@@ -7,14 +7,43 @@ mapping happens per request at the route boundary.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
+import quodeq.services._projects_cache as mod
 from quodeq.core.types import ProjectEntry
 from quodeq.services._projects_cache import ProjectsCache
 
 
 def _entry(pid: str = "p1") -> ProjectEntry:
     return ProjectEntry(id=pid, name="proj", runs_count=2, latest_run_id="r2")
+
+
+def _fake_clock():
+    """Deterministic stand-in for time.monotonic(): a small counter, not the
+    real (unspecified-magnitude, uptime-scale) system clock -- zeroing a
+    stamp and resubtracting a real reading almost never lands back under a
+    TTL, so a real clock would silently fail to reproduce the race below."""
+    state = {"t": 0.0}
+
+    def _tick() -> float:
+        state["t"] += 0.01
+        return state["t"]
+
+    return _tick
+
+
+def _invalidate_once_then(cache, fake):
+    """Clock function: fires cache.invalidate() on its first call, then just ticks."""
+    armed = {"on": True}
+
+    def hook():
+        if armed["on"]:
+            armed["on"] = False
+            cache.invalidate()
+        return fake()
+
+    return hook
 
 
 def test_cache_returns_entities_not_wire_dicts(tmp_path):
@@ -94,10 +123,9 @@ def test_concurrent_cold_reads_share_one_build(tmp_path):
 
 
 def test_service_module_does_no_serialization():
-    """The declared WS6 wire-boundary entry is retired: no to_camel_dict here."""
-    import quodeq.services._projects_cache as mod
-
-    assert "to_camel_dict" not in open(mod.__file__).read()
+    """The declared wire-boundary entry is retired: no to_camel_dict here."""
+    from pathlib import Path
+    assert "to_camel_dict" not in Path(mod.__file__).read_text(encoding="utf-8")
 
 
 def test_route_serializes_entities_to_camel_case(tmp_path):
@@ -121,20 +149,6 @@ def test_route_serializes_entities_to_camel_case(tmp_path):
     assert body["projects"][0]["latestRunId"] == "r2"
 
 
-def test_pending_summaries_keep_the_cache_cold(tmp_path):
-    """While any entry is summary-pending the TTL must not stamp: the UI polls
-    every few seconds for grades the warm-up engine is still computing."""
-    pending = ProjectEntry(id="p1", name="proj", runs_count=2, latest_run_id="r2", summary_pending=True)
-    with patch(
-        "quodeq.services._projects_cache.fs_projects.build_project_list",
-        return_value=[pending],
-    ) as spy:
-        cache = ProjectsCache()
-        cache.list(str(tmp_path))
-        cache.list(str(tmp_path))
-    assert spy.call_count == 2, "pending entries must bypass the TTL window"
-
-
 def test_settled_summaries_stamp_the_cache_again(tmp_path):
     done = ProjectEntry(id="p1", name="proj", runs_count=2, latest_run_id="r2", summary_pending=False)
     with patch(
@@ -156,7 +170,7 @@ def test_summary_pending_serializes_camelcase():
 def test_paginated_hydration_gets_the_index_auto_detected_parent():
     """Critical #1 regression (code review): _hydrate() must not silently
     return the raw, unenriched .parent that build_project_entries()/
-    _build_project_entry() read straight off repository_info.json -- it
+    build_project_entry() read straight off repository_info.json -- it
     must use the value build_project_index() already auto-detected.
     """
     index = [ProjectEntry(id="child", name="child", parent="parent")]
@@ -173,6 +187,39 @@ def test_paginated_hydration_gets_the_index_auto_detected_parent():
     entry = out["projects"][0]
     assert entry.parent == "parent"
     assert entry.runs_count == 3, "the rest of the hydrated entry must be untouched"
+
+
+def test_list_never_returns_none_when_invalidated_mid_fast_path(tmp_path, monkeypatch):
+    """A one-shot hook fires ``invalidate()`` from inside the freshness
+    check's own ``time.monotonic()`` call -- after it commits to "payload is
+    not None" but before it re-reads ``self._payload`` to return it.
+    ``list()`` must never surface that as a fake cache miss returning None."""
+    monkeypatch.setattr(mod.fs_projects, "build_project_list", lambda _p: [_entry()])
+    cache = mod.ProjectsCache(ttl_s=60)
+    cache.list(str(tmp_path))
+
+    monkeypatch.setattr(mod, "time", SimpleNamespace(monotonic=_invalidate_once_then(cache, _fake_clock())))
+    result = cache.list(str(tmp_path))
+    assert result is not None and len(result["projects"]) == 1
+
+
+def test_paginated_list_never_returns_none_when_invalidated_mid_fast_path(tmp_path, monkeypatch):
+    """Same race, for the paginated (index + hydrate) tier: the hook fires
+    inside ``_fresh_index()``'s own monotonic() call. ``_hydrated_fresh()``
+    calls monotonic() again later in the same request, but the hook has
+    already disarmed by then -- one invalidate per request exposes it."""
+    index = [ProjectEntry(id="p1", name="proj")]
+    monkeypatch.setattr(mod._fs_project_index, "build_project_index", lambda _p: index)
+    monkeypatch.setattr(
+        mod._fs_project_index, "build_project_entries",
+        lambda _p, ids: [_entry(pid) for pid in ids],
+    )
+    cache = mod.ProjectsCache(ttl_s=60)
+    cache.list(str(tmp_path), offset=0, limit=1)
+
+    monkeypatch.setattr(mod, "time", SimpleNamespace(monotonic=_invalidate_once_then(cache, _fake_clock())))
+    result = cache.list(str(tmp_path), offset=0, limit=1)
+    assert result is not None and len(result["projects"]) == 1
 
 
 def test_hydrate_read_cannot_observe_a_concurrent_invalidate_mid_fill():

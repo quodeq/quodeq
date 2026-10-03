@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field, fields
-from datetime import datetime, timezone
+
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 # Bumped whenever the entry format itself changes shape. Independent of
 # CacheKey.schema_version, which gates input-side invalidation.
@@ -22,20 +23,15 @@ from datetime import datetime, timezone
 ENTRY_FORMAT_VERSION = 3
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
 def quodeq_version() -> str:
-    """Best-effort current quodeq version string for provenance.
+    """Current quodeq version string for provenance, or "" if unset.
 
-    Lazily imported so this module stays import-cheap and never raises if the
-    package metadata is unavailable (e.g. running from an uninstalled tree)."""
-    try:
-        from quodeq import __version__  # noqa: PLC0415
-        return __version__ or ""
-    except Exception:  # noqa: BLE001 — provenance must never break a cache write
-        return ""
+    Lazily imported so this module stays import-cheap. Package metadata
+    resolution failures (e.g. running from an uninstalled tree) already
+    yield ``__version__ is None`` at import time (see ``quodeq/__init__.py``),
+    not a raise, so there is nothing left here worth swallowing."""
+    from quodeq import __version__  # noqa: PLC0415
+    return __version__ or ""
 
 
 def build_provenance(
@@ -86,7 +82,7 @@ class CacheEntry:
     # default config). Format v3; older entries load as "" and the migration
     # derives the real value from ``provenance.effective_params``.
     params_hash: str = ""
-    created_at: str = field(default_factory=_utc_now)
+    created_at: str = field(default_factory=lambda: utc_now_iso(timespec=ISO_SECONDS))
     cache_format_version: int = ENTRY_FORMAT_VERSION
     # Whether a COMPLETED run has consolidated these findings into its
     # report. Written False at creation and flipped to True by

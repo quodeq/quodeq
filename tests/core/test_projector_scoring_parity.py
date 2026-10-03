@@ -29,11 +29,11 @@ def _legacy_dim_score(violations, compliance) -> float | None:
     findings.
     """
     from quodeq.core.scoring.overall import MODE_NUMERICAL, weighted_overall
-    from quodeq.services.rescore import _group_by_principle, _score_all_principles
+    from quodeq.services.rescore import group_by_principle, score_all_principles
 
-    pv = _group_by_principle(violations)
-    pc = _group_by_principle(compliance)
-    principle_scores, _ = _score_all_principles(pv, pc)
+    pv = group_by_principle(violations)
+    pc = group_by_principle(compliance)
+    principle_scores, _ = score_all_principles(pv, pc)
     overall = weighted_overall(principle_scores, MODE_NUMERICAL)
     return overall.weighted_score
 
@@ -93,15 +93,15 @@ def test_parity_low_confidence_returns_insufficient_in_both() -> None:
     fallback), but the *grade* must be Insufficient.
     """
     from quodeq.core.scoring.overall import MODE_NUMERICAL, weighted_overall
-    from quodeq.services.rescore import _group_by_principle, _score_all_principles
+    from quodeq.services.rescore import group_by_principle, score_all_principles
 
     violations = [_f("R1", "P1", "high")]
     compliance = []
 
     # Legacy
-    pv = _group_by_principle(violations)
-    pc = _group_by_principle(compliance)
-    legacy_principle_scores, _ = _score_all_principles(pv, pc)
+    pv = group_by_principle(violations)
+    pc = group_by_principle(compliance)
+    legacy_principle_scores, _ = score_all_principles(pv, pc)
     legacy_overall = weighted_overall(legacy_principle_scores, MODE_NUMERICAL)
     assert legacy_overall.grade == "Insufficient"
 

@@ -160,7 +160,7 @@ class TestListModelDirs:
 class TestConcurrency:
     def test_no_models_available(self):
         with patch("quodeq.llm_bridge.omlx.list_omlx_models", return_value=[]), \
-             patch("quodeq.llm_bridge.omlx._detect_memory", return_value=48e9):
+             patch("quodeq.llm_bridge.omlx.detect_memory", return_value=48e9):
             result = run_concurrency_test("any")
         assert result["recommended"] == 1
         assert "reason" in result
@@ -168,7 +168,7 @@ class TestConcurrency:
     def test_estimates_with_models_available(self):
         mock_models = [{"name": "mlx-community/gemma-3-4b-it-4bit", "size": 0}]
         with patch("quodeq.llm_bridge.omlx.list_omlx_models", return_value=mock_models), \
-             patch("quodeq.llm_bridge.omlx._detect_memory", return_value=128e9):
+             patch("quodeq.llm_bridge.omlx.detect_memory", return_value=128e9):
             result = run_concurrency_test("mlx-community/gemma-3-4b-it-4bit")
         assert result["recommended"] >= 1
         assert result["gpu_memory"] == 128e9
@@ -176,7 +176,7 @@ class TestConcurrency:
     def test_no_host_memory_detected(self):
         mock_models = [{"name": "mlx-community/gemma-3-4b-it-4bit", "size": 0}]
         with patch("quodeq.llm_bridge.omlx.list_omlx_models", return_value=mock_models), \
-             patch("quodeq.llm_bridge.omlx._detect_memory", return_value=0):
+             patch("quodeq.llm_bridge.omlx.detect_memory", return_value=0):
             result = run_concurrency_test("mlx-community/gemma-3-4b-it-4bit")
         assert result["recommended"] == 1
         assert "reason" in result

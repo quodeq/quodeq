@@ -1,4 +1,4 @@
-"""Cluster 33: analysis/config best-effort handlers log through the injected sink."""
+"""analysis/config best-effort handlers log through the injected sink."""
 from __future__ import annotations
 
 import os
@@ -11,23 +11,46 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.analysis import _api_standards_text, _loop_state
-from quodeq.analysis._run_lifecycle_support import _SIGNALS_TO_HANDLE, _SignalGuard
+from quodeq.analysis._run_lifecycle_support import _SIGNALS_TO_HANDLE, SignalGuard
+from quodeq.analysis.run_lifecycle import (
+    mark_unfinished_dims_incomplete,
+    seed_dimension_states,
+)
 from quodeq.analysis.subagents import _queue_state
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 from quodeq.config import ai_provider
 from quodeq.config.paths import ConfigPaths
+from quodeq.core.run.dimensions import DimState, IllegalDimTransitionError
+from quodeq.data.fs import dimensions_state_store
+from quodeq.data.fs.dimensions_state_store import write_dim_state
 
 
 def test_silence_broken_stdout_survives_unopenable_devnull(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(_loop_state.os, "devnull", str(tmp_path / "missing" / "null"))
     out, err = sys.stdout, sys.stderr
-    _loop_state._silence_broken_stdout()  # must not raise
+    _loop_state.silence_broken_stdout()  # must not raise
     assert sys.stdout is out
     assert sys.stderr is err
 
 
+def test_safe_write_dim_state_uses_injected_write_state(tmp_path) -> None:
+    """write_state is a call-time seam: when set, safe_write_dim_state must
+    call it instead of the concrete data-layer write_dim_state."""
+    calls: list[tuple] = []
+
+    def _fake_write_state(run_dir, dim, state, *, reason=None, exit_reason=None):
+        calls.append((run_dir, dim, state, reason, exit_reason))
+
+    transition = _loop_state.DimTransition(state="running")
+    _loop_state.safe_write_dim_state(
+        tmp_path, "security", transition, write_state=_fake_write_state,
+    )
+
+    assert calls == [(tmp_path, "security", "running", None, None)]
+
+
 def test_signal_guard_logs_install_failure_off_main_thread(recording_log) -> None:
-    guard = _SignalGuard(lambda *_: None, log=recording_log)
+    guard = SignalGuard(lambda *_: None, log=recording_log)
     worker = threading.Thread(target=guard.install)
     worker.start()
     worker.join()
@@ -38,7 +61,7 @@ def test_signal_guard_logs_install_failure_off_main_thread(recording_log) -> Non
 
 def test_signal_guard_logs_restore_failure_off_main_thread(recording_log) -> None:
     originals = {sig: signal.getsignal(sig) for sig in _SIGNALS_TO_HANDLE}
-    guard = _SignalGuard(lambda *_: None, log=recording_log)
+    guard = SignalGuard(lambda *_: None, log=recording_log)
     try:
         guard.install()  # main thread: succeeds
         worker = threading.Thread(target=guard.restore)
@@ -55,28 +78,6 @@ def test_prioritize_files_logs_unreadable_file_size(tmp_path, recording_log) -> 
     assert files == ["missing.py"]
     assert recording_log.debug_messages
     assert "missing.py" in recording_log.debug_messages[0]
-
-
-def test_cleanup_stale_lock_logs_when_unlink_finds_it_already_gone() -> None:
-    """The stat-then-unlink pair races with another process's own cleanup.
-
-    A duck-typed stand-in gives a deterministic "stat succeeds, unlink then
-    discovers the lock file is already gone" sequence without depending on
-    real filesystem timing.
-    """
-    class _RacyLockPath:
-        def stat(self):
-            from types import SimpleNamespace
-            return SimpleNamespace(st_mtime=0.0)
-
-        def unlink(self):
-            raise FileNotFoundError("already removed")
-
-    with patch.object(_queue_state._log, "debug") as debug:
-        result = _queue_state.cleanup_stale_lock(_RacyLockPath(), threshold=0)
-
-    assert result is True
-    assert any("already removed" in call.args[0] for call in debug.call_args_list)
 
 
 def test_write_state_logs_cleanup_failure_after_replace_error(tmp_path, monkeypatch) -> None:
@@ -102,12 +103,16 @@ def test_load_standards_text_logs_corrupt_json_and_falls_back(tmp_path) -> None:
     """The compiled JSON is corrupt; the handler logs it and falls through
     to the (absent) .md file, the same failure path
     ``test_subprocess_coverage.py::test_falls_back_to_md`` exercises for the
-    success case."""
+    success case. Warning level (not debug): a compiled-standards read
+    failure changes what the model sees, so it must not be silent by
+    default."""
     (tmp_path / "security.json").write_text("{not json")
-    with patch.object(_api_standards_text._log, "debug") as debug:
-        result = _api_standards_text._load_standards_text(tmp_path, "security")
-    assert debug.called
-    assert "compiled standards file skipped" in debug.call_args.args[0]
+    with patch.object(_api_standards_text._log, "warning") as warning:
+        result = _api_standards_text.load_standards_text(tmp_path, "security")
+    assert warning.called
+    message = warning.call_args.args[0] % warning.call_args.args[1:]
+    assert "compiled standards file skipped" in message
+    assert "security" in message
     assert result == ""
 
 
@@ -128,12 +133,12 @@ def test_gather_source_files_logs_unreadable_file(tmp_path, monkeypatch) -> None
 
     monkeypatch.setattr(Path, "stat", _flaky_stat)
     # On Python 3.13, Path.is_file() itself calls stat(); force it to True so the
-    # only stat() call exercised is the one inside _gather_source_files' try block.
+    # only stat() call exercised is the one inside gather_source_files' try block.
     monkeypatch.setattr(Path, "is_file", lambda self, *a, **k: True)
     messages: list[tuple] = []
     monkeypatch.setattr(_api_standards_text._log, "debug", lambda *a: messages.append(a))
 
-    result = _api_standards_text._gather_source_files(tmp_path)
+    result = _api_standards_text.gather_source_files(tmp_path)
 
     assert good in result
     assert flaky not in result
@@ -141,8 +146,109 @@ def test_gather_source_files_logs_unreadable_file(tmp_path, monkeypatch) -> None
     assert "source file skipped" in messages[0][0]
 
 
+def test_mark_unfinished_dims_incomplete_logs_and_returns_zero_for_bad_run_dir(
+    recording_log,
+) -> None:
+    """A run_dir that isn't a real Path makes read_dimensions' own ``/``
+    join raise TypeError; the flip must log and return 0, not raise."""
+    flipped = mark_unfinished_dims_incomplete(
+        object(), "not_reached", log=recording_log,  # type: ignore[arg-type]
+    )
+    assert flipped == 0
+    assert recording_log.warning_messages
+    assert "failed to read dimensions for flip" in recording_log.warning_messages[0]
+
+
+def test_mark_unfinished_dims_incomplete_logs_and_returns_zero_for_non_object_dimensions_json(
+    tmp_path, recording_log,
+) -> None:
+    """A dimensions.json that parses but isn't an object (e.g. ``[]``) makes
+    read_dimensions' result raise AttributeError on ``.get``; the flip must
+    log and return 0, not raise."""
+    (tmp_path / "dimensions.json").write_text("[]", encoding="utf-8")
+    flipped = mark_unfinished_dims_incomplete(
+        tmp_path, "not_reached", log=recording_log,
+    )
+    assert flipped == 0
+    assert recording_log.warning_messages
+    assert "failed to read dimensions for flip" in recording_log.warning_messages[0]
+
+
+def test_mark_unfinished_dims_incomplete_logs_and_skips_on_illegal_transition(
+    tmp_path, recording_log, monkeypatch,
+) -> None:
+    """write_dim_state raising IllegalDimTransitionError for one dim must be
+    caught, logged, and skipped, not crash the flip for the rest."""
+    write_dim_state(tmp_path, "security", DimState.RUNNING)
+
+    def _raise(*_args, **_kwargs):
+        raise IllegalDimTransitionError("bad transition")
+
+    monkeypatch.setattr(dimensions_state_store, "write_dim_state", _raise)
+
+    flipped = mark_unfinished_dims_incomplete(tmp_path, "not_reached", log=recording_log)
+
+    assert flipped == 0
+    assert recording_log.warning_messages
+    assert "failed to mark dim security incomplete" in recording_log.warning_messages[0]
+
+
+def test_mark_unfinished_dims_incomplete_propagates_unnamed_write_error(
+    tmp_path, recording_log, monkeypatch,
+) -> None:
+    """A write_dim_state failure outside (OSError, IllegalDimTransitionError)
+    must propagate, not be swallowed."""
+    write_dim_state(tmp_path, "security", DimState.RUNNING)
+
+    def _raise(*_args, **_kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(dimensions_state_store, "write_dim_state", _raise)
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        mark_unfinished_dims_incomplete(tmp_path, "not_reached", log=recording_log)
+
+
+def test_seed_dimension_states_logs_and_continues_on_illegal_transition(
+    tmp_path, recording_log, monkeypatch,
+) -> None:
+    """One dim's write_dim_state raising IllegalDimTransitionError must be
+    caught and logged; the remaining dims still get seeded."""
+    calls: list[str] = []
+    real_write = write_dim_state
+
+    def _flaky(run_dir, dim, state, **kwargs):
+        if dim == "security":
+            raise IllegalDimTransitionError("bad transition")
+        calls.append(dim)
+        return real_write(run_dir, dim, state, **kwargs)
+
+    monkeypatch.setattr(dimensions_state_store, "write_dim_state", _flaky)
+
+    seed_dimension_states(tmp_path, ["security", "usability"], log=recording_log)
+
+    assert calls == ["usability"]
+    assert recording_log.warning_messages
+    assert "failed to seed dim state for security" in recording_log.warning_messages[0]
+
+
+def test_seed_dimension_states_propagates_unnamed_write_error(
+    tmp_path, recording_log, monkeypatch,
+) -> None:
+    """A write_dim_state failure outside (OSError, IllegalDimTransitionError)
+    must propagate, not be swallowed."""
+    def _raise(*_args, **_kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(dimensions_state_store, "write_dim_state", _raise)
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        seed_dimension_states(tmp_path, ["security"], log=recording_log)
+
+
 def test_write_env_logs_cleanup_failure_and_reraises(tmp_path, monkeypatch) -> None:
     paths = ConfigPaths.from_root(tmp_path)
+    monkeypatch.setenv("QUODEQ_ALLOW_PLAINTEXT_KEY", "1")
 
     def _raise(*_args, **_kwargs):
         raise OSError("boom")

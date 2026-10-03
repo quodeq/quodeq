@@ -3,6 +3,10 @@ import {
   seedHash, seededRng, mkBackgroundStars,
   RNG_MIDPOINT, MIN_SEPARATION_PX, REPULSION_PASSES_LARGE,
 } from '../core/galaxyCore.js';
+import { SEVERITY } from '../../../../vocab/severity.js';
+import { SCORE_SCALE_MAX } from '../../../../constants.js';
+import { emptySeverityCounts } from '../../../../utils/severity.js';
+import { isDrillableFolder } from '../core/fileTree.js';
 
 /* ── Position consistency engine ── */
 
@@ -29,7 +33,7 @@ export function unwrapLeaf(node) {
 export function layoutChildren(node) {
   const ch = node.children || [];
   const resolved = ch.map(c => unwrapLeaf(c));
-  const folders = resolved.filter(c => !c.isFile && c.children && c.children.length > 0);
+  const folders = resolved.filter(isDrillableFolder);
   const files = resolved.filter(c => c.isFile || !c.children || c.children.length === 0);
   const folderSet = new Set(folders);
   const all = [...folders, ...files];
@@ -60,6 +64,8 @@ const FOLDER_RADIUS_BASE_PX = 6; // before the sqrt-of-contents growth term
 const FILE_RADIUS_BASE_PX = 5;
 // The folder gap widens with the star count, up to this many stars.
 const FOLDER_GAP_STAR_CAP = 20;
+// Base pixel gap folders keep from neighbors before the star-count term.
+const FOLDER_GAP_BASE_PX = 10;
 // Fit margin, as a multiple of a star's radius (wider with particles).
 const FIT_MARGIN_RATIO_WITH_PARTICLES = 3;
 const FIT_MARGIN_RATIO_PLAIN = 2;
@@ -91,56 +97,49 @@ export function countDescendants(node) {
   return n;
 }
 
-/** Folder-nebula alert particles (critical/major/minor blips), seeded by path. */
-function _buildFolderParticles(c, radius, sev) {
+// Severity draw order; changing it re-seeds every particle.
+const ORBIT_SEVERITIES = [SEVERITY.CRITICAL, SEVERITY.MAJOR, SEVERITY.MINOR];
+
+/** Violation particles orbiting a star: up to `cfg.maxPerSeverity` blips per
+ * severity, seeded by *seedKey* so a star keeps its particles across renders.
+ * The rng() call order per particle is part of the output; keep it. */
+function _orbitParticles(seedKey, radius, sev, cfg) {
+  const rng = seededRng(seedHash(seedKey));
+  const sizes = {
+    [SEVERITY.CRITICAL]: [cfg.sizeCritical, cfg.sizeCriticalRange],
+    [SEVERITY.MAJOR]: [cfg.sizeMajor, cfg.sizeMajorRange],
+    [SEVERITY.MINOR]: [cfg.sizeMinor, cfg.sizeMinorRange],
+  };
   const particles = [];
-  if (!(sev.critical > 0 || sev.major > 0 || sev.minor > 0)) return particles;
-  const fRng = seededRng(seedHash((c.path || c.name) + ':fsev'));
-  const addAlert = (count, sevName) => {
-    const sevCol = sevRGB(sevName);
-    const pn = Math.min(count, FOLDER_ALERT.maxPerSeverity);
-    for (let j = 0; j < pn; j++) {
+  for (const sevName of ORBIT_SEVERITIES) {
+    const col = sevRGB(sevName);
+    const [sizeBase, sizeRange] = sizes[sevName];
+    const count = Math.min(sev[sevName] || 0, cfg.maxPerSeverity);
+    for (let j = 0; j < count; j++) {
       particles.push({
-        col: sevCol, sev: sevName,
-        or: radius * FOLDER_ALERT.orbitRadiusRatio + fRng() * radius * FOLDER_ALERT.orbitJitterRatio,
-        os: (FOLDER_ALERT.speedMin + fRng() * FOLDER_ALERT.speedRange) * (fRng() > RNG_MIDPOINT ? 1 : -1),
-        op: fRng() * TAU,
-        sz: sevName === 'critical' ? FOLDER_ALERT.sizeCritical + fRng() * FOLDER_ALERT.sizeCriticalRange : sevName === 'major' ? FOLDER_ALERT.sizeMajor + fRng() * FOLDER_ALERT.sizeMajorRange : FOLDER_ALERT.sizeMinor + fRng() * FOLDER_ALERT.sizeMinorRange,
-        ec: FOLDER_ALERT.eccentricityBase + fRng() * FOLDER_ALERT.eccentricityRange,
-        tp: fRng() * TAU,
+        col, sev: sevName,
+        or: radius * cfg.orbitRadiusRatio + rng() * radius * cfg.orbitJitterRatio,
+        os: (cfg.speedMin + rng() * cfg.speedRange) * (rng() > RNG_MIDPOINT ? 1 : -1),
+        op: rng() * TAU,
+        sz: sizeBase + rng() * sizeRange,
+        ec: cfg.eccentricityBase + rng() * cfg.eccentricityRange,
+        tp: rng() * TAU,
       });
     }
-  };
-  if (sev.critical > 0) addAlert(sev.critical, 'critical');
-  if (sev.major > 0) addAlert(sev.major, 'major');
-  if (sev.minor > 0) addAlert(sev.minor, 'minor');
+  }
   return particles;
+}
+
+/** Folder-nebula alert particles (critical/major/minor blips), seeded by path. */
+function _buildFolderParticles(c, radius, sev) {
+  if (!(sev.critical > 0 || sev.major > 0 || sev.minor > 0)) return [];
+  return _orbitParticles((c.path || c.name) + ':fsev', radius, sev, FOLDER_ALERT);
 }
 
 /** Per-file violation particles orbiting a flagged file, seeded by path. */
 function _buildFileParticles(c, radius) {
-  const particles = [];
-  if (!(c.violations > 0)) return particles;
-  const sev = c.severity || { critical: 0, major: 0, minor: 0 };
-  const rng2 = seededRng(seedHash((c.path || c.name) + ':fp'));
-  const addP = (count, sevName) => {
-    const pcol = sevRGB(sevName);
-    for (let j = 0; j < Math.min(count, FILE_PARTICLE.maxPerSeverity); j++) {
-      particles.push({
-        col: pcol, sev: sevName,
-        or: radius * FILE_PARTICLE.orbitRadiusRatio + rng2() * radius * FILE_PARTICLE.orbitJitterRatio,
-        os: (FILE_PARTICLE.speedMin + rng2() * FILE_PARTICLE.speedRange) * (rng2() > RNG_MIDPOINT ? 1 : -1),
-        op: rng2() * TAU,
-        sz: sevName === 'critical' ? FILE_PARTICLE.sizeCritical + rng2() * FILE_PARTICLE.sizeCriticalRange : sevName === 'major' ? FILE_PARTICLE.sizeMajor + rng2() * FILE_PARTICLE.sizeMajorRange : FILE_PARTICLE.sizeMinor + rng2() * FILE_PARTICLE.sizeMinorRange,
-        ec: FILE_PARTICLE.eccentricityBase + rng2() * FILE_PARTICLE.eccentricityRange,
-        tp: rng2() * TAU,
-      });
-    }
-  };
-  addP(sev.critical || 0, 'critical');
-  addP(sev.major || 0, 'major');
-  addP(sev.minor || 0, 'minor');
-  return particles;
+  if (!(c.violations > 0)) return [];
+  return _orbitParticles((c.path || c.name) + ':fp', radius, c.severity || {}, FILE_PARTICLE);
 }
 
 /** Every root star's position/radius/color/particles, before repulsion. Returns `{ rootStars, n }`. */
@@ -157,8 +156,8 @@ function placeRootStars(positioned, W, H) {
       ? FOLDER_RADIUS_BASE_PX + Math.sqrt(Math.max(desc, 1)) * RADIUS_MULTIPLIER
       : FILE_RADIUS_BASE_PX + Math.sqrt(c.violations || 1) * RADIUS_MULTIPLIER;
     const rate = c.complianceRate || 0;
-    const sev = c.severity || { critical: 0, major: 0, minor: 0 };
-    const col = scoreRGB(rate * 10);
+    const sev = c.severity || emptySeverityCounts();
+    const col = scoreRGB(rate * SCORE_SCALE_MAX);
 
     const distFactor = ip.isFolder ? (FOLDER_DIST_MIN + ip.dist * FOLDER_DIST_MAX) : (FILE_DIST_MIN + ip.dist * FILE_DIST_MAX);
     const dist = positioned.length === 1 ? 0 : spread * distFactor;
@@ -198,7 +197,7 @@ function recenterStars(rootStars) {
 
 /** Push overlapping stars apart until every pair clears its gap (folders need more room than files). */
 function applyRepulsion(rootStars, n) {
-  const folderGap = 10 + Math.min(n, FOLDER_GAP_STAR_CAP) * 1.0;
+  const folderGap = FOLDER_GAP_BASE_PX + Math.min(n, FOLDER_GAP_STAR_CAP) * 1.0;
   const fileGap = 1;
   const repulsionIters = rootStars.length > LARGE_SCENE_STARS ? REPULSION_PASSES_LARGE : rootStars.length > MEDIUM_SCENE_STARS ? REPULSION_PASSES_MEDIUM : REPULSION_PASSES_SMALL;
   for (let iter = 0; iter < repulsionIters; iter++) {
@@ -289,7 +288,7 @@ export function buildNavPath(root, targetPath) {
   return path;
 }
 
-// Level-info panel builder split out to galaxyFolderLevelInfo.js (self-
-// contained; shares nothing with the layout math above) — re-exported so
-// GalaxyFolderView.jsx keeps one import path.
+// The level-info panel builder lives in galaxyFolderLevelInfo.js (it shares
+// nothing with the layout math above); re-exported so GalaxyFolderView.jsx
+// has one import path.
 export { buildLevelInfo } from './galaxyFolderLevelInfo.js';

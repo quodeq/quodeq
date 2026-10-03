@@ -16,12 +16,13 @@ from quodeq.core.standards.overrides import resolve_requirement_text
 _SOURCE_CWE = "cwe"
 _SOURCE_WCAG = "wcag22"
 _SOURCE_ASVS = "asvs"
+_SOURCE_EN301549 = "en301549"
 
 
 def ref_label(ref: dict) -> str:
     """Build a display label for a ref (e.g. 'CWE-396', 'ERR08-J', 'WCAG 1.1.1').
 
-    Recognises ``cwe``, ``wcag22``, and ``asvs`` source types; falls back to
+    Recognises ``cwe``, ``wcag22``, ``asvs`` and ``en301549`` source types; falls back to
     the raw ``id`` or uppercased ``source``.
     """
     source = ref.get("source", "")
@@ -32,6 +33,8 @@ def ref_label(ref: dict) -> str:
         return f"WCAG {ref_id}"
     if source == _SOURCE_ASVS and ref_id:
         return f"ASVS {ref_id}"
+    if source == _SOURCE_EN301549 and ref_id:
+        return f"EN 301 549 {ref_id}"
     if ref_id:
         return ref_id
     return source.upper() if source else "REF"

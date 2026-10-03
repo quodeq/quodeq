@@ -69,7 +69,7 @@ def test_list_standards_empty(service):
     standards = service.list_standards()
     assert len(standards) == 1
     assert standards[0].id == "security"
-    assert standards[0].type == "builtin"
+    assert standards[0].type == "iso"
     assert standards[0].managed is True
 
 
@@ -98,7 +98,7 @@ def test_get_standard_builtin(service, compiled_dir):
     }))
     detail = service.get_standard("security")
     assert detail.id == "security"
-    assert detail.type == "builtin"
+    assert detail.type == "iso"
 
 
 def test_get_standard_not_found(service):
@@ -235,3 +235,39 @@ class TestImportFromFile:
         result = service.import_from_file(data, force=False)
         assert result["status"] == "imported"
         assert len(result["warnings"]) >= 1
+
+    def _count_store(self, service, monkeypatch) -> dict[str, int]:
+        counts = {"exists": 0, "read": 0}
+        store = service._store
+        real_exists, real_read = store.exists, store.read
+
+        def exists(*a, **k):
+            counts["exists"] += 1
+            return real_exists(*a, **k)
+
+        def read(*a, **k):
+            counts["read"] += 1
+            return real_read(*a, **k)
+
+        monkeypatch.setattr(store, "exists", exists)
+        monkeypatch.setattr(store, "read", read)
+        return counts
+
+    def test_force_import_checks_and_reads_the_existing_standard_once(
+        self, service, evaluators_dir, monkeypatch,
+    ):
+        _write_custom(evaluators_dir, CUSTOM_STANDARD)
+        counts = self._count_store(service, monkeypatch)
+        data = {"id": "clean-arch", "name": "Overwritten", "principles": []}
+        service.import_from_file(data, force=True)
+        assert counts["exists"] == 1
+        # one read of the existing file; the detail build may read the new one
+        assert counts["read"] <= 2
+
+    def test_conflict_checks_and_reads_the_existing_standard_once(
+        self, service, evaluators_dir, monkeypatch,
+    ):
+        _write_custom(evaluators_dir, CUSTOM_STANDARD)
+        counts = self._count_store(service, monkeypatch)
+        service.import_from_file({"id": "clean-arch", "name": "X", "principles": []}, force=False)
+        assert counts == {"exists": 1, "read": 1}

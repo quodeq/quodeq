@@ -1,22 +1,20 @@
 """Force-promote-to-cancelled helpers for the SQLite run index.
 
-Split out of ``index_sync.py`` purely to keep that module under the size
-cap (an intra-file extraction there would have pushed it over 300 lines).
 ``force_promote_to_cancelled_stale`` is re-exported from ``index_sync`` --
 that is the stable entry point callers use. The few names shared with
-``index_sync`` (``_logger``, ``_TERMINAL_STATE_VALUES``,
-``_upsert_from_status``) are looked up via a deferred import inside each
-function body, so this module carries no top-level dependency back on
-``index_sync`` and there is no import cycle.
+``index_sync`` (``logger``, ``upsert_from_status``) are looked up via a
+deferred import inside each function body, so this module carries no
+top-level dependency back on ``index_sync`` and there is no import cycle.
 """
 from __future__ import annotations
 
 import dataclasses
 import sqlite3
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
+from quodeq.core.run.exit_reason import ExitReason
+from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.data.fs.run_status_store import (
     RunState,
     RunStatus,
@@ -24,6 +22,7 @@ from quodeq.data.fs.run_status_store import (
     read_status,
     write_status,
 )
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 
 class _StaleRunRow(NamedTuple):
@@ -46,7 +45,7 @@ def _promote_via_status_write(
     Returns True on success. On a write failure, logs and returns False so
     the caller can fall back to the DB-only path.
     """
-    from quodeq.data.sqlite.index_sync import _logger, _upsert_from_status
+    from quodeq.data.sqlite.index_sync import logger, upsert_from_status
 
     try:
         existing = read_status(run_dir) or {}
@@ -60,17 +59,17 @@ def _promote_via_status_write(
             phase=row.phase,
             current_dimension=row.current_dimension,
             pid=row.pid if isinstance(row.pid, int) else None,
-            exit_reason="stale_detected",
+            exit_reason=ExitReason.STALE_DETECTED,
             finalized_at=None,
             time_limit_s=None,
         )
         write_status(run_dir, status)
-        _upsert_from_status(
+        upsert_from_status(
             db, run_dir, project_uuid=row.project_uuid, run_id=row.run_id,
         )
         return True
     except (OSError, UnsupportedSchemaError) as exc:
-        _logger.warning(
+        logger.warning(
             "force-promote: status.json write failed for %s (%s); "
             "falling back to index-only update", job_id, exc,
         )
@@ -79,11 +78,11 @@ def _promote_via_status_write(
 
 def _promote_index_only(db: sqlite3.Connection, job_id: str) -> None:
     """Update the index row directly (no run_dir on disk / full orphan)."""
-    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now_iso = utc_now_iso(timespec=ISO_SECONDS)
     db.execute(
         "UPDATE runs SET state = ?, exit_reason = ?, finalized_at = ?, "
         "updated_at = ? WHERE job_id = ?",
-        ("cancelled", "stale_detected", now_iso, now_iso, job_id),
+        (RunState.CANCELLED, ExitReason.STALE_DETECTED, now_iso, now_iso, job_id),
     )
 
 
@@ -103,8 +102,6 @@ def force_promote_to_cancelled_stale(
     Returns True if the row was promoted, False if it didn't exist or was
     already terminal.
     """
-    from quodeq.data.sqlite.index_sync import _TERMINAL_STATE_VALUES
-
     row = db.execute(
         "SELECT state, project_uuid, run_id, started_at, phase, "
         "current_dimension, pid FROM runs WHERE job_id = ?", (job_id,),
@@ -112,7 +109,7 @@ def force_promote_to_cancelled_stale(
     if row is None:
         return False
     stale_row = _StaleRunRow(*row)
-    if stale_row.state in _TERMINAL_STATE_VALUES:
+    if stale_row.state in TERMINAL_STATES:
         return False
 
     # Prefer the FS path: write status.json and let the upsert sync the row.

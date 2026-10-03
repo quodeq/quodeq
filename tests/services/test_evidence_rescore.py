@@ -201,18 +201,53 @@ def test_traversal_dim_id_does_not_read_evidence_planted_outside_run_dir(tmp_pat
 
 
 def test_scoring_engine_exception_returns_none_for_fallback(run_dir, monkeypatch):
-    """The engine can throw on edge-case evidence (see da04c1a2). The rescore
-    must degrade to None (callers fall back to the stored/legacy score) rather
-    than propagate and 500 the dashboard or /api/rescore for the whole run.
+    """The engine can throw on edge-case evidence (see da04c1a2): a division
+    by a zero-file-count principle, a malformed evidence dict missing an
+    expected key, etc. -- all arithmetic/shape failures over the evidence
+    dict, matching the engine's own (ValueError, KeyError, TypeError,
+    ArithmeticError) surface. The rescore must degrade to None (callers fall
+    back to the stored/legacy score) rather than propagate and 500 the
+    dashboard or /api/rescore for the whole run.
     """
     def _boom(*args, **kwargs):
-        raise RuntimeError("scoring engine exploded")
+        raise ZeroDivisionError("scoring engine exploded")
     monkeypatch.setattr("quodeq.services.evidence_rescore.score_evidence", _boom)
     out = score_dimension_from_evidence(
         run_dir, DIM, EvidenceScoreRequest(
             dismissed=set(), deleted=set(),
             source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     assert out is None
+
+
+def test_parse_failure_is_logged_at_warning_not_debug(run_dir, monkeypatch, caplog):
+    """A parse-time failure inside the traced (OSError, ValueError, KeyError)
+    surface must be visible: it degrades every caller (dashboard, /api/rescore,
+    trend fetcher) to the stored score silently otherwise, with nothing in the
+    logs above debug level to explain why."""
+    def _boom(*args, **kwargs):
+        raise ValueError("malformed evidence")
+    monkeypatch.setattr("quodeq.services.evidence_rescore.parse_jsonl_to_evidence", _boom)
+    with caplog.at_level("WARNING", logger="quodeq.services.evidence_rescore"):
+        out = score_dimension_from_evidence(
+            run_dir, DIM, EvidenceScoreRequest(
+                dismissed=set(), deleted=set(),
+                source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
+    assert out is None
+    assert any("malformed evidence" in r.message for r in caplog.records)
+
+
+def test_scoring_engine_out_of_scope_error_propagates(run_dir, monkeypatch):
+    """A bug outside the engine's traced (ValueError, KeyError, TypeError,
+    ArithmeticError) surface is a genuine defect and must surface, not be
+    silently absorbed into a fallback."""
+    def _boom(*args, **kwargs):
+        raise RuntimeError("unexpected bug")
+    monkeypatch.setattr("quodeq.services.evidence_rescore.score_evidence", _boom)
+    with pytest.raises(RuntimeError, match="unexpected bug"):
+        score_dimension_from_evidence(
+            run_dir, DIM, EvidenceScoreRequest(
+                dismissed=set(), deleted=set(),
+                source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
 
 
 def test_injected_standard_dirs_fn_replaces_global_resolution(run_dir, monkeypatch):

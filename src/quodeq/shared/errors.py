@@ -1,6 +1,13 @@
 """Exception base for errors whose message is safe to show a client."""
 from __future__ import annotations
 
+# Error codes a service-layer outcome carries to the client. They live here,
+# not in quodeq.api._constants (which re-exports them), because services may
+# not import api.
+CODE_PROJECT_EXISTS = "PROJECT_EXISTS"  # 409 for a project already registered or imported
+# The optional "action" field (copy|replace) on an import or pull collision.
+CODE_INVALID_ACTION = "INVALID_ACTION"
+
 
 class ClientMessageError(Exception):
     """An exception carrying hand-written, client-safe text.

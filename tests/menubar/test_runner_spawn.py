@@ -1,7 +1,10 @@
 """Dashboard launch spawns the menu bar when the preference is enabled."""
 from __future__ import annotations
 
+import sys
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from quodeq.dashboard.runner import _maybe_spawn_menubar
 from quodeq.menubar import control
@@ -31,6 +34,20 @@ def test_skips_when_unsupported():
     spawn.assert_not_called()
 
 
-def test_never_raises():
+def test_import_error_is_swallowed(monkeypatch):
+    # _maybe_spawn_menubar's except is narrowed to (ImportError,): both
+    # control.is_supported() and state.is_enabled() are already fail-soft
+    # internally, so the only realistic source left is the import itself.
+    import quodeq.menubar as menubar_pkg
+
+    monkeypatch.delattr(menubar_pkg, "control", raising=False)
+    monkeypatch.setitem(sys.modules, "quodeq.menubar.control", None)
+    _maybe_spawn_menubar()  # must not propagate
+
+
+def test_out_of_scope_error_propagates():
+    """R-FT-7 — an error outside (ImportError,) (e.g. a programming bug)
+    must now propagate instead of being swallowed."""
     with patch.object(control, "is_supported", MagicMock(side_effect=RuntimeError("boom"))):
-        _maybe_spawn_menubar()  # must not propagate
+        with pytest.raises(RuntimeError, match="boom"):
+            _maybe_spawn_menubar()

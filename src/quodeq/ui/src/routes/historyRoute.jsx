@@ -1,13 +1,15 @@
 /**
- * The History tab's route renderer, moved out of routes/renderers.jsx
- * verbatim (move-only refactor).
+ * The History tab's route renderer.
  */
 import { lazy } from 'react';
+import { LATEST_RUN_ID } from '../constants.js';
+import { NAV_TAB } from '../vocab/navTab.js';
+import { findProject } from '../utils/projectIdentity.js';
 
 const HistoryPage = lazy(() => import('../features/history/components/HistoryPage.jsx'));
 
 function resolveHistorySelectedRunId(selectedRun, trend) {
-  if (selectedRun && selectedRun !== 'latest' && trend.some((t) => t.runId === selectedRun)) return selectedRun;
+  if (selectedRun && selectedRun !== LATEST_RUN_ID && trend.some((t) => t.runId === selectedRun)) return selectedRun;
   return trend.length > 0 ? trend[0].runId : null;
 }
 
@@ -17,21 +19,21 @@ export function historyRoute(params, props) {
   return (
     <HistoryPage
       trend={trend}
+      partialRuns={props.dashboardData.dashboard?.partialRuns || []}
       selection={{
         selectedRunId: resolveHistorySelectedRunId(props.navigation.historySelectedRun, trend),
         selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
       }}
       availableRuns={runs}
       callbacks={{
-        onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
-        onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
+        onRunClick: (runId, dateLabel) => props.navigation.handleNavigate(NAV_TAB.HISTORY_RUN, { runId, dateLabel }),
+        onDimensionClick: (dim) => props.navigation.handleNavigate(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
         onNavigate: props.navigation.handleNavigate,
         onRunChange: props.navigation.setHistorySelectedRun,
-        // Run deletion changes the accumulated rollup the Overview grade is
-        // built from — same mutation class as dismiss/restore, so it gets
-        // the same debounced ACTIVE reconcile (mark-stale alone never
-        // reaches the always-mounted Overview observer).
-        onRunDeleted: () => props.scheduleDashboardReconcile?.(),
+        // Drops the run from every cached run list at once, resets a
+        // selection that pointed at it, then the same debounced rollup
+        // reconcile dismiss/restore use, plus a projects reload.
+        onRunDeleted: props.handleRunDeleted,
       }}
       projects={props.navigation.projects}
       projectsLoaded={props.navigation.projectsLoaded}
@@ -41,7 +43,7 @@ export function historyRoute(params, props) {
       isFetching={props.dashboardData.isFetching}
       error={props.dashboardData.error}
       onRetry={props.dashboardData.onRetry}
-      projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
+      projectInfo={findProject(props.navigation.projects, props.navigation.selectedProject)}
     />
   );
 }

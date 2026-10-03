@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.assistant.action_status import ActionStatus
+from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.services.import_validator import validate_import
@@ -58,11 +60,11 @@ def _summarize_create_standard(canonical: dict) -> dict:
 
 
 def _apply_create_standard(payload: dict, ctx: ActionContext) -> dict:
-    from quodeq.services.standards import StandardsService  # noqa: PLC0415
+    from quodeq.services.standards import IMPORT_STATUS_CONFLICT, StandardsService  # noqa: PLC0415
 
     service = StandardsService(ctx.evaluators_dir, ctx.compiled_dir, ctx.dimensions_file)
     result = service.import_from_file(payload, force=False)
-    if result.get("status") == "conflict":
+    if result.get("status") == IMPORT_STATUS_CONFLICT:
         raise ActionConflict("standard id already exists")
     return result
 
@@ -216,10 +218,10 @@ def _draft_action(ctx: ToolContext, action_type: str, payload: dict) -> dict:
         action_type=action_type, payload=canonical, content_hash=content_hash,
     )
     ctx.repository.append_event(ctx.session_id, {
-        "type": "action_draft", "actionId": action_id, "actionType": action_type,
+        "type": FrameType.ACTION_DRAFT, "actionId": action_id, "actionType": action_type,
         "summary": spec.summarize(canonical),
     })
-    return {"action_id": action_id, "status": "drafted", "action_type": action_type}
+    return {"action_id": action_id, "status": ActionStatus.DRAFTED, "action_type": action_type}
 
 
 def register_action_tools(registry: ToolRegistry, ctx: ToolContext) -> None:

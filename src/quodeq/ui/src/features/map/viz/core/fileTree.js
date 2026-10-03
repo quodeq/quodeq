@@ -1,8 +1,12 @@
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../../../../vocab/severity.js';
+import { FINDING_TYPE } from '../../../../vocab/findingType.js';
+import { emptySeverityCounts } from '../../../../utils/severity.js';
+
 function createNode(name, path, isFile) {
   return {
     name, path, isFile,
     violations: 0, compliance: 0,
-    severity: { critical: 0, major: 0, minor: 0 },
+    severity: emptySeverityCounts(),
     dimensions: {},
     complianceRate: 0,
     children: [],
@@ -87,19 +91,30 @@ function collapseSingleChildren(node, _depth = 0) {
   }
 }
 
+/**
+ * Whether a tree node is a folder the views can drill into: not a file, and
+ * holding at least one child.
+ *
+ * @param {{isFile?: boolean, children?: Array}} node
+ * @returns {boolean}
+ */
+export function isDrillableFolder(node) {
+  return !node.isFile && node.children?.length > 0;
+}
+
 /** Convert a tree node into a file object, optionally filtered by severity.
  *  severity: null = all violations, 'critical'|'major'|'minor' = filtered, 'all' = violations + compliance */
 export function treeNodeToFileObj(node, { severity } = {}) {
   const items = collectItems(node);
-  let violations = items.filter((i) => i.type === 'violation');
-  let compliance = items.filter((i) => i.type === 'compliance');
-  if (severity && severity !== 'all') {
-    violations = violations.filter((v) => (v.severity || 'minor') === severity);
+  let violations = items.filter((i) => i.type === FINDING_TYPE.VIOLATION);
+  let compliance = items.filter((i) => i.type === FINDING_TYPE.COMPLIANCE);
+  if (severity && severity !== SEVERITY_FILTER_ALL) {
+    violations = violations.filter((v) => (v.severity || SEVERITY.MINOR) === severity);
     compliance = []; // severity filter shows only violations
   }
   const bySev = { critical: [], major: [], minor: [], unknown: [] };
   for (const v of violations) {
-    const sev = v.severity || 'minor';
+    const sev = v.severity || SEVERITY.MINOR;
     (bySev[sev] || bySev.unknown).push(v);
   }
   const dims = new Set(violations.map((v) => v.dimension).filter(Boolean));
@@ -126,11 +141,11 @@ export function buildFileTree(dimensions) {
       const filePath = v.file || '(unknown)';
       const node = ensurePath(root, filePath);
       node.violations++;
-      const sev = v.severity || 'minor';
+      const sev = v.severity || SEVERITY.MINOR;
       if (node.severity[sev] !== undefined) node.severity[sev]++;
       if (!node.dimensions[dimName]) node.dimensions[dimName] = { violations: 0, compliance: 0 };
       node.dimensions[dimName].violations++;
-      node.items.push({ ...v, dimension: dimName, type: 'violation' });
+      node.items.push({ ...v, dimension: dimName, type: FINDING_TYPE.VIOLATION });
     }
     for (const c of dim.compliance || []) {
       const filePath = c.file || '(unknown)';
@@ -138,7 +153,7 @@ export function buildFileTree(dimensions) {
       node.compliance++;
       if (!node.dimensions[dimName]) node.dimensions[dimName] = { violations: 0, compliance: 0 };
       node.dimensions[dimName].compliance++;
-      node.items.push({ ...c, dimension: dimName, type: 'compliance' });
+      node.items.push({ ...c, dimension: dimName, type: FINDING_TYPE.COMPLIANCE });
     }
   }
   aggregateUp(root);

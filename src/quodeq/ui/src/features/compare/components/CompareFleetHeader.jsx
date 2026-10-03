@@ -4,6 +4,7 @@ import ScopePicker from './ScopePicker.jsx';
 import DuelTrigger from './DuelTrigger.jsx';
 import DimensionTrigger from './DimensionTrigger.jsx';
 import { nf } from '../compareFormatters.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
 
 
 /** Title + subtitle, and the header controls: duel/dimension launchers,
@@ -33,7 +34,7 @@ export default function CompareFleetHeader({
             onClick={toggleSortDir}
             aria-label={t('compare.sortToggleAria')}
           >
-            {t('compare.sortScore')} {sortDir === 'desc' ? '↓' : '↑'}
+            {t('compare.sortScore')} {sortDir === SORT_DIR.DESC ? '↓' : '↑'}
           </button>
         </span>
         <ScopePicker

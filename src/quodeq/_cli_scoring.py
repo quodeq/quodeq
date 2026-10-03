@@ -15,16 +15,18 @@ again to rescore.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from pathlib import Path
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
+from quodeq.core.types.severity import Severity
+from quodeq.data.fs.report_parser.finding_details import read_eval_report
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.evidence_rescore import EvidenceScoreRequest
+from quodeq.services.violations import filter_dismissed_from_result
+from quodeq.services.evidence_rescore import EvidenceScoreRequest, standard_dirs
 
 _logger = logging.getLogger(__name__)
 
@@ -35,11 +37,11 @@ def _as_int(value: object) -> int:
     """Coerce *value* to int, falling back to 0 on junk input."""
     try:
         return int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 
-def _dim_evidence_counts(evaluation_dir: Path, dim_id: str) -> tuple[int, int]:
+def dim_evidence_counts(evaluation_dir: Path, dim_id: str) -> tuple[int, int]:
     """Read (sourceFileCount, filesRead) from a dimension's just-written report JSON.
 
     Falls back to (0, 0) when the report is missing or unparseable.
@@ -51,38 +53,57 @@ def _dim_evidence_counts(evaluation_dir: Path, dim_id: str) -> tuple[int, int]:
 def _read_report(evaluation_dir: Path, dim_id: str) -> dict:
     """The dimension's report dict, or {} when missing or unparseable."""
     try:
-        data = json.loads((evaluation_dir / f"{dim_id}.json").read_text(encoding="utf-8"))
+        data = read_eval_report(evaluation_dir, dim_id)
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
 
 
-def _dim_report_totals(evaluation_dir: Path, dim_id: str) -> dict:
-    """The report's ``totals`` block for the summary line; {} when absent."""
-    totals = _read_report(evaluation_dir, dim_id).get("totals")
-    return totals if isinstance(totals, dict) else {}
+def _active_violations(report: dict, dim: str, dismissed: object, deleted: set) -> list[dict]:
+    """The report's violations minus the project's dismissals and deletions."""
+    if not report:
+        return []
+    filtered = filter_dismissed_from_result(
+        {"violations": list(report.get("violations") or [])}, dismissed, deleted, dim,
+    )
+    return list((filtered or {}).get("violations") or [])
 
 
-def _format_score_line(dim: str, score: str, totals: dict, suffix: str = "") -> str:
-    """One summary line: grade first, volume beside it, then any suffix.
+def _severity_tally(findings: list[dict]) -> dict[str, int]:
+    tally = {Severity.CRITICAL: 0, Severity.MAJOR: 0, Severity.MINOR: 0}
+    for finding in findings:
+        key = finding.get("severity")
+        tally[key if key in tally else Severity.MINOR] += 1
+    return {str(k): v for k, v in tally.items()}
 
-    The grade deducts per distinct violation type, so the count, the majors
-    and the density are what show a bucket shrinking between runs. The
-    counts are the report's as written; a dismissed-findings suffix does not
-    subtract from them.
+
+def _format_score_line(
+    dim: str, score: str, totals: dict, suffix: str = "",
+    *, open_types: int | None = None, coverage_pct: float | None = None,
+) -> str:
+    """One summary line: grade first, then the numbers that only move when
+    the code moves (majors, open requirement types, density, coverage).
+
+    The raw count is not on this line: it rises with coverage and sampling,
+    not with the code. The numbers are the report's as written; a
+    dismissed-findings suffix does not subtract from them.
     """
     if not totals:
         return f"  {dim}: {score}{suffix}"
-    n = _as_int(totals.get("violationCount") or 0)
-    major = _as_int((totals.get("severity") or {}).get("major") or 0)
-    parts = [f"{n} violation{'s' if n != 1 else ''}", f"{major} major"]
+    severity = totals.get("severity") or {}
+    majors = _as_int(severity.get("major") or 0) + _as_int(severity.get("critical") or 0)
+    parts = [f"{majors} major"]
+    if open_types is not None:
+        parts.append(f"{open_types} open type{'s' if open_types != 1 else ''}")
     per_100 = totals.get("violationsPer100Files")
     if per_100 is not None:
         parts.append(f"{per_100} per 100 files")
+    if coverage_pct is not None:
+        parts.append(f"{round(coverage_pct)}% coverage")
     return f"  {dim}: {score}  ({', '.join(parts)}){suffix}"
 
 
-def _format_adjusted_score(original: str, result: ScoringResult) -> str | None:
+def format_adjusted_score(original: str, result: ScoringResult) -> str | None:
     """Format *result*'s overall value to match *original*'s numeric-vs-grade shape.
 
     Returns None when no adjusted value is available, so the caller falls
@@ -112,29 +133,34 @@ def _adjusted_score(
     from quodeq import cli_evaluation as _facade
 
     dismissed, deleted = suppressions
-    source_file_count, files_read = _dim_evidence_counts(run_dir / "evaluation", dim)
+    source_file_count, files_read = dim_evidence_counts(run_dir / "evaluation", dim)
     try:
         rescored = _facade.rescore_dimension_from_evidence(
             run_dir, dim, EvidenceScoreRequest(
                 dismissed=dismissed, deleted=deleted,
                 source_file_count=source_file_count, files_read=files_read,
-                params=params,
+                params=params, standard_dirs_fn=standard_dirs,
             ),
             # Nothing excluded means the stored grade already is the answer
             # (see the return below), so don't pay for a scoring pass.
             score_when_nothing_excluded=False,
         )
-    except Exception as exc:  # noqa: BLE001 — console embellishment on top of
-        # reports already on disk; nothing upstream catches a generic exception
-        # (see _run_pipeline_with_cleanup), so fall back instead of crashing.
-        _logger.debug("Suppression-aware rescore failed for dim %s: %s", dim, exc)
+    except ValueError as exc:
+        # The only unguarded raise in this call chain: _resolve_evidence_jsonl's
+        # validate_path_segment(dim_id) rejects a path-traversal/separator
+        # character. Everything else rescore_dimension_from_evidence calls is
+        # already fail-soft internally (evidence_rescore._parse_evidence_jsonl
+        # catches (OSError, ValueError, KeyError) and returns None; the
+        # score_evidence call site catches (ValueError, KeyError, TypeError,
+        # ArithmeticError)).
+        _logger.warning("suppression-aware rescore failed for dim %s: %s", dim, exc, exc_info=True)
         return None, 0
     if rescored.excluded == 0 or rescored.result is None:
         return None, rescored.excluded
-    return _format_adjusted_score(score, rescored.result), rescored.excluded
+    return format_adjusted_score(score, rescored.result), rescored.excluded
 
 
-def _print_scores(
+def print_scores(
     scores: dict[str, str], run_dir: Path, project_dir: Path, params: ScoringParams,
 ) -> None:
     """Print each dimension's score with its volume, noting excluded findings.
@@ -153,13 +179,21 @@ def _print_scores(
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
     for dim, score in scores.items():
-        totals = _dim_report_totals(evaluation_dir, dim)
+        report = _read_report(evaluation_dir, dim)
+        totals = report.get("totals") if isinstance(report.get("totals"), dict) else {}
         adjusted, excluded = (
             _adjusted_score(run_dir, dim, (dismissed, deleted), score, params)
             if (dismissed or deleted) else (None, 0)
         )
         if adjusted is None:
-            print(_format_score_line(dim, score, totals))
+            # The score is the report's own, so the counts are the report's own too.
+            shown, suffix, counted = score, "", list(report.get("violations") or [])
         else:
-            print(_format_score_line(dim, adjusted, totals,
-                                     suffix=f" ({excluded} dismissed findings excluded)"))
+            # The score excludes the suppressed findings, so the majors and the open types do too.
+            shown, suffix = adjusted, f" ({excluded} dismissed findings excluded)"
+            counted = _active_violations(report, dim, dismissed, deleted)
+            totals = {**totals, "severity": _severity_tally(counted)}
+        open_types = len({v.get("req") for v in counted if v.get("req")})
+        print(_format_score_line(dim, shown, totals, suffix,
+                                 open_types=open_types if report else None,
+                                 coverage_pct=report.get("coveragePct")))

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 
+from quodeq.services._violations_stream import parse_violations_from_stream
+
 
 class TestTryParseTextLine:
     def test_non_json_line(self):
@@ -99,18 +101,44 @@ class TestParseStreamLine:
         acc = _StreamAccumulator(dimension="sec")
         _parse_stream_line(json.dumps({"type": "unknown_event"}), acc)
         assert acc.violations == []
+        # A list-shaped line and a dict with a non-string `type` must be
+        # skipped the same way, without raising and without blocking a
+        # later, well-formed line on the same accumulator.
+        _parse_stream_line(json.dumps([1]), acc)
+        _parse_stream_line(json.dumps({"type": []}), acc)
+        valid_text = json.dumps({"p": "P1", "t": "violation", "file": "a.py", "line": 1})
+        valid_event = json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "text", "text": valid_text},
+        ]}})
+        _parse_stream_line(valid_event, acc)
+        assert len(acc.violations) == 1
+        assert acc.violations[0].practice_id == "P1"
 
 
 class TestParseViolationsFromStream:
     def test_missing_file(self, tmp_path):
-        from quodeq.services._violations_stream import parse_violations_from_stream
         from quodeq.services.violation_context import ViolationContext
         ctx = ViolationContext(dimension="sec", run_id="r1", project="p1")
         result = parse_violations_from_stream(tmp_path / "missing.stream", ctx)
         assert result is None
 
+    def test_missing_file_logs_a_warning(self, tmp_path, caplog):
+        """A missing stream file must still log the read-failure warning,
+        exactly as it did before ``iter_stream_lines`` existed -- a plain
+        early return (with no log call) would silently drop this signal."""
+        import logging
+        from quodeq.services.violation_context import ViolationContext
+        ctx = ViolationContext(dimension="sec", run_id="r1", project="p1")
+        missing = tmp_path / "missing.stream"
+        with caplog.at_level(logging.WARNING, logger="quodeq.services._violations_stream"):
+            result = parse_violations_from_stream(missing, ctx)
+        assert result is None
+        assert "Failed to read stream file" in caplog.text
+        # str(missing) is wrong on Windows: OSError's str() renders the
+        # filename via repr(), which doubles backslashes there.
+        assert repr(str(missing)) in caplog.text
+
     def test_valid_stream_file(self, tmp_path):
-        from quodeq.services._violations_stream import parse_violations_from_stream
         from quodeq.services.violation_context import ViolationContext
         stream = tmp_path / "stream.jsonl"
         # Write a minimal stream event (no findings in it)

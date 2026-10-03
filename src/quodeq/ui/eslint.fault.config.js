@@ -4,17 +4,14 @@
 // may only shrink. src/adapters/storage.js is the approved web-storage
 // wrapper -- the one place raw localStorage access is correct.
 import faultRules from './tools/fault_rules.mjs';
+import { JSX_MODULE_LANGUAGE_OPTIONS } from './tools/eslint_shared_config.mjs';
 
 export default [
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],
     ignores: ['src/**/*.test.js', 'src/**/*.test.jsx', 'src/**/*.fixtures.js', 'src/**/*.fixtures.jsx'],
     plugins: { fault: faultRules },
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
     rules: {
       'fault/swallowed-catch': 'error',
       'fault/floating-promise': 'error',

@@ -10,6 +10,26 @@ from quodeq.ci.review import handle_review
 from quodeq.services.dismissed import dismiss_finding
 
 
+def _run_handle_review_with_mocked_gh(args):
+    """Run handle_review with gh PR/repo lookups and run_diff_evaluation mocked out.
+
+    subprocess.run returns a PR lookup then a repo lookup, and
+    run_diff_evaluation is patched to succeed. Returns the run_diff_evaluation
+    mock so callers can inspect how it was called.
+    """
+    pr_result = MagicMock()
+    pr_result.stdout = json.dumps({"number": 7, "baseRefName": "main"})
+    repo_result = MagicMock()
+    repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
+
+    with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
+         patch("quodeq.cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
+        from quodeq.ci.review import handle_review
+        handle_review(args)
+
+    return mock_run
+
+
 def test_handle_review_default_does_not_pass_dimensions(tmp_path):
     """When no --dimensions flag is given, handle_review must pass
     dimensions=None so the evaluate entry defaults to all dimensions."""
@@ -22,15 +42,7 @@ def test_handle_review_default_does_not_pass_dimensions(tmp_path):
         dry_run=True,
     )
 
-    pr_result = MagicMock()
-    pr_result.stdout = json.dumps({"number": 7, "baseRefName": "main"})
-    repo_result = MagicMock()
-    repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
-
-    with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq.cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
-        from quodeq.ci.review import handle_review
-        handle_review(args)
+    mock_run = _run_handle_review_with_mocked_gh(args)
 
     assert mock_run.call_args.kwargs["dimensions"] is None
 
@@ -46,15 +58,7 @@ def test_handle_review_expands_dimension_alias(tmp_path):
         dry_run=True,
     )
 
-    pr_result = MagicMock()
-    pr_result.stdout = json.dumps({"number": 7, "baseRefName": "main"})
-    repo_result = MagicMock()
-    repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
-
-    with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq.cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
-        from quodeq.ci.review import handle_review
-        handle_review(args)
+    mock_run = _run_handle_review_with_mocked_gh(args)
 
     assert mock_run.call_args.kwargs["dimensions"] == "security"
 
@@ -151,15 +155,7 @@ def test_handle_review_time_limit_zero_means_unlimited(tmp_path):
         dry_run=True,
     )
 
-    pr_result = MagicMock()
-    pr_result.stdout = json.dumps({"number": 7, "baseRefName": "main"})
-    repo_result = MagicMock()
-    repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
-
-    with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq.cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
-        from quodeq.ci.review import handle_review
-        handle_review(args)
+    mock_run = _run_handle_review_with_mocked_gh(args)
 
     assert mock_run.call_args.kwargs["time_limit"] == 0
 

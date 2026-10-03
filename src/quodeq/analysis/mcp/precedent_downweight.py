@@ -5,13 +5,13 @@ similarity is consulted only on an exact-tier miss (see
 ``apply_precedent_downweight``). The batch path -- ``precedent_scores``,
 called from ``FindingEnricher.precedent_scores`` -- computes every eligible
 finding's score with one ``PrecedentCorpus.match_many`` call instead of one
-``match`` call per finding (finding 5598).
+``match`` call per finding.
 """
 from __future__ import annotations
 
 from typing import Callable
 
-from quodeq.analysis.mcp.schemas import FINDING_TYPE_VIOLATION
+from quodeq.core.types.finding_type import FindingType
 from quodeq.context.precedent import (
     PrecedentCorpus,
     fingerprint as _precedent_fingerprint,
@@ -21,6 +21,11 @@ from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.observability import NULL_LOG, LogSink
 
 _PRECEDENT_DOWNWEIGHT = 25
+
+# apply_precedent_downweight()'s matched-tier return value for a fingerprint
+# hit; enricher.py compares against it to decide whether to notify. Its
+# sibling "semantic" is never compared elsewhere, so it stays bare.
+PRECEDENT_TIER_EXACT = "exact"
 
 
 class _UnsetScore:
@@ -60,7 +65,7 @@ def _precedent_probe(
     None when the semantic lookup is skipped: not a violation, already
     exact-fingerprint matched, or ineligible (see `_semantic_eligible`).
     """
-    if finding.get("t") != FINDING_TYPE_VIOLATION:
+    if finding.get("t") != FindingType.VIOLATION:
         return False, None
     req = finding.get("req")
     snippet = finding.get("snippet")
@@ -92,7 +97,7 @@ def apply_precedent_downweight(
     field (see ``FindingEnricher._after_precedent``).
     """
     matched, text = _precedent_probe(finding, fingerprints)
-    tier: str | None = "exact" if matched else None
+    tier: str | None = PRECEDENT_TIER_EXACT if matched else None
 
     if not matched and corpus is not None and text is not None:
         similarity = corpus.match(text) if isinstance(score, _UnsetScore) else score

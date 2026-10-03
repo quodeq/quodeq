@@ -1,4 +1,4 @@
-"""Extended tests for _api_runner.py: _call_api parsing, lossy flags and response_format."""
+"""Extended tests for _api_runner.py: call_api parsing, lossy flags and response_format."""
 from __future__ import annotations
 
 import logging
@@ -10,11 +10,11 @@ pytest.importorskip("openai", reason="requires the openai SDK")
 
 import httpx
 
-from quodeq.analysis._api_runner import ApiRunnerConfig, _call_api
+from quodeq.analysis._api_runner import ApiRunnerConfig, call_api
 
 
 # ---------------------------------------------------------------------------
-# _call_api
+# call_api
 # ---------------------------------------------------------------------------
 
 def _mock_response(content: str) -> MagicMock:
@@ -54,7 +54,7 @@ class TestCallApi:
             else:
                 client.chat.completions.create.return_value = _mock_response(content)
             mock_oa.return_value.__enter__.return_value = client
-            findings, lossy = _call_api("prompt", config or _local_config())
+            findings, lossy = call_api("prompt", config or _local_config())
             return findings, lossy, mock_oa, client
 
     def test_clean_wrapped_array(self):
@@ -128,3 +128,28 @@ class TestCallApi:
         msgs = " ".join(r.message for r in caplog.records)
         assert "timed out" not in msgs
         assert "call failed" in msgs
+
+    def test_drop_counter_field_wins_over_run_configs_counter(self, tmp_path):
+        """I1: the single-agent fallback and consolidated builders carry the
+        run's drop counter directly on the config (no run_config, so the
+        API cache writer stays off for those paths). That field must be
+        checked before run_config's counter."""
+        from quodeq.analysis.run_types import RunConfig
+
+        direct_counter = RunConfig(src=tmp_path, language="python").drop_counter
+        run_config = RunConfig(src=tmp_path, language="python")
+        config = ApiRunnerConfig(
+            model="test-model", api_base="http://localhost:11434/v1", api_key="ollama",
+            drop_counter=direct_counter, run_config=run_config,
+        )
+
+        findings, lossy, *_ = self._run(
+            f'{{"findings":[{_GOOD},{_BAD_MISSING_REASON}]}}', config=config,
+        )
+
+        assert len(findings) == 1
+        stats = direct_counter.consume()
+        assert stats.dropped == 1
+        assert stats.kept == 1
+        # run_config's own (distinct) counter never saw the drop.
+        assert run_config.drop_counter.consume().parsed == 0

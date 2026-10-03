@@ -1,3 +1,5 @@
+import { NAV_TAB } from '../vocab/navTab.js';
+
 /**
  * Maps the active nav-stack entry to the standard ids the evaluate screen
  * should preselect. Returns [] for any page that carries no standard context
@@ -9,11 +11,11 @@
 export function deriveEvaluatePreselect(activePage) {
   if (!activePage) return [];
   const { page } = activePage;
-  if (page === 'explorer' && activePage.dimension) {
+  if (page === NAV_TAB.EXPLORER && activePage.dimension) {
     return [activePage.dimension];
   }
   if (
-    (page === 'evalprinciple' || page === 'eval-principle-detail') &&
+    (page === NAV_TAB.EVAL_PRINCIPLE || page === NAV_TAB.EVAL_PRINCIPLE_DETAIL) &&
     activePage.evalPrincipal?.dimension
   ) {
     return [activePage.evalPrincipal.dimension];

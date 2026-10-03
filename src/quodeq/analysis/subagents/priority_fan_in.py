@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from quodeq.analysis.subagents.priority_config import _LANG_ALIASES, load_priority_config
+from quodeq.analysis.subagents.priority_config import LANG_ALIASES, load_priority_config
 
 
 def compute_fan_in(
@@ -19,7 +19,7 @@ def compute_fan_in(
     fresh load.
     """
     config = config or load_priority_config()
-    lang_key = _LANG_ALIASES.get(language.lower(), language.lower())
+    lang_key = LANG_ALIASES.get(language.lower(), language.lower())
     patterns = config.get("import_patterns", {}).get(lang_key)
     if not patterns:
         return {}

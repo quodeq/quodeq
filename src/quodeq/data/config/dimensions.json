@@ -5,37 +5,49 @@
       "id": "security",
       "weight": 1.0,
       "iso_25010": "Security",
-      "source": "ISO/IEC 25010:2023"
+      "source": "ISO/IEC 25010:2023",
+      "type": "iso",
+      "subtype": "25010"
     },
     {
       "id": "reliability",
       "weight": 1.0,
       "iso_25010": "Reliability",
-      "source": "ISO/IEC 25010:2023"
+      "source": "ISO/IEC 25010:2023",
+      "type": "iso",
+      "subtype": "25010"
     },
     {
       "id": "maintainability",
       "weight": 1.0,
       "iso_25010": "Maintainability",
-      "source": "ISO/IEC 25010:2023"
+      "source": "ISO/IEC 25010:2023",
+      "type": "iso",
+      "subtype": "25010"
     },
     {
       "id": "performance",
       "weight": 1.0,
       "iso_25010": "Performance Efficiency",
-      "source": "ISO/IEC 25010:2023"
+      "source": "ISO/IEC 25010:2023",
+      "type": "iso",
+      "subtype": "25010"
     },
     {
       "id": "usability",
       "weight": 1.0,
       "iso_25010": "Usability",
-      "source": "ISO/IEC 25010:2023"
+      "source": "ISO/IEC 25010:2023",
+      "type": "iso",
+      "subtype": "25010"
     },
     {
       "id": "flexibility",
       "weight": 1.0,
       "iso_25010": "Flexibility",
-      "source": "ISO/IEC 25010:2023"
+      "source": "ISO/IEC 25010:2023",
+      "type": "iso",
+      "subtype": "25010"
     },
     {
       "id": "clean-architecture",
@@ -50,6 +62,14 @@
       "weight": 1.0,
       "source": "Eric Evans / Vaughn Vernon",
       "type": "quodeq"
+    },
+    {
+      "id": "accessibility",
+      "name": "Accessibility",
+      "weight": 1.0,
+      "source": "WCAG 2.2 (W3C, 2023) and EN 301 549 v3.2.1 (ETSI, 2021)",
+      "type": "wcag",
+      "subtype": "2.2"
     }
   ]
 }

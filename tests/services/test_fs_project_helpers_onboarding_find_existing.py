@@ -8,7 +8,7 @@ from unittest.mock import patch
 from quodeq.services import fs_project_helpers as helpers
 from quodeq.services.fs_project_helpers import find_existing_project
 from quodeq.services.fs_projects import update_project_path
-from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
+from quodeq.services._repo_index import load_repo_index, repo_index_key, save_repo_index
 from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import register_project
 
@@ -32,7 +32,7 @@ def test_find_existing_project_uses_index_then_self_heals_via_walk_fallback(tmp_
 
     index_path = reports / ".repo_index.json"
     assert index_path.exists()
-    assert set(_load_repo_index(reports).values()) == set(uuids)
+    assert set(load_repo_index(reports).values()) == set(uuids)
 
     # An index hit reads exactly one record — the candidate it is about to
     # return, to confirm the entry isn't stale. It must never read the other
@@ -58,7 +58,27 @@ def test_find_existing_project_uses_index_then_self_heals_via_walk_fallback(tmp_
         assert find_existing_project(str(reports), str(repo), None) == uuid
 
     assert index_path.exists()
-    assert set(_load_repo_index(reports).values()) == set(uuids)
+    assert set(load_repo_index(reports).values()) == set(uuids)
+
+
+def test_find_existing_project_walk_visits_directories_in_sorted_order(tmp_path, monkeypatch):
+    """The directory-walk fallback must visit candidates in a deterministic
+    (sorted) order, not whatever order the filesystem happens to return."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    for name in ("zeta", "alpha", "mu"):
+        (reports / name).mkdir()
+
+    visited: list[str] = []
+    real = helpers._repo_identity_matches
+
+    def spy(project_dir, expected_name, repo_resolved, scope_path):
+        visited.append(project_dir.name)
+        return real(project_dir, expected_name, repo_resolved, scope_path)
+
+    monkeypatch.setattr(helpers, "_repo_identity_matches", spy)
+    assert find_existing_project(str(reports), "nomatch-repo", None) is None
+    assert visited == ["alpha", "mu", "zeta"]
 
 
 def test_find_existing_project_ignores_index_entry_left_by_a_path_move(tmp_path):
@@ -93,13 +113,13 @@ def test_find_existing_project_drops_an_index_hit_its_record_contradicts(tmp_pat
 
     unclaimed = tmp_path / "repos" / "unclaimed"
     unclaimed.mkdir(parents=True)
-    stale_key = _repo_index_key("unclaimed", str(unclaimed.resolve()), None)
-    index = _load_repo_index(reports)
+    stale_key = repo_index_key("unclaimed", str(unclaimed.resolve()), None)
+    index = load_repo_index(reports)
     index[stale_key] = uuid
-    _save_repo_index(reports, index)
+    save_repo_index(reports, index)
 
     assert find_existing_project(str(reports), str(unclaimed), None) is None
-    assert stale_key not in _load_repo_index(reports)
+    assert stale_key not in load_repo_index(reports)
     # The project's genuine identity is untouched by the purge.
     assert find_existing_project(str(reports), str(repo), None) == uuid
 
@@ -119,7 +139,7 @@ def test_find_existing_project_resolves_a_url_registered_project(tmp_path):
     clone_dest.mkdir()
     url = "https://github.com/example/repo.git"
 
-    def fake_clone(_url, dest):
+    def fake_clone(_url, dest, env=None):
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
@@ -127,13 +147,13 @@ def test_find_existing_project_resolves_a_url_registered_project(tmp_path):
     with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         uuid = register_project(str(reports), NewProjectSpec(url, None, clone_dest=str(clone_dest)))
 
-    key = _repo_index_key("repo", url, None)
-    assert _load_repo_index(reports).get(key) == uuid
+    key = repo_index_key("repo", url, None)
+    assert load_repo_index(reports).get(key) == uuid
 
     # Both the lookup and the index entry survive repeated duplicate checks.
     assert find_existing_project(str(reports), url, None) == uuid
     assert find_existing_project(str(reports), url, None) == uuid
-    assert _load_repo_index(reports).get(key) == uuid
+    assert load_repo_index(reports).get(key) == uuid
 
 
 def test_find_existing_project_resolves_a_scoped_registration(tmp_path):
@@ -154,13 +174,13 @@ def test_find_existing_project_resolves_a_scoped_registration(tmp_path):
 
     uuid = register_project(str(reports), NewProjectSpec(str(repo), None, "src"))
 
-    key = _repo_index_key("alpha", str(repo.resolve()), "src")
-    assert _load_repo_index(reports).get(key) == uuid
+    key = repo_index_key("alpha", str(repo.resolve()), "src")
+    assert load_repo_index(reports).get(key) == uuid
 
     # Both the lookup and the index entry survive repeated duplicate checks.
     assert find_existing_project(str(reports), str(repo), "src") == uuid
     assert find_existing_project(str(reports), str(repo), "src") == uuid
-    assert _load_repo_index(reports).get(key) == uuid
+    assert load_repo_index(reports).get(key) == uuid
 
 
 def test_scoped_project_stays_findable_after_a_path_move(tmp_path):
@@ -184,8 +204,8 @@ def test_scoped_project_stays_findable_after_a_path_move(tmp_path):
     moved_to.mkdir(parents=True)
     assert update_project_path(str(reports), uuid, str(moved_to)) is True
 
-    moved_key = _repo_index_key("alpha", str(moved_to.resolve()), "src")
-    assert _load_repo_index(reports).get(moved_key) == uuid
+    moved_key = repo_index_key("alpha", str(moved_to.resolve()), "src")
+    assert load_repo_index(reports).get(moved_key) == uuid
     assert find_existing_project(str(reports), str(moved_to), "src") == uuid
 
 
@@ -200,8 +220,8 @@ def test_find_existing_project_survives_a_corrupt_index_file(tmp_path):
     (reports / ".repo_index.json").write_text("{ this is not json", encoding="utf-8")
 
     assert find_existing_project(str(reports), str(repo), None) == uuid
-    assert _load_repo_index(reports) == {
-        _repo_index_key("alpha", str(repo.resolve()), None): uuid,
+    assert load_repo_index(reports) == {
+        repo_index_key("alpha", str(repo.resolve()), None): uuid,
     }
 
 

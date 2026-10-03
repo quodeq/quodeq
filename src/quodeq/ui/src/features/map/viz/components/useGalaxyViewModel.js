@@ -147,7 +147,7 @@ export function useGalaxyViewModel({ dimensions, standardTypes, showLabels, rese
   });
 
   const breadcrumb = useMemo(() => buildBreadcrumb(scene, navRef.current, projectName), [scene, navVersion]); // eslint-disable-line react-hooks/exhaustive-deps
-  const levelInfo = useMemo(() => computeLevelInfo(scene, navRef.current, projectName, onNavigate, navRef), [scene, navVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  const levelInfo = useMemo(() => computeLevelInfo(scene, navRef.current, projectName, onNavigate), [scene, navVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { scene, size, canvasRef, tooltipRef, liveMsg, breadcrumb, levelInfo, handlers, startTransition, saveNav };
 }

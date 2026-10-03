@@ -1,11 +1,11 @@
 """On-disk index backing ``find_existing_project``'s duplicate pre-flight check.
 
-Finding (self-eval, Time Behaviour, major): ``find_existing_project`` did a
-linear directory scan with a ``repository_info.json`` read per project
-instead of an indexed lookup.
+Why: without it ``find_existing_project`` would scan every project directory
+and read each ``repository_info.json``; this index makes the duplicate check
+a lookup.
 
 Mirrors the import-identity index
-(``api/_import_identity.py`` + ``data/fs/project_index.py``): index-first
+(``services/project_import_identity.py`` + ``data/fs/project_index.py``): index-first
 lookup, directory-walk fallback for entries the index doesn't have yet (a
 project created before this index existed, or an index write that failed),
 and self-heal -- a fallback hit is written back into the index so the next
@@ -22,18 +22,22 @@ three-field key rather than reusing a key scheme that doesn't match it.
 """
 from __future__ import annotations
 
-import json
-import os
-import tempfile
+import os  # noqa: F401 -- monkeypatched (module-attribute -> the shared os
+# module) by tests/services/test_cluster32_empty_except_logging.py's
+# save_repo_index cleanup-failure test; the actual os.replace/os.unlink
+# calls are in data.fs.repo_index_store.write_repo_index, but patching
+# THIS name still works since `import os` everywhere binds the same module.
 from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.services.wiring import read_repo_index as _read_repo_index_file
+from quodeq.services.wiring import write_repo_index as _write_repo_index_file
 
 _INDEX_FILENAME = ".repo_index.json"
 
 
-def _repo_index_key(name: str, path: str, scope_path: str | None) -> str:
+def repo_index_key(name: str, path: str, scope_path: str | None) -> str:
     """Stable string key for a (name, path, scopePath) identity tuple."""
     return f"{name}\x00{path}\x00{scope_path or ''}"
 
@@ -51,39 +55,37 @@ class RepoIdentity:
     scope_path: str | None = None
 
     def key(self) -> str:
-        """The index key for this identity (see ``_repo_index_key``)."""
-        return _repo_index_key(self.name, self.path, self.scope_path)
+        """The index key for this identity (see ``repo_index_key``)."""
+        return repo_index_key(self.name, self.path, self.scope_path)
+
+    def matches_record(self, data: dict) -> bool:
+        """True when a ``repository_info.json`` payload carries this identity.
+
+        An empty or missing ``scopePath`` and a ``None`` scope compare equal.
+        """
+        return (
+            data.get("name") == self.name
+            and data.get("path") == self.path
+            and (data.get("scopePath") or None) == (self.scope_path or None)
+        )
 
 
-def _load_repo_index(reports_root: Path) -> dict[str, str]:
+def load_repo_index(reports_root: Path) -> dict[str, str]:
     """Load the repo-identity index, returning {} on a missing/corrupt file."""
-    try:
-        data = json.loads((reports_root / _INDEX_FILENAME).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    return _read_repo_index_file(reports_root / _INDEX_FILENAME)
 
 
-def _save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink = NULL_LOG) -> None:
+def save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink = NULL_LOG) -> None:
     """Write the repo-identity index atomically.
 
     Best-effort: a write failure is logged and swallowed, leaving
     ``find_existing_project``'s directory-walk fallback as the (slower,
     still-correct) path until a later successful write repairs the index.
     """
-    tmp = ""
     try:
-        fd, tmp = tempfile.mkstemp(dir=reports_root, suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(index, f, indent=2)
-        os.replace(tmp, reports_root / _INDEX_FILENAME)
+        _write_repo_index_file(reports_root / _INDEX_FILENAME, index, log=log)
     except OSError as exc:
         log.warning(f"Could not save repo-identity index: {exc}")
-        if tmp and os.path.exists(tmp):
-            try:
-                os.unlink(tmp)
-            except OSError as inner_exc:
-                log.debug(f"temp repo index file not removed after a failed save: {inner_exc}")
 
 
 def add_repo_index_entry(
@@ -91,9 +93,9 @@ def add_repo_index_entry(
     *, log: LogSink = NULL_LOG,
 ) -> None:
     """Register a newly-created project in the repo-identity index (best-effort)."""
-    index = _load_repo_index(reports_root)
+    index = load_repo_index(reports_root)
     index[identity.key()] = project_uuid
-    _save_repo_index(reports_root, index, log=log)
+    save_repo_index(reports_root, index, log=log)
 
 
 def rekey_repo_index_entry(
@@ -113,11 +115,11 @@ def rekey_repo_index_entry(
     that verification (their key and record disagree by construction) and
     trust the index, so for those a failure here can cost a wrong answer.
     """
-    index = _load_repo_index(reports_root)
+    index = load_repo_index(reports_root)
     updated = {key: value for key, value in index.items() if value != project_uuid}
     updated[identity.key()] = project_uuid
     if updated != index:
-        _save_repo_index(reports_root, updated, log=log)
+        save_repo_index(reports_root, updated, log=log)
 
 
 def remove_repo_index_entries(
@@ -126,7 +128,7 @@ def remove_repo_index_entries(
     """Purge any index entries pointing at a deleted project (best-effort)."""
     if not project_uuids:
         return
-    index = _load_repo_index(reports_root)
+    index = load_repo_index(reports_root)
     remaining = {key: value for key, value in index.items() if value not in project_uuids}
     if len(remaining) != len(index):
-        _save_repo_index(reports_root, remaining, log=log)
+        save_repo_index(reports_root, remaining, log=log)

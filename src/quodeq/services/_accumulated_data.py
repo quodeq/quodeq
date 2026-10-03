@@ -7,26 +7,26 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
-from quodeq.data.fs.run_files import run_fingerprint  # facade re-export
-from quodeq.data.fs.report_parser.runs import RunInfo, read_run_data
+from quodeq.services.wiring import RunInfo, read_run_data, read_run_manifest, read_run_scalars, run_fingerprint
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import DimensionResult
+from quodeq.core.types.dimension import open_types_of
+from quodeq.shared.constants import JSON_SUFFIX
 
-# Files whose contents feed read_run_data for a single run. A completed run is
-# not immutable: dismissing a finding or applying a grade formula rewrites the
-# SQL grade tables that overlay_sql_grades reads back, so the fingerprint has
-# to cover the database (and its write-ahead log, which absorbs writes long
-# before a checkpoint touches the main file) alongside the JSON.
+# A run's per-dimension evaluation reports; without them the full read yields no
+# dimensions, so the scalar read (which would still find grade rows) must not be used.
+_EVALUATION_DIR = "evaluation"
 
 
 @dataclass
 class _DimensionBuckets:
-    """Mutable accumulation buckets used during a single _read_all_run_data pass."""
+    """Mutable accumulation buckets used during a single read_all_run_data pass."""
     latest_by_dimension: dict[str, DimensionResult] = field(default_factory=dict)
     prev_occurrence: dict[str, DimensionResult] = field(default_factory=dict)
     prev_run_latest_map: dict[str, DimensionResult] = field(default_factory=dict)
 
 
-def _has_valid_score(dim: DimensionResult) -> bool:
+def has_valid_score(dim: DimensionResult) -> bool:
     """Return True if the dimension carries a usable, trustworthy score.
 
     Requires a non-empty ``overall_score`` AND that the model actually
@@ -52,7 +52,7 @@ def _classify_dimension(
     if dim_name not in buckets.latest_by_dimension:
         # Only accept as latest if the dimension has a valid score;
         # otherwise keep searching older runs for a scored result.
-        if _has_valid_score(dim):
+        if has_valid_score(dim):
             buckets.latest_by_dimension[dim_name] = replace(
                 dim,
                 from_run_id=run_id,
@@ -65,19 +65,22 @@ def _classify_dimension(
         buckets.prev_run_latest_map[dim_name] = dim
 
 
-def _strip_findings(dimensions: list[DimensionResult]) -> list[DimensionResult]:
+def slim_dimensions(dimensions: list[DimensionResult]) -> list[DimensionResult]:
     """Drop the violation/compliance bodies, keeping every scalar field.
 
     Everything the accumulated walk consults -- ``overall_score``,
     ``files_read``, ``totals``, ``principles`` -- survives, so classification is
-    bit-identical to classifying the full read.
+    bit-identical to classifying the full read. The count of open requirement
+    types is taken before the findings go, because the Overview hero reads it
+    and a slim dimension has no findings left to count.
     """
-    return [replace(d, violations=[], compliance=[]) for d in dimensions]
+    return [replace(d, violations=[], compliance=[], open_types=open_types_of(d)) for d in dimensions]
 
 
 def make_slim_run_fetcher(
     reports_root: Path, project: str,
     cache: OrderedDict, lock: threading.Lock, max_size: int,
+    *, log: LogSink = NULL_LOG,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a fetcher of findings-free per-run dimensions, LRU-cached.
 
@@ -88,9 +91,12 @@ def make_slim_run_fetcher(
 
     *max_size* <= 0 disables caching entirely (every call reads through).
     """
+    def read_slim(run_id: str) -> list[DimensionResult]:
+        return slim_dimensions(read_scalar_dimensions(reports_root, project, run_id, log=log))
+
     def get_slim(run_id: str) -> list[DimensionResult]:
         if max_size <= 0:
-            return _strip_findings(_read_run_data_safely(reports_root, project, run_id))
+            return read_slim(run_id)
         key = (str(reports_root), project, run_id,
                run_fingerprint(reports_root / project / run_id))
         with lock:
@@ -98,7 +104,7 @@ def make_slim_run_fetcher(
             if hit is not None:
                 cache.move_to_end(key)
                 return hit
-        slim = _strip_findings(_read_run_data_safely(reports_root, project, run_id))
+        slim = read_slim(run_id)
         with lock:
             cache[key] = slim
             cache.move_to_end(key)
@@ -109,13 +115,69 @@ def make_slim_run_fetcher(
     return get_slim
 
 
-def _read_run_data_safely(
+def _report_dimensions(run_dir: Path) -> set[str]:
+    """Dimensions with an evaluation report (``evaluation/<dimension>.json``) in *run_dir*."""
+    eval_dir = run_dir / _EVALUATION_DIR
+    if not eval_dir.is_dir():
+        return set()
+    return {p.stem for p in eval_dir.iterdir() if p.suffix == JSON_SUFFIX}
+
+
+def _scalars_match_reports(dims: list[DimensionResult], reports: set[str]) -> bool:
+    """True when the scalar read answers what a full read would for winner selection.
+
+    The dimension set must equal the reports on disk, and no dimension may carry
+    ``files_read == 0``: the grade table stores an unrecorded count as 0, which a
+    full read reports as unknown (trusted) and the scalar row as a coverage-0 stub.
+    """
+    return {d.dimension for d in dims} == reports and all(d.files_read != 0 for d in dims)
+
+
+def read_scalar_dimensions(
     reports_root: Path, project: str, run_id: str,
+    *, log: LogSink = NULL_LOG,
+    full_reader: Callable[[Path, str, str], list[DimensionResult]] | None = None,
+    scalar_reader: Callable[..., list[DimensionResult]] = read_run_scalars,
+) -> list[DimensionResult]:
+    """One run's per-dimension scores, grades, counts and files read, without its findings.
+
+    Served from the run database's grade tables (*scalar_reader*, default
+    ``read_run_scalars``), a few aggregate rows instead of every finding,
+    whenever that answers exactly what the full read would
+    (``_scalars_match_reports``); otherwise *full_reader* (default: the
+    tolerant full read). Winning dimensions that need their findings are
+    re-read in full by the caller.
+    """
+    def _full(root: Path, proj: str, rid: str) -> list[DimensionResult]:
+        if full_reader is not None:
+            return full_reader(root, proj, rid)
+        return _read_run_data_safely(root, proj, rid, log=log)
+
+    reports = _report_dimensions(reports_root / project / run_id)
+    if not reports:
+        return _full(reports_root, project, run_id)
+    try:
+        dims = scalar_reader(reports_root, project, run_id, fallback_reader=_full)
+    except (OSError, ValueError, KeyError) as exc:
+        log.warning(f"read_run_scalars failed for {run_id}: {exc}")
+        return []
+    return dims if _scalars_match_reports(dims, reports) else _full(reports_root, project, run_id)
+
+
+def run_source_file_count(run_dir: Path) -> int | None:
+    """The run's source file count from its evidence manifest, the value a full read carries."""
+    count = (read_run_manifest(run_dir) or {}).get("source_files_count")
+    return count if isinstance(count, int) and count > 0 else None
+
+
+def _read_run_data_safely(
+    reports_root: Path, project: str, run_id: str, *, log: LogSink = NULL_LOG,
 ) -> list[DimensionResult]:
     """``read_run_data`` with the same error tolerance the LRU fetcher applies."""
     try:
         return read_run_data(reports_root, project, run_id)
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError) as exc:
+        log.warning(f"read_run_data failed for {run_id}: {exc}")
         return []
 
 
@@ -151,7 +213,7 @@ def _hydrate_latest_dimensions(
             )
 
 
-def _read_all_run_data(
+def read_all_run_data(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     get_run_data: Callable[[str], list[DimensionResult]] | None = None,
     get_run_slim: Callable[[str], list[DimensionResult]] | None = None,

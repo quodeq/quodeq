@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import CloneTargetStep from './CloneTargetStep.jsx';
+import { ApiProvider } from '../../../../api/ApiContext.jsx';
 
 beforeEach(() => {
   localStorage.clear();
@@ -14,9 +15,14 @@ describe('CloneTargetStep', () => {
     expect(screen.getByLabelText(/clone destination/i)).toHaveValue('/Users/v/code');
   });
 
-  it('falls back to ~ when no localStorage value', () => {
+  it('falls back to ~/quodeq/repos when no localStorage value', () => {
     render(<CloneTargetStep repoUrl="https://x/y.git" onSubmit={vi.fn()} onBack={vi.fn()} />);
-    expect(screen.getByLabelText(/clone destination/i)).toHaveValue('~');
+    expect(screen.getByLabelText(/clone destination/i)).toHaveValue('~/quodeq/repos');
+  });
+
+  it('offers a folder picker next to the destination', () => {
+    render(<CloneTargetStep repoUrl="https://x/y.git" onSubmit={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'choose a folder' })).toBeInTheDocument();
   });
 
   it('submitting calls onSubmit with cloneDest and ephemeral=false', () => {
@@ -56,5 +62,22 @@ describe('CloneTargetStep', () => {
     const input = screen.getByLabelText(/clone destination/i);
     fireEvent.change(input, { target: { value: '   ' } });
     expect(screen.getByRole('button', { name: /clone and scan/i })).toBeDisabled();
+  });
+
+  it('renders the access panel instead of the error line when access failed', () => {
+    const api = { probeGit: vi.fn(), getGithubAccount: vi.fn(async () => ({ ghAvailable: false, ghLoggedIn: false, signInAvailable: true })), startDeviceFlow: vi.fn(), getDeviceFlow: vi.fn(), pasteGithubToken: vi.fn() };
+    render(
+      <ApiProvider value={api}>
+        <CloneTargetStep repoUrl="https://github.com/o/r.git" onSubmit={vi.fn()} onBack={vi.fn()} error="should not show"
+          accessFailure={{ kind: 'auth_required', detail: '', host: 'github.com', isGitHub: true }} onAccessResolved={vi.fn()} onRetry={vi.fn()} />
+      </ApiProvider>,
+    );
+    expect(screen.getByText(/can't access this repository yet/i)).toBeInTheDocument();
+    expect(screen.queryByText('should not show')).not.toBeInTheDocument();
+  });
+
+  it('shows the git detail under a clone error', () => {
+    render(<CloneTargetStep repoUrl="https://x/y.git" onSubmit={vi.fn()} onBack={vi.fn()} error="Couldn't clone the repository." detail="fatal: boom" />);
+    expect(screen.getByText(/fatal: boom/)).toBeInTheDocument();
   });
 });

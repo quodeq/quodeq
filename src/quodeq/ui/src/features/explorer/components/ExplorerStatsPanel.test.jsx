@@ -73,4 +73,16 @@ describe('ExplorerStatsPanel severity badges', () => {
     fireEvent.click(stat);
     expect(onCardNavigate).toHaveBeenCalledWith('violations');
   });
+
+  it('the history chart follows the tiles directly: no strip in between', () => {
+    render(<ExplorerStatsPanel {...baseProps} />);
+    const grid = document.querySelector('.qd-stats-2x2');
+    expect(grid.nextElementSibling.dataset.testid).toBe('history-panel');
+    expect(document.querySelector('.term-strip')).toBeNull();
+  });
+
+  it('shows the grade as a chip on the score tile', () => {
+    render(<ExplorerStatsPanel {...baseProps} overallGrade={{ grade: 'Exemplary', score: '9.6' }} />);
+    expect(screen.getByText('EXEMPLARY').className).toContain('chip');
+  });
 });

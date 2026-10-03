@@ -28,6 +28,8 @@ _FLAG_APPEND_SYSTEM_PROMPT = "--append-system-prompt"
 _FLAG_SESSION_ID = "--session-id"
 _FLAG_RESUME = "--resume"
 _FLAG_GEMINI_RESUME = "-r"
+_FLAG_DISALLOWED_TOOLS = "--disallowedTools"
+_FLAG_ALLOWED_TOOLS = "--allowedTools"
 
 
 def _with_web_access(args: list[str]) -> list[str]:
@@ -42,10 +44,10 @@ def _with_web_access(args: list[str]) -> list[str]:
     # The value token following each flag comes only from the static bundled
     # config (ai_providers.json), so degenerate/empty values need no handling.
     for i, token in enumerate(out[:-1]):
-        if token == "--disallowedTools":
+        if token == _FLAG_DISALLOWED_TOOLS:
             names = [n for n in out[i + 1].split() if n not in _NATIVE_WEB_TOOLS]
             out[i + 1] = " ".join(names)
-        elif token == "--allowedTools":
+        elif token == _FLAG_ALLOWED_TOOLS:
             names = out[i + 1].split()
             out[i + 1] = " ".join(names + [n for n in _NATIVE_WEB_TOOLS if n not in names])
     return out

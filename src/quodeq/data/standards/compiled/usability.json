@@ -2,6 +2,9 @@
   "id": "usability",
   "name": "Usability",
   "description": "How easy the product is to learn, operate, and recover from mistakes with. Appropriateness recognisability, learnability, operability, user error protection, and accessibility shape the everyday experience for real users.",
+  "type": "iso",
+  "subtype": "25010",
+  "version": "2023.11",
   "sources": [
     "iso25010",
     "wcag22"

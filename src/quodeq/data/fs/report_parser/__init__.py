@@ -10,6 +10,7 @@ from quodeq.data.fs.report_parser.grades import (
     summarize_dimensions,
 )
 from quodeq.data.fs.report_parser.json_parser import (
+    OVERALL_PRINCIPLE,
     empty_severity_buckets,
     parse_eval_from_json,
     parse_evidence_file,
@@ -22,6 +23,8 @@ from quodeq.data.fs.report_parser.markdown import (
     parse_eval_markdown,
     split_table_row,
 )
+from quodeq.data.fs.report_parser._evidence_sqlite import has_evaluation_db
+from quodeq.data.fs.report_parser._report_keys import read_report_key_sets
 from quodeq.data.fs.report_parser.runs import (
     RunInfo,
     build_repository_info,
@@ -32,6 +35,7 @@ from quodeq.data.fs.report_parser.runs import (
 
 __all__ = [
     "NUMERIC_GRADE_ORDER",
+    "OVERALL_PRINCIPLE",
     "SEVERITIES",
     "TEXT_GRADE_ORDER",
     "RunInfo",
@@ -49,6 +53,8 @@ __all__ = [
     "parse_evidence_file",
     "parse_numeric_score",
     "parse_report_json",
+    "has_evaluation_db",
+    "read_report_key_sets",
     "read_run_data",
     "safe_read_dir",
     "split_table_row",

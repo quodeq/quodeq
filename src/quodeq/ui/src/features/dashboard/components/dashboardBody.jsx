@@ -11,15 +11,15 @@ import { dashboardPageClassName } from './dashboardGate.jsx';
 // and it only survives while every branch returns its tree from the one
 // position in DashboardPage's render.
 
-function renderReadyContent({ data, callbacks, runMode, projectInfo, selectedRunId, accumulatedDimensions, focus, handlers }) {
+function renderReadyContent({ data, callbacks, runMode, projectInfo, selectedRunId, accumulatedDimensions, focus, handlers, refreshing }) {
   const { dashboard, accumulated, availableRuns = [], dailyRuns, overviewRunIndex = 0, selectedProject, granularity = 'day', selectedSource, scoresPending = false, customFormula = false, onGranularityChange } = data;
-  const { onRunSelect, onNavigate } = callbacks;
+  const { onRunSelect, onRunHover, onRunHoverEnd, onNavigate } = callbacks;
   return (
     <DashboardContent
       runMode={runMode}
-      data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula }}
+      data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula, refreshing }}
       focus={focus}
-      callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
+      callbacks={{ onRunSelect, onRunHover, onRunHoverEnd, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
     />
   );
 }
@@ -50,8 +50,8 @@ export function renderDashboardBody(ctx) {
   const { contentReady, isLoading, showOverviewSkeleton, dashboardAppearClass } = pageState;
   // True while a *background* fetch is running but we're already showing
   // data (placeholderData kept the previous run on screen during a switch).
-  // The page dims itself slightly so the user sees "still working" without
-  // the jarring full-screen LoadingScreen.
+  // Each section mutes its text (see section-pending in dashboard.css);
+  // the loading line itself lives on the top bar. The page never dims.
   const isRefreshing = isFetching && !!dashboard && !isLoading;
   // showOverviewSkeleton comes from useDashboardPageState (beside the appear
   // latch, which needs it too) -- from the user's perspective this covers both
@@ -74,7 +74,7 @@ export function renderDashboardBody(ctx) {
           -- the Overview shows the OverviewSkeleton (inside .dashboard-page,
           see showOverviewSkeleton) instead. */}
       {isLoading && runMode && <LoadingScreen variant="inline" message={projectName ? t('overview.loadingProjectMsg', { name: projectName }) : undefined} />}
-      <div className={dashboardPageClassName({ appearClass: dashboardAppearClass, dimmed: isDimmed, refreshing: isRefreshing })}>
+      <div className={dashboardPageClassName({ appearClass: dashboardAppearClass, dimmed: isDimmed })}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={onSetupComplete} />
         {error && <p className="inline-error">{t('overview.loadFailed')}</p>}
         {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} />}
@@ -83,7 +83,7 @@ export function renderDashboardBody(ctx) {
             contentReady is already true -- there's no window where dashboard is
             in but content isn't ready yet. The `isLoading && runMode`
             LoadingScreen above is the only loader runMode needs. */}
-        {dashboard && contentReady && renderReadyContent(ctx)}
+        {dashboard && contentReady && renderReadyContent({ ...ctx, refreshing: isRefreshing })}
       </div>
     </>
   );

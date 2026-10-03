@@ -81,3 +81,30 @@ def test_returned_key_sets_are_independent_copies(tmp_path):
     again = read_run_key_sets(run_dir)
     assert ("Rx", "z.py", 99) not in again[0]
     assert ("security", "P1", "f1.py") in again[1]
+
+
+def test_a_run_without_a_database_takes_its_keys_from_its_reports(tmp_path):
+    # Legacy runs carry only evaluation/*.json. Their findings must still
+    # scope the cache version and the touch check, or a dismissal on one of
+    # them would never reach the rows the trend and the Overview serve.
+    import json
+    eval_dir = tmp_path / "run1" / "evaluation"
+    eval_dir.mkdir(parents=True)
+    (eval_dir / "security.json").write_text(json.dumps({
+        "dimension": "security", "overallScore": "6.0/10", "overallGrade": "Fair",
+        "principles": [], "compliance": [
+            {"principle": "P2", "req": "R2", "file": "b.py", "line": 2, "snippet": "y"}],
+        "violations": [{"principle": "P1", "req": "R1", "file": "a.py", "line": 1, "snippet": "x"}],
+    }), encoding="utf-8")
+    dismiss, cls = read_run_key_sets(tmp_path / "run1")
+    assert ("R1", "a.py", 1) in dismiss
+    assert ("R2", "b.py", 2) in dismiss          # compliance rows contribute keys too
+    assert cls == {("security", "P1", "a.py"), ("security", "P2", "b.py")}
+
+
+def test_legacy_run_with_an_unparsable_report_yields_empty_sets(tmp_path):
+    evaluation = tmp_path / "run" / "evaluation"
+    evaluation.mkdir(parents=True)
+    (evaluation / "security.json").write_text("{}", encoding="utf-8")
+
+    assert read_run_key_sets(tmp_path / "run") == (set(), set())

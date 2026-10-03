@@ -6,7 +6,10 @@
 import { computeOverallProgress } from '../scanProgressTotals.js';
 import { t } from '../../../../strings/index.js';
 import { SCAN_MODE } from '../scanModes.js';
-import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
+import { MS_PER_SECOND, SECONDS_PER_MINUTE, MINUTES_PER_HOUR, SECONDS_PER_HOUR } from '../../../../utils/time.js';
+import { DIM_STATE } from '../../../../vocab/dimState.js';
+import { SEVERITY_ORDER } from '../../../../vocab/severity.js';
+import { emptySeverityCounts } from '../../../../utils/severity.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -20,6 +23,10 @@ const ETA_FINISHING_SEC = 45;          // below this, "finishing" reads truer th
 // Round the "~N min left" estimate to a legible step instead of showing an
 // exact minute that visibly jitters as the rate estimate wobbles.
 const MINUTE_ROUNDING_STEP = 5;
+// Below this many minutes remaining, round to the nearest minute (5-minute
+// steps would be too coarse close to done); at or above, round to
+// MINUTE_ROUNDING_STEP.
+const MINUTE_PRECISE_BELOW_MIN = 10;
 
 /**
  * Files/sec from a buffer of {t, taken} samples (t = epoch ms, ascending).
@@ -37,7 +44,7 @@ export function computeRate(samples) {
   if (spanMs < RATE_MIN_SPAN_MS) return null;
   const dFiles = newest.taken - oldest.taken;
   if (dFiles <= 0) return null;
-  return dFiles / (spanMs / 1000);
+  return dFiles / (spanMs / MS_PER_SECOND);
 }
 
 /**
@@ -47,7 +54,7 @@ export function computeRate(samples) {
  */
 export function formatRate(rate) {
   if (rate == null || !Number.isFinite(rate) || rate <= 0) return null;
-  const perMin = rate * 60;
+  const perMin = rate * SECONDS_PER_MINUTE;
   const shown = perMin >= 1 ? String(Math.round(perMin)) : perMin.toFixed(1);
   return `~${shown} files/min`;
 }
@@ -63,14 +70,14 @@ export function formatEta(remainingFiles, rate) {
   const etaSec = remainingFiles / rate;
   if (etaSec <= ETA_FINISHING_SEC) return 'finishing';
   if (etaSec < SECONDS_PER_HOUR) {
-    const rawMin = etaSec / 60;
-    let min = rawMin < 10 ? Math.max(1, Math.round(rawMin)) : Math.round(rawMin / MINUTE_ROUNDING_STEP) * MINUTE_ROUNDING_STEP;
-    if (min >= 60) return '~1h left';
+    const rawMin = etaSec / SECONDS_PER_MINUTE;
+    let min = rawMin < MINUTE_PRECISE_BELOW_MIN ? Math.max(1, Math.round(rawMin)) : Math.round(rawMin / MINUTE_ROUNDING_STEP) * MINUTE_ROUNDING_STEP;
+    if (min >= MINUTES_PER_HOUR) return '~1h left';
     return `~${min} min left`;
   }
   let hours = Math.floor(etaSec / SECONDS_PER_HOUR);
-  let min = Math.round(((etaSec % SECONDS_PER_HOUR) / 60) / MINUTE_ROUNDING_STEP) * MINUTE_ROUNDING_STEP;
-  if (min === 60) { hours += 1; min = 0; }
+  let min = Math.round(((etaSec % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE) / MINUTE_ROUNDING_STEP) * MINUTE_ROUNDING_STEP;
+  if (min === MINUTES_PER_HOUR) { hours += 1; min = 0; }
   return min === 0 ? `~${hours}h left` : `~${hours}h ${min}m left`;
 }
 
@@ -96,9 +103,9 @@ export function buildEtaHint({ rate, takenFiles, totalFiles }) {
  * in (0, 1000]; defaults to 1000 for a non-finite input.
  */
 export function msUntilNextSecond(elapsedMs) {
-  if (!Number.isFinite(elapsedMs)) return 1000;
-  const rem = ((elapsedMs % 1000) + 1000) % 1000;  // normalize negatives
-  return 1000 - rem;
+  if (!Number.isFinite(elapsedMs)) return MS_PER_SECOND;
+  const rem = ((elapsedMs % MS_PER_SECOND) + MS_PER_SECOND) % MS_PER_SECOND;  // normalize negatives
+  return MS_PER_SECOND - rem;
 }
 
 /**
@@ -108,8 +115,8 @@ export function msUntilNextSecond(elapsedMs) {
  * time since that payload landed. Anchoring to the server (instead of
  * Date.parse(job.startedAt) vs client Date.now()) makes the clock immune to
  * client/server clock skew and keeps every clock on the screen in lock-step
- * — the stat strip and the footer previously mixed client wall-clock with
- * 2s-stale poll data and visibly disagreed.
+ * — mixing client wall-clock with 2s-stale poll data would make the stat
+ * strip and the footer visibly disagree.
  *
  * Fallback order when the server hasn't reported an elapsed yet (first
  * render before any poll, legacy runs): job wall-clock timestamps, else null.
@@ -128,13 +135,13 @@ export function deriveRunElapsedS({ running, serverElapsedS, serverUpdatedAtMs, 
   if (Number.isFinite(serverElapsedS)) {
     if (!running) return serverElapsedS;
     const sinceMs = Number.isFinite(serverUpdatedAtMs) ? Math.max(0, nowMs - serverUpdatedAtMs) : 0;
-    return serverElapsedS + sinceMs / 1000;
+    return serverElapsedS + sinceMs / MS_PER_SECOND;
   }
   const start = startedAt ? Date.parse(startedAt) : NaN;
   if (Number.isNaN(start)) return null;
   const end = !running && endedAt ? Date.parse(endedAt) : nowMs;
   if (Number.isNaN(end)) return null;
-  return Math.max(0, (end - start) / 1000);
+  return Math.max(0, (end - start) / MS_PER_SECOND);
 }
 
 /**
@@ -148,12 +155,12 @@ export function deriveRunElapsedS({ running, serverElapsedS, serverUpdatedAtMs, 
 export function buildDimensionCycle(progress) {
   const dims = progress?.dimensions || [];
   if (dims.length === 0) return null;
-  let runningIdx = dims.findIndex((d) => d?.state === 'running');
+  let runningIdx = dims.findIndex((d) => d?.state === DIM_STATE.RUNNING);
   if (runningIdx === -1) {
-    const doneCount = dims.filter((d) => d?.state === 'done').length;
+    const doneCount = dims.filter((d) => d?.state === DIM_STATE.DONE).length;
     runningIdx = Math.min(doneCount, dims.length - 1);
   }
-  const next = dims.slice(runningIdx + 1).find((d) => d?.state === 'pending')?.id ?? null;
+  const next = dims.slice(runningIdx + 1).find((d) => d?.state === DIM_STATE.PENDING)?.id ?? null;
   return {
     current: progress?.currentDimension ?? dims[runningIdx]?.id ?? null,
     index: runningIdx + 1,
@@ -164,7 +171,7 @@ export function buildDimensionCycle(progress) {
 
 /** Severity buckets across the live feed's `{dim: Violation[]}` map. */
 export function sumSeverities(liveViolations) {
-  const counts = { critical: 0, major: 0, minor: 0 };
+  const counts = emptySeverityCounts();
   for (const vs of Object.values(liveViolations || {})) {
     for (const v of vs || []) {
       const sev = String(v?.severity || '').toLowerCase();
@@ -176,7 +183,7 @@ export function sumSeverities(liveViolations) {
 
 /** "1 critical · 4 major" — zero buckets omitted; "none yet" when all zero. */
 export function formatSevHint(counts) {
-  const parts = ['critical', 'major', 'minor']
+  const parts = SEVERITY_ORDER
     .filter((k) => counts?.[k] > 0)
     .map((k) => `${counts[k]} ${k}`);
   return parts.length > 0 ? parts.join(' · ') : 'none yet';

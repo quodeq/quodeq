@@ -1,0 +1,5 @@
+# Grandfathered magic numbers: rule A (a bare number passed as an
+# argument or parameter default), rule R (returned) and rule C (compared
+# against). The fix is a named constant that carries meaning and unit.
+# Burn to zero; never add.
+# Regenerate intentionally: python tools/check_magic_numbers.py --update-baseline

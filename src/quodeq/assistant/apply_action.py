@@ -1,4 +1,4 @@
-"""Apply-drafted-action use case, extracted from the HTTP route.
+"""Apply-drafted-action use case behind the HTTP route.
 
 The workflow (ownership check, atomic drafted->applied claim, release on
 failure, spec dispatch) is framework-free; the route maps each outcome to
@@ -8,18 +8,31 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal
+from enum import StrEnum
 
+from quodeq.assistant.action_status import ActionStatus
 from quodeq.assistant.tools.actions import ACTIONS, ActionConflict, ActionContext, ActionSpec
+from quodeq.core.types.project_source import ProjectSource, session_source
 from quodeq.data.ports.assistant import AssistantStore
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
+
+
+class ActionOutcomeKind(StrEnum):
+    """What an apply or reject of a drafted action concluded; the route maps each kind to its response."""
+
+    UNKNOWN_ACTION = "unknown_action"
+    READ_ONLY = "read_only"
+    ALREADY = "already"
+    UNSUPPORTED = "unsupported"
+    INVALID = "invalid"
+    CONFLICT = "conflict"
+    APPLIED = "applied"
+    REJECTED = "rejected"
 
 
 @dataclass(frozen=True)
 class ApplyOutcome:
     """Result of an apply attempt; ``detail`` carries a state name or error."""
-    kind: Literal["unknown_action", "read_only", "already", "unsupported",
-                  "invalid", "conflict", "applied"]
+    kind: ActionOutcomeKind
     detail: str = ""
     result: dict | None = None
 
@@ -33,7 +46,7 @@ def _is_read_only_action(repo: AssistantStore, action: Mapping) -> bool:
     id.
     """
     owner = repo.get_session(action["session_id"])
-    return owner is not None and (owner.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED
+    return owner is not None and session_source(owner) == ProjectSource.SHARED
 
 
 def apply_drafted_action(
@@ -43,38 +56,41 @@ def apply_drafted_action(
     """Apply a drafted action, claiming the transition atomically first."""
     action = repo.get_action(action_id)
     if action is None:
-        return ApplyOutcome("unknown_action")
+        return ApplyOutcome(ActionOutcomeKind.UNKNOWN_ACTION)
     if _is_read_only_action(repo, action):
-        return ApplyOutcome("read_only")
-    if action["status"] != "drafted":
-        return ApplyOutcome("already", detail=action["status"])
+        return ApplyOutcome(ActionOutcomeKind.READ_ONLY)
+    if action["status"] != ActionStatus.DRAFTED:
+        return ApplyOutcome(ActionOutcomeKind.ALREADY, detail=action["status"])
     spec = actions.get(action["action_type"])
     if spec is None:
-        return ApplyOutcome("unsupported")
+        return ApplyOutcome(ActionOutcomeKind.UNSUPPORTED)
     # Atomically claim the drafted->applied transition BEFORE running the
     # side effect, so a double-click / two-tab race can't run spec.apply
     # twice (which double-ran the dismiss rescore). The loser sees a
     # non-drafted row and 409s. On failure we release back to drafted so
     # the user can retry.
-    if not repo.set_action_status(action_id, "applied", expected="drafted"):
+    if not repo.set_action_status(action_id, ActionStatus.APPLIED, expected=ActionStatus.DRAFTED):
         fresh = repo.get_action(action_id)
         state = fresh["status"] if fresh else "gone"
-        return ApplyOutcome("already", detail=state)
+        return ApplyOutcome(ActionOutcomeKind.ALREADY, detail=state)
     try:
         result = spec.apply(action["payload"], context)
     except ValueError as exc:
-        repo.set_action_status(action_id, "drafted")
-        return ApplyOutcome("invalid", detail=str(exc))
+        repo.set_action_status(action_id, ActionStatus.DRAFTED)
+        return ApplyOutcome(ActionOutcomeKind.INVALID, detail=str(exc))
     except ActionConflict as exc:
-        repo.set_action_status(action_id, "drafted")
-        return ApplyOutcome("conflict", detail=str(exc))
-    return ApplyOutcome("applied", result=result)
+        repo.set_action_status(action_id, ActionStatus.DRAFTED)
+        return ApplyOutcome(ActionOutcomeKind.CONFLICT, detail=str(exc))
+    except Exception:
+        repo.set_action_status(action_id, ActionStatus.DRAFTED)
+        raise
+    return ApplyOutcome(ActionOutcomeKind.APPLIED, result=result)
 
 
 @dataclass(frozen=True)
 class RejectOutcome:
     """Result of a reject attempt; ``detail`` carries a state name."""
-    kind: Literal["unknown_action", "read_only", "already", "rejected"]
+    kind: ActionOutcomeKind
     detail: str = ""
 
 
@@ -82,14 +98,14 @@ def reject_drafted_action(repo: AssistantStore, action_id: str) -> RejectOutcome
     """Reject a drafted action, claiming the transition atomically."""
     action = repo.get_action(action_id)
     if action is None:
-        return RejectOutcome("unknown_action")
+        return RejectOutcome(ActionOutcomeKind.UNKNOWN_ACTION)
     if _is_read_only_action(repo, action):
-        return RejectOutcome("read_only")
+        return RejectOutcome(ActionOutcomeKind.READ_ONLY)
     # Same replay guard as apply, made atomic: an applied action must not
     # flip to rejected on a stale card click, SSE replay, or a race with a
     # concurrent apply. The compare-and-set wins at most once.
-    if not repo.set_action_status(action_id, "rejected", expected="drafted"):
+    if not repo.set_action_status(action_id, ActionStatus.REJECTED, expected=ActionStatus.DRAFTED):
         fresh = repo.get_action(action_id)
         state = fresh["status"] if fresh else "gone"
-        return RejectOutcome("already", detail=state)
-    return RejectOutcome("rejected")
+        return RejectOutcome(ActionOutcomeKind.ALREADY, detail=state)
+    return RejectOutcome(ActionOutcomeKind.REJECTED)

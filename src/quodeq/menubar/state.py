@@ -1,24 +1,19 @@
 """Shared, on-disk menu bar preference at ~/.quodeq/menubar_state.json.
 
 Read/written by separate processes (dashboard runner, Flask API, the menu bar
-app itself), so the file is the single source of truth. Resolution mirrors
-update/state.py: an explicit QUODEQ_MENUBAR_STATE_PATH wins, else
-<QUODEQ_DIR or ~/.quodeq>/menubar_state.json. Basing the fallback on
-QUODEQ_DIR means the test suite's autouse _isolate_quodeq_home fixture
-isolates this file automatically.
+app itself), so the file is the single source of truth. Set
+QUODEQ_MENUBAR_STATE_PATH to put it elsewhere (see
+``shared.json_state.state_file_path``).
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
-from quodeq.shared.json_state import read_json_state, state_file_path, write_json_state
+from quodeq.shared.json_state import JsonStateFile
 
 _logger = logging.getLogger(__name__)
-
-_STATE_FILENAME = "menubar_state.json"
 
 
 @dataclass
@@ -28,9 +23,14 @@ class MenubarState:
     enabled: bool = False
 
 
+_STATE_FILE = JsonStateFile(
+    MenubarState, "QUODEQ_MENUBAR_STATE_PATH", "menubar_state.json", "menubar", _logger,
+)
+
+
 def get_menubar_state_path(env: dict[str, str] | None = None) -> str:
     """Resolve the state file path. *env* overrides ``os.environ`` for tests."""
-    return state_file_path("QUODEQ_MENUBAR_STATE_PATH", _STATE_FILENAME, env)
+    return _STATE_FILE.path(env)
 
 
 def read_state(env: dict[str, str] | None = None) -> MenubarState:
@@ -39,12 +39,12 @@ def read_state(env: dict[str, str] | None = None) -> MenubarState:
     Unknown keys are dropped so an older process can read a file written by a
     newer one.
     """
-    return read_json_state(Path(get_menubar_state_path(env)), MenubarState)
+    return _STATE_FILE.read(get_menubar_state_path(env))
 
 
 def write_state(state: MenubarState, env: dict[str, str] | None = None) -> None:
     """Persist the preference atomically. Failures are logged, never raised."""
-    write_json_state(state, Path(get_menubar_state_path(env)), "menubar", _logger)
+    _STATE_FILE.write(state, get_menubar_state_path(env))
 
 
 def set_enabled(enabled: bool, env: dict[str, str] | None = None) -> None:

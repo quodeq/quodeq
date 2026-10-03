@@ -14,10 +14,10 @@ from pathlib import Path
 
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.analysis.manifest_targets import (
-    _MIN_FILES_PER_TARGET,
+    MIN_FILES_PER_TARGET,
     WalkCounts,
-    _build_targets_from_matches,
-    _iter_source_files,
+    build_targets_from_matches,
+    iter_source_files,
     target_name,
 )
 from quodeq.config.discipline_registry import DisciplineRegistry
@@ -67,16 +67,18 @@ def _walk_and_partition_by_scope(
     Counter[str],
     dict[str, dict[str, Counter]],
     int,
+    int,
 ]:
     """Walk *src* once, bucketing files by their owning subproject scope.
 
     Each file is assigned to the deepest scope path that contains it. Files outside
     every scope are dropped — they don't belong to any classified subproject and
     shouldn't appear in any target. Callers that must not lose unclassified source
-    pass ``"."`` among *scope_paths* as a catch-all (see _build_multi_scope_manifest).
+    pass ``"."`` among *scope_paths* as a catch-all (see build_multi_scope_manifest).
 
-    The fourth element is how many files the git-tracked filter skipped: the
-    filter lives in the shared walk, so a monorepo run gets it too.
+    The fourth element is how many files the git-tracked filter skipped; the
+    fifth is how many directories the walk could not list. Both live in the
+    shared walk, so a monorepo run gets them too.
     """
     files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
     ext_counts_overall: Counter[str] = Counter()
@@ -85,7 +87,7 @@ def _walk_and_partition_by_scope(
     counts = WalkCounts()
     # Paths are POSIX-style like the scope_paths from detect_matches_recursive,
     # so prefix matching works on Windows.
-    for rel, suffix, lang in _iter_source_files(src, src, walk, counts):
+    for rel, suffix, lang in iter_source_files(src, src, walk, counts):
         owner = resolve_scope(rel)
         if owner is None:
             continue
@@ -94,7 +96,7 @@ def _walk_and_partition_by_scope(
         ext_counts_by_scope_lang[owner].setdefault(lang, Counter())[suffix] += 1
     return (
         files_by_scope_lang, ext_counts_overall, ext_counts_by_scope_lang,
-        counts.skipped_untracked,
+        counts.skipped_untracked, counts.unreadable_dirs,
     )
 
 
@@ -109,7 +111,7 @@ def _resolve_scope_paths(
     not. Without a catch-all root scope those files are dropped and the
     manifest comes back with no targets, which downstream reads as "no
     source files". "." is depth 0 in _deepest_scope, so it only claims files
-    no more specific scope owns, and _MIN_FILES_PER_TARGET still keeps a
+    no more specific scope owns, and MIN_FILES_PER_TARGET still keeps a
     handful of stray root files from becoming a target.
     """
     scope_paths = [rel for rel, _ in sub_results]
@@ -132,13 +134,13 @@ def _build_scope_targets(
     for scope in scope_paths:
         lang_files = files_by_scope[scope]
         ext_counts_by_lang = ext_counts_by_scope_lang[scope]
-        framework_targets = _build_targets_from_matches(
+        framework_targets = build_targets_from_matches(
             registry, matches_by_scope[scope], lang_files, ext_counts_by_lang,
             scope_path=scope,
         )
         targets.extend(framework_targets)
         for lang, files in lang_files.items():
-            if len(files) < _MIN_FILES_PER_TARGET:
+            if len(files) < MIN_FILES_PER_TARGET:
                 continue
             targets.append(AnalysisTarget(
                 name=target_name(lang, None),
@@ -151,7 +153,7 @@ def _build_scope_targets(
     return targets
 
 
-def _build_multi_scope_manifest(
+def build_multi_scope_manifest(
     src: Path,
     walk: ManifestWalkSpec,
     registry: DisciplineRegistry,
@@ -160,7 +162,7 @@ def _build_multi_scope_manifest(
     """Produce a manifest with one target group per detected subproject scope."""
     scope_paths, matches_by_scope = _resolve_scope_paths(sub_results)
     (
-        files_by_scope, ext_counts_overall, ext_counts_by_scope_lang, skipped,
+        files_by_scope, ext_counts_overall, ext_counts_by_scope_lang, skipped, unreadable,
     ) = _walk_and_partition_by_scope(src, walk, scope_paths)
 
     targets = _build_scope_targets(
@@ -171,5 +173,5 @@ def _build_multi_scope_manifest(
     total = sum(t.total_files for t in targets)
     return SourceManifest(
         targets=targets, total_files=total, language_stats=dict(ext_counts_overall),
-        skipped_untracked=skipped,
+        skipped_untracked=skipped, unreadable_dirs=unreadable,
     )

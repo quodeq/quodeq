@@ -5,7 +5,9 @@
  * hand-rolls an Enter-only check again (U-ACC-3), and one tab trap for the
  * DOM-built dialogs and portaled menus.
  */
-const ACTIVATION_KEYS = new Set(['Enter', ' ']);
+import { KEY } from '../vocab/keyboard.js';
+
+const ACTIVATION_KEYS = new Set([KEY.ENTER, ' ']);
 
 // The tabindex clause does not look at `hidden`, `aria-disabled` or CSS
 // visibility; a custom role="button" that is disabled by aria alone is
@@ -34,6 +36,17 @@ export function activateOnKey(handler) {
   };
 }
 
+/**
+ * `onClick` and `onKeyDown` props that run `action` on a click or on Enter
+ * or Space, for an element acting as a button.
+ *
+ * @param {() => void} action
+ * @returns {{onClick: Function, onKeyDown: Function}}
+ */
+export function activationHandlers(action) {
+  return { onClick: action, onKeyDown: activateOnKey(action) };
+}
+
 /** The tabbable descendants of `root`, in document order (see the selector's limits above). */
 export function focusables(root) {
   return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR));
@@ -41,7 +54,7 @@ export function focusables(root) {
 
 /** Keep Tab / Shift+Tab inside `root`; call from a keydown listener. */
 export function trapTab(root, e) {
-  if (e.key !== 'Tab') return;
+  if (e.key !== KEY.TAB) return;
   const items = focusables(root);
   if (items.length === 0) {
     e.preventDefault();

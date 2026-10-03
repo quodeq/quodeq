@@ -1571,6 +1571,18 @@ textarea:focus {
   white-space: normal;
 }
 
+.help-hint-learn {
+  display: block;
+  margin-top: 6px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .help-hint-popover p {
   margin: 0;
 }
@@ -1966,22 +1978,88 @@ textarea:focus {
 }
 
 .loading-tip {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  text-align: center;
-  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 34rem;
+  padding: 0 var(--space-4);
   margin-top: var(--space-5);
-  animation: loading-fadein 500ms ease;
+  text-align: center;
+  animation: loading-fadein 700ms ease;
+  /* Duration mirrors TIP_FADE_MS in LoadingScreen.jsx. */
+  transition: opacity 700ms ease, transform 700ms ease;
 }
 
-/* The tip floats below the centered logo instead of joining the flex column,
-   so the logo never shifts when a tip appears or wraps to a second line. */
+.loading-tip--fading {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.loading-tip__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.loading-tip__text {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--color-text-muted);
+  text-wrap: balance;
+}
+
+/* The question is a block so the answer starts on the next line; the space
+   between them in the markup keeps textContent readable for screen readers. */
+.loading-tip__question {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* Medium, not bold: the highlight should guide a skim, not shout. */
+.loading-tip__text strong {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.loading-tip__text code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 1px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* With tips on, the logo sits above center so logo and tip read as one group
+   centered on screen, instead of the tip hanging below a centered logo. The
+   margin (not a transform) keeps loading-pulse's scale free. */
+.loading-screen--tips {
+  --loading-tip-lift: 48px;
+}
+
+.loading-screen--tips .loading-logo {
+  margin-bottom: calc(var(--loading-tip-lift) * 2);
+}
+
+/* The tip floats below the logo instead of joining the flex column, so the
+   logo never shifts when a tip appears or wraps to a second line. */
 .loading-screen:not(.loading-screen--inline) .loading-tip {
   position: absolute;
-  top: calc(50% + 64px);
+  top: calc(50% + 76px - var(--loading-tip-lift, 0px));
   left: 0;
   right: 0;
   margin: 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-tip--fading { transform: none; }
 }
 
 .loading-screen--leaving {
@@ -2218,6 +2296,29 @@ textarea:focus {
 .gf-tab--active { color: var(--color-accent); background: var(--color-surface-alt); }
 .gf-tab-body { border: 1px solid var(--color-border); border-radius: 0 4px 4px 4px; padding: 14px; }
 .gf-preview { border: 1px solid var(--color-border); border-radius: 4px; padding: 8px; margin-top: 12px; }
+
+/* Grade formula: one row per scoring stage, knobs left, the run's numbers right. */
+.gf-stages { display: flex; flex-direction: column; gap: 6px; }
+.gf-stage { display: grid; grid-template-columns: 26px 1fr 1.2fr; gap: 10px; align-items: start;
+  padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 6px; }
+.gf-stage__n { color: var(--color-accent); font-family: var(--font-mono, monospace); font-size: 16px; line-height: 1.2; }
+.gf-stage__title { margin: 0; font-size: 13px; font-weight: 500; color: var(--color-text); }
+.gf-stage__meaning { margin: 2px 0 8px; font-size: 11px; color: var(--color-text-muted); }
+.gf-stage__live { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--color-text-muted);
+  border-left: 1px solid var(--color-border); padding-left: 10px; align-self: stretch; }
+.gf-stage__line { margin-bottom: 4px; }
+.gf-stage__line b { color: var(--color-text); font-weight: 500; }
+.gf-stage__line b.gf-stage__final { color: var(--color-accent); font-size: 14px; }
+.gf-stage__was { color: var(--color-text-muted); }
+.gf-stage__note { color: var(--color-text-muted); }
+.gf-labels { padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 6px; }
+.gf-pickers { display: inline-flex; gap: 6px; margin-left: 10px; }
+.gf-picker { font-family: var(--font-mono, monospace); font-size: 11px; background: var(--color-surface-alt);
+  color: var(--color-text); border: 1px solid var(--color-border); border-radius: 4px; padding: 1px 4px; }
+@media (max-width: 720px) {
+  .gf-stage { grid-template-columns: 26px 1fr; }
+  .gf-stage__live { grid-column: 2; border-left: none; padding-left: 0; }
+}
 .gf-gauges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-start; }
 .gf-gauge { border: 1px dashed var(--color-border); border-radius: 4px; padding: 6px 10px; text-align: center; }
 .gf-gauge-was { color: var(--color-text-muted); text-decoration: line-through; font-size: 11px; margin-right: 4px; }

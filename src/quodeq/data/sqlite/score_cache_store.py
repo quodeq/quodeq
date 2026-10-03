@@ -10,28 +10,37 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from dataclasses import dataclass
 
 from quodeq.core.types import DimensionResult
 from quodeq.data.sqlite.score_cache_db import open_score_cache
+from quodeq.data.sqlite.score_cache_principles import (
+    attach_principles, principle_rows, read_principle_rows, write_principle_rows,
+)
+from quodeq.data.sqlite.score_cache_rows import RUN_SCALARS_COLUMNS, dimension_from_row, row_values
 
 _logger = logging.getLogger(__name__)
+
+_SCALAR_COLUMNS = ", ".join(RUN_SCALARS_COLUMNS)
+_SCALAR_PLACEHOLDERS = ", ".join("?" * len(RUN_SCALARS_COLUMNS))
 
 
 def read_cached_rows(
     conn: sqlite3.Connection, project: str, run_id: str, version: str,
 ) -> list[DimensionResult] | None:
-    """Return cached scalar dims for (project, run_id, version), or None on miss/error."""
+    """The run's row dimensions at *version*, principles attached; None on miss or error."""
     try:
         rows = conn.execute(
-            "SELECT dimension, overall_score, overall_grade FROM run_scalars "
-            "WHERE project=? AND run_id=? AND version=? ORDER BY dimension",
+            f"SELECT {_SCALAR_COLUMNS} FROM run_scalars"
+            " WHERE project=? AND run_id=? AND version=? ORDER BY dimension",
             (project, run_id, version),
         ).fetchall()
+        principles = read_principle_rows(conn, project, run_id) if rows else {}
     except sqlite3.Error:
         return None
     if not rows:
         return None
-    return [DimensionResult(dimension=r[0], overall_score=r[1], overall_grade=r[2]) for r in rows]
+    return attach_principles([dimension_from_row(r) for r in rows], principles.get((run_id, version), {}))
 
 
 def write_cached_rows(
@@ -40,30 +49,39 @@ def write_cached_rows(
 ) -> None:
     """Replace all cached rows for (project, run_id) with *dims* at *version*.
 
-    Best-effort: logs and returns on any SQLite error (the caller still has the
-    computed result).
+    Each dimension's scalars go to ``run_scalars`` and its principle grades to
+    ``run_principle_scalars``, in one commit. Best-effort: logs and returns on
+    any SQLite error (the caller still has the computed result).
     """
     try:
         conn.execute("DELETE FROM run_scalars WHERE project=? AND run_id=?", (project, run_id))
+        write_principle_rows(conn, project, run_id, version, principle_rows(dims))
         conn.executemany(
-            "INSERT OR REPLACE INTO run_scalars "
-            "(project, run_id, version, dimension, overall_score, overall_grade) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            [(project, run_id, version, d.dimension, d.overall_score, d.overall_grade)
-             for d in dims if d.dimension],
+            f"INSERT OR REPLACE INTO run_scalars (project, run_id, version, {_SCALAR_COLUMNS})"
+            f" VALUES (?, ?, ?, {_SCALAR_PLACEHOLDERS})",
+            [(project, run_id, version, *row_values(d)) for d in dims if d.dimension],
         )
         conn.commit()
     except sqlite3.Error:
         _logger.warning("score cache write failed for %s/%s", project, run_id, exc_info=True)
 
 
-def read_cached_accumulated(
-    conn: sqlite3.Connection, project: str, version: str,
-) -> dict | None:
-    """Return the cached accumulated payload for (project, version), or None."""
+@dataclass(frozen=True)
+class _PayloadSlot:
+    """One single-slot-per-project JSON payload table and the warnings it logs."""
+
+    table: str  # a module constant below, never caller input (it is formatted into the SQL)
+    write_failed_log: str  # %s is the project
+
+
+_PROJECT_SUMMARY = _PayloadSlot("project_summary_cache", "project summary cache write failed for %s")
+
+
+def _read_payload(conn: sqlite3.Connection, slot: _PayloadSlot, project: str, version: str) -> dict | None:
+    """The payload stored in *slot* for (project, version); None on miss, error or bad JSON."""
     try:
         row = conn.execute(
-            "SELECT payload FROM accumulated_cache WHERE project=? AND version=?",
+            f"SELECT payload FROM {slot.table} WHERE project=? AND version=?",
             (project, version),
         ).fetchone()
     except sqlite3.Error:
@@ -76,70 +94,40 @@ def read_cached_accumulated(
         return None
 
 
-def write_cached_accumulated(
-    conn: sqlite3.Connection, project: str, version: str, payload: dict,
+def _write_payload(
+    conn: sqlite3.Connection, slot: _PayloadSlot, project: str, version: str, payload: dict,
 ) -> None:
-    """Replace the cached accumulated payload for *project* at *version*.
-
-    Single-slot per project: the DELETE clears any prior version first, so the
-    table holds at most one accumulated payload per project. The default
-    dashboard uses ``as_of=None`` (one version), so this is stable; rapidly
-    alternating distinct ``as_of`` historical views would each miss + overwrite.
-
-    Best-effort: logs and returns on any SQLite/serialization error.
-    """
+    """Replace *project*'s payload in *slot* with *payload* at *version* (best-effort)."""
     try:
         blob = json.dumps(payload)
     except (TypeError, ValueError):
-        _logger.warning("accumulated payload for %s not serializable; skipping cache", project)
         return
     try:
-        conn.execute("DELETE FROM accumulated_cache WHERE project=?", (project,))
+        conn.execute(f"DELETE FROM {slot.table} WHERE project=?", (project,))
         conn.execute(
-            "INSERT OR REPLACE INTO accumulated_cache (project, version, payload) VALUES (?, ?, ?)",
+            f"INSERT OR REPLACE INTO {slot.table} (project, version, payload) VALUES (?, ?, ?)",
             (project, version, blob),
         )
         conn.commit()
     except sqlite3.Error:
-        _logger.warning("accumulated cache write failed for %s", project, exc_info=True)
+        _logger.warning(slot.write_failed_log, project, exc_info=True)
 
 
 def read_cached_project_summary(
     conn: sqlite3.Connection, project: str, version: str,
 ) -> dict | None:
     """Return the cached project-card summary for (project, version), or None."""
-    try:
-        row = conn.execute(
-            "SELECT payload FROM project_summary_cache WHERE project=? AND version=?",
-            (project, version),
-        ).fetchone()
-    except sqlite3.Error:
-        return None
-    if row is None:
-        return None
-    try:
-        return json.loads(row[0])
-    except (ValueError, TypeError):
-        return None
+    return _read_payload(conn, _PROJECT_SUMMARY, project, version)
 
 
 def write_cached_project_summary(
     conn: sqlite3.Connection, project: str, version: str, payload: dict,
 ) -> None:
-    """Single-slot-per-project write for the project-card summary."""
-    try:
-        blob = json.dumps(payload)
-    except (TypeError, ValueError):
-        return
-    try:
-        conn.execute("DELETE FROM project_summary_cache WHERE project=?", (project,))
-        conn.execute(
-            "INSERT OR REPLACE INTO project_summary_cache (project, version, payload) VALUES (?, ?, ?)",
-            (project, version, blob),
-        )
-        conn.commit()
-    except sqlite3.Error:
-        _logger.warning("project summary cache write failed for %s", project, exc_info=True)
+    """Single-slot-per-project write for the project-card summary.
+
+    Best-effort: logs a SQLite error; an unserializable payload is skipped silently.
+    """
+    _write_payload(conn, _PROJECT_SUMMARY, project, version, payload)
 
 
 def store_run_keys(
@@ -164,77 +152,41 @@ def _keys_json(keys: set[tuple]) -> str:
     Ordered by each key's JSON form rather than by element comparison: a
     dismiss key ends in an int line or a str fingerprint for the same finding
     (``finding_dismiss_keys``), and Python refuses to order an int against a
-    str. ``load_run_keys`` rebuilds a set, so only determinism matters here.
+    str. ``load_run_key_sets`` rebuilds a set, so only determinism matters here.
     """
     return json.dumps(sorted((list(k) for k in keys), key=json.dumps))
 
 
-def load_run_keys(
-    conn: sqlite3.Connection, project: str,
-) -> dict[str, tuple[set[tuple], set[tuple]]]:
-    """Return ``{run_id: (dismiss_keys, class_keys)}`` for *project* (empty on error)."""
-    out: dict[str, tuple[set[tuple], set[tuple]]] = {}
-    try:
-        rows = conn.execute(
-            "SELECT run_id, dismiss_keys, class_keys FROM run_keys WHERE project=?",
-            (project,),
-        ).fetchall()
-    except sqlite3.Error:
-        return {}
-    for run_id, dj, cj in rows:
-        try:
-            out[run_id] = ({tuple(k) for k in json.loads(dj)},
-                           {tuple(k) for k in json.loads(cj)})
-        except (ValueError, TypeError):
-            continue
-    return out
+def load_run_key_sets(
+    conn: sqlite3.Connection, project: str, run_id: str,
+) -> tuple[set[tuple], set[tuple]] | None:
+    """One run's persisted ``(dismiss_keys, class_keys)``; None when absent or unreadable.
 
-
-def load_run_keys_or_empty(
-    project: str,
-) -> dict[str, tuple[set[tuple], set[tuple]]]:
-    """Leak-free wrapper: open the cache, load a project's run keys, close.
-
-    Returns {} on any sqlite3 error, including one from ``open_score_cache``
-    itself (an unopenable/twice-corrupt db raises past its one rebuild
-    attempt), not just from the query — matching every other read in this
-    module's empty-on-error contract. Named for the call site in
-    ``services.score_cache.per_run_versions``, which used to open the
-    connection itself and only wrap the query, letting an open/rebuild
-    failure propagate to callers (``scoring.get_project_scores``,
-    ``services._fs_metadata`` summaries) that expect this disposable cache
-    to degrade to recompute, never raise.
+    A single primary-key row, decoded on demand. A large project's blobs run
+    to megabytes per run, so the per-run paths (trend fetch, scoped versions)
+    must never decode the whole table to answer for one run.
     """
     try:
-        with open_score_cache() as conn:
-            return load_run_keys(conn, project)
+        row = conn.execute(
+            "SELECT dismiss_keys, class_keys FROM run_keys WHERE project=? AND run_id=?",
+            (project, run_id),
+        ).fetchone()
     except sqlite3.Error:
-        return {}
+        return None
+    return _decode_keys(*row) if row else None
 
 
-def store_run_keys_best_effort(
-    project: str, run_id: str,
-    dismiss_keys: set[tuple], class_keys: set[tuple],
-) -> None:
-    """Leak-free wrapper: open the cache, store a run's key sets, close.
-
-    Best-effort: swallows any sqlite3 error, including one from
-    ``open_score_cache`` itself, not just from the write (``store_run_keys``
-    already logs+returns on a query/serialization error; this also covers
-    an open/rebuild failure the same way). Named for the call site in
-    ``services.score_cache.per_run_versions`` (see :func:`load_run_keys_or_empty`).
-    """
+def _decode_keys(dj: str, cj: str) -> tuple[set[tuple], set[tuple]] | None:
     try:
-        with open_score_cache() as conn:
-            store_run_keys(conn, project, run_id, dismiss_keys, class_keys)
-    except sqlite3.Error:
-        _logger.warning("run_keys open failed for %s/%s", project, run_id, exc_info=True)
+        return ({tuple(k) for k in json.loads(dj)}, {tuple(k) for k in json.loads(cj)})
+    except (ValueError, TypeError):
+        return None
 
 
 def read_all_cached_rows(
     conn: sqlite3.Connection, project: str,
 ) -> dict[tuple[str, str], list[DimensionResult]]:
-    """Every cached scalar row for *project*, grouped by (run_id, version).
+    """Every cached row dimension of *project*, principles attached, grouped by (run_id, version).
 
     Empty dict on any sqlite3.Error (missing table included) -- the caller
     (the bulk-load path in ``services._score_cache_fetch``) treats an empty
@@ -243,23 +195,22 @@ def read_all_cached_rows(
     by_run_version: dict[tuple[str, str], list[DimensionResult]] = {}
     try:
         rows = conn.execute(
-            "SELECT run_id, version, dimension, overall_score, overall_grade "
-            "FROM run_scalars WHERE project=? ORDER BY run_id, dimension",
+            f"SELECT run_id, version, {_SCALAR_COLUMNS} FROM run_scalars"
+            " WHERE project=? ORDER BY run_id, dimension",
             (project,),
         )
-        for rid, ver, dim, score, grade in rows:
-            by_run_version.setdefault((rid, ver), []).append(
-                DimensionResult(dimension=dim, overall_score=score, overall_grade=grade))
+        for rid, ver, *row in rows:
+            by_run_version.setdefault((rid, ver), []).append(dimension_from_row(tuple(row)))
+        principles = read_principle_rows(conn, project)
     except sqlite3.Error:
         return {}
-    return by_run_version
+    return {key: attach_principles(dims, principles.get(key, {})) for key, dims in by_run_version.items()}
 
 
 def read_project_summary_cached(project: str, version: str) -> dict | None:
-    """Leak-free wrapper: open the cache, read one project-summary row, close.
+    """Open the cache, read one project-summary row, close.
 
-    Returns None on any sqlite3 error (corrupt/locked db) as well as a clean
-    miss, matching every other read in this module's None-on-miss contract.
+    None on a clean miss and on any sqlite3 error (corrupt/locked db).
     """
     try:
         with open_score_cache() as conn:

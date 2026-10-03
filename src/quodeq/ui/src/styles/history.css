@@ -296,3 +296,6 @@
   border-color: var(--color-text-muted);
   color: var(--color-text);
 }
+
+/* The chart tooltip's counts line: criticals, majors, open types of the run. */
+.rht-counts { display: block; color: var(--color-text-muted); font-size: 0.72rem; }

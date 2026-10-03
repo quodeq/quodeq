@@ -5,10 +5,11 @@ import io
 import json
 import uuid
 import zipfile
+from unittest.mock import patch
 
 import pytest
 
-from quodeq.api.zip import _MANIFEST_FILENAME, _MANIFEST_KIND, _MANIFEST_SCHEMA
+from quodeq.api.zip import MANIFEST_FILENAME, MANIFEST_KIND, MANIFEST_SCHEMA
 from tests.api._project_import_fixtures import (  # noqa: F401 -- app_client is a pytest fixture
     _ORIGIN,
     _make_zip,
@@ -94,9 +95,9 @@ def test_import_rejects_backslashes_in_member_name():
     directory, so a HTTP-level test can't exercise this branch on Windows.
     Test the validator directly instead.
     """
-    from quodeq.api.import_project import _ImportError, _validate_member_name
-    with pytest.raises(_ImportError) as exc:
-        _validate_member_name("uuid\\repository_info.json")
+    from quodeq.services.project_import import ImportValidationError, validate_member_name
+    with pytest.raises(ImportValidationError) as exc:
+        validate_member_name("uuid\\repository_info.json")
     assert "backslash" in str(exc.value).lower()
 
 
@@ -138,9 +139,9 @@ def test_import_rejects_missing_repository_info(app_client):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         manifest = {
-            "schema": _MANIFEST_SCHEMA, "kind": _MANIFEST_KIND, "source_uuid": project_uuid,
+            "schema": MANIFEST_SCHEMA, "kind": MANIFEST_KIND, "source_uuid": project_uuid,
         }
-        zf.writestr(f"{project_uuid}/{_MANIFEST_FILENAME}", json.dumps(manifest))
+        zf.writestr(f"{project_uuid}/{MANIFEST_FILENAME}", json.dumps(manifest))
     with _patch_home(home):
         resp = _post_zip(c, buf.getvalue())
     assert resp.status_code == 400
@@ -178,3 +179,17 @@ def test_import_accepts_missing_manifest(app_client):
         resp = _post_zip(c, data)
     assert resp.status_code == 200, resp.get_json()
     assert (eval_dir / project_uuid / "repository_info.json").exists()
+
+
+def test_import_direct_upload_os_error_returns_io_error(app_client):
+    """A read failure before extraction is not caught inside import_zip_stream
+    (see the comment there); the direct-upload route must still turn it into
+    the same IO_ERROR JSON response as a write failure, not an unhandled 500."""
+    c, home, _ = app_client
+    data = _make_zip()
+    with _patch_home(home), patch(
+        "quodeq.services.project_import.validate_archive", side_effect=OSError("disk read error"),
+    ):
+        resp = _post_zip(c, data)
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "IO_ERROR"

@@ -10,6 +10,8 @@ from unittest import mock
 
 from quodeq.data.cache_store.index import close_all_for_tests
 from quodeq.data.fs._index_cache import clear_index_cache
+from quodeq.services.dashboard import clear_shared_dimension_cache
+from tests._sharding import ENV_VAR, parse_shard, select_shard
 
 # Deep enough to exhaust the C JSON decoder's call stack on a default 8MB
 # main-thread stack. ~160KB of text -- trivially producible by hand or by a
@@ -95,7 +97,7 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
     Set the env vars the production code actually consults:
       * ``QUODEQ_INDEX_DB_PATH``    — ``services/filesystem._open_index``
       * ``QUODEQ_EVALUATIONS_DIR``  — ``services/filesystem.list_evaluations`` etc.
-      * ``QUODEQ_DIR``              — ``dashboard/_build_npm._quodeq_dir``
+      * ``QUODEQ_DIR``              — ``dashboard/_build_npm.quodeq_dir``
       * ``QUODEQ_CACHE_ROOT``       — ``analysis/cache/local.default_cache_root``
         (and the online cache). Without this, the content-addressed result
         cache falls through to the real ``~/.quodeq/cache``; the one-time
@@ -124,6 +126,26 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
 
 
 @pytest.fixture(autouse=True)
+def _projection_standards(request, monkeypatch) -> None:
+    """Project fixture events as reported unless a test asks for the real standards.
+
+    Production projection places every finding in the installed standard
+    (``data/projection/admission.py``). Most tests seed events with made-up
+    ids (``P1``/``R1`` under "Security") to exercise scoring, dismissals or
+    caching, not placement; against the real security standard those would
+    all be unmapped. An empty catalog keeps them as reported (the
+    no-standard pass-through). Tests about placement, the integration flows
+    and the perf budgets opt back in with ``@pytest.mark.real_standards``.
+    """
+    if request.node.get_closest_marker("real_standards") is None:
+        from quodeq.core.admission import StandardCatalog  # noqa: PLC0415
+        from quodeq.data.projection import admission  # noqa: PLC0415
+
+        monkeypatch.setattr(admission, "installed_catalog", lambda *_a, **_k: StandardCatalog.of([]))
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _fresh_index_cache() -> None:
     """Clear the shared project-resolver index cache before every test.
 
@@ -132,6 +154,18 @@ def _fresh_index_cache() -> None:
     next test that resolves the same path. Suite-wide isolation by default.
     """
     clear_index_cache()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _fresh_dimension_caches() -> None:
+    """Clear the process-wide run-dimension caches before every test.
+
+    The trend scalar cache lives for the process and is keyed by the reports
+    root, so a test that reuses a root (or injects a fake reader) would
+    otherwise see entries a previous test stored.
+    """
+    clear_shared_dimension_cache()
     yield
 
 
@@ -168,6 +202,24 @@ def _reset_cancellation() -> None:
     cancellation.reset()
     yield
     cancellation.reset()
+
+
+@pytest.fixture(autouse=True)
+def _global_warmup_engine_stays_idle() -> Iterator[None]:
+    """Fail any test that leaves the process-wide warm-up engine running.
+
+    ``quodeq.services.warmup.engine`` is one object per process; ``start``
+    spawns a daemon thread that outlives the test and, under xdist, the rest
+    of the worker. A later test's ``/api/projects`` then carries a ``warmup``
+    snapshot and competes with real background warming. Tests that need a
+    running engine build their own ``WarmupEngine`` (see test_warmup_engine).
+    """
+    from quodeq.services.warmup import engine
+
+    yield
+    if engine.snapshot() is not None:
+        engine.reset_for_tests()
+        pytest.fail("test left the global warm-up engine running; patch _start_background_work or use a local WarmupEngine")
 
 
 class DummyProcess:
@@ -227,3 +279,16 @@ class RecordingLog:
 @pytest.fixture
 def recording_log() -> RecordingLog:
     return RecordingLog()
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Keep only this job's shard of the test files (tests/_sharding.py).
+
+    Unset or ``1/1`` leaves collection untouched, so only the sharded CI legs
+    see a difference.
+    """
+    index, total = parse_shard(os.environ.get(ENV_VAR))
+    kept, dropped = select_shard(items, index, total)
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = kept

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+import { projectsKeys } from './api/queryKeys.js';
 import {
   resolveSelectionAfterSharedDisconnect,
   buildDashboardDataBundle,
@@ -62,60 +63,68 @@ describe('buildAssistantSessionPayload', () => {
   });
 });
 
-// The wizard registers a project on its Repo & Scan step, but the projects
-// list in React state is only reloaded at boot and when an evaluation
-// finishes. Both wizard exits that leave a registered project behind (saved
-// close and launch) must reload the list so the new project appears in the
-// Projects tab immediately, before any run exists.
+// The wizard registers a project on its Repo & Scan step, and the projects
+// list is a query that refetches only when invalidated. Both wizard exits
+// that leave a registered project behind (saved close and launch) must
+// invalidate it so the new project appears in the Projects tab immediately,
+// before any run exists.
 describe('buildWizardHandlers', () => {
+  const PROJECTS_LIST = { queryKey: projectsKeys.list() };
+  function stubClient() {
+    return { invalidateQueries: vi.fn(async () => {}) };
+  }
   function stubState() {
     return {
-      loadProjects: vi.fn(),
       refreshDashboard: vi.fn(),
-      evalLifecycle: { handleStartEvaluation: vi.fn() },
+      liveEvaluation: { actions: { startEvaluation: vi.fn() } },
     };
   }
 
   it('onClose after a saved exit reloads the projects list', () => {
     const state = stubState();
+    const queryClient = stubClient();
     const setWizardEntry = vi.fn();
-    const { onClose } = buildWizardHandlers({ state, setWizardEntry, navTab: vi.fn() });
+    const { onClose } = buildWizardHandlers({ state, setWizardEntry, navTab: vi.fn(), queryClient });
     onClose({ saved: true, projectId: 'proj-1' });
     expect(setWizardEntry).toHaveBeenCalledWith(null);
-    expect(state.loadProjects).toHaveBeenCalled();
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(PROJECTS_LIST);
     expect(state.refreshDashboard).toHaveBeenCalled();
   });
 
   it('onClose without a saved project does not reload anything', () => {
     const state = stubState();
+    const queryClient = stubClient();
     const setWizardEntry = vi.fn();
-    const { onClose } = buildWizardHandlers({ state, setWizardEntry, navTab: vi.fn() });
+    const { onClose } = buildWizardHandlers({ state, setWizardEntry, navTab: vi.fn(), queryClient });
     onClose({ saved: false });
     expect(setWizardEntry).toHaveBeenCalledWith(null);
-    expect(state.loadProjects).not.toHaveBeenCalled();
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
     expect(state.refreshDashboard).not.toHaveBeenCalled();
   });
 
   it('onLaunch reloads the projects list, starts the evaluation, and navigates', () => {
     const state = stubState();
+    const queryClient = stubClient();
     const navTab = vi.fn();
-    const { onLaunch } = buildWizardHandlers({ state, setWizardEntry: vi.fn(), navTab });
+    const { onLaunch } = buildWizardHandlers({ state, setWizardEntry: vi.fn(), navTab, queryClient });
     onLaunch({
       projectId: 'proj-1', repo: '/x/repo', scopePath: null, branch: null,
       provider: { id: 'claude', model: 'sonnet' }, standardIds: ['security'], totalTimeLimitS: 60,
     });
-    expect(state.loadProjects).toHaveBeenCalled();
-    expect(state.evalLifecycle.handleStartEvaluation).toHaveBeenCalledWith(expect.objectContaining({
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(PROJECTS_LIST);
+    expect(state.liveEvaluation.actions.startEvaluation).toHaveBeenCalledWith(expect.objectContaining({
       repo: '/x/repo', dimensions: ['security'], aiCmd: 'claude', aiModel: 'sonnet', timeLimit: 60,
+      // The in-progress card names the project that landed, not the old selection.
+      uiProject: 'proj-1',
     }));
     expect(navTab).toHaveBeenCalledWith('evaluate');
   });
 
   it('onLaunch falls back to the projectId when no repo path is present', () => {
     const state = stubState();
-    const { onLaunch } = buildWizardHandlers({ state, setWizardEntry: vi.fn(), navTab: vi.fn() });
+    const { onLaunch } = buildWizardHandlers({ state, setWizardEntry: vi.fn(), navTab: vi.fn(), queryClient: stubClient() });
     onLaunch({ projectId: 'proj-1', repo: null, provider: {}, standardIds: [] });
-    expect(state.evalLifecycle.handleStartEvaluation).toHaveBeenCalledWith(expect.objectContaining({ repo: 'proj-1' }));
+    expect(state.liveEvaluation.actions.startEvaluation).toHaveBeenCalledWith(expect.objectContaining({ repo: 'proj-1' }));
   });
 });
 

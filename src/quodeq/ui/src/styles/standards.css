@@ -171,7 +171,7 @@
   letter-spacing: 0.05em;
 }
 
-.standard-type-badge--builtin {
+.standard-type-badge--iso {
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   color: var(--color-accent);
 }
@@ -1414,7 +1414,8 @@
   letter-spacing: 0;
 }
 
-.standards-base-pill--builtin,
+.standards-base-pill--iso,
+.standards-base-pill--wcag,
 .standards-base-pill--quodeq {
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
   color: var(--color-accent);

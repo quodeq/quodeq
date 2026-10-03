@@ -4,24 +4,27 @@
  * Split out of useEvaluation.js (see that file's header for the hook's
  * overall data-flow doc). Kept logic-identical to the pre-split version.
  */
-import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_CONFIGURED_MARKER } from "../../../constants.js";
+import { ACTIVE_PROVIDER_KEY, providerKey } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 import { t } from "../../../strings/index.js";
+import { STREAM_STATE } from "./runEventSourceRegistry.js";
 
-export const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
-const DIM_POLL_MS = 2000;
+export const JOB_POLL_MS = 1500;
+// The status query still refetches, slowly, as a safety net against a frame
+// the stream dropped or a server that never sent one.
+export const SSE_STATUS_SAFETY_NET_MS = 10_000;
 
 /**
- * Poll interval for the live findings query. Exported for tests.
+ * Poll interval for the job status query. Exported for tests.
  *
- * Polling must stop once the job is terminal: without the gate a finished
- * run kept re-fetching every full evaluation/<dim>.json payload every 2s
- * for as long as the Evaluate card stayed mounted.
+ * The stream feeds the cache, so the query only refetches on a slow safety
+ * net, except while the stream is in error: then the fast poll takes over
+ * until it reconnects, so a dropped connection never leaves the screen
+ * frozen on a stale job.
  */
-export function findingsRefetchInterval(job, sseEnabled = SSE_ENABLED) {
-  if (sseEnabled) return false;
-  if (job?.status && job.status !== "running") return false;
-  return DIM_POLL_MS;
+export function statusRefetchInterval(streamState) {
+  if (streamState === STREAM_STATE.ERROR) return JOB_POLL_MS;
+  return SSE_STATUS_SAFETY_NET_MS;
 }
 
 /**
@@ -47,8 +50,9 @@ function userFacingError(key) {
  * code because of exactly that). Per-provider settings are read from the
  * payload's provider when one is named. Unset keys resolve through
  * resolveProviderSettings — the same source of truth the Settings screen
- * and the Evaluate header display. Throws a user-facing error if no
- * provider/model is configured.
+ * and the Evaluate header display. The payload never carries an API key:
+ * the backend resolves it from its own secure store. Throws a user-facing
+ * error if no provider/model is configured.
  */
 export function preparePayload(payload, storage = localStorage) {
   const provider = payload.aiCmd || storage.getItem(ACTIVE_PROVIDER_KEY) || "";
@@ -66,18 +70,6 @@ export function preparePayload(payload, storage = localStorage) {
   };
   if (settings.perDimension) result.perDimension = true;
   if (!settings.verify) result.verifyFindings = false;
-  // A key saved through the current flow leaves only the "configured"
-  // sentinel here (see useProviderSettings.js) and the backend resolves the
-  // real one from its own secure store, so the sentinel must never be
-  // forwarded as a credential. But installs that saved a key before that
-  // change still have the raw value sitting in this browser's localStorage
-  // and nothing has migrated it, so dropping it outright silently stopped
-  // sending any key at all for them. Forward a genuine legacy value; ignore
-  // the sentinel.
-  const storedApiKey = get("api-key");
-  if (storedApiKey && storedApiKey !== PROVIDER_CONFIGURED_MARKER) {
-    result.apiKey = storedApiKey;
-  }
   const apiBase = get("api-base");
   if (apiBase) result.apiBase = apiBase;
   // The Settings field pre-fills the provider id as its default; only a

@@ -1,9 +1,9 @@
-import { SectionLabel } from '../../../components/terminal/index.js';
-import TrendBadge from '../../../components/TrendBadge.jsx';
+import ComparePanel from './ComparePanel.jsx';
+import CompareDeltaBadge from './CompareDeltaBadge.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
-import { nf, score1, MIN_BAR_HEIGHT_PCT } from '../compareFormatters.js';
+import { nf, score1, MIN_BAR_HEIGHT_PCT, SCORE_TO_PCT } from '../compareFormatters.js';
 
 
 function standingTag(index, total, score, avg) {
@@ -20,7 +20,7 @@ function StandingPBars({ s }) {
           key={p.key}
           className="compare-standings__pbar"
           style={{
-            height: `${Math.max(MIN_BAR_HEIGHT_PCT, Math.round(p.score * 10))}%`,
+            height: `${Math.max(MIN_BAR_HEIGHT_PCT, Math.round(p.score * SCORE_TO_PCT))}%`,
             background: scoreGradeColorVar(p.score),
           }}
           title={`${p.label} · ${score1(p.score)}`}
@@ -38,13 +38,7 @@ function StandingScoreCells({ s }) {
         <span className="compare-standings__tier">{scoreToGradeLabel(s.score) || ''}</span>
       </span>
       <span className="compare-standings__delta">
-        {s.delta != null ? (
-          <TrendBadge delta={s.delta} />
-        ) : s.lastDelta != null ? (
-          <span className="compare-delta--old" title={t('compare.oldDeltaTip')}>
-            <TrendBadge delta={s.lastDelta} />
-          </span>
-        ) : null}
+        <CompareDeltaBadge delta={s.delta} lastDelta={s.lastDelta} />
       </span>
     </>
   );
@@ -95,11 +89,7 @@ function StandingRow({ s, i, view, onOpenProject, onOpenProjectDimension, setFoc
 
 export default function CompareStandingsList({ view, onOpenProject, onOpenProjectDimension, setFocusId }) {
   return (
-    <section className="compare-panel" aria-label={t('compare.standingsAria')}>
-      <div className="compare-panel__head">
-        <SectionLabel>{t('compare.standingsHeader', { count: view.standings.length })}</SectionLabel>
-        <span className="compare-panel__note">{t('compare.standingsNote', { dim: view.label })}</span>
-      </div>
+    <ComparePanel ariaLabel={t('compare.standingsAria')} header={t('compare.standingsHeader', { count: view.standings.length })} note={t('compare.standingsNote', { dim: view.label })}>
       <ul className="compare-standings">
         {view.standings.map((s, i) => (
           <StandingRow
@@ -113,6 +103,6 @@ export default function CompareStandingsList({ view, onOpenProject, onOpenProjec
           />
         ))}
       </ul>
-    </section>
+    </ComparePanel>
   );
 }

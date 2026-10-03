@@ -1,6 +1,6 @@
 """Shared types for the analysis layer — extracted to break circular dependencies.
 
-``RunConfig``, ``AnalysisOptions``, and ``_AnalysisContext`` are defined
+``RunConfig``, ``AnalysisOptions``, and ``AnalysisContext`` are defined
 here so that both ``runner.py`` and its helper modules (``_incremental``,
 ``_loops``, ``_backfill``, ``subagents/``) can import them without creating
 mutual dependencies.
@@ -13,13 +13,26 @@ from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
 from quodeq.analysis._dimensions import DimensionsConfig
+from quodeq.analysis._drop_stats import DropStatsCounter
 from quodeq.analysis.dispatch_policy import DispatchPolicy, default_dispatch_policy
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis._config import HeartbeatCallback
+from quodeq.config.analysis_env import (
+    AGENT_FAILURE_STREAK_DEFAULT, DEFAULT_MAX_DURATION_DEFAULT, DEFAULT_MAX_TURNS_DEFAULT,
+    FAILURE_STREAK_THRESHOLD_DEFAULT,
+)
 from quodeq.config.paths import default_paths
 
 if TYPE_CHECKING:
+    from quodeq.analysis._command import CliMcpRegistry
     from quodeq.analysis.cache.dimension_helpers import ClassifyResult
+
+
+def _new_mcp_registry() -> "CliMcpRegistry":
+    """A fresh per-run registry. Imported here, not at module top:
+    ``_command`` reaches ``analysis.cache``, which imports this module."""
+    from quodeq.analysis._command import CliMcpRegistry  # noqa: PLC0415
+    return CliMcpRegistry()
 
 
 class ClassifyStash(NamedTuple):
@@ -44,6 +57,10 @@ class AnalysisOptions:
     consolidated: bool = True
     time_limit: int | None = None
     deadline_at: float | None = None
+    # The whole-run deadline while ``deadline_at`` holds one dimension's slice
+    # (set by ``_loops.run_incremental_loop``); None when nothing is sliced.
+    # Only read to say which budget stopped a pool.
+    run_deadline_at: float | None = None
     # Invoked with the new ISO deadline whenever the pool auto-scale ratchets
     # ``deadline_at`` forward — wired by the CLI layer to the lifecycle so
     # status.json (dashboard countdown, exit-reason labeling) follows.
@@ -56,10 +73,23 @@ class AnalysisOptions:
     # persistence and scoring are suppressed — PR runs are evidence-only.
     diff_from: str | None = None
     skip_scoring: bool = False
+    # Resolved once per run by the CLI (AI_CMD_PATH / QUODEQ_CACHE_ROOT) and
+    # copied onto every AnalysisConfig; None leaves ``run_analysis`` to fill
+    # them from its own environment.
+    ai_cmd_path: str | None = None
+    cache_root: Path | None = None
     # Consecutive `file_done: error` markers that trip the dim-runner's
-    # circuit breaker. 0 disables. The QUODEQ_FAILURE_STREAK env var,
-    # when set, overrides this default at runtime.
-    failure_streak_threshold: int = 5
+    # circuit breaker. 0 disables. The CLI resolves the QUODEQ_FAILURE_STREAK
+    # override into this field once per run.
+    failure_streak_threshold: int = FAILURE_STREAK_THRESHOLD_DEFAULT
+    # Consecutive whole-agent failures before the pool cancels the run
+    # (QUODEQ_AGENT_FAILURE_STREAK, resolved by the CLI). 0 disables.
+    agent_failure_streak_limit: int = AGENT_FAILURE_STREAK_DEFAULT
+    # Single-agent dimension ceilings when ``max_turns``/``max_duration`` are
+    # unset (QUODEQ_DEFAULT_MAX_TURNS/DURATION, resolved by the CLI). Pool
+    # agents never read them.
+    default_max_turns: int = DEFAULT_MAX_TURNS_DEFAULT
+    default_max_duration: int = DEFAULT_MAX_DURATION_DEFAULT
 
 
 @dataclass
@@ -97,19 +127,32 @@ class RunConfig:
     # when the file list still matches. ``None`` means "stashing disabled" —
     # tests and one-shot callers that construct a fresh RunConfig get the
     # original behaviour without any wiring.
-    _classify_cache: "dict[str, ClassifyStash] | None" = None
+    classify_stash: "dict[str, ClassifyStash] | None" = None
+    # Per-request memo of file content hashes (path -> sha256) for one-shot
+    # read-only callers that classify every dim in one go, like the /estimates
+    # endpoint. ``None`` for pipeline runs: minutes pass between their
+    # classifications, and a file edited in between must hash fresh.
+    content_hash_memo: dict[str, str] | None = None
     # Explicit DispatchPolicy for this run. ``None`` means "resolve a fresh
-    # live snapshot on demand" via :meth:`_policy` — see there for why that
+    # live snapshot on demand" via :meth:`dispatch_policy` — see there for why that
     # resolution is deliberately NOT cached onto this field.
     dispatch: DispatchPolicy | None = None
+    # Per-run drop-stats accumulator and CLI-MCP registration cache. Fields
+    # (not module globals) so ``dataclasses.replace()`` copies and pool
+    # worker threads of the SAME run share one owner each, while two
+    # concurrent runs in one process stay isolated. Consumers that receive
+    # no ``RunConfig`` (``run_config=None``) fall back to each owner's own
+    # module-level default instead.
+    drop_counter: DropStatsCounter = field(default_factory=DropStatsCounter, compare=False, repr=False)
+    mcp_registry: CliMcpRegistry = field(default_factory=_new_mcp_registry, compare=False, repr=False)
 
     def classify_cache(self, dim_id: str) -> "ClassifyStash | None":
         """This run's stashed classify result for *dim_id*, or None."""
-        if self._classify_cache is None:
+        if self.classify_stash is None:
             return None
-        return self._classify_cache.get(dim_id)
+        return self.classify_stash.get(dim_id)
 
-    def _policy(self) -> DispatchPolicy:
+    def dispatch_policy(self) -> DispatchPolicy:
         """The DispatchPolicy for this run: the explicit override, or a
         fresh live snapshot.
 
@@ -126,7 +169,7 @@ class RunConfig:
     @property
     def ai_cmd(self) -> str:
         """The active AI provider id for this run (resolved dispatch policy)."""
-        return self._policy().ai_cmd
+        return self.dispatch_policy().ai_cmd
 
     @property
     def source_file_count(self) -> int:
@@ -145,7 +188,7 @@ class RunConfig:
             files, total = self.manifest.source_files, self.manifest.total_files
         else:
             return 0
-        policy = self._policy()
+        policy = self.dispatch_policy()
         if not files or not policy.provider_is_api():
             return total
         dispatchable, _excluded = policy.split_api_dispatchable(self.src, files)
@@ -153,16 +196,10 @@ class RunConfig:
 
 
 @dataclass(frozen=True)
-class _AnalysisContext:
+class AnalysisContext:
     """Pre-loaded data reused across dimensions."""
     dimensions_data: DimensionsConfig
     date_str: str
     template: str
     subagent_template: str
     total: int
-
-
-# Public spelling for cross-package importers (the class itself keeps its
-# underscore name; see the private-import ratchet). The underscore original
-# stays importable for the many in-package callers.
-AnalysisContext = _AnalysisContext

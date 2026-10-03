@@ -3,8 +3,9 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../api/index.js', () => ({
-  getCompareSummary: vi.fn(),
+  getFleetCompare: vi.fn(),
   getDimensionEval: vi.fn(),
+  sharedGetFleetCompare: vi.fn(),
 }));
 vi.mock('../../../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
@@ -12,12 +13,11 @@ vi.mock('../../../api/standards.js', () => ({
 }));
 vi.mock('../../../api/shared.js', () => ({
   sharedListProjects: vi.fn(),
-  sharedGetCompareSummary: vi.fn(),
 }));
 
-import { getCompareSummary } from '../../../api/index.js';
-import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
-import { summary, renderPage, iso } from './_comparePage.fixtures.jsx';
+import { getFleetCompare, sharedGetFleetCompare } from '../../../api/index.js';
+import { sharedListProjects } from '../../../api/shared.js';
+import { fleetOf, summary, renderPage, iso } from './_comparePage.fixtures.jsx';
 
 /**
  * Split from ComparePage.test.jsx: remote/shared-fleet projects.
@@ -26,12 +26,12 @@ import { summary, renderPage, iso } from './_comparePage.fixtures.jsx';
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  getCompareSummary.mockImplementation((id) => Promise.resolve(
-    id === 'alpha' ? summary(7.4, 7.0) : summary(5.9, 5.5),
-  ));
+  getFleetCompare.mockImplementation(fleetOf((id) => (
+    id === 'alpha' ? summary(7.4, 7.0) : summary(5.9, 5.5)
+  )));
   // Default: no shared repository configured — the local-only flow.
   sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
-  sharedGetCompareSummary.mockRejectedValue(new Error('unexpected shared fetch'));
+  sharedGetFleetCompare.mockRejectedValue(new Error('unexpected shared fetch'));
 });
 
 describe('ComparePage remote projects', () => {
@@ -41,16 +41,16 @@ describe('ComparePage remote projects', () => {
 
   beforeEach(() => {
     sharedListProjects.mockResolvedValue({ projects: [REMOTE], lastSynced: null, stale: false });
-    sharedGetCompareSummary.mockResolvedValue(summary(6.5, 6.2));
+    sharedGetFleetCompare.mockImplementation(fleetOf(() => summary(6.5, 6.2)));
   });
 
   it('remote rows join the fleet through the shared route, tagged', async () => {
     renderPage();
     expect(await screen.findByText('gamma')).toBeInTheDocument();
     expect((await screen.findAllByText('remote')).length).toBeGreaterThan(0);
-    await waitFor(() => expect(sharedGetCompareSummary).toHaveBeenCalledWith('gamma'));
+    await waitFor(() => expect(sharedGetFleetCompare).toHaveBeenCalledWith(['gamma']));
     // The local endpoint is never asked for the remote project.
-    expect(getCompareSummary).not.toHaveBeenCalledWith('gamma');
+    expect(getFleetCompare.mock.calls.flat(2)).not.toContain('gamma');
   });
 
   it('opening a remote row switches to the shared source', async () => {
@@ -89,8 +89,8 @@ describe('ComparePage remote projects', () => {
     expect(alphaRows).toHaveLength(1);
     // The local endpoint serves alpha; the shared route is only asked for
     // the genuinely remote project.
-    await waitFor(() => expect(getCompareSummary).toHaveBeenCalledWith('alpha'));
-    expect(sharedGetCompareSummary).not.toHaveBeenCalledWith('alpha');
+    await waitFor(() => expect(getFleetCompare.mock.calls.flat(2)).toContain('alpha'));
+    expect(sharedGetFleetCompare.mock.calls.flat(2)).not.toContain('alpha');
   });
 
   it('leaves the fleet local-only when no shared repository is configured', async () => {
@@ -99,5 +99,29 @@ describe('ComparePage remote projects', () => {
     expect(await screen.findByText('alpha')).toBeInTheDocument();
     expect(screen.queryByText('gamma')).toBeNull();
     expect(screen.queryByText('remote')).toBeNull();
+  });
+});
+
+// A connected evaluations repository is a comparable fleet on its own: with
+// no local project at all, the published rows are ranked instead of the
+// "nothing to compare" empty state.
+describe('ComparePage with published projects only', () => {
+  const PUBLISHED = [
+    { id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { rb: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(3) },
+    { id: 'delta', name: 'delta', displayName: 'delta', languageStats: { go: 20 }, totalFiles: 80, analyzedFiles: 80, runsCount: 2, latestDate: iso(1) },
+  ];
+
+  beforeEach(() => {
+    sharedListProjects.mockResolvedValue({ projects: PUBLISHED, lastSynced: null, stale: false });
+    sharedGetFleetCompare.mockImplementation(fleetOf((id) => (id === 'gamma' ? summary(6.5, 6.2) : summary(7.1, 6.9))));
+  });
+
+  it('ranks the published rows and never shows the empty state', async () => {
+    renderPage({ projects: [] });
+    expect(await screen.findByText('gamma')).toBeInTheDocument();
+    // The leader is named in the table and again in the attention strip.
+    expect(screen.getAllByText('delta').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Nothing to compare yet')).toBeNull();
+    expect(getFleetCompare).not.toHaveBeenCalled();
   });
 });

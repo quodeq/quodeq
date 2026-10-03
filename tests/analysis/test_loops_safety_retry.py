@@ -1,5 +1,5 @@
 """Retry-after-broken-pipe persistence semantics, and the exact production
-bug shape (run f7768d55).
+bug shape (observed in a real run).
 
 Split from test_loops_safety.py. Shared helpers live in
 tests/analysis/_loops_safety_fixtures.py.
@@ -14,7 +14,7 @@ from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, 
 
 
 class TestCallbackRetryPersistsSideEffects:
-    """Pin down the per-dim run f061b58e bug: security's queue completed,
+    """Pin down the per-dim bug: security's queue completed,
     the scoring callback raised BrokenPipeError mid-run, the loop swallowed
     it with a misleading "result kept" message but evaluation/security.json
     was never written.
@@ -69,7 +69,7 @@ class TestCallbackRetryPersistsSideEffects:
         def fake_runner(_c, dim, _i, _ctx):
             return _FakeEvidence()
 
-        # _log_dimension_result raises BrokenPipeError before
+        # log_dimension_result raises BrokenPipeError before
         # on_dimension_done is reached on the original try; the retry path
         # then invokes on_dimension_done with stdout silenced.
         def log_result(_ev, dim, _i, _t, **_):
@@ -80,7 +80,7 @@ class TestCallbackRetryPersistsSideEffects:
             attempts[dim] = attempts.get(dim, 0) + 1
             written.append(dim)
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result", side_effect=log_result):
+        with patch("quodeq.analysis._loop_steps.log_dimension_result", side_effect=log_result):
             run_incremental_loop(
                 cfg, ["security", "reliability"], _ctx(2),
                 LoopDeps(runner=_runner_from(fake_runner), on_dimension_done=scoring_callback),
@@ -91,7 +91,7 @@ class TestCallbackRetryPersistsSideEffects:
 
 
 class TestProductionBugRegression:
-    """Pins down the run f7768d55 incident: usability's queue completed,
+    """Pins down the production incident: usability's queue completed,
     the scoring callback raised BrokenPipeError, the loop bailed before
     flexibility could iterate, and the lifecycle promoted the half-done
     state to ``done`` — both usability's eval and flexibility entirely
@@ -119,7 +119,7 @@ class TestProductionBugRegression:
                 usability_first_call["done"] = True
                 raise BrokenPipeError("Broken pipe")
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
             result = run_incremental_loop(
                 cfg, ["security", "reliability", "maintainability", "performance", "usability", "flexibility"], _ctx(6),
                 LoopDeps(runner=_runner_from(fake_runner), on_dimension_done=scoring_callback),

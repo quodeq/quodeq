@@ -1,7 +1,16 @@
 import { focusables, trapTab, restoreFocus } from './a11y.js';
+import { KEY } from '../vocab/keyboard.js';
 
 // Distinct title/message ids per dialog for aria-labelledby / aria-describedby.
 let dialogSeq = 0;
+// Element.tagName is always upper-case; exported so chooseDialog.js and
+// confirmDialog.js's own <button> elements share one home for both the tag
+// and the type value instead of each defining their own.
+export const BUTTON_TAG_NAME = 'BUTTON';
+// <button type="button"> avoids the implicit type="submit" default; also the
+// element tag chooseDialog.js/confirmDialog.js pass to createElement.
+export const BUTTON_TYPE = 'button';
+const DIV_TAG = 'div'; // element tag for the shell's overlay/dialog/actions wrapper below
 
 // True when the event started on one of the dialog's own action buttons. Such
 // a button decides Enter through its own click, so the dialog-wide
@@ -9,7 +18,7 @@ let dialogSeq = 0;
 // action and confirmDialog's danger variant focuses Cancel, so an
 // unconditional shortcut would confirm the delete from a focused Cancel.
 function onOwnButton(overlay, target) {
-  return overlay.contains(target) && target.tagName === 'BUTTON';
+  return overlay.contains(target) && target.tagName === BUTTON_TAG_NAME;
 }
 
 /**
@@ -25,12 +34,12 @@ function onOwnButton(overlay, target) {
  */
 export function buildDialogShell({ title, message, dialogClassName, onCancel, onConfirm }) {
   dialogSeq += 1;
-  const overlay = document.createElement('div');
+  const overlay = document.createElement(DIV_TAG);
   overlay.className = 'qd-confirm-overlay';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
 
-  const dialog = document.createElement('div');
+  const dialog = document.createElement(DIV_TAG);
   dialog.className = dialogClassName;
 
   const titleEl = document.createElement('h3');
@@ -48,7 +57,7 @@ export function buildDialogShell({ title, message, dialogClassName, onCancel, on
   overlay.setAttribute('aria-labelledby', titleEl.id);
   overlay.setAttribute('aria-describedby', messageEl.id);
 
-  const actionsEl = document.createElement('div');
+  const actionsEl = document.createElement(DIV_TAG);
   actionsEl.className = 'qd-confirm-actions';
 
   overlay.appendChild(dialog);
@@ -56,8 +65,8 @@ export function buildDialogShell({ title, message, dialogClassName, onCancel, on
   let opener = null;
 
   function onKey(e) {
-    if (e.key === 'Escape') onCancel();
-    if (e.key === 'Enter' && onConfirm && !onOwnButton(overlay, e.target)) onConfirm();
+    if (e.key === KEY.ESCAPE) onCancel();
+    if (e.key === KEY.ENTER && onConfirm && !onOwnButton(overlay, e.target)) onConfirm();
     trapTab(overlay, e);
   }
   function onOverlayClick(e) {

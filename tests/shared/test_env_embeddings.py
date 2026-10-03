@@ -15,6 +15,11 @@ def test_embedding_model_override() -> None:
     assert get_embedding_model(env={"QUODEQ_EMBEDDING_MODEL": "mxbai-embed-large"}) == "mxbai-embed-large"
 
 
+def test_embedding_model_empty_string_falls_back_to_default() -> None:
+    """An explicitly-empty override must not surface as an empty model name."""
+    assert get_embedding_model(env={"QUODEQ_EMBEDDING_MODEL": ""}) == "nomic-embed-text"
+
+
 def test_base_url_default() -> None:
     assert get_embedding_base_url(env={}) == "http://localhost:11434"
 

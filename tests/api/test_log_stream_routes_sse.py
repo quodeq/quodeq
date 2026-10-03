@@ -34,6 +34,18 @@ def test_sse_respects_last_event_id(tmp_path, app) -> None:
     assert [e["data"] for e in line_events] == ["beta", "gamma"]
 
 
+def test_sse_negative_last_event_id_clamps_to_start(tmp_path, app) -> None:
+    """A negative ``Last-Event-ID`` must not seek before byte 0 of the log --
+    it replays from the start, exactly like an absent header, instead of
+    ``open(...).seek(-5)`` reading from near the end of the file."""
+    _seed_run(tmp_path, app, "job-sse-neg-done", "alpha\nbeta\n")
+    client = app.test_client()
+    resp = client.get("/api/jobs/job-sse-neg-done/logs/stream", headers={"Last-Event-ID": "-5"})
+    events = _collect_sse(resp)
+    line_events = [e for e in events if "data" in e and e.get("event") != "done"]
+    assert [e["data"] for e in line_events] == ["alpha", "beta"]
+
+
 def test_sse_waits_when_run_log_missing_then_emits_done(tmp_path, app) -> None:
     """run_dir exists, run.log doesn't — the job is still preparing.
 
@@ -84,7 +96,7 @@ def test_sse_waits_for_preparing_internal_job(tmp_path, app) -> None:
 
     job = FakeJob("running")
     provider = app.config["_provider"]
-    provider._jobs = JobsHolder(job)
+    provider.in_memory_job = JobsHolder(job).get_job
 
     # Flip the job to "done" on the second is_job_complete call so the
     # generator first sees an active preparing job (path None, not done)
@@ -127,9 +139,9 @@ def test_sse_streams_log_after_it_appears(tmp_path, app) -> None:
             return FakeJob()
 
     provider = app.config["_provider"]
-    provider._jobs = JobsHolder()
+    provider.in_memory_job = JobsHolder().get_job
 
-    # First call (from the route's _resolve_run_log) returns None, so
+    # First call (from the route's resolve_run_log) returns None, so
     # the route falls through to _is_preparing_job and opens the SSE
     # response. From the second call onward (generator's lazy resolver)
     # the run dir is "available" and run.log gets seeded — that's the

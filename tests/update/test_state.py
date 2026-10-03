@@ -53,6 +53,18 @@ def test_read_corrupt_file_returns_defaults(tmp_path: Path) -> None:
     assert read_state(env) == UpdateState()
 
 
+def test_read_drops_a_field_whose_type_does_not_match_the_schema(tmp_path: Path) -> None:
+    """A numeric latest_version (the field is declared ``str | None``) must
+    not reach the caller: is_newer's normalize() calls ``.strip()`` on it and
+    raises AttributeError for anything but a string. read_state drops the
+    wrong-typed field the same way it already drops an unknown one, so the
+    field falls back to its default instead."""
+    env = _env(tmp_path)
+    Path(env["QUODEQ_UPDATE_STATE_PATH"]).write_text(json.dumps({"latest_version": 5}))
+    state = read_state(env)
+    assert state.latest_version is None
+
+
 def test_write_uses_unique_temp_names(tmp_path: Path, monkeypatch) -> None:
     """Regression: a fixed `<path>.tmp` name raced between the dashboard,
     menubar and CLI processes; each write must use its own temp file."""

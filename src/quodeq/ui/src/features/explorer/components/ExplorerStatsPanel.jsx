@@ -1,42 +1,39 @@
 import { Stat, SevBadge } from '../../../components/terminal/index.js';
-import { complianceRatio } from '../../../utils/formatters.js';
+import { formatScoreDisplay } from '../../../utils/gradeFormatting.js';
 import StatGrid2x2 from './StatGrid2x2.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 import { t } from '../../../strings/index.js';
+import { SEVERITY_ORDER } from '../../../vocab/severity.js';
+import { HERO_CARD_KIND } from '../../dashboard/dashboardVocab.js';
+import { RatioDensityStat, ScoreStat, ratioDisplay } from '../../dashboard/components/heroSectionParts.jsx';
 
-// The three buckets the violations stat summarises, most severe first.
-const SUMMARY_SEVERITIES = ['critical', 'major', 'minor'];
-
-/** The score/violations/compliance/ratio stat grid + the run-history bar
- * chart — the left column of the dimension page's top grid. */
+/** The score/violations/compliance/ratio stat grid and the run-history bar
+ * chart: the left column of the dimension page's top grid. */
 export default function ExplorerStatsPanel({
   overallScoreNum, overallGrade, allViolations, totalCompliant, sev, onSeverityBadge,
-  onNavigate, onCardNavigate, trend, dimension, activeRunId, granularity, onGranularityChange, onBarClick,
+  onNavigate, onCardNavigate, trend, dimension, activeRunId, granularity, onGranularityChange, onBarClick, deltas = null, density = null,
 }) {
   return (
     <div className="qd-top-left">
       <StatGrid2x2>
-        <Stat
-          label={t('overview.statScore')}
-          value={Number.isNaN(overallScoreNum) ? '—' : overallScoreNum.toFixed(1)}
-          hint={overallGrade?.grade ? t('overview.gradeHint', { letter: overallGrade.grade }) : null}
-        />
+        <ScoreStat scoreDisplay={formatScoreDisplay(overallScoreNum)} grade={overallGrade?.grade} />
         <Stat
           label={t('overview.statViolations')}
           value={allViolations.length}
-          hint={SUMMARY_SEVERITIES.some((level) => sev[level]) ? (
+          hint={SEVERITY_ORDER.some((level) => sev[level] || deltas?.[level]) ? (
             <span className="principle-detail-sev-row">
-              {SUMMARY_SEVERITIES.map((level) => sev[level] > 0 && (
+              {SEVERITY_ORDER.map((level) => (sev[level] > 0 || Boolean(deltas?.[level])) && (
                 <SevBadge
                   key={level}
                   level={level}
-                  count={sev[level]}
+                  count={sev[level] || 0}
+                  delta={deltas?.[level]}
                   onClick={onNavigate ? onSeverityBadge(level) : undefined}
                 />
               ))}
             </span>
           ) : null}
-          onClick={onNavigate && allViolations.length > 0 ? () => onCardNavigate('violations') : undefined}
+          onClick={onNavigate && allViolations.length > 0 ? () => onCardNavigate(HERO_CARD_KIND.VIOLATIONS) : undefined}
           ariaLabel={allViolations.length > 0 ? t('overview.showAllViolationsAria') : undefined}
         />
         <Stat
@@ -46,11 +43,7 @@ export default function ExplorerStatsPanel({
           onClick={onNavigate && totalCompliant > 0 ? () => onCardNavigate('compliance') : undefined}
           ariaLabel={totalCompliant > 0 ? t('overview.showComplianceAria') : undefined}
         />
-        <Stat
-          label={t('overview.statRatio')}
-          value={complianceRatio(allViolations.length, totalCompliant)}
-          hint={t('overview.ratioHint')}
-        />
+        <RatioDensityStat ratio={ratioDisplay(allViolations.length, totalCompliant)} density={density} />
       </StatGrid2x2>
 
       <DimensionScoreHistoryPanel

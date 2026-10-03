@@ -65,4 +65,15 @@ describe('useProviderDetection', () => {
     await waitFor(() => expect(result.current.status).toBe('error'));
     expect(result.current.preselection).toBeNull();
   });
+
+  it('accepts an injected `detect`, for tests that want a fake without mocking the module', async () => {
+    const detect = vi.fn().mockResolvedValue([
+      { id: 'ollama', classification: 'local-api', detected: true, defaultModel: 'llama3' },
+    ]);
+    const { result } = renderHook(() => useProviderDetection({ detect }));
+    await waitFor(() => expect(result.current.status).toBe('detected'));
+    expect(detect).toHaveBeenCalledTimes(1);
+    expect(mockDetect).not.toHaveBeenCalled();
+    expect(result.current.preselection.id).toBe('ollama');
+  });
 });

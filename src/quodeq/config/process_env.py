@@ -10,8 +10,8 @@ is where their ``None`` default resolves, so the inner layers never name
 """
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
+from quodeq.shared.env_resolve import resolve_env
 
 
 def process_environment(env: Mapping[str, str] | None = None) -> Mapping[str, str]:
@@ -19,7 +19,7 @@ def process_environment(env: Mapping[str, str] | None = None) -> Mapping[str, st
 
     An injected ``{}`` means "no variables set" and is returned as-is.
     """
-    return os.environ if env is None else env
+    return resolve_env(env)
 
 
 def process_environment_copy(env: Mapping[str, str] | None = None) -> dict[str, str]:

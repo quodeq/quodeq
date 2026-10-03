@@ -26,7 +26,7 @@ class TestCacheReplayAppliesProvenanceGate:
     through the deterministic provenance gate too.
 
     The live finding path gates in ``FindingEnricher.enrich()``, but cache
-    replay (``_write_findings``) writes cached findings straight to the
+    replay (``write_findings``) writes cached findings straight to the
     per-dim JSONL and the event log, bypassing ``enrich()``. A stale,
     un-gated ``critical`` R-FT-2 / S-AUT-3 finding produced by an older
     quodeq version would otherwise replay at ``critical`` and inflate the
@@ -39,7 +39,7 @@ class TestCacheReplayAppliesProvenanceGate:
         return {
             "file": file, "line": 1, "t": "violation",
             "w": "Unguarded index access", "p": "Fault Tolerance",
-            "d": "security", "req": "R-FT-2", "severity": "critical",
+            "d": "reliability", "req": "R-FT-2", "severity": "critical",
             "snippet": "arr[idx]", "reason": reason,
         }
 
@@ -54,16 +54,16 @@ class TestCacheReplayAppliesProvenanceGate:
         self, tmp_path: Path, cache, reason: str,
     ) -> tuple[RunConfig, FakeDispatcher]:
         config, src = _setup(tmp_path, {"a.py": "x"})
-        key = build_cache_key_for_file(config, "a.py", "security")
+        key = build_cache_key_for_file(config, "a.py", "reliability")
         cache.put(key, CacheEntry(
             key=key, schema_version=1,
             findings=[self._cached_critical("a.py", reason)],
-            files_read=1, file_path="a.py", dimension="security",
+            files_read=1, file_path="a.py", dimension="reliability",
             model_id="test-model",
         ))
         dispatcher = FakeDispatcher(src)
         process_dimension_with_cache(
-            config, "security", idx=1, ctx=_make_ctx(),
+            config, "reliability", idx=1, ctx=_make_ctx(),
             opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
         assert dispatcher.calls == [], "all-hits path must not dispatch"
@@ -79,7 +79,7 @@ class TestCacheReplayAppliesProvenanceGate:
             "Index derived from a function argument with no bounds check.",
         )
 
-        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        jsonl = (config.work_dir or config.src) / "reliability_evidence.jsonl"
         findings = self._findings_in(jsonl)
         assert len(findings) == 1
         assert findings[0]["severity"] == "major", (
@@ -112,7 +112,7 @@ class TestCacheReplayAppliesProvenanceGate:
             "Index taken straight from the HTTP request body, unvalidated.",
         )
 
-        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        jsonl = (config.work_dir or config.src) / "reliability_evidence.jsonl"
         findings = self._findings_in(jsonl)
         assert len(findings) == 1
         assert findings[0]["severity"] == "critical", (

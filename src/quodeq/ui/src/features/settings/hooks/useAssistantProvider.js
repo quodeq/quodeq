@@ -1,5 +1,8 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } from '../../../constants.js';
+import { useState, useCallback, useMemo } from 'react';
+import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT, PROVIDER_SETTING_KEY } from '../../../constants.js';
+import { broadcastSettingsChange, useSettingsChangeSync } from './settingsSync.js';
+import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
+import { ASSISTANT_MODE } from '../settingsVocab.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
 export const ASSISTANT_MODE_KEY = 'cc-assistant-mode';
@@ -17,14 +20,14 @@ const CHANGE_EVENT = 'assistant-provider-changed';
 // - custom mode: use the assistant-scoped provider/model, falling back to the
 //   analysis selection when the assistant keys are unset.
 function loadState(storage) {
-  const mode = storage.getItem(ASSISTANT_MODE_KEY) === 'custom' ? 'custom' : 'default';
+  const mode = storage.getItem(ASSISTANT_MODE_KEY) === ASSISTANT_MODE.CUSTOM ? ASSISTANT_MODE.CUSTOM : ASSISTANT_MODE.DEFAULT;
   const analysisActive = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
   // Default ON: only an explicit opt-out ('false') disables it.
-  const enabled = storage.getItem(ASSISTANT_ENABLED_KEY) !== 'false';
+  const enabled = storage.getItem(ASSISTANT_ENABLED_KEY) !== STORED_FALSE;
 
-  if (mode === 'default') {
+  if (mode === ASSISTANT_MODE.DEFAULT) {
     const model = analysisActive
-      ? (storage.getItem(providerKey(analysisActive, 'model')) || '')
+      ? (storage.getItem(providerKey(analysisActive, PROVIDER_SETTING_KEY.MODEL)) || '')
       : '';
     return { enabled, mode, activeProvider: analysisActive, model, followsAnalysis: true };
   }
@@ -36,75 +39,57 @@ function loadState(storage) {
     : null;
   const model = explicitModel !== null
     ? explicitModel
-    : (activeProvider ? (storage.getItem(providerKey(activeProvider, 'model')) || '') : '');
+    : (activeProvider ? (storage.getItem(providerKey(activeProvider, PROVIDER_SETTING_KEY.MODEL)) || '') : '');
   return { enabled, mode, activeProvider, model, followsAnalysis: false };
 }
 
-function makeSetEnabled(storage, setState, broadcast) {
+// A setter that writes one storage key, then re-reads the whole state and
+// broadcasts it. A refused write (quota, private mode) goes to `onRefused` and
+// the re-read still runs. `keyFor` runs before the write is attempted.
+function makePersistingSetter({ storage, setState, broadcast }, { keyFor, stored = (value) => value, onRefused }) {
   return (value) => {
+    const key = keyFor();
     try {
-      storage.setItem(ASSISTANT_ENABLED_KEY, value ? 'true' : 'false');
+      storage.setItem(key, stored(value));
     } catch (err) {
-      console.warn('[useAssistantProvider] Could not persist assistant enabled:', err);
+      onRefused(err);
     }
     setState(loadState(storage));
     broadcast();
   };
 }
 
-function makeSetMode(storage, setState, broadcast) {
-  return (mode) => {
-    try {
-      storage.setItem(ASSISTANT_MODE_KEY, mode === 'custom' ? 'custom' : 'default');
-    } catch (err) {
-      console.warn('[useAssistantProvider] Could not persist assistant mode:', err);
-    }
-    setState(loadState(storage));
-    broadcast();
-  };
-}
+// Per-setter storage key, stored form and refusal warning; the model setter
+// is built separately because its key depends on the active provider.
+const SETTERS = {
+  setEnabled: {
+    onRefused: (err) => console.warn('[useAssistantProvider] Could not persist assistant enabled:', err),
+    keyFor: () => ASSISTANT_ENABLED_KEY,
+    stored: (value) => (value ? STORED_TRUE : STORED_FALSE),
+  },
+  setMode: {
+    onRefused: (err) => console.warn('[useAssistantProvider] Could not persist assistant mode:', err),
+    keyFor: () => ASSISTANT_MODE_KEY,
+    stored: (mode) => (mode === ASSISTANT_MODE.CUSTOM ? ASSISTANT_MODE.CUSTOM : ASSISTANT_MODE.DEFAULT),
+  },
+  setActiveProvider: {
+    onRefused: (err) => console.warn('[useAssistantProvider] Could not persist active provider:', err),
+    keyFor: () => ASSISTANT_ACTIVE_PROVIDER_KEY,
+  },
+};
 
-function makeSetActiveProvider(storage, setState, broadcast) {
-  return (id) => {
-    try {
-      storage.setItem(ASSISTANT_ACTIVE_PROVIDER_KEY, id);
-    } catch (err) {
-      console.warn('[useAssistantProvider] Could not persist active provider:', err);
-    }
-    setState(loadState(storage));
-    broadcast();
-  };
-}
-
-function makeSetModel(storage, setState, broadcast) {
-  return (value) => {
-    const { activeProvider } = loadState(storage);
-    try {
-      storage.setItem(providerKey(activeProvider, 'model-assistant'), value);
-    } catch (err) {
-      console.warn('[useAssistantProvider] Could not persist assistant model:', err);
-    }
-    setState(loadState(storage));
-    broadcast();
-  };
+function makeSetModel(ctx) {
+  return makePersistingSetter(ctx, {
+    onRefused: (err) => console.warn('[useAssistantProvider] Could not persist assistant model:', err),
+    keyFor: () => providerKey(loadState(ctx.storage).activeProvider, 'model-assistant'),
+  });
 }
 
 // Analysis-gate changes (provider/model) fire PROVIDER_SETTINGS_CHANGED_EVENT
 // so Default mode, which mirrors the analysis selection, updates its display live.
-function useProviderChangeSync(storage, setState) {
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const handleChange = () => setState(loadState(storage));
-    window.addEventListener(CHANGE_EVENT, handleChange);
-    window.addEventListener(PROVIDER_SETTINGS_CHANGED_EVENT, handleChange);
-    window.addEventListener('storage', handleChange);
-    return () => {
-      window.removeEventListener(CHANGE_EVENT, handleChange);
-      window.removeEventListener(PROVIDER_SETTINGS_CHANGED_EVENT, handleChange);
-      window.removeEventListener('storage', handleChange);
-    };
-  }, [storage]);
-}
+// The analysis provider settings feed the default mode, so their change
+// event re-reads this hook's state too.
+const SYNC_EVENTS = [CHANGE_EVENT, PROVIDER_SETTINGS_CHANGED_EVENT];
 
 function buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvider, setModel) {
   return {
@@ -132,21 +117,22 @@ function buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvi
 export function useAssistantProvider({ storage = localStorage } = {}) {
   const [state, setState] = useState(() => loadState(storage));
 
-  const broadcast = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event(CHANGE_EVENT));
-    }
-  }, []);
+  const broadcast = useCallback(() => broadcastSettingsChange(CHANGE_EVENT), []);
 
   // useMemo, not useCallback: the factories must run only when their inputs
   // change, where useCallback(factory(...), deps) rebuilds the closure every
   // render and then throws it away.
-  const setEnabled = useMemo(() => makeSetEnabled(storage, setState, broadcast), [storage, broadcast]);
-  const setMode = useMemo(() => makeSetMode(storage, setState, broadcast), [storage, broadcast]);
-  const setActiveProvider = useMemo(() => makeSetActiveProvider(storage, setState, broadcast), [storage, broadcast]);
-  const setModel = useMemo(() => makeSetModel(storage, setState, broadcast), [storage, broadcast]);
+  const { setEnabled, setMode, setActiveProvider, setModel } = useMemo(() => {
+    const ctx = { storage, setState, broadcast };
+    return {
+      setEnabled: makePersistingSetter(ctx, SETTERS.setEnabled),
+      setMode: makePersistingSetter(ctx, SETTERS.setMode),
+      setActiveProvider: makePersistingSetter(ctx, SETTERS.setActiveProvider),
+      setModel: makeSetModel(ctx),
+    };
+  }, [storage, broadcast]);
 
-  useProviderChangeSync(storage, setState);
+  useSettingsChangeSync(SYNC_EVENTS, { load: loadState, setState, storage });
 
   return buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvider, setModel);
 }

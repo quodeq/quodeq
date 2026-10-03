@@ -6,10 +6,10 @@
  *
  * Data sources:
  *   - statusQuery: ['evaluation', jobId, 'status'] — fetched via api.getEvaluation
- *     and updated by useRunEventStream when VITE_USE_SSE_EVENTS=true.
- *   - findingsQuery: ['evaluation', jobId, 'findings'] — under SSE, populated
- *     entirely by useRunEventStream's setQueryData writes (queryFn is a no-op).
- *     Under polling, fetched via per-dimension getDimensionEval calls.
+ *     and updated by useRunEventStream's status frames.
+ *   - findingsQuery: ['evaluation', jobId, 'findings'] — populated entirely
+ *     by useRunEventStream's setQueryData writes (queryFn is a no-op). The
+ *     server decides which judgments are findings, once, on the stream.
  *   (both live in ./useEvaluationQueries.js)
  *
  * Mutations (./useEvaluationMutations.js):
@@ -26,16 +26,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { apiErrorMessage } from "../../../strings/apiErrors.js";
-import { confirmCancelEvaluation } from "../cancelDialog.js";
+import { confirmCancelEvaluation, CANCEL_CHOICE } from "../cancelDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys } from "../../../api/queryKeys.js";
-import { LOCAL_API_PROVIDERS } from "../../../constants.js";
-import { findingsRefetchInterval } from "./useEvaluation.helpers.js";
+import { LOCAL_API_PROVIDERS } from "../../../vocab/provider.js";
 import { useEvaluationQueries } from "./useEvaluationQueries.js";
 import { useEvaluationMutations } from "./useEvaluationMutations.js";
 
-export { findingsRefetchInterval };
-// Re-exported for the existing importers; the set itself lives in constants.js
+// Re-exported for the existing importers; the set itself lives in vocab/provider.js
 // so the Evaluate header resolves unset limits exactly like the start payload.
 export { LOCAL_API_PROVIDERS };
 
@@ -84,7 +82,7 @@ function useCancelEvaluationCallback(cancelMutation) {
       : confirmCancelEvaluation;
     const choice = await confirm();
     if (!choice) return;
-    cancelMutation.mutate({ discard: choice === "discard" });
+    cancelMutation.mutate({ discard: choice === CANCEL_CHOICE.DISCARD });
   }, [cancelMutation]);
 }
 
@@ -122,11 +120,11 @@ export function useEvaluation() {
   const [startedProject, setStartedProject] = useState(null);
 
   // SSE side-effect — writes status/dimensions/findings into cache.
-  // No-op when VITE_USE_SSE_EVENTS is off; refetchInterval below covers.
-  useRunEventStream(jobId);
+  // Its connection state drives the status query's poll interval.
+  const streamState = useRunEventStream(jobId);
   useResumeRunningJob(api, queryClient, setJobId, setJobError);
 
-  const { job, liveViolations } = useEvaluationQueries(api, jobId);
+  const { job, liveViolations } = useEvaluationQueries(api, jobId, streamState);
 
   const { startMutation, cancelMutation } = useEvaluationMutations({
     api, queryClient, jobId, setJobId, setJobError, setStartedProject,

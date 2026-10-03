@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from quodeq.services.suppression import SuppressionMatcher, matcher_for
+from quodeq.services.suppression import SuppressionMatcher, build_matcher, load_req_to_principle, matcher_for
 from quodeq.services.suppression_keys import SuppressionKeys
 
 
@@ -85,6 +85,53 @@ class TestSuppressionMatcher:
         assert not m.is_suppressed(_evidence(t="compliance", req="R-FT-1"))
 
 
+class TestLoadReqToPrinciple:
+    """evaluators_dir is required (CLEA-DEP-07, row 9184): this reader never
+    falls back to global config -- callers resolve the production default."""
+
+    def test_evaluators_dir_is_required(self):
+        with pytest.raises(TypeError):
+            load_req_to_principle("reliability")  # missing evaluators_dir
+
+    def test_reads_the_requirement_to_principle_map(self, tmp_path):
+        (tmp_path / "reliability.json").write_text(json.dumps({
+            "principles": [{"name": "Fault Tolerance", "requirements": [{"id": "R-FT-1"}]}],
+        }))
+        assert load_req_to_principle("reliability", tmp_path) == {"R-FT-1": "Fault Tolerance"}
+
+    def test_missing_dir_returns_empty_map(self, tmp_path):
+        assert load_req_to_principle("reliability", tmp_path / "nope") == {}
+
+
+class TestBuildMatcherResolvesEvaluatorsDir:
+    def test_explicit_evaluators_dir_feeds_req_to_principle(self, tmp_path):
+        (tmp_path / "reliability.json").write_text(json.dumps({
+            "principles": [{"name": "Fault Tolerance", "requirements": [{"id": "R-FT-1"}]}],
+        }))
+        m = build_matcher(
+            "reliability", dismissed=frozenset({("R-FT-1", "a.py", 1)}), deleted=frozenset(),
+            evaluators_dir=tmp_path,
+        )
+        assert m.req_to_principle == {"R-FT-1": "Fault Tolerance"}
+
+    def test_default_evaluators_dir_used_when_none_passed(self, monkeypatch, tmp_path):
+        """None still resolves to the production default at call time --
+        the call-time-default seam moved from load_req_to_principle up into
+        build_matcher, not dropped."""
+        import quodeq.services.suppression as suppression_mod
+
+        monkeypatch.setattr(suppression_mod, "default_paths", lambda: type(
+            "P", (), {"evaluators_dir": tmp_path},
+        )())
+        (tmp_path / "reliability.json").write_text(json.dumps({
+            "principles": [{"name": "Fault Tolerance", "requirements": [{"id": "R-FT-1"}]}],
+        }))
+        m = build_matcher(
+            "reliability", dismissed=frozenset({("R-FT-1", "a.py", 1)}), deleted=frozenset(),
+        )
+        assert m.req_to_principle == {"R-FT-1": "Fault Tolerance"}
+
+
 class TestMatcherFor:
     def test_reads_dismissed_and_deleted_from_the_project_dir(self, tmp_path):
         (tmp_path / "deleted.json").write_text(json.dumps([
@@ -118,7 +165,7 @@ class TestParityWithTheDashboardParsePath:
 
     def test_tally_and_parse_agree_on_which_rows_survive(self, project, tmp_path):
         from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        from quodeq.services._violations_jsonl import _jsonl_parser
         from quodeq.services.deleted import deleted_keys
 
         rows = [
@@ -134,12 +181,23 @@ class TestParityWithTheDashboardParsePath:
         m = matcher_for(project, "reliability", evaluators_dir=tmp_path / "nope")
         tally = tally_unique_findings(jsonl, suppressed=m.is_suppressed)
 
-        parsed, compliance = _parse_jsonl_findings(
-            jsonl.read_text().splitlines(), "reliability",
-            keys=SuppressionKeys(frozenset(), deleted_keys(project)),
-        )
+        parsed, compliance = _jsonl_parser(
+            "reliability", None, None, SuppressionKeys(frozenset(), deleted_keys(project)),
+        )(jsonl.read_text().splitlines())
 
         assert tally.violations == len(parsed) == 1
         assert tally.compliance == len(compliance) == 1
         assert tally.suppressed == 2
         assert tally.duplicates == 1
+
+
+def test_the_delete_key_folds_a_near_miss_requirement():
+    from quodeq.services.suppression import SuppressionMatcher
+
+    matcher = SuppressionMatcher(
+        dimension="accessibility",
+        deleted=frozenset({("accessibility", "Perceivable", "a.kt")}),
+        req_to_principle={"ACC-PER-01": "Perceivable"},
+    )
+
+    assert matcher.is_suppressed({"t": "violation", "req": "acc-per-1", "p": "Stale", "file": "a.kt"})

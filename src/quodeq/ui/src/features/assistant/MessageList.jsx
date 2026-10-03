@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { ActionPreviewCard } from './ActionPreviewCard.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 import { t } from '../../strings/index.js';
+import { MESSAGE_ROLE } from './messageRole.js';
 
 // Q-mark avatar column next to assistant-authored content.
 function CompassAvatar({ thinking = false }) {
@@ -26,9 +27,9 @@ const mdComponents = {
 
 function MessageItem({ message }) {
   switch (message.role) {
-    case 'user':
+    case MESSAGE_ROLE.USER:
       return <div className="assistant-msg assistant-msg-user">{message.text}</div>;
-    case 'assistant':
+    case MESSAGE_ROLE.ASSISTANT:
       return (
         <div className="assistant-msg-row">
           <CompassAvatar />
@@ -39,13 +40,13 @@ function MessageItem({ message }) {
           </div>
         </div>
       );
-    case 'tool':
+    case MESSAGE_ROLE.TOOL:
       return (
         <div className="assistant-msg assistant-msg-tool">
           {t('assistant.toolUsed', { name: message.name })}{message.argsSummary ? ` · ${message.argsSummary}` : ''}
         </div>
       );
-    case 'local':
+    case MESSAGE_ROLE.LOCAL:
       return (
         <div className="assistant-msg assistant-msg-local assistant-md">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -53,13 +54,13 @@ function MessageItem({ message }) {
           </ReactMarkdown>
         </div>
       );
-    case 'action':
+    case MESSAGE_ROLE.ACTION:
       return (
         <div className="assistant-msg assistant-msg-action">
           <ActionPreviewCard action={message} />
         </div>
       );
-    case 'warning':
+    case MESSAGE_ROLE.WARNING:
       return <div className="assistant-msg assistant-msg-warning">{message.message}</div>;
     default:
       return null;

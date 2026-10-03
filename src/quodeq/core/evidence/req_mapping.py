@@ -5,10 +5,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from quodeq.core.admission import Admitted, FindingFacts, StandardCatalog, StandardIndex, admit
+from quodeq.core.admission.ids import id_shape, normalize_req_id  # noqa: F401 -- re-exported
 from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
 
 _SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-_MIN_REQ_ID_SEGMENTS = 2  # ``<category>-<number>`` is the shortest ID we guess about
 
 # Reads ``<directory>/<dimension>.json`` into a req-id → principle-name map.
 # Injected by outer layers (see quodeq.data.fs.standards_loader.
@@ -37,7 +38,8 @@ QuarantineSink = Callable[[list[QuarantinedFinding]], None]
 
 
 @dataclass
-class _GroupedJudgments:
+class GroupedJudgments:
+    """Judgments grouped by principle, plus the findings quarantined on the way."""
     violations: dict[str, list[Judgment]]
     compliance: dict[str, list[Judgment]]
     severity: dict[str, str]
@@ -76,90 +78,47 @@ def _resolve_req_to_principle_map(
     return mapping or {}
 
 
-def _id_shape(req_id: str) -> tuple[str, str] | None:
-    """The trailing ``(category, number)`` of a requirement ID, upper-cased.
-
-    ``CLEA-DEP-05`` and ``DEP-05`` both shape to ``("DEP", "05")``. Returns
-    None for anything without at least two dash-separated segments ending in
-    a number, which is the only form we are willing to guess about.
-    """
-    parts = [p for p in (req_id or "").strip().split("-") if p]
-    if len(parts) < _MIN_REQ_ID_SEGMENTS or not parts[-1].isdigit():
-        return None
-    return parts[-2].upper(), parts[-1].lstrip("0") or "0"
-
-
-def normalize_req_id(raw: str, canonical_ids) -> str | None:
-    """Fold a near-miss requirement ID onto the standard's real ID.
-
-    Local models emit IDs the standard does not define -- wrong case
-    (``CLEa-DEP-05``), a truncated prefix (``CLE-TES-02``) or no prefix at all
-    (``SEP-03``). Each is a real finding that would otherwise be quarantined
-    over a typo.
-
-    The match is on the trailing ``(category, number)`` pair, so two genuinely
-    different requirements can never merge: ``CLEA-DEP-01`` and ``CLEA-DEP-02``
-    differ in the number and stay distinct despite being one character apart.
-    An ambiguous shape (two canonical IDs sharing the pair) refuses to fold --
-    guessing between real requirements is worse than quarantining.
-    """
-    ids = tuple(canonical_ids or ())
-    if not raw or not ids:
-        return None
-    for candidate in ids:
-        if candidate == raw:
-            return candidate
-    shape = _id_shape(raw)
-    if shape is None:
-        return None
-    matches = [c for c in ids if _id_shape(c) == shape]
-    if len(matches) != 1:
-        return None  # unknown, or ambiguous between real requirements
-    return matches[0]
+_RESOLVER_KEY = "_resolver"  # the one dimension a resolver's catalog holds
 
 
 @dataclass(frozen=True)
 class PrincipleResolver:
-    """Resolves a finding's raw principle/requirement ID to a canonical principle.
+    """Resolves a finding's requirement (and the principle it named) to a canonical principle.
 
     The single source of truth for "does this finding belong to the dimension's
-    standard?". Both the report path (:func:`_group_judgments`) and the live
-    scan counters resolve through this, so the counters the UI shows mid-scan
-    and the persisted evaluation JSON can never disagree on which findings count.
+    standard?", built on ``core.admission``: every reader places a finding
+    with the same rule the writers and the projection use. The report path
+    (:func:`group_judgments`), the live counters and the live findings view
+    all resolve through this.
     """
 
     req_to_principle: dict[str, str]
     canonical: frozenset[str]
-    # Built once: resolve() runs per judgment and the fold wants a tuple of ids.
-    _req_ids: tuple[str, ...] = field(init=False, repr=False, compare=False)
+    _catalog: StandardCatalog = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "_req_ids", tuple(self.req_to_principle))
+        index = StandardIndex(_RESOLVER_KEY, self.req_to_principle)
+        object.__setattr__(self, "_catalog", StandardCatalog.of([index]))
+
+    def place(self, req: str | None, principle_hint: str | None = None) -> str | None:
+        """Canonical principle of a finding with *req* and *principle_hint*, or None.
+
+        None means quarantine: the dimension has a standard and cannot place
+        the finding. With no standard (an empty map) the finding keeps the
+        principle it named, else its code, keeping callers permissive.
+        """
+        if not req and not principle_hint:
+            return None
+        if not self.req_to_principle:
+            return principle_hint or req
+        facts = FindingFacts(req=req or None, verdict=None, dimension=None, file=None, line=None,
+                             principle_hint=principle_hint or None)
+        result = admit(facts, self._catalog, _RESOLVER_KEY)
+        return result.principle if isinstance(result, Admitted) else None
 
     def resolve(self, practice_id: str | None) -> str | None:
-        """Canonical principle name, or None when the finding is unmappable.
-
-        None means quarantine: the dimension has a standard and this finding's
-        principle is not one it defines. With no standard (canonical empty) every
-        finding maps through unchanged, keeping callers permissive. A missing
-        practice_id never resolves — it has no principle to group under.
-        """
-        if not practice_id:
-            return None
-        principle = self.req_to_principle.get(practice_id)
-        if principle is None:
-            # Second chance before quarantine: fold a near-miss ID (wrong case,
-            # truncated or missing prefix) onto the standard's real one.
-            folded = normalize_req_id(practice_id, self._req_ids)
-            if folded is not None:
-                principle = self.req_to_principle[folded]
-        if principle is None:
-            # Not a requirement ID: findings may name the principle directly,
-            # and with no standard at all every id passes through unchanged.
-            principle = practice_id
-        if self.canonical and principle not in self.canonical:
-            return None
-        return principle
+        """Canonical principle for one id that may be a requirement or a principle name."""
+        return self.place(None, practice_id)
 
 
 def build_principle_resolver(
@@ -199,13 +158,14 @@ def principle_names_for_dimension(
     return {p for p in mapping.values() if p}
 
 
-def _group_judgments(
+def group_judgments(
     judgments: list[Judgment],
     dimension: str = "",
     evaluators_dir: Path | None = None,
     compiled_dir: Path | None = None,
     *, req_map_reader: ReqMapReader | None = None,
-) -> _GroupedJudgments:
+) -> GroupedJudgments:
+    """Group *judgments* into violations, compliance and severity per principle."""
     resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir,
                                         req_map_reader=req_map_reader)
     sc_violations: dict[str, list[Judgment]] = {}
@@ -223,7 +183,7 @@ def _group_judgments(
         # layer via the caller's `on_quarantine` sink; core only collects the
         # data. The live scan counters resolve through the same
         # PrincipleResolver, so they exclude exactly these findings too.
-        principle = resolver.resolve(j.practice_id)
+        principle = resolver.place(j.req, j.practice_id)
         if principle is None:
             quarantined_findings.append(QuarantinedFinding(
                 dimension=dimension,
@@ -235,13 +195,13 @@ def _group_judgments(
             ))
             quarantined += 1
             continue
-        if j.verdict == "violation":
+        if j.is_violation():
             sc_violations.setdefault(principle, []).append(j)
-        elif j.verdict == "compliance":
+        elif j.is_compliance():
             sc_compliance.setdefault(principle, []).append(j)
         sev = j.severity or DEFAULT_SEVERITY
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
 
-    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity, quarantined,
+    return GroupedJudgments(sc_violations, sc_compliance, sc_severity, quarantined,
                               quarantined_findings)

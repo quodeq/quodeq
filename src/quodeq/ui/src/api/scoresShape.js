@@ -28,6 +28,21 @@ export function runQuery(run) {
 }
 
 /**
+ * The query string of a /compliance-detail request. `run` scopes it to one
+ * run's deferred lists and wins over `asOf`, which scopes the accumulated ones.
+ * @param {{kind: string, dimension: string, run?: string|null, asOf?: string|null, principle?: string, pathPrefix?: string}} scope
+ * @returns {string} Without the leading `?`.
+ */
+export function findingDetailQuery({ kind, dimension, run, asOf, principle, pathPrefix }) {
+  const params = new URLSearchParams({ dimension, kind });
+  if (run) params.set('run', run);
+  else if (asOf) params.set('asOf', asOf);
+  if (principle) params.set('principle', principle);
+  if (pathPrefix) params.set('pathPrefix', pathPrefix);
+  return params.toString();
+}
+
+/**
  * Map the `dimensions` array of an accumulated payload to Dimension models.
  * @param {Object} data Raw accumulated payload; left untouched when it has no dimensions array.
  * @returns {Object} The same payload object.
@@ -49,6 +64,17 @@ export function parseUnifiedScores(data) {
     data.accumulated.dimensions = data.accumulated.dimensions.map(createDimension);
   }
   return data;
+}
+
+/**
+ * Parse a fleet compare response: every summary's slim dimensions, the
+ * per-project errors untouched.
+ */
+export function parseFleetCompare(data) {
+  return {
+    summaries: (data?.summaries || []).map(parseSlimDimensions),
+    errors: data?.errors || {},
+  };
 }
 
 /**

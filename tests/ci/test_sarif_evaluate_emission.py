@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from quodeq.cli_evaluation import _write_sarif_if_requested
+from quodeq.cli_evaluation import write_sarif_if_requested
 
 
 def _seed_reports(eval_dir: Path) -> None:
@@ -29,7 +29,7 @@ def test_write_sarif_emits_file_on_success(tmp_path):
     _seed_reports(eval_dir)
     out = tmp_path / "q.sarif"
 
-    _write_sarif_if_requested(_Args(sarif=str(out)), eval_dir)
+    write_sarif_if_requested(_Args(sarif=str(out)), eval_dir)
 
     doc = json.loads(out.read_text(encoding="utf-8"))
     assert doc["version"] == "2.1.0"
@@ -45,7 +45,7 @@ def test_write_sarif_is_fail_soft(tmp_path):
     bad_out = blocker / "nested" / "q.sarif"
 
     # Must NOT raise.
-    _write_sarif_if_requested(_Args(sarif=str(bad_out)), eval_dir)
+    write_sarif_if_requested(_Args(sarif=str(bad_out)), eval_dir)
     assert not bad_out.exists()
 
 
@@ -53,4 +53,16 @@ def test_write_sarif_noop_when_flag_absent(tmp_path):
     eval_dir = tmp_path / "evaluation"
     _seed_reports(eval_dir)
     # sarif=None -> nothing written, no error.
-    _write_sarif_if_requested(_Args(sarif=None), eval_dir)
+    write_sarif_if_requested(_Args(sarif=None), eval_dir)
+
+
+def test_write_sarif_is_fail_soft_on_malformed_report(tmp_path):
+    """A corrupt report JSON raises json.JSONDecodeError (a ValueError
+    subclass) out of load_evaluation_reports; must be swallowed too."""
+    eval_dir = tmp_path / "evaluation"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    (eval_dir / "reliability.json").write_text("{not valid json", encoding="utf-8")
+    out = tmp_path / "q.sarif"
+
+    write_sarif_if_requested(_Args(sarif=str(out)), eval_dir)  # must NOT raise
+    assert not out.exists()

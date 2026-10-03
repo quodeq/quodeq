@@ -3,6 +3,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
+import { MockEventSource } from "../../../test-utils/MockEventSource.js";
 import { PROVIDER_CONFIGURED_MARKER } from "../../../constants.js";
 
 vi.mock("../../../utils/confirmDialog.js", () => ({
@@ -20,7 +21,6 @@ const fakeApi = {
   getEvaluation: vi.fn(),
   startEvaluation: vi.fn(),
   cancelEvaluation: vi.fn(),
-  getDimensionEval: vi.fn(),
   listEvaluations: vi.fn().mockResolvedValue([]),
 };
 
@@ -43,8 +43,8 @@ describe("useEvaluation", () => {
   beforeEach(() => {
     Object.values(fakeApi).forEach((fn) => fn.mockReset?.());
     fakeApi.listEvaluations.mockResolvedValue([]);
-    // Default: SSE off — refetchInterval path
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
+    // jsdom has no EventSource; the stream opens against the mock.
+    vi.stubGlobal("EventSource", MockEventSource);
     // preparePayload reads localStorage; seed a working provider+model.
     localStorage.setItem("cc-active-provider", "ollama");
     localStorage.setItem("cc-ollama-model", "llama3.1");
@@ -163,11 +163,9 @@ describe("useEvaluation", () => {
     expect(payload.apiKey).toBeUndefined();
   });
 
-  it("startEvaluation still forwards a genuine legacy raw api key", async () => {
-    // Installs that saved a key through the (since-deleted) Settings input
-    // still have the raw value in this browser's localStorage and nothing
-    // migrated it. Dropping it outright silently sent no key at all for
-    // them — a live regression, not just dead code.
+  it("startEvaluation never forwards a raw api key left in browser storage", async () => {
+    // The backend resolves the key from its own secure store; a raw value
+    // here is moved there by the legacy provider-key migration at boot.
     localStorage.setItem("cc-ollama-api-key", "sk-legacy-raw-value");
     fakeApi.startEvaluation.mockResolvedValue({ jobId: "j5", status: "pending", dimensions: [] });
     const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
@@ -175,7 +173,7 @@ describe("useEvaluation", () => {
       await result.current.startEvaluation({ repo: "x", dimensions: ["security"] });
     });
     const [payload] = fakeApi.startEvaluation.mock.calls.at(-1);
-    expect(payload.apiKey).toBe("sk-legacy-raw-value");
+    expect(payload).not.toHaveProperty("apiKey");
   });
 
   it("startEvaluation sends no api key when nothing is stored", async () => {

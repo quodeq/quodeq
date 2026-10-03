@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useReEvaluateCard } from '../hooks/useReEvaluateCard.js';
 import ScanModeCards from './ScanModeCards.jsx';
 import { CLEAN_PERSIST } from './scanModes.js';
-import DimensionSelector from './DimensionSelector.jsx';
+import DimensionSelector, { DIMENSION_SELECTOR_VARIANT_TERMINAL } from './DimensionSelector.jsx';
 import { readActiveProviderModel } from './providerLabel.js';
 import { UrlRestoreSection, DetectedLine, BudgetChips, RunBar, IdentityHeader, ScopeBrowserOverlay } from './ReEvaluateCardParts.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t, LOCALE } from '../../../strings/index.js';
+import { PERCENT } from '../../../constants.js';
 
 export { buildScanPayload } from '../hooks/useDimensionSelection.js';
 
@@ -34,7 +35,7 @@ function buildDimMetas(estimates, isClean) {
     const count = isClean ? total : (est.count ?? 0);
     const cached = isClean ? 0 : (est.cached ?? 0);
     if (count === 0) return [id, [t('evaluate.upToDate')]];
-    const pct = Math.round((cached / total) * 100);
+    const pct = Math.round((cached / total) * PERCENT);
     const lines = [t('evaluate.filesToAnalyze', { count: count.toLocaleString(LOCALE) })];
     if (pct > 0) lines.push(t('evaluate.pctAnalyzed', { pct }));
     return [id, lines];
@@ -88,7 +89,7 @@ function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, a
 
       {allDimensions.length > 0 && (
         <DimensionSelector
-          variant="terminal"
+          variant={DIMENSION_SELECTOR_VARIANT_TERMINAL}
           allDimensions={allDimensions}
           selectedDims={selectedDims}
           onToggle={toggleDim}

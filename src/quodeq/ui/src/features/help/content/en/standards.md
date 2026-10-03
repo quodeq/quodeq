@@ -4,7 +4,7 @@ The **Standards** tab is where you decide what quality means for your project. B
 
 ### Built-in standards
 
-Quodeq ships with managed standards for the six ISO 25010 dimensions plus Clean Architecture and DDD Design. Their structure is **read-only** and marked as *Managed*, but their numeric thresholds are editable (see below). To turn one off, hide it with the `icon:eye` visibility toggle.
+Quodeq ships with managed standards for the six ISO 25010 dimensions plus Clean Architecture, DDD Design and WCAG 2.2 Accessibility. Their structure is **read-only** and marked as *Managed*, but their numeric thresholds are editable (see below). To turn one off, hide it with the `icon:eye` visibility toggle.
 
 ### Customizing thresholds
 

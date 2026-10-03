@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from quodeq.core.run.state import RunState
 from quodeq.core.types import DimensionResult
+from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services import _fs_metadata as md
 from quodeq.services.score_cache import (
     open_score_cache, read_cached_project_summary, write_cached_project_summary,
 )
+
+from tests.services.conftest import stub_row_fetcher
 
 
 def test_project_summary_roundtrip_and_versioning(monkeypatch, tmp_path):
@@ -30,20 +34,19 @@ def test_read_accumulated_summary_is_cached(monkeypatch, tmp_path):
         calls["n"] += 1
         return [DimensionResult(dimension="security", overall_score="7.0/10",
                                 overall_grade="Good", source_file_count=10)]
-    monkeypatch.setattr(md, "read_run_data", _read)
+    stub_row_fetcher(monkeypatch, _read)
 
-    class _Run:
-        def __init__(self, rid):
-            self.run_id = rid
-            self.status = "complete"
-    runs = [_Run("a"), _Run("b")]
+    runs = [
+        RunInfo(run_id="a", date_iso="2026-01-02", date_label="Jan 02", status=RunState.DONE),
+        RunInfo(run_id="b", date_iso="2026-01-01", date_label="Jan 01", status=RunState.DONE),
+    ]
 
     # compute_on_miss=True: this test exercises the compute-and-cache path
     # itself (the shared-repo route's contract), not the local list path's
     # pending-on-miss behavior covered by test_fs_metadata_readonly.py.
-    first = md._read_accumulated_summary(tmp_path, "proj", runs, compute_on_miss=True)
+    first = md.read_accumulated_summary(tmp_path, "proj", runs, compute_on_miss=True)
     n_after_first = calls["n"]
-    second = md._read_accumulated_summary(tmp_path, "proj", runs, compute_on_miss=True)
+    second = md.read_accumulated_summary(tmp_path, "proj", runs, compute_on_miss=True)
     assert first == second
     assert first == ("Good", 7.0, 10, False)  # grade, numeric_average, files_count, pending
     assert calls["n"] == n_after_first  # second call served from cache, no re-read

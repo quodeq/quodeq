@@ -1,0 +1,92 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom/vitest';
+import ProjectsPage from './ProjectsPage.jsx';
+import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
+import { DISMISSED_CONNECT_KEY } from '../hooks/useDismissedConnectFailure.js';
+import { LOCAL, makeApi, pageActions, renderPage } from './_projectsPageTeam.fixtures.jsx';
+
+const FOREIGN_COPY = 'That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.';
+const foreign = { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', url: 'https://github.com/team/other.git', finishedAt: 5 };
+const urlField = () => screen.queryByRole('textbox', { name: /evaluations repository url/i });
+
+afterEach(() => {
+  vi.clearAllMocks();
+  localStorage.removeItem(DISMISSED_CONNECT_KEY);
+});
+
+describe('ProjectsPage — closing a failed connect', () => {
+  it('configured: a failed "change repository" card closes with "close"', async () => {
+    const user = userEvent.setup();
+    const { api } = makeApi({ configured: true, slots: { connect: foreign } });
+    renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
+    expect(await screen.findByText(FOREIGN_COPY)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'close' }));
+    expect(urlField()).not.toBeInTheDocument();
+    expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
+  });
+
+  it('unconfigured with local projects: close hides a stale failure, and it stays hidden for the same finishedAt', async () => {
+    const user = userEvent.setup();
+    const { api } = makeApi({ slots: { connect: foreign } });
+    const view = renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
+    expect(await screen.findByText(FOREIGN_COPY)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'close' }));
+    expect(urlField()).not.toBeInTheDocument();
+    expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
+
+    // A fresh mount (the next visit) reads the same slot and keeps it closed.
+    view.unmount();
+    renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
+    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(2));
+    await screen.findByRole('button', { name: 'connect evaluations repository' });
+    expect(urlField()).not.toBeInTheDocument();
+    expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
+  });
+
+  it('a new failure (a later finishedAt) shows again after one was closed', async () => {
+    const user = userEvent.setup();
+    const { api, server } = makeApi({ slots: { connect: foreign } });
+    const view = renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
+    await user.click(await screen.findByRole('button', { name: 'close' }));
+    expect(urlField()).not.toBeInTheDocument();
+
+    server.slots.connect = { ...foreign, finishedAt: 9 };
+    view.unmount();
+    renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
+    expect(await screen.findByText(FOREIGN_COPY)).toBeInTheDocument();
+    expect(urlField()).toHaveValue(foreign.url);
+  });
+
+  it('on an empty page the failure shows above the two paths, and close leaves just the paths', async () => {
+    const user = userEvent.setup();
+    const { api } = makeApi({ slots: { connect: foreign } });
+    renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
+    expect(await screen.findByText(FOREIGN_COPY)).toBeInTheDocument();
+    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'close' }));
+    expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
+    expect(urlField()).not.toBeInTheDocument();
+    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
+  });
+});
+
+describe('ProjectsPage — an empty page while a connect reads the team projects', () => {
+  it('says the results are on their way instead of the two paths, then shows the cards at DONE', async () => {
+    const reading = { state: 'running', phase: SYNC_PHASE.READING, projectsFound: 1, url: 'u' };
+    const { api, server } = makeApi({ configured: true, slots: { connect: reading } });
+    renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
+
+    expect(await screen.findByText("Published evaluations will appear here when reading finishes.")).toBeInTheDocument();
+    expect(screen.queryByText('An evaluations repository')).not.toBeInTheDocument();
+
+    server.slots.connect = { state: 'done', phase: SYNC_PHASE.DONE, projectsFound: 1, finishedAt: 8 };
+    await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument(), { timeout: 4000 });
+    expect(screen.queryByText("Published evaluations will appear here when reading finishes.")).not.toBeInTheDocument();
+    expect(screen.queryByText('An evaluations repository')).not.toBeInTheDocument();
+  });
+});

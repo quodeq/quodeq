@@ -6,16 +6,10 @@ import { abbrevDim } from '../utils/dimAbbrev.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { activateOnKey, isActivationKey } from '../../../utils/a11y.js';
 import { PARTIAL_STATUSES } from './historyRowAssembly.js';
-import { deltaDirection } from '../utils/deltaDirection.js';
-
-const DELTA_SIGN = { up: '+', down: '-', flat: '' };
-const DELTA_CLASS = {
-  up: 'history-delta history-delta--up',
-  down: 'history-delta history-delta--down',
-  flat: 'history-delta',
-};
-
-const NOT_READY_MESSAGE = t('history.notReadyMessage');
+import { DeltaText, CountCell, trimTrailingZero } from './HistoryCountCells.jsx';
+import { runCounts } from '../../dashboard/headlineStats.js';
+import { RUN_STATE } from '../../../vocab/runState.js';
+import { NOT_READY_MESSAGE } from '../historyHelpers.js';
 
 // Splits an ISO timestamp into the row's two-line date/time cell. A
 // malformed timestamp degrades to the caller's fallback label rather than
@@ -38,12 +32,6 @@ function formatDateParts(dateISO, fallbackLabel) {
   }
 }
 
-// Drop trailing .0 so integers render as "9" and zeros as "0" — matches mock.
-const TRAILING_ZERO_SUFFIX_LENGTH = 2; // ".0"
-function trimTrailingZero(n) {
-  const fixed = n.toFixed(1);
-  return fixed.endsWith('.0') ? fixed.slice(0, -TRAILING_ZERO_SUFFIX_LENGTH) : fixed;
-}
 
 function formatDimSummary(entry) {
   const dims = (entry?.dimensionDetails || []).filter((d) => d?.dimension);
@@ -67,20 +55,13 @@ function formatDimSummary(entry) {
   return `${t('history.dimsCount', { count: dims.length })} · ${parts.join(', ')}`;
 }
 
-function DeltaText({ delta }) {
-  if (delta == null) return <span className="history-delta history-delta--muted">—</span>;
-  const direction = deltaDirection(delta);
-  const abs = Math.abs(delta);
-  return <span className={DELTA_CLASS[direction]}>{DELTA_SIGN[direction]}{trimTrailingZero(abs)}</span>;
-}
-
 /**
  * Single row layout using flex. The entire row is clickable, so a standalone
  * `view` button would only duplicate the affordance. Columns:
  *
- *   [ DATE ][ TIME ][ GRADE ][ SCORE ][ Δ ][ DIMENSIONS (flex) ]
+ *   [ DATE ][ TIME ][ GRADE ][ SCORE ][ Δ ][ MAJORS ][ Δ ][ TYPES ][ Δ ][ DIMENSIONS (flex) ]
  */
-function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }) {
+function HistoryRow({ className = '', onClick, onHover, cells, onDelete, deleteDisabled = false, title }) {
   const common = `history-row ${className}`.trim();
   const isHeader = className.includes('history-row--header');
   function handleDeleteClick(e) {
@@ -111,6 +92,10 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
       <div className="history-row__col history-row__col--grade">{cells.grade}</div>
       <div className="history-row__col history-row__col--score">{cells.score}</div>
       <div className="history-row__col history-row__col--delta">{cells.delta}</div>
+      <div className="history-row__col history-row__col--majors">{cells.majors}</div>
+      <div className="history-row__col history-row__col--majors-delta">{cells.majorsDelta}</div>
+      <div className="history-row__col history-row__col--types">{cells.types}</div>
+      <div className="history-row__col history-row__col--types-delta">{cells.typesDelta}</div>
       <div className="history-row__col history-row__col--dims">{cells.dims}</div>
       <div className="history-row__col history-row__col--chevron">
         {isHeader ? '' : (
@@ -123,6 +108,7 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
                 title={t('history.deleteRunTitle')}
                 onClick={handleDeleteClick}
                 onKeyDown={handleDeleteKeyDown}
+                disabled={deleteDisabled}
               >
                 ×
               </button>
@@ -177,7 +163,11 @@ function InProgressHistoryRow({ entry, onClick, onNotReadyClick }) {
         ),
         grade: <span className="history-row__muted">—</span>,
         score: <span className="history-row__muted">—</span>,
-        delta: <span className="history-delta history-delta--muted">—</span>,
+        delta: <DeltaText delta={null} />,
+        majors: <CountCell value={null} />,
+        majorsDelta: <DeltaText delta={null} />,
+        types: <CountCell value={null} />,
+        typesDelta: <DeltaText delta={null} />,
         dims: dimsCell,
       }}
     />
@@ -194,24 +184,43 @@ function EvaluationsTableHeader() {
         grade: t('history.colGrade'),
         score: t('history.colScore'),
         delta: t('history.colDelta'),
+        majors: t('history.colMajors'),
+        majorsDelta: t('history.colDelta'),
+        types: t('history.colTypes'),
+        typesDelta: t('history.colDelta'),
         dims: t('history.colDims'),
       }}
     />
   );
 }
 
-function CompletedHistoryRow({ entry, delta, selectedRunId, statusByRunId, onRunClick, onRunHover, onDeleteRun }) {
+// The state classes of a completed row: selected, partial (cancelled with
+// scores) and deleting (its DELETE is in flight).
+function completedRowClass({ isSelected, isPartial, isDeleting }) {
+  return [
+    isSelected && 'history-row--selected',
+    isPartial && 'history-row--partial',
+    isDeleting && 'history-row--deleting',
+  ].filter(Boolean).join(' ');
+}
+
+function CompletedHistoryRow({ entry, delta, countDelta, selectedRunId, statusByRunId, onRunClick, onRunHover, onDeleteRun, deletingRunIds }) {
   const { date, time } = formatDateParts(entry.dateISO, entry.dateLabel);
+  const counts = runCounts(entry);
   const runScore = parseFloat(entry.runNumericAverage ?? entry.numericAverage);
   const grade = gradeLabel(entry.runOverallGrade || entry.overallGrade) || '—';
   const isSelected = entry.runId === selectedRunId;
   const isPartial = PARTIAL_STATUSES.has(statusByRunId.get(entry.runId));
+  // A row whose DELETE is in flight: dimmed, its button disabled, and not
+  // openable or prefetchable by mouse, keyboard or focus in the meantime.
+  const isDeleting = !!deletingRunIds?.has(entry.runId);
   return (
     <HistoryRow
-      className={`${isSelected ? 'history-row--selected' : ''}${isPartial ? ' history-row--partial' : ''}`.trim()}
-      onClick={() => onRunClick(entry.runId, entry.dateLabel)}
-      onHover={onRunHover ? () => onRunHover(entry.runId) : undefined}
+      className={completedRowClass({ isSelected, isPartial, isDeleting })}
+      onClick={isDeleting ? undefined : () => onRunClick(entry.runId, entry.dateLabel)}
+      onHover={onRunHover && !isDeleting ? () => onRunHover(entry.runId) : undefined}
       onDelete={onDeleteRun ? () => onDeleteRun(entry.runId, entry.dateLabel || date) : undefined}
+      deleteDisabled={isDeleting}
       cells={{
         date,
         time: <span className="history-row__muted">{time}</span>,
@@ -230,6 +239,10 @@ function CompletedHistoryRow({ entry, delta, selectedRunId, statusByRunId, onRun
         ),
         score: <strong>{Number.isNaN(runScore) ? '—' : trimTrailingZero(runScore)}</strong>,
         delta: <DeltaText delta={delta} />,
+        majors: <CountCell value={counts.majors} />,
+        majorsDelta: <DeltaText delta={countDelta?.majors} invert />,
+        types: <CountCell value={counts.openTypes} />,
+        typesDelta: <DeltaText delta={countDelta?.openTypes} invert />,
         dims: (
           <span className="history-row__muted">
             <FittedText text={formatDimSummary(entry)} mode="end" />
@@ -241,8 +254,8 @@ function CompletedHistoryRow({ entry, delta, selectedRunId, statusByRunId, onRun
 }
 
 function renderEvaluationRow(entry, i, props) {
-  const { selectedRunId, deltas, statusByRunId, onRunClick, onRunHover, onDeleteRun, onNotReadyClick } = props;
-  if (entry.status === 'in_progress') {
+  const { selectedRunId, deltas, countDeltas, statusByRunId, onRunClick, onRunHover, onDeleteRun, deletingRunIds, onNotReadyClick } = props;
+  if (entry.status === RUN_STATE.RUNNING) {
     return (
       <InProgressHistoryRow
         key={entry.runId}
@@ -257,11 +270,13 @@ function renderEvaluationRow(entry, i, props) {
       key={entry.runId}
       entry={entry}
       delta={deltas[i]}
+      countDelta={countDeltas?.[i]}
       selectedRunId={selectedRunId}
       statusByRunId={statusByRunId}
       onRunClick={onRunClick}
       onRunHover={onRunHover}
       onDeleteRun={onDeleteRun}
+      deletingRunIds={deletingRunIds}
     />
   );
 }

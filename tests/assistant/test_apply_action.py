@@ -134,6 +134,17 @@ class TestApplyDraftedAction:
         assert outcome == ApplyOutcome("conflict", detail="already dismissed")
         assert repo.action["status"] == "drafted"
 
+    def test_unexpected_apply_error_releases_claim_and_propagates(self, tmp_path):
+        repo = FakeRepo(action=_drafted())
+
+        def apply_fn(payload, ctx):
+            raise RuntimeError("boom")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            apply_drafted_action(
+                repo, "a1", _ctx(tmp_path), actions={"fake": _spec(apply_fn)})
+        assert repo.action["status"] == "drafted"
+
 
 def test_reject_drafted_action_success():
     repo = FakeRepo(action={"session_id": "s1", "status": "drafted"})

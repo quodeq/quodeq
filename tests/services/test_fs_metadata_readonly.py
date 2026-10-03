@@ -13,7 +13,8 @@ from unittest.mock import patch
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.fs.report_parser._run_info import RunInfo
-from quodeq.services._fs_metadata import _compute_summary, _read_accumulated_summary, warm_project_summary
+from quodeq.services._fs_metadata import _compute_summary, read_accumulated_summary, warm_project_summary
+from quodeq.services.fs_project_helpers import build_project_entry
 
 
 def _project(tmp_path: Path, name: str = "proj") -> Path:
@@ -34,7 +35,7 @@ def test_miss_returns_pending_without_computing(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     _project(tmp_path)
     with patch("quodeq.services._fs_metadata._compute_summary") as compute:
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _runs(), DEFAULT_PARAMS)
     compute.assert_not_called()
     assert (grade, score, files, pending) == (None, None, None, True)
@@ -47,7 +48,7 @@ def test_no_complete_runs_is_not_pending(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     _project(tmp_path)
     with patch("quodeq.services._fs_metadata._compute_summary") as compute:
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", [], DEFAULT_PARAMS)
     compute.assert_not_called()
     assert (grade, score, files, pending) == (None, None, None, False)
@@ -62,7 +63,7 @@ def test_cancelled_only_miss_returns_pending_without_computing(tmp_path, monkeyp
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     _project(tmp_path)
     with patch("quodeq.services._fs_metadata._compute_summary") as compute:
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _cancelled_runs(), DEFAULT_PARAMS)
     compute.assert_not_called()
     assert (grade, score, files, pending) == (None, None, None, True)
@@ -79,11 +80,11 @@ def test_warm_cancelled_only_then_read_hits_without_pending(tmp_path, monkeypatc
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "D", "score": 4.0, "files": 2},
     ) as compute, patch(
-        "quodeq.data.fs.report_parser.runs.list_runs", return_value=_cancelled_runs(),
+        "quodeq.services.wiring.list_runs", return_value=_cancelled_runs(),
     ):
         warm_project_summary(tmp_path, "proj")
         assert compute.call_count == 1
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _cancelled_runs(), DEFAULT_PARAMS)
     assert (grade, score, files, pending) == ("D", 4.0, 2, False)
     assert compute.call_count == 1  # the read did not recompute
@@ -96,11 +97,11 @@ def test_warm_then_read_hits_without_pending(tmp_path, monkeypatch):
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "B", "score": 7.5, "files": 10},
     ) as compute, patch(
-        "quodeq.data.fs.report_parser.runs.list_runs", return_value=_runs(),
+        "quodeq.services.wiring.list_runs", return_value=_runs(),
     ):
         warm_project_summary(tmp_path, "proj")
         assert compute.call_count == 1
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _runs(), DEFAULT_PARAMS)
     assert (grade, score, files, pending) == ("B", 7.5, 10, False)
     assert compute.call_count == 1  # the read did not recompute
@@ -115,22 +116,41 @@ def test_compute_on_miss_keeps_inline_behavior_for_shared_path(tmp_path, monkeyp
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "C", "score": 5.0, "files": 4},
     ) as compute:
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _runs(), DEFAULT_PARAMS, compute_on_miss=True)
     compute.assert_called_once()
     assert (grade, score, files, pending) == ("C", 5.0, 4, False)
 
 
-def test_kill_switch_keeps_inline_compute(tmp_path, monkeypatch):
-    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+def test_cache_disabled_param_keeps_inline_compute(tmp_path):
+    """``cache_enabled=False`` is the resolved kill switch, passed in by the
+    caller -- read_accumulated_summary itself never reads the environment."""
     _project(tmp_path)
     with patch(
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "A", "score": 9.0, "files": 3},
     ):
-        grade, score, files, pending = _read_accumulated_summary(
-            tmp_path, "proj", _runs(), DEFAULT_PARAMS)
+        grade, score, files, pending = read_accumulated_summary(
+            tmp_path, "proj", _runs(), DEFAULT_PARAMS, cache_enabled=False)
     assert (grade, score, files, pending) == ("A", 9.0, 3, False)
+
+
+def test_kill_switch_reaches_inline_compute_through_build_project_entry(tmp_path, monkeypatch):
+    """QUODEQ_DISABLE_SCORE_CACHE still forces inline compute end to end: the
+    public entry point (build_project_entry, the provider composition)
+    resolves it once via score_cache_disabled() and threads cache_enabled
+    through to read_accumulated_summary."""
+    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+    project_dir = _project(tmp_path)
+    (project_dir / "repository_info.json").write_text(
+        json.dumps({"name": "proj", "location": "local", "path": None}))
+    with patch(
+        "quodeq.services._fs_metadata._compute_summary",
+        return_value={"grade": "A", "score": 9.0, "files": 3},
+    ) as compute:
+        entry = build_project_entry(tmp_path, "proj", _runs())
+    compute.assert_called_once()
+    assert (entry.latest_grade, entry.latest_score, entry.summary_pending) == ("A", 9.0, False)
 
 
 def test_metadata_read_failure_is_logged(caplog, tmp_path):
@@ -138,7 +158,7 @@ def test_metadata_read_failure_is_logged(caplog, tmp_path):
     card falls back to an empty summary, but an operator needs a trace to
     diagnose which project's data is broken."""
     with patch(
-        "quodeq.services._fs_metadata._select_accumulated_dims",
+        "quodeq.services.dismissed.dismissed_keys",
         side_effect=json.JSONDecodeError("Expecting value", "doc", 0),
     ), caplog.at_level(logging.WARNING):
         result = _compute_summary(tmp_path, "proj", [], DEFAULT_PARAMS, set())

@@ -1,6 +1,8 @@
 """Rebuild-vs-update decision and the staleness checks behind ``ensure_projected``."""
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -23,6 +25,9 @@ class ProjectionResult:
     rebuilt: bool
 
 
+_NO_REPORTS_STAMP = "0"  # report_stamp() for a run without evaluation/*.json; unstamped rows match it
+
+
 @dataclass(frozen=True)
 class _StalenessCheck:
     """What ``_detect_staleness`` found -- consumed by ``_apply_projection_deltas``."""
@@ -32,6 +37,27 @@ class _StalenessCheck:
     actions_changed: bool
     actions_log: Path | None
     grades_stale: bool
+    coverage_stale: bool = False
+    # The standards the findings were placed with changed (or were never
+    # recorded): re-project from the events so every derived field is current.
+    mapping_stale: bool = False
+
+
+def _mapping_stale(store: SQLiteStateStore) -> bool:
+    """True when a projected run's standard mappings differ from the installed ones.
+
+    A run projected before stamps existed has none, so it re-projects once:
+    that is how runs stored with a blank principle heal. A run never
+    projected is rebuilt through its checkpoint check instead.
+    """
+    get = getattr(store, "get_mapping_stamps", None)
+    if get is None or store.get_checkpoint() is None:
+        return False
+    stored = get()
+    if stored is None:
+        return True
+    from quodeq.data.projection.admission import mapping_stamps  # noqa: PLC0415
+    return mapping_stamps(list(stored)) != stored
 
 
 class EnsureLockRegistry:
@@ -160,12 +186,21 @@ class Projector:
         from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION  # noqa: PLC0415
         grades_stale = store.get_grades_algo_version() != GRADE_ALGO_VERSION
 
+        # The coverage columns come from the dimension reports, which the CLI
+        # writes after the last event; a newer report than the one graded
+        # (or none stamped yet) re-derives the tables once.
+        from quodeq.data.projection.grade_projector import report_stamp  # noqa: PLC0415
+        stamped = store.get_coverage_stamp() or _NO_REPORTS_STAMP
+        coverage_stale = stamped != report_stamp(events_path.parent)
+
         return _StalenessCheck(
+            mapping_stale=_mapping_stale(store),
             events_changed=events_changed,
             pre_pr1_db=pre_pr1_db,
             actions_changed=actions_changed,
             actions_log=actions_log,
             grades_stale=grades_stale,
+            coverage_stale=coverage_stale,
         )
 
     def _apply_projection_deltas(
@@ -181,23 +216,31 @@ class Projector:
         matched against pre-existing dismissals.
         """
         # Project events first (so new findings exist before action events touch them).
-        if staleness.events_changed:
-            result = self.project(events_path, run_dir, force_rebuild=staleness.pre_pr1_db)
+        # A changed standard mapping rebuilds from event zero: every stored
+        # finding is placed again.
+        if staleness.events_changed or staleness.mapping_stale:
+            result = self.project(
+                events_path, run_dir, force_rebuild=staleness.pre_pr1_db or staleness.mapping_stale)
         else:
             result = ProjectionResult(events_projected=0, rebuilt=False)
 
         # Project actions. If events changed too, force-replay so brand-new findings
         # get matched against pre-existing dismissals.
-        if staleness.actions_log is not None and (staleness.actions_changed or staleness.events_changed):
-            self._engine.update_actions(
-                staleness.actions_log, run_dir, force=staleness.events_changed,
+        verdicts_changed = 0
+        replayed = staleness.events_changed or staleness.mapping_stale
+        if staleness.actions_log is not None and (staleness.actions_changed or replayed):
+            verdicts_changed = self._engine.update_actions(
+                staleness.actions_log, run_dir, force=replayed,
             )
 
         # Grade tables are derived from findings + dismissals. Recompute
-        # whenever either source changed, or when the stored grades were
-        # computed with an older version of the math (recompute_grades
-        # stamps the current one).
-        if staleness.events_changed or staleness.actions_changed or staleness.grades_stale:
+        # whenever the findings changed, a dismissal moved one of this run's
+        # verdicts, or the stored grades were computed with an older version
+        # of the math (recompute_grades stamps the current one). A dismissal
+        # that touches no finding here leaves the grades as they are: one
+        # dismiss grows actions.jsonl for every run of the project.
+        if (replayed or verdicts_changed or staleness.grades_stale
+                or staleness.coverage_stale):
             from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
             recompute_grades(run_dir)
 
@@ -222,9 +265,15 @@ class Projector:
                 migrate_if_needed(project_dir)
             store = self._store_factory(run_dir)
 
-            staleness = self._detect_staleness(store, events_path, project_dir)
+            # One connection for every run_meta read the check makes; each read
+            # used to open and configure its own.
+            held = store.connection() if hasattr(store, "connection") else nullcontext()
+            with held:
+                staleness = self._detect_staleness(store, events_path, project_dir)
 
-            if not staleness.events_changed and not staleness.actions_changed and not staleness.grades_stale:
+            if not (staleness.events_changed or staleness.actions_changed
+                    or staleness.grades_stale or staleness.coverage_stale
+                    or staleness.mapping_stale):
                 return ProjectionResult(events_projected=0, rebuilt=False)
 
             return self._apply_projection_deltas(events_path, run_dir, staleness)

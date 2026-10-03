@@ -7,6 +7,8 @@ import { useOuterPaneDrag } from './hooks/useOuterPaneDrag.js';
 import { usePaneDragPlumbing } from './hooks/usePaneDragPlumbing.js';
 import { useInnerDividerDrag, MIN_WINDOW_RATIO, DEFAULT_SPLIT_RATIO } from './hooks/useInnerDividerDrag.js';
 import './SidePane.css';
+import { KEY } from '../../vocab/keyboard.js';
+import { PERCENT } from '../../constants.js';
 
 // Build weights from ratios: walk through, treating each ratios[i] as the
 // split between weights[i] and weights[i+1] of their combined share.
@@ -40,9 +42,9 @@ function OuterDivider({ isDragging, onOuterDividerPointerDown, paneWidth, setPan
       onPointerDown={onOuterDividerPointerDown}
       onKeyDown={(e) => {
         const STEP = 16;
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (e.key === KEY.ARROW_LEFT || e.key === KEY.ARROW_RIGHT) {
           e.preventDefault();
-          const delta = e.key === 'ArrowLeft' ? -STEP : STEP;
+          const delta = e.key === KEY.ARROW_LEFT ? -STEP : STEP;
           const newWidth = clampSidePaneWidth(paneWidth + delta, window.innerWidth);
           document.documentElement.style.setProperty('--side-pane-width', `${newWidth}px`);
           setPaneWidth(newWidth);
@@ -60,16 +62,16 @@ function InnerRowDivider({ i, windowCount, ratios, setRatios, onInnerDividerPoin
       role="separator"
       aria-orientation="horizontal"
       aria-label={t('sidePane.resizeBetween', { first: i + 1, second: i + 2 })}
-      aria-valuenow={Math.round((ratios[i] ?? DEFAULT_SPLIT_RATIO) * 100)}
+      aria-valuenow={Math.round((ratios[i] ?? DEFAULT_SPLIT_RATIO) * PERCENT)}
       aria-valuemin={0}
-      aria-valuemax={100}
+      aria-valuemax={PERCENT}
       tabIndex={0}
       onPointerDown={onInnerDividerPointerDown(i)}
       onKeyDown={(e) => {
         const STEP = 0.05;
-        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (e.key === KEY.ARROW_UP || e.key === KEY.ARROW_DOWN) {
           e.preventDefault();
-          const delta = e.key === 'ArrowUp' ? -STEP : STEP;
+          const delta = e.key === KEY.ARROW_UP ? -STEP : STEP;
           setRatios((prev) => {
             const out = [...prev];
             out[i] = Math.min(1 - MIN_WINDOW_RATIO, Math.max(MIN_WINDOW_RATIO, (out[i] ?? DEFAULT_SPLIT_RATIO) + delta));

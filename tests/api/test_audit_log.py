@@ -1,4 +1,4 @@
-"""Audit log records the request outcome, not just that a request was attempted (Task 11)."""
+"""Audit log records the request outcome, not just that a request was attempted."""
 from __future__ import annotations
 
 import logging
@@ -92,3 +92,12 @@ def test_audit_log_emits_exactly_once_per_request(caplog):
 
     lines = [r.getMessage() for r in caplog.records if r.name == "quodeq.api.security"]
     assert len(lines) == 1
+
+
+def test_non_ascii_authorization_header_is_401():
+    """hmac.compare_digest refuses non-ASCII str input, so a garbage
+    header must be turned away before the compare, not reach the 500."""
+    client = create_app(api_key="test-key").test_client()
+    resp = client.get("/api/projects", headers={"Authorization": "Bearer caf\xe9"})
+    assert resp.status_code == 401
+    assert resp.get_json()["code"] == "UNAUTHORIZED"

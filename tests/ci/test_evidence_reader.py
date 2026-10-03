@@ -89,3 +89,13 @@ def test_non_integer_line_value_is_skipped_gracefully(tmp_path: Path) -> None:
     for v in result:
         if v.get("file") == "a.py":
             assert "line" not in v or isinstance(v["line"], int)
+
+
+def test_skips_non_object_lines_and_undecodable_files(tmp_path: Path) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    row = {"p": "SEC", "t": "violation", "d": "security", "file": "c.py", "line": 5}
+    (evidence_dir / "a_evidence.jsonl").write_text('[1, 2]\n"str"\n7\n' + json.dumps(row) + "\n")
+    (evidence_dir / "b_evidence.jsonl").write_bytes(b"\xff\xfe\n" + json.dumps(row).encode() + b"\n")
+    result = load_violations_from_evidence(evidence_dir)
+    assert [v["file"] for v in result] == ["c.py"]

@@ -69,7 +69,7 @@ def _respawns(loop, ctx: LoopContext, *, done: int, in_flight: int, remaining: i
     with patch("quodeq.analysis.subagents._pool_loops.collect_done", _ScriptedPolls(polls)), \
          patch("quodeq.analysis.subagents._pool_loops.should_respawn", should_respawn), \
          patch("quodeq.analysis.subagents._pool_loops.maybe_scale_up", return_value=True), \
-         patch("quodeq.analysis.subagents._pool_loops._FUTURE_POLL_INTERVAL_S", 0):
+         patch("quodeq.analysis.subagents._pool_loops.FUTURE_POLL_INTERVAL_S", 0):
         loop(ctx)
     return ctx.submit_fn.call_count - launched, should_respawn.call_count
 

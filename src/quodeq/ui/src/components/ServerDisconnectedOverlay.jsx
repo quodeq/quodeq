@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useApi } from '../api/ApiContext.jsx';
 import { t } from '../strings/index.js';
 
@@ -7,8 +8,29 @@ import { t } from '../strings/index.js';
 // eslint-disable-next-line i18n/no-prose-literals
 const RESTART_COMMAND = 'quodeq dashboard';
 
+// A wedged server accepts the connection and never answers; the default
+// request timeout would hold the retry button for 30 s with no sign.
+const HEALTH_PROBE_TIMEOUT_MS = 5000;
+
 export default function ServerDisconnectedOverlay({ onReconnect }) {
   const { getHealth } = useApi();
+  const [checking, setChecking] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function retry() {
+    setChecking(true);
+    setFailed(false);
+    try {
+      await getHealth({ timeout: HEALTH_PROBE_TIMEOUT_MS });
+      onReconnect();
+    } catch (err) {
+      console.warn('Reconnect failed:', err);
+      setFailed(true);
+    } finally {
+      setChecking(false);
+    }
+  }
+
   return (
     <div className="server-disconnected-overlay">
       <div className="server-disconnected-card">
@@ -26,8 +48,9 @@ export default function ServerDisconnectedOverlay({ onReconnect }) {
         <h2>{t('common.serverDisconnected')}</h2>
         <p>{t('common.serverDisconnectedBody')}</p>
         <code>{RESTART_COMMAND}</code>
-        <button type="button" className="server-retry-btn" onClick={() => getHealth().then(() => onReconnect()).catch((err) => console.warn('Reconnect failed:', err))}>
-          {t('common.retryConnection')}
+        {failed && <p className="server-retry-status" role="status">{t('common.stillUnreachable')}</p>}
+        <button type="button" className="server-retry-btn" onClick={retry} disabled={checking}>
+          {checking ? t('common.checkingConnection') : t('common.retryConnection')}
         </button>
       </div>
     </div>

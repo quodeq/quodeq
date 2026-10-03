@@ -14,9 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.config.services_env import RUN_DIM_CACHE_MAX_DEFAULT
+from quodeq.config.services_env import run_dim_cache_max as _resolve_run_dim_cache_max
 from quodeq.core.types import DimensionResult
 from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
-from quodeq.shared.env_resolve import resolve_env
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,17 +35,12 @@ class DashboardCacheConfig:
     version: str = ""
 
 
-_DEFAULT_RUN_DIM_CACHE_MAX = 256
+DEFAULT_RUN_DIM_CACHE_MAX = RUN_DIM_CACHE_MAX_DEFAULT
 
 
-def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
+def run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
-    if override is not None:
-        return override
-    try:
-        return int(resolve_env(env).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
-    except (ValueError, TypeError):
-        return _DEFAULT_RUN_DIM_CACHE_MAX
+    return override if override is not None else _resolve_run_dim_cache_max(env=env)
 
 
 class DimensionCache:
@@ -53,7 +49,7 @@ class DimensionCache:
     Without a shared cache, every dashboard request used a fresh one (built
     fresh in ``make_run_dimension_fetcher`` below), so re-fetching the same
     project's history (which ``collect_stale_dimensions`` /
-    ``_collect_previous_scores`` / ``build_accumulated_trend`` all walk) cost
+    ``collect_previous_scores`` / ``build_accumulated_trend`` all walk) cost
     ~750ms per request even on warm calls. The shared cache eliminates the
     cross-request I/O without compromising the per-request consistency
     guarantees (the cache is keyed by
@@ -96,10 +92,13 @@ def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]],
 def clear_shared_dimension_cache(cache: DimensionCache | None = None) -> None:
     """Drop all cached run-dimension data (e.g. after a formula change).
 
-    Clears *cache*, defaulting to the module-wide instance production
-    shares (the dashboard and the grade-formula-change hook).
+    Clears *cache* when given; by default the module-wide full-data cache
+    production shares.
     """
-    (cache or _shared_dimension_cache).clear()
+    if cache is not None:
+        cache.clear()
+        return
+    _shared_dimension_cache.clear()
 
 
 def make_run_dimension_fetcher(
@@ -118,7 +117,7 @@ def make_run_dimension_fetcher(
     ctx = DimensionCacheContext(
         cache=cc.cache if cc.cache is not None else _shared_dimension_cache.data,
         lock=cc.lock if cc.lock is not None else _shared_dimension_cache.lock,
-        max_size=cc.max_size if cc.max_size is not None else _run_dim_cache_max(),
+        max_size=cc.max_size if cc.max_size is not None else run_dim_cache_max(),
     )
     return make_lru_dimension_fetcher(reports_root, project, ctx, version=cc.version)
 

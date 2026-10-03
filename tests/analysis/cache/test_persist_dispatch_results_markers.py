@@ -25,7 +25,7 @@ def _write_jsonl(path: Path, lines: list[dict]) -> None:
 def _hash_inputs(config: RunConfig, dimension: str) -> CachePersistProvenance:
     """Compute the provenance hash inputs persist_dispatch_results now
     expects the caller to hoist and pass in."""
-    from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
+    from quodeq.analysis.cache._key_provenance import hash_prompts_combined
     from quodeq.analysis.fingerprint import hash_standards, dimension_params_state
 
     standards_hash = (
@@ -35,7 +35,7 @@ def _hash_inputs(config: RunConfig, dimension: str) -> CachePersistProvenance:
     params_hash, effective_params = dimension_params_state(
         config.standards_dir, dimension, config.src,
     )
-    prompts_hash = _hash_prompts_combined(config.prompts_dir)
+    prompts_hash = hash_prompts_combined(config.prompts_dir)
     return CachePersistProvenance(
         standards_hash=standards_hash, params_hash=params_hash,
         effective_params=effective_params, prompts_hash=prompts_hash,

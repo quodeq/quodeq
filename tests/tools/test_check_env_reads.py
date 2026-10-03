@@ -174,7 +174,7 @@ def test_baseline_has_no_stale_entries():
     )
 
 
-# Revise DOWNWARD as PR 2 Tasks 2-5 make each read injectable; the target is
+# Revise DOWNWARD as each read becomes injectable; the target is
 # 0. NEVER raise without a justification reviewed in the PR that raises it.
 BASELINE_CEILING = 94
 

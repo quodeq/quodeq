@@ -3,6 +3,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
+import { MockEventSource } from "../../../test-utils/MockEventSource.js";
 
 vi.mock("../../../utils/confirmDialog.js", () => ({
   confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
@@ -19,7 +20,6 @@ const fakeApi = {
   getEvaluation: vi.fn(),
   startEvaluation: vi.fn(),
   cancelEvaluation: vi.fn(),
-  getDimensionEval: vi.fn(),
   listEvaluations: vi.fn().mockResolvedValue([]),
 };
 
@@ -35,7 +35,7 @@ function makeWrapper() {
 }
 
 
-// Split from useEvaluation.test.jsx: findingsRefetchInterval,
+// Split from useEvaluation.test.jsx: statusRefetchInterval,
 // cancel-failure-status handling, and preparePayload's honoring of
 // caller-provided values.
 //
@@ -49,24 +49,24 @@ function makeWrapper() {
 beforeEach(() => {
   Object.values(fakeApi).forEach((fn) => fn.mockReset?.());
   fakeApi.listEvaluations.mockResolvedValue([]);
-  vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
+  // jsdom has no EventSource; the stream opens against the mock.
+  vi.stubGlobal("EventSource", MockEventSource);
   localStorage.setItem("cc-active-provider", "ollama");
   localStorage.setItem("cc-ollama-model", "llama3.1");
 });
 
-describe("findingsRefetchInterval", () => {
-  it("polls while the job runs, stops when it reaches any terminal status", async () => {
-    const { findingsRefetchInterval } = await import("./useEvaluation.js");
-    expect(findingsRefetchInterval({ status: "running" }, false)).toBe(2000);
-    expect(findingsRefetchInterval(null, false)).toBe(2000);
-    for (const status of ["done", "failed", "cancelled", "lost", "completed"]) {
-      expect(findingsRefetchInterval({ status }, false)).toBe(false);
-    }
+describe("statusRefetchInterval", () => {
+  it("only refetches on the slow safety net while the stream is up", async () => {
+    const { statusRefetchInterval, SSE_STATUS_SAFETY_NET_MS } = await import("./useEvaluation.helpers.js");
+    const { STREAM_STATE } = await import("./runEventSourceRegistry.js");
+    expect(statusRefetchInterval(STREAM_STATE.OPEN)).toBe(SSE_STATUS_SAFETY_NET_MS);
+    expect(statusRefetchInterval(STREAM_STATE.IDLE)).toBe(SSE_STATUS_SAFETY_NET_MS);
   });
 
-  it("never polls under SSE", async () => {
-    const { findingsRefetchInterval } = await import("./useEvaluation.js");
-    expect(findingsRefetchInterval({ status: "running" }, true)).toBe(false);
+  it("falls back to the fast poll while the stream is in error", async () => {
+    const { statusRefetchInterval, JOB_POLL_MS } = await import("./useEvaluation.helpers.js");
+    const { STREAM_STATE } = await import("./runEventSourceRegistry.js");
+    expect(statusRefetchInterval(STREAM_STATE.ERROR)).toBe(JOB_POLL_MS);
   });
 });
 

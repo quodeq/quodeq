@@ -3,16 +3,18 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from quodeq.analysis._ignore import load_ignore_patterns
-from quodeq.analysis.manifest_build_scope import _build_multi_scope_manifest
+from quodeq.analysis.manifest_build_scope import build_multi_scope_manifest
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.analysis.manifest_targets import (
-    _MIN_FILES_PER_TARGET,
+    MIN_FILES_PER_TARGET,
     WalkCounts,
-    _build_targets_from_matches,
-    _iter_source_files,
+    build_targets_from_matches,
+    iter_source_files,
     target_name,
 )
 from quodeq.config.discipline_registry import DisciplineRegistry
@@ -20,19 +22,32 @@ from quodeq.data.git_cli import list_tracked_files
 
 _logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
+
+
+def _guard_detection(disciplines_conf: Path, detect: Callable[[], _T]) -> _T | None:
+    """Run *detect*; when the registry is unreadable or invalid, log it and return None."""
+    try:
+        return detect()
+    except (ValueError, OSError) as exc:
+        _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
+        return None
+
 
 def _build_targets_from_disciplines(
     src: Path, disciplines_conf: Path,
     files_by_lang: dict[str, list[str]], ext_counts_by_lang: dict[str, Counter],
 ) -> list[AnalysisTarget]:
     """Build AnalysisTarget list for a single-scope walk via root-level detection."""
-    try:
+    def detect() -> tuple[DisciplineRegistry, list[str]]:
         registry = DisciplineRegistry.from_file(disciplines_conf)
-        matches = registry.detect_matches(src)
-    except (ValueError, OSError) as exc:
-        _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
+        return registry, registry.detect_matches(src)
+
+    detected = _guard_detection(disciplines_conf, detect)
+    if detected is None:
         return []
-    return _build_targets_from_matches(registry, matches, files_by_lang, ext_counts_by_lang)
+    registry, matches = detected
+    return build_targets_from_matches(registry, matches, files_by_lang, ext_counts_by_lang)
 
 
 def _resolve_walk_root(src: Path, scope_path: str | None) -> Path:
@@ -52,7 +67,7 @@ def _resolve_walk_root(src: Path, scope_path: str | None) -> Path:
 
 def _walk_and_group(
     src: Path, walk: ManifestWalkSpec, scope_path: str | None = None,
-) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter], int]:
+) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter], int, int]:
     """Walk *src* (or a scoped subdirectory) once, grouping files by language.
 
     When *scope_path* is given (relative to *src*), only files under that
@@ -60,18 +75,22 @@ def _walk_and_group(
     expressed relative to *src* so callers see the same format regardless.
     *walk.ignore_patterns* (.quodeqignore) are anchored at *src*, not the scope.
 
-    The fourth element is how many files the git-tracked filter skipped.
+    The fourth element is how many files the git-tracked filter skipped; the
+    fifth is how many directories the walk could not list.
     """
     files_by_lang: dict[str, list[str]] = {}
     ext_counts: Counter[str] = Counter()
     ext_counts_by_lang: dict[str, Counter] = {}
     counts = WalkCounts()
     walk_root = _resolve_walk_root(src, scope_path)
-    for rel, suffix, lang in _iter_source_files(src, walk_root, walk, counts):
+    for rel, suffix, lang in iter_source_files(src, walk_root, walk, counts):
         files_by_lang.setdefault(lang, []).append(rel)
         ext_counts[suffix] += 1
         ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
-    return files_by_lang, ext_counts, ext_counts_by_lang, counts.skipped_untracked
+    return (
+        files_by_lang, ext_counts, ext_counts_by_lang,
+        counts.skipped_untracked, counts.unreadable_dirs,
+    )
 
 
 def _build_single_scope_manifest(
@@ -81,7 +100,7 @@ def _build_single_scope_manifest(
     scope_path: str | None,
 ) -> SourceManifest:
     """Legacy single-scope path: walk once at the (optionally scoped) root."""
-    files_by_lang, ext_counts, ext_counts_by_lang, skipped = _walk_and_group(
+    files_by_lang, ext_counts, ext_counts_by_lang, skipped, unreadable = _walk_and_group(
         src, walk, scope_path=scope_path,
     )
     all_source_files_count = sum(len(f) for f in files_by_lang.values())
@@ -95,7 +114,7 @@ def _build_single_scope_manifest(
         for t in targets:
             t.scope_path = scope_label
     for lang, lang_files in files_by_lang.items():
-        if len(lang_files) < _MIN_FILES_PER_TARGET:
+        if len(lang_files) < MIN_FILES_PER_TARGET:
             continue
         lang_ext_counts = ext_counts_by_lang.get(lang, Counter())
         targets.append(AnalysisTarget(
@@ -113,6 +132,7 @@ def _build_single_scope_manifest(
         total_files=all_source_files_count,
         language_stats=dict(ext_counts),
         skipped_untracked=skipped,
+        unreadable_dirs=unreadable,
     )
 
 
@@ -123,22 +143,23 @@ def _resolve_registry_and_scopes(
     than the repo root alone, its recursive subproject scopes.
 
     Returns ``(registry, sub_results)`` where *sub_results* is ``None`` when
-    there is no registry, or when the registry classifies only a single
-    root-level project — both cases mean the caller should take the legacy
-    single-scope path.
+    there is no registry, when recursive discovery itself fails, or when the
+    registry classifies only a single root-level project — every case means
+    the caller should take the legacy single-scope path.
     """
     registry: DisciplineRegistry | None = None
     if disciplines_conf and disciplines_conf.exists():
-        try:
-            registry = DisciplineRegistry.from_file(disciplines_conf)
-        except (ValueError, OSError) as exc:
-            _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
-            return None, None
-
+        registry = _guard_detection(
+            disciplines_conf, lambda: DisciplineRegistry.from_file(disciplines_conf),
+        )
     if registry is None:
         return None, None
 
-    sub_results = registry.detect_matches_recursive(src)
+    sub_results = _guard_detection(
+        disciplines_conf, lambda: registry.detect_matches_recursive(src),
+    )
+    if sub_results is None:
+        return registry, None
     is_single_root = (
         not sub_results or (len(sub_results) == 1 and sub_results[0][0] == ".")
     )
@@ -152,6 +173,8 @@ def build_manifest(
     detection: dict,
     disciplines_conf: Path | None = None,
     scope_path: str | None = None,
+    *,
+    tracked_files: set[Path] | None = None,
 ) -> SourceManifest:
     """Walk a repository and build a SourceManifest.
 
@@ -179,22 +202,39 @@ def build_manifest(
     exactly as before. What the filter dropped is reported on the manifest as
     ``skipped_untracked`` and logged once, so a run that scores fewer files
     than the reader can see says why.
+
+    Directories the walk could not list (permission denied, vanished
+    mid-walk) are reported on the manifest as ``unreadable_dirs`` and logged
+    once at warning when non-zero, so a partially-scanned repo does not look
+    identical to a fully-scanned one.
     """
     walk = ManifestWalkSpec(
         ext_map=detection.get("extensions", {}),
         skip_dirs=set(detection.get("skip_dirs", [])),
         skip_patterns=detection.get("skip_patterns", []),
         ignore_patterns=load_ignore_patterns(src),
-        tracked_files=list_tracked_files(src),
+        tracked_files=tracked_files if tracked_files is not None else list_tracked_files(src),
     )
     manifest = _dispatch_manifest_build(src, walk, disciplines_conf, scope_path)
+    _log_manifest_diagnostics(manifest, src)
+    return manifest
+
+
+def _log_manifest_diagnostics(manifest: SourceManifest, src: Path) -> None:
+    """Log the walk's skipped/unreadable counts once each, when non-zero."""
     skipped = manifest.skipped_untracked
     if skipped:
         _logger.info(
             "Skipped %d untracked file%s under %s (only what git tracks is scored)",
             skipped, "" if skipped == 1 else "s", src,
         )
-    return manifest
+    unreadable = manifest.unreadable_dirs
+    if unreadable:
+        _logger.warning(
+            "%d director%s under %s could not be listed (permission denied or "
+            "vanished mid-walk); the manifest may be missing source under them",
+            unreadable, "y" if unreadable == 1 else "ies", src,
+        )
 
 
 def _dispatch_manifest_build(
@@ -210,6 +250,6 @@ def _dispatch_manifest_build(
     registry, sub_results = _resolve_registry_and_scopes(src, disciplines_conf)
     if sub_results is not None:
         assert registry is not None  # sub_results is only set alongside a loaded registry
-        return _build_multi_scope_manifest(src, walk, registry, sub_results)
+        return build_multi_scope_manifest(src, walk, registry, sub_results)
 
     return _build_single_scope_manifest(src, walk, disciplines_conf, None)

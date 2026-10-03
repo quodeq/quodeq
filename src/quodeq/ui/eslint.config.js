@@ -4,6 +4,7 @@
 // linting elsewhere, not here, or the ratchet counts drift.
 import react from 'eslint-plugin-react';
 import i18n from './tools/i18n_rules.mjs';
+import { JSX_MODULE_LANGUAGE_OPTIONS, REACT_SETTINGS } from './tools/eslint_shared_config.mjs';
 
 // Files whose English is addressed to a model or to a file format, not to a
 // person: LLM prompt scaffolding and the exported-report layout. Translating
@@ -17,6 +18,7 @@ const NOT_USER_FACING = [
   'src/utils/reportBuilder/shared.js',
   'src/utils/reportBuilder/dimensionSummary.js',
   'src/utils/reportBuilder/runBuilders.js',
+  'src/utils/reportBuilder/headline.js',
   'src/utils/reportBuilder/principleBuilder.js',
   'src/utils/reportBuilder/fileBuilder.js',
 ];
@@ -26,12 +28,8 @@ export default [
     files: ['src/**/*.jsx'],
     ignores: ['**/*.test.jsx', '**/*.fixtures.jsx'], // Fixtures modules are test-support data, not user-facing prose
     plugins: { react, i18n },
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
-    settings: { react: { version: 'detect' } },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
+    settings: REACT_SETTINGS,
     rules: {
       'react/jsx-no-literals': [
         'error',
@@ -46,7 +44,7 @@ export default [
           ignoreProps: true,
           noAttributeStrings: false,
           // Pure punctuation/symbol glyphs are not translatable text.
-          allowedStrings: [' ', '×', '·', '•', '…', ':', '(', ')', '[', ']', '/', ',', '-', '%', '—', '‹', '›', '→', '@', '↑', '↓', '+', '▸', '▶', '✓', '✕', '↻', 'Δ', '⟳', '▾', '?', '.', '←', '>_', '--'],
+          allowedStrings: [' ', '×', '·', '•', '…', ':', '(', ')', '[', ']', '/', ',', '-', '%', '—', '‹', '›', '→', '@', '↑', '↓', '+', '▸', '▶', '✓', '✕', '↻', 'Δ', '⟳', '▾', '?', '.', '←', '>_', '--', '⋯', '☁'],
         },
       ],
       'i18n/no-literal-visible-attrs': 'error',

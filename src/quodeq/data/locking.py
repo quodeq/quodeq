@@ -4,12 +4,19 @@ from __future__ import annotations
 import sys
 from typing import IO, Protocol
 
+from quodeq.data.file_lock import lock_file, unlock_file
+from quodeq.shared.constants import PLATFORM_WIN32
+
 
 class FileLock(Protocol):
     """Exclusive whole-file lock held for the lifetime of a critical section."""
 
     def acquire(self, f: IO) -> None:
-        """Block until this process owns the lock on *f*."""
+        """Wait until this process owns the lock on *f*.
+
+        Raises ``OSError`` (``TimeoutError`` on POSIX) once the lock budget
+        in ``core/utils/file_lock.py`` runs out.
+        """
         ...
 
     def release(self, f: IO) -> None:
@@ -17,17 +24,15 @@ class FileLock(Protocol):
         ...
 
 
-if sys.platform == "win32":
-    import msvcrt
-
+if sys.platform == PLATFORM_WIN32:
     class _WindowsFileLock:
         def acquire(self, f: IO) -> None:
             f.seek(0)
-            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+            lock_file(f.fileno())
 
         def release(self, f: IO) -> None:
             f.seek(0)
-            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            unlock_file(f.fileno())
 
     def get_file_lock() -> FileLock:
         """Return the ``msvcrt.locking`` implementation used on Windows.
@@ -38,14 +43,12 @@ if sys.platform == "win32":
         return _WindowsFileLock()
 
 else:
-    import fcntl
-
     class _UnixFileLock:
         def acquire(self, f: IO) -> None:
-            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            lock_file(f.fileno())
 
         def release(self, f: IO) -> None:
-            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            unlock_file(f.fileno())
 
     def get_file_lock() -> FileLock:
         """Return the ``flock`` implementation used everywhere except Windows."""

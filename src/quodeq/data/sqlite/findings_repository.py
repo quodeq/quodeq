@@ -1,31 +1,20 @@
 """SQLite implementation of FindingsRepository (per-run evaluation.db)."""
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
 from quodeq.core.types.finding import Finding
+from quodeq.data.ports.findings import DEFAULT_SEARCH_LIMIT
 from quodeq.data.projection.projector import Projector
 from quodeq.data.sqlite.row_mappers import (
     finding_dict_to_row,
     row_to_finding,
 )
 from quodeq.data.sqlite.connection import open_evaluation_db
+from quodeq.data.sqlite._schema import INSERT_FINDING_SQL
 
-_INSERT_SQL = """
-INSERT OR IGNORE INTO findings (
-    schema_version, practice_id, dimension, requirement, verdict, severity,
-    file, line, end_line, title, reason, snippet,
-    violation_type, violation_type_raw, context, scope, req_refs_json, dedup_key, confidence,
-    provenance_downgrade, scope_downgrade_json
-) VALUES (
-    :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
-    :file, :line, :end_line, :title, :reason, :snippet,
-    :violation_type, :violation_type_raw, :context, :scope, :req_refs_json, :dedup_key, :confidence,
-    :provenance_downgrade, :scope_downgrade_json
-)
-"""
 
 _SELECT_COLUMNS = (
     "id, practice_id, dimension, requirement, verdict, severity, "
@@ -80,7 +69,7 @@ class SqliteFindingsRepository:
         """
         row = finding_dict_to_row(finding)
         with open_evaluation_db(self._run_dir) as conn:
-            cur = conn.execute(_INSERT_SQL, row)
+            cur = conn.execute(INSERT_FINDING_SQL, row)
             conn.commit()
             return cur.rowcount == 1
 
@@ -90,13 +79,7 @@ class SqliteFindingsRepository:
         Projects first, so the rows reflect the current event log.
         """
         self._ensure_fresh()
-        with open_evaluation_db(self._run_dir) as conn:
-            conn.row_factory = _dict_row
-            rows = conn.execute(
-                f"SELECT {_SELECT_COLUMNS} FROM findings WHERE dimension = ? ORDER BY id",
-                (dimension,),
-            ).fetchall()
-        return [row_to_finding(r) for r in rows]
+        return self._select_findings("WHERE dimension = ? ORDER BY id", (dimension,))
 
     def list_all(self) -> list[Finding]:
         """Return every finding in the DB in a single query (all dimensions).
@@ -105,12 +88,19 @@ class SqliteFindingsRepository:
         and group in Python rather than issuing N ``list_by_dimension`` calls.
         """
         self._ensure_fresh()
+        return self._select_findings("ORDER BY id")
+
+    def list_keys(self) -> list[tuple[str | None, str | None, object]]:
+        """Return ``(requirement, file, line)`` for every finding in one narrow query.
+
+        The identity check needs only these three columns; ``list_all`` would
+        build a full ``Finding`` per row. Every verdict is included, like
+        ``list_all``, so an already-dismissed finding still matches.
+        """
+        self._ensure_fresh()
         with open_evaluation_db(self._run_dir) as conn:
-            conn.row_factory = _dict_row
-            rows = conn.execute(
-                f"SELECT {_SELECT_COLUMNS} FROM findings ORDER BY id",
-            ).fetchall()
-        return [row_to_finding(r) for r in rows]
+            return [tuple(r) for r in conn.execute(
+                "SELECT requirement, file, line FROM findings ORDER BY id")]
 
     def count_by_dimension(self) -> dict[str, int]:
         """Return ``COUNT(*) GROUP BY dimension``, dismissed rows included.
@@ -127,7 +117,7 @@ class SqliteFindingsRepository:
     def search(
         self,
         query: str,
-        limit: int = 100,
+        limit: int = DEFAULT_SEARCH_LIMIT,
         *,
         exclude_dimensions: Iterable[str] | None = None,
     ) -> list[Finding]:
@@ -156,14 +146,13 @@ class SqliteFindingsRepository:
             where.append(f"LOWER(dimension) NOT IN ({placeholders})")
             params.extend(excluded)
         params.append(limit)
+        return self._select_findings(f"WHERE {' AND '.join(where)} ORDER BY id LIMIT ?", params)
+
+    def _select_findings(self, clause: str, params: Sequence[Any] = ()) -> list[Finding]:
+        """``SELECT <finding columns> FROM findings <clause>`` as Findings. Does not project."""
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row
-            rows = conn.execute(
-                f"SELECT {_SELECT_COLUMNS} FROM findings "
-                f"WHERE {' AND '.join(where)} "
-                "ORDER BY id LIMIT ?",
-                params,
-            ).fetchall()
+            rows = conn.execute(f"SELECT {_SELECT_COLUMNS} FROM findings {clause}", params).fetchall()
         return [row_to_finding(r) for r in rows]
 
     def set_verdict(self, *, practice_id: str, file: str, line: int, verdict: str) -> int:

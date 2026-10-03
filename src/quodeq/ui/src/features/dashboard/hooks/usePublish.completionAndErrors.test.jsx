@@ -32,7 +32,7 @@ function wrap(fakeApi, children) {
 // completion, POST-error surfacing, and mount-fetch gating.
 
 describe('usePublish', () => {
-  // Audit C3/C4: the "published <relative time>" meta, the PUBLISHED badge,
+  // The "published <relative time>" meta, the PUBLISHED badge,
   // and the publish/update button used to update at different speeds --
   // the meta from usePublish's own cheap refetch, the badge/button only once
   // the (possibly-coalesced, possibly-slow) authoritative refresh landed.

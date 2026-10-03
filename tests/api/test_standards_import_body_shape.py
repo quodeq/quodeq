@@ -37,6 +37,25 @@ def test_import_from_library_list_body_returns_400(dirs, monkeypatch):
     assert "object" in body["error"]
 
 
+def test_import_standard_string_force_returns_400(client):
+    """``force: "false"`` is rejected, not coerced: ``bool("false")`` is
+    ``True`` in Python, so coercing it would overwrite an existing standard
+    the client asked to keep."""
+    payload = {"data": {"id": "x", "name": "X", "principles": []}, "force": "false"}
+    resp = client.post("/api/standards/import", json=payload, headers=_ORIGIN)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "INVALID_PARAM"
+    assert "force" in body["error"]
+
+
+def test_import_standard_null_force_is_treated_as_absent(client):
+    payload = {"data": {"id": "y", "name": "Y", "principles": []}, "force": None}
+    resp = client.post("/api/standards/import", json=payload, headers=_ORIGIN)
+    assert resp.status_code == 201
+    assert resp.get_json()["status"] == "imported"
+
+
 def test_import_from_library_non_string_file_returns_400(dirs, monkeypatch):
     """``{"file": 5}`` passes the truthiness check; before the type guard the
     ``".." in file_path`` test then raised TypeError, a bare 500."""

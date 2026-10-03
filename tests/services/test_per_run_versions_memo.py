@@ -7,6 +7,7 @@ versions that had not changed.
 """
 import pytest
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.services import run_keys as run_keys_mod
@@ -41,18 +42,18 @@ def _forbid_key_reads(monkeypatch):
     def _no_read(run_dir):
         raise AssertionError(f"run key sets re-read for {run_dir}")
 
-    def _no_load(project):
-        raise AssertionError(f"cached run keys reloaded for {project}")
+    def _no_load(project, run_id):
+        raise AssertionError(f"cached run keys reloaded for {project}/{run_id}")
 
     monkeypatch.setattr(run_keys_mod, "read_run_key_sets", _no_read)
-    monkeypatch.setattr(sc, "load_run_keys_or_empty", _no_load)
+    monkeypatch.setattr(sc, "persisted_run_key_sets", _no_load)
 
 
 def test_unchanged_state_serves_complete_runs_from_memory(tmp_path, monkeypatch):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
     _run_with_finding(pd, "r2", file="b.py")
-    runs = [("r1", "complete"), ("r2", "complete")]
+    runs = [("r1", RunState.DONE), ("r2", RunState.DONE)]
     first = per_run_versions(pd, "proj", DEFAULT_PARAMS, runs, keys=_NO_KEYS)
 
     _forbid_key_reads(monkeypatch)
@@ -63,20 +64,20 @@ def test_unchanged_state_serves_complete_runs_from_memory(tmp_path, monkeypatch)
 def test_a_dismissal_touching_the_run_changes_its_version(tmp_path):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
-    base = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
+    base = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.DONE)], keys=_NO_KEYS)
     touched = per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "complete")],
+        pd, "proj", DEFAULT_PARAMS, [("r1", RunState.DONE)],
         keys=SuppressionKeys({("R1", "a.py", 1)}, set()))
     assert base[0][2] != touched[0][2]
     # Back to the earlier state: the earlier version, not a third one.
-    back = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
+    back = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.DONE)], keys=_NO_KEYS)
     assert back == base
 
 
 def test_non_complete_runs_are_still_read_every_call(tmp_path, monkeypatch):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
-    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "cancelled")], keys=_NO_KEYS)
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.CANCELLED)], keys=_NO_KEYS)
 
     seen = []
     real = run_keys_mod.read_run_key_sets
@@ -86,39 +87,41 @@ def test_non_complete_runs_are_still_read_every_call(tmp_path, monkeypatch):
         return real(run_dir)
 
     monkeypatch.setattr(run_keys_mod, "read_run_key_sets", counting)
-    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "cancelled")], keys=_NO_KEYS)
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.CANCELLED)], keys=_NO_KEYS)
     assert seen == [pd / "r1"]
 
 
 def test_trend_version_for_reuses_the_memo_for_cacheable_runs(tmp_path, monkeypatch):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
-    inputs = VersionInputs.of(DEFAULT_PARAMS, set(), set())
-    first = _make_version_for(pd, "proj", inputs, lambda: {}, {"r1"})("r1")
+    inputs = VersionInputs.of(DEFAULT_PARAMS, set(), set(), pd)
+    first = _make_version_for(pd, "proj", inputs, lambda _rid: None, {"r1"})("r1")
 
     _forbid_key_reads(monkeypatch)
 
-    def _no_load():
+    def _no_load(_rid):
         raise AssertionError("cached run keys loaded although every run was memoized")
 
     again = _make_version_for(pd, "proj", inputs, _no_load, {"r1"})("r1")
     assert again == first
 
 
-def test_trend_version_for_loads_keys_lazily_and_once(tmp_path):
+def test_trend_version_for_loads_each_runs_keys_lazily_and_once(tmp_path):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
     _run_with_finding(pd, "r2", file="b.py")
     loads = []
 
-    def load():
-        loads.append(1)
-        return {}
+    def load(run_id):
+        loads.append(run_id)
+        return None
 
-    # Not cacheable: nothing memoized, so the loader runs, but only once per fetcher.
+    # Not cacheable: nothing memoized, so the per-run loader runs for the run
+    # asked about (never the whole project), and once per run per fetcher.
     version_for = _make_version_for(
-        pd, "proj", VersionInputs.of(DEFAULT_PARAMS, set(), set()), load, set())
+        pd, "proj", VersionInputs.of(DEFAULT_PARAMS, set(), set(), pd), load, set())
     assert loads == []
     version_for("r1")
     version_for("r2")
-    assert loads == [1]
+    version_for("r1")
+    assert loads == ["r1", "r2"]

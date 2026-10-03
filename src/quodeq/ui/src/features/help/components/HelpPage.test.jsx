@@ -19,8 +19,21 @@ describe('HelpPage grade formula section', () => {
     render(<HelpPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Grade Formula' }));
     expect(screen.getByRole('heading', { level: 2, name: 'Grade Formula' })).toBeInTheDocument();
-    expect(screen.getByText('SEVERITY')).toBeInTheDocument();
+    expect(screen.getByText('FORMULA')).toBeInTheDocument();
+    expect(screen.getByText('TYPES')).toBeInTheDocument();
     expect(screen.getByText(/RESET Q²/)).toBeInTheDocument();
+    expect(screen.queryByText('SEVERITY')).not.toBeInTheDocument();
+  });
+});
+
+describe('HelpPage why this grade section', () => {
+  it('is prose only and points at the editor for the live numbers', () => {
+    render(<HelpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Why This Grade' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Why This Grade' })).toBeInTheDocument();
+    expect(screen.getByText(/shows these stages on your own run/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Principle')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Open a project with a finished run/)).not.toBeInTheDocument();
   });
 });
 
@@ -113,5 +126,72 @@ describe('HelpPage violations section', () => {
     expect(screen.getByText('by-dimension')).toBeInTheDocument();
     expect(screen.getByText('by-file')).toBeInTheDocument();
     expect(screen.queryByText(/Heatgrid/)).toBeNull();
+  });
+});
+
+describe('HelpPage deep link', () => {
+  it('opens on the requested section', () => {
+    render(<HelpPage initialSection="grade-formula" />);
+    expect(screen.getByRole('heading', { level: 2, name: 'Grade Formula' })).toBeInTheDocument();
+  });
+
+  it('falls back to philosophy on an unknown section', () => {
+    render(<HelpPage initialSection="nope" />);
+    expect(screen.getByRole('button', { name: 'Philosophy' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+describe('HelpPage grade formula parameters', () => {
+  it('documents every on-the-fly parameter', () => {
+    render(<HelpPage initialSection="grade-formula" />);
+    for (const name of ['Severity weights', 'Strictness K', 'Lift compress', 'Ceiling scale', 'Severity floors', 'Grade thresholds', 'Dimension weights']) {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    }
+  });
+});
+
+describe('HelpPage overview header stats', () => {
+  it('describes the badges, the ratio and the density, and no since-baseline panel', () => {
+    render(<HelpPage initialSection="overview" />);
+    for (const name of ['MAJ badges', 'Density']) {
+      expect(screen.getAllByText(name, { exact: false }).length).toBeGreaterThan(0);
+    }
+    expect(screen.queryAllByText('Since baseline', { exact: false })).toHaveLength(0);
+  });
+});
+
+describe('HelpPage violations by type', () => {
+  it('documents the by-type sub-tab and dismissing a type', () => {
+    render(<HelpPage initialSection="violations" />);
+    expect(screen.getByRole('heading', { level: 3, name: /Four sub-tabs, one dataset/ })).toBeInTheDocument();
+    expect(screen.getAllByText(/by-type/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Dismiss all/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('HelpPage overview: the four tiles', () => {
+  it('documents the chips\' arrows, the ratio reading and density in the tile, and no strip', () => {
+    const { container } = render(<HelpPage initialSection="overview" />);
+    expect(screen.queryByRole('heading', { level: 3, name: /The strip/ })).not.toBeInTheDocument();
+    expect(container.textContent).toMatch(/change since the baseline run/);
+    expect(container.textContent).toMatch(/violations to compliance/);
+    expect(container.textContent).toMatch(/per 100 files read/);
+    expect(container.textContent).not.toMatch(/Open types|see findings/);
+  });
+});
+
+describe('HelpPage history counts', () => {
+  it('documents the tooltip counts and the MAJORS and TYPES columns, without lines, legend or a since-baseline panel', () => {
+    const { container } = render(<HelpPage initialSection="history" />);
+    expect((container.textContent.match(/majors/gi) || []).length).toBeGreaterThan(1);
+    expect((container.textContent.match(/open types/gi) || []).length).toBeGreaterThan(1);
+    expect(container.textContent).toMatch(/criticals/i);
+    expect(screen.queryByRole('heading', { level: 3, name: /Since the baseline/ })).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/legend|dashed|dotted|per-dimension lines/i);
+  });
+
+  it('describes the report order on the Overview page', () => {
+    render(<HelpPage initialSection="overview" />);
+    expect(screen.getByText(/report opens with the header's numbers/)).toBeInTheDocument();
   });
 });

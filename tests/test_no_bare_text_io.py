@@ -31,6 +31,8 @@ _BINARY_MODE = re.compile(r"""['"][rwax]{1,2}b\+?['"]""")
 _NON_TEXT_OPEN = (
     "os.open(",
     "webbrowser.open(",
+    # urllib OpenerDirector.open() fetches a URL and returns a byte stream.
+    "opener.open(",
     "gzip.open(",
     "tarfile.open(",
     "zipfile.",

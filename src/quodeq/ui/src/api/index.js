@@ -12,7 +12,7 @@
  * working unchanged.
  */
 
-export { listDismissedFindings, dismissFinding, restoreFinding, restoreAllFindings, getRescore, deleteFinding, deleteAllFindings, listVerifiedFindings, unverifyFinding } from './findings.js';
+export { listDismissedFindings, dismissFinding, dismissByType, restoreFinding, restoreAllFindings, getRescore, deleteFinding, deleteAllFindings, listVerifiedFindings, unverifyFinding } from './findings.js';
 export { listStandards, getStandard, createStandard, updateStandard, deleteStandard, duplicateStandard, listLibrary, listCwes, importFromLibrary, importStandard, exportStandard, getStandardsOverrides, putStandardsOverrides } from './standards.js';
 export {
   createAssistantSession, fetchAssistantWorkspace, postAssistantMessage, stopAssistantTurn,
@@ -20,14 +20,16 @@ export {
   applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
 } from './assistant.js';
 export {
-  getSharedStatus, connectShared, disconnectShared, refreshShared,
+  getSharedStatus, connectShared, disconnectShared,
   sharedListProjects, sharedGetProjectInfo, sharedGetRuns,
   sharedGetDashboard, sharedGetAccumulated, sharedGetProjectScores,
-  sharedGetRunScores, sharedGetDimensionEval, sharedGetViolations,
+  sharedGetRunScores, sharedGetFindingDetail, sharedGetDimensionEval, sharedGetViolations,
   sharedListDismissedFindings, sharedListVerifiedFindings,
-  publishProject, pullSharedProject,
+  publishProject, sharedGetCompareSummary, sharedGetFleetCompare,
 } from './shared.js';
-export { listTerminalSessions, createTerminalSession, killTerminalSession } from './terminal.js';
+export { getSyncStatus, startRefresh, startPull, getInvite } from './syncStatus.js';
+export { getCloneStatus, isCloneActive, cloneNameFromUrl } from './projectClone.js';
+export { listTerminalSessions, createTerminalSession, killTerminalSession, killTerminal } from './terminal.js';
 
 export {
   getHealth, listProjects, getProjectInfo, getProjectScan, deleteProject,
@@ -41,13 +43,16 @@ export {
 } from './evaluations.js';
 
 export {
-  getProjectScores, getRunScores, getCompareSummary, getDashboard,
-  getAccumulated, getDimensionEval,
+  getProjectScores, getRunScores, getCompareSummary, getFleetCompare, getDashboard,
+  getAccumulated, getDimensionEval, getComplianceDetail, getFindingDetail,
 } from './scores.js';
 
 export {
   getGradeFormula, saveGradeFormula, resetGradeFormula, previewGradeFormula,
 } from './gradeFormula.js';
+
+export { getGradeExplain, previewGradeExplain } from './gradeExplain.js';
+export { getRunDiff } from './runDiff.js';
 
 export {
   getAiClients, getClientModels, checkCmdPath, testProviderConnection,
@@ -66,3 +71,5 @@ export {
 } from './updates.js';
 
 export { getMenubar, setMenubar } from './menubar.js';
+
+export { probeGit, getGithubAccount, startDeviceFlow, getDeviceFlow, pasteGithubToken, signOutGithub } from './githubAccess.js';

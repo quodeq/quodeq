@@ -1,8 +1,10 @@
 import { t } from '../../../../strings/index.js';
+import { countKnownSeverities } from '../../../../utils/severity.js';
+import { NAV_TAB } from '../../../../vocab/navTab.js';
 
-// The overlay's fixed styling, hoisted out of the JSX: one object per element
-// for the whole module instead of a fresh one on every panel render, and each
-// property readable on its own line.
+// The overlay's fixed styling: one object per element for the whole module
+// instead of a fresh one on every panel render, and each property readable
+// on its own line.
 const PANEL_STYLE = {
   position: 'absolute',
   top: 12,
@@ -84,19 +86,15 @@ function computeSystemLevelInfo(scene, nav, projectName) {
   const clusterCon = nav.clusterCx != null
     ? (scene.constellations || []).find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy)
     : null;
-  // One pass over the cluster for every figure (score, violations,
-  // compliance, per-severity counts) rather than a reduce per figure.
+  // One pass over the cluster for the score, violation and compliance
+  // totals rather than a reduce per figure.
   let totalV = 0, totalC = 0, totalScore = 0;
-  const sevCounts = { critical: 0, major: 0, minor: 0 };
   for (const s of clusterStars) {
     totalV += s.violations;
     totalC += s.compliance;
     totalScore += s.score;
-    for (const v of s._raw?.violations || []) {
-      const sev = v.severity || 'minor';
-      if (sevCounts[sev] != null) sevCounts[sev]++;
-    }
   }
+  const sevCounts = countKnownSeverities(clusterStars.flatMap((s) => s._raw?.violations || []));
   const avgScore = clusterStars.length > 0 ? totalScore / clusterStars.length : 0;
   const lines = [
     { label: t('map.score'), value: avgScore.toFixed(1) },
@@ -111,17 +109,26 @@ function computeSystemLevelInfo(scene, nav, projectName) {
   };
 }
 
-/** Depth 1: one dimension. */
-function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
+/**
+ * The Explorer target for one dimension, or null when the star carries no
+ * raw dimension data.
+ */
+function dimensionDetailTarget(star) {
+  const d = star?._raw;
+  if (!d) return null;
+  return {
+    tab: NAV_TAB.EXPLORER,
+    payload: { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: NAV_TAB.MAP },
+  };
+}
+
+/** Depth 1: one dimension. Pure: the detail target is plain data. */
+export function computeDimensionLevelInfo(scene, nav) {
   const dim = scene.stars?.[nav.dim];
   if (!dim) return null;
   const prins = scene.principles[nav.dim] || [];
   const rawDim = dim._raw;
-  const dimSev = { critical: 0, major: 0, minor: 0 };
-  (rawDim?.violations || []).forEach(v => {
-    const sev = v.severity || 'minor';
-    if (dimSev[sev] != null) dimSev[sev]++;
-  });
+  const dimSev = countKnownSeverities(rawDim?.violations);
   const dimLines = [
     { label: t('map.score'), value: dim.score.toFixed(1) },
     { label: t('map.principles'), value: prins.length },
@@ -131,16 +138,35 @@ function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
   dimLines.push({ label: t('map.compliance'), value: dim.compliance });
   return {
     title: dim.name, lines: dimLines, hint: t('map.clickPrinciple'),
-    detailAction: () => {
-      const d = scene.stars[navRef.current.dim]?._raw;
-      if (!d) return;
-      onNavigate?.('explorer', { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: 'map' });
+    detailTarget: dimensionDetailTarget(dim),
+  };
+}
+
+/** The principle detail target for principle `p` of dimension star `d`. */
+function principleDetailTarget(p, d) {
+  return {
+    tab: NAV_TAB.EVAL_PRINCIPLE,
+    payload: {
+      evalPrincipal: {
+        principle: p.name,
+        score: p.rawScore ?? (p.score != null ? p.score.toFixed(1) : null),
+        grade: p.grade,
+        dimension: d.name,
+        // Carry the originating run id so PrincipleDetail's dismiss POST
+        // sends a real run_id; without it the backend can't rescore and
+        // the dismissed entry never lands on the Dismissed tab.
+        runId: d._raw?.fromRunId || '',
+        principleData: { name: p.name, grade: p.grade, violations: p._rawViolations, compliance: p._rawCompliance },
+        dimViolations: p._rawViolations,
+        dimCompliance: p._rawCompliance,
+      },
+      sourceTab: NAV_TAB.MAP,
     },
   };
 }
 
-/** Depth 2: one principle within a dimension. */
-function computePrincipleLevelInfo(scene, nav, navRef, onNavigate) {
+/** Depth 2: one principle within a dimension. Pure: the detail target is plain data. */
+export function computePrincipleLevelInfo(scene, nav) {
   const prin = scene.principles?.[nav.dim]?.[nav.prin];
   if (!prin) return null;
   const prinLines = [
@@ -151,30 +177,18 @@ function computePrincipleLevelInfo(scene, nav, navRef, onNavigate) {
     prinLines.push(...buildSevLines({ critical: prin.critical, major: prin.major, minor: prin.minor }));
   }
   prinLines.push({ label: t('map.compliance'), value: prin.compliance });
+  const star = scene.stars?.[nav.dim];
   return {
     title: prin.name, lines: prinLines, hint: null,
-    detailAction: () => {
-      const p = scene.principles[navRef.current.dim]?.[navRef.current.prin];
-      const d = scene.stars[navRef.current.dim];
-      if (!p || !d) return;
-      onNavigate?.('evalprinciple', {
-        evalPrincipal: {
-          principle: p.name,
-          score: p.rawScore || (p.score != null ? p.score.toFixed(1) : null),
-          grade: p.grade,
-          dimension: d.name,
-          // Carry the originating run id so PrincipleDetail's dismiss POST
-          // sends a real run_id — without it the backend can't rescore and
-          // the dismissed entry never lands on the Dismissed tab.
-          runId: d._raw?.fromRunId || '',
-          principleData: { name: p.name, grade: p.grade, violations: p._rawViolations, compliance: p._rawCompliance },
-          dimViolations: p._rawViolations,
-          dimCompliance: p._rawCompliance,
-        },
-        sourceTab: 'map',
-      });
-    },
+    detailTarget: star ? principleDetailTarget(prin, star) : null,
   };
+}
+
+/** Turn a level's plain detail target into the panel's click handler. */
+function withDetailAction(info, onNavigate) {
+  if (!info) return null;
+  const { detailTarget: target, ...rest } = info;
+  return { ...rest, detailAction: target ? () => onNavigate?.(target.tab, target.payload) : null };
 }
 
 /**
@@ -183,15 +197,14 @@ function computePrincipleLevelInfo(scene, nav, navRef, onNavigate) {
  * @param {object} scene - The scene built by buildScene
  * @param {object} nav - Current navigation state { depth, dim, prin, clusterCx, clusterCy }
  * @param {string} projectName - Project name for display
- * @param {Function} onNavigate - Navigation callback
- * @param {React.MutableRefObject} navRef - Ref to live nav state (for detail actions)
+ * @param {Function} onNavigate - Navigation callback the detail action calls
  * @returns {object|null} { title, lines, hint, detailAction }
  */
-export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
+export function computeLevelInfo(scene, nav, projectName, onNavigate) {
   if (!scene) return null;
   if (nav.depth === 0) return computeSystemLevelInfo(scene, nav, projectName);
-  if (nav.depth === 1 && nav.dim !== null) return computeDimensionLevelInfo(scene, nav, navRef, onNavigate);
-  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) return computePrincipleLevelInfo(scene, nav, navRef, onNavigate);
+  if (nav.depth === 1 && nav.dim !== null) return withDetailAction(computeDimensionLevelInfo(scene, nav), onNavigate);
+  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) return withDetailAction(computePrincipleLevelInfo(scene, nav), onNavigate);
   return null;
 }
 

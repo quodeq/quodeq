@@ -9,11 +9,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.finding_mappings import finding_to_response_dict
+from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.data.fs.report_parser._run_info import safe_read_dir
+from quodeq.data.fs.report_parser.finding_response import finding_to_response_dict
 from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+from quodeq.shared.constants import EVIDENCE_DIRNAME, MANIFEST_FILENAME
 from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
@@ -23,21 +25,14 @@ def has_evaluation_db(run_dir: Path) -> bool:
     return (run_dir / EVALUATION_DB_FILENAME).is_file()
 
 
-def _load_run_metadata(run_dir: Path) -> dict[str, Any]:
-    """Read run-level metadata (sourceFileCount, date, discipline) shared by all dimensions.
+def manifest_metadata(run_dir: Path) -> dict[str, Any]:
+    """``sourceFileCount`` and ``discipline`` from ``evidence/manifest.json``, None when absent.
 
-    Pulls source-file count and language from ``evidence/manifest.json`` (the
-    canonical run-level manifest), and falls back to scanning evaluation JSON
-    files or parsing the run-id for the date.  Any missing field is left as
-    ``None`` so callers receive a stable shape.
+    The run-level part of the metadata a full read attaches to every
+    dimension; the scalar read attaches the same so both agree.
     """
-    metadata: dict[str, Any] = {
-        "sourceFileCount": None,
-        "date": None,
-        "discipline": None,
-    }
-
-    manifest_path = run_dir / "evidence" / "manifest.json"
+    metadata: dict[str, Any] = {"sourceFileCount": None, "discipline": None}
+    manifest_path = run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME
     if manifest_path.is_file():
         try:
             data = read_json(manifest_path)
@@ -51,6 +46,18 @@ def _load_run_metadata(run_dir: Path) -> dict[str, Any]:
             language = data.get("language")
             if isinstance(language, str) and language:
                 metadata["discipline"] = language
+    return metadata
+
+
+def _load_run_metadata(run_dir: Path) -> dict[str, Any]:
+    """Read run-level metadata (sourceFileCount, date, discipline) shared by all dimensions.
+
+    Pulls source-file count and language from ``evidence/manifest.json`` (the
+    canonical run-level manifest), and falls back to scanning evaluation JSON
+    files or parsing the run-id for the date.  Any missing field is left as
+    ``None`` so callers receive a stable shape.
+    """
+    metadata: dict[str, Any] = {**manifest_metadata(run_dir), "date": None}
 
     # Date precedence:
     #   (a) any evaluation/<dim>.json carrying a parsable "date"
@@ -93,10 +100,10 @@ def load_evidence_map_from_db(run_dir: Path) -> dict[str, dict[str, Any]]:
             "compliance": [],
         })
         finding_dict = finding_to_response_dict(j)
-        if j.verdict == "violation":
+        if j.verdict == FindingType.VIOLATION:
             entry["violations"].append(finding_dict)
             result[dimension]["violation_count"] += 1
-        elif j.verdict == "compliance":
+        elif j.verdict == FindingType.COMPLIANCE:
             entry["compliance"].append(finding_dict)
             result[dimension]["compliance_count"] += 1
         else:

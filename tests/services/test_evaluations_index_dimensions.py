@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.services._evaluations_index import _read_dimensions_from_status
+from quodeq.services._evaluations_index import read_dimensions_from_status
 
 
 def _write_status(run_dir: Path, dimensions: list[str]) -> None:
@@ -26,7 +26,7 @@ def _write_status(run_dir: Path, dimensions: list[str]) -> None:
 class TestReadDimensionsFromStatus:
     def test_explicit_dimensions_returned_as_is(self, tmp_path: Path) -> None:
         _write_status(tmp_path, ["security"])
-        assert _read_dimensions_from_status(tmp_path) == ["security"]
+        assert read_dimensions_from_status(tmp_path) == ["security"]
 
     def test_empty_dimensions_recovered_from_dimensions_json(self, tmp_path: Path) -> None:
         _write_status(tmp_path, [])
@@ -37,7 +37,7 @@ class TestReadDimensionsFromStatus:
             }),
             encoding="utf-8",
         )
-        assert _read_dimensions_from_status(tmp_path) == ["security", "reliability"]
+        assert read_dimensions_from_status(tmp_path) == ["security", "reliability"]
 
     def test_empty_dimensions_recovered_from_dim_estimates(self, tmp_path: Path) -> None:
         _write_status(tmp_path, [])
@@ -45,24 +45,24 @@ class TestReadDimensionsFromStatus:
             json.dumps({"security": {"count": 10, "reason": "incremental"}}),
             encoding="utf-8",
         )
-        assert _read_dimensions_from_status(tmp_path) == ["security"]
+        assert read_dimensions_from_status(tmp_path) == ["security"]
 
     def test_empty_dimensions_no_sidecars_stays_empty(self, tmp_path: Path) -> None:
         _write_status(tmp_path, [])
-        assert _read_dimensions_from_status(tmp_path) == []
+        assert read_dimensions_from_status(tmp_path) == []
 
 
 class TestReadTimeLimitFromStatus:
     def test_reads_time_limit(self, tmp_path: Path) -> None:
-        from quodeq.services._evaluations_index import _read_time_limit_from_status
+        from quodeq.services._evaluations_index import read_time_limit_from_status
         tmp_path.mkdir(parents=True, exist_ok=True)
         (tmp_path / "status.json").write_text(
             json.dumps({"schema_version": 1, "state": "running", "time_limit_s": 900}),
             encoding="utf-8",
         )
-        assert _read_time_limit_from_status(tmp_path) == 900
+        assert read_time_limit_from_status(tmp_path) == 900
 
     def test_missing_field_returns_none(self, tmp_path: Path) -> None:
-        from quodeq.services._evaluations_index import _read_time_limit_from_status
+        from quodeq.services._evaluations_index import read_time_limit_from_status
         _write_status(tmp_path, [])
-        assert _read_time_limit_from_status(tmp_path) is None
+        assert read_time_limit_from_status(tmp_path) is None

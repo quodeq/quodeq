@@ -11,6 +11,7 @@
 
 import { getGradeThresholds } from '../../../../utils/gradeThresholds.js';
 import { DATA_THEME_ATTR } from '../../../../constants.js';
+import { SEVERITY } from '../../../../vocab/severity.js';
 
 export const TAU = Math.PI * 2;
 
@@ -205,7 +206,7 @@ export function mkParticles(critical, major, minor, baseRadius) {
         or: baseRadius + PARTICLE_ORBIT_OFFSET + Math.random() * PARTICLE_ORBIT_RANGE,
         os: (PARTICLE_SPEED_BASE + Math.random() * PARTICLE_SPEED_RANGE) * (Math.random() > RNG_MIDPOINT ? 1 : -1),
         op: Math.random() * TAU,
-        sz: sev === 'critical' ? PARTICLE_SIZE_CRITICAL + Math.random() * PARTICLE_SIZE_CRITICAL_RANGE : sev === 'major' ? PARTICLE_SIZE_MAJOR + Math.random() * PARTICLE_SIZE_MAJOR_RANGE : PARTICLE_SIZE_MINOR + Math.random() * PARTICLE_SIZE_MINOR_RANGE,
+        sz: sev === SEVERITY.CRITICAL ? PARTICLE_SIZE_CRITICAL + Math.random() * PARTICLE_SIZE_CRITICAL_RANGE : sev === SEVERITY.MAJOR ? PARTICLE_SIZE_MAJOR + Math.random() * PARTICLE_SIZE_MAJOR_RANGE : PARTICLE_SIZE_MINOR + Math.random() * PARTICLE_SIZE_MINOR_RANGE,
         ec: PARTICLE_ECCENTRICITY_BASE + Math.random() * PARTICLE_ECCENTRICITY_RANGE,
         tp: Math.random() * TAU,
       });

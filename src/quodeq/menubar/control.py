@@ -15,7 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from quodeq.shared.env_paths import get_run_dir
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+from quodeq.shared.env_paths import ensure_run_dir
 from quodeq.shared.frozen import is_frozen, subprocess_cmd
 
 _logger = logging.getLogger(__name__)
@@ -23,12 +24,12 @@ _PIDFILE_NAME = "menubar.pid"
 
 
 def _pidfile_path() -> Path:
-    return get_run_dir() / _PIDFILE_NAME
+    return ensure_run_dir() / _PIDFILE_NAME
 
 
 def is_supported() -> bool:
     """True when this install can show a menu bar icon (macOS + rumps)."""
-    if sys.platform != "darwin":
+    if sys.platform != PLATFORM_DARWIN:
         return False
     if is_frozen():
         return True
@@ -46,7 +47,7 @@ def _read_pid() -> int | None:
 
 
 def _pid_alive(pid: int) -> bool:
-    if sys.platform == "win32":
+    if sys.platform == PLATFORM_WIN32:
         # os.kill(pid, 0) is NOT a liveness probe on Windows: signal 0 is
         # CTRL_C_EVENT, and os.kill routes it through GenerateConsoleCtrlEvent,
         # interrupting every process sharing the console (this aborted whole

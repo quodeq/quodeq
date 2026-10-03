@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { assistantEventsUrl } from '../../api/assistant.js';
 import { t } from '../../strings/index.js';
+import { FRAME_TYPE } from '../../vocab/frameType.js';
+import { MESSAGE_ROLE } from './messageRole.js';
+import { STREAM_INACTIVITY_MS } from '../../constants.js';
 
-const INACTIVITY_MS = 60000;
 // Max characters revealed per flush tick. Delta-streaming providers (ollama,
 // claude) send frames smaller than this, so they render unchanged; providers
 // without deltas (codex) deliver a whole message as ONE frame, which sweeps
@@ -19,17 +21,17 @@ const FLUSH_DEBOUNCE_MS = 50;
 export function applyFrame(frame, handlers) {
   if (!frame || typeof frame !== 'object') return;
   const { onToken, onToolCall, onActionDraft, onWarning, onError, onStopped, onDone, onHeartbeat } = handlers;
-  if (frame.type === 'token') onToken(frame);
-  else if (frame.type === 'tool_call') onToolCall(frame);
-  else if (frame.type === 'action_draft') onActionDraft(frame);
-  else if (frame.type === 'warning') onWarning(frame);
-  else if (frame.type === 'error') onError(frame);
+  if (frame.type === FRAME_TYPE.TOKEN) onToken(frame);
+  else if (frame.type === FRAME_TYPE.TOOL_CALL) onToolCall(frame);
+  else if (frame.type === FRAME_TYPE.ACTION_DRAFT) onActionDraft(frame);
+  else if (frame.type === FRAME_TYPE.WARNING) onWarning(frame);
+  else if (frame.type === FRAME_TYPE.ERROR) onError(frame);
   // User-initiated stop: terminal like done (turn over, stream stays
   // open), plus a visible marker so the truncated answer isn't mistaken
   // for a complete one.
-  else if (frame.type === 'stopped') onStopped(frame);
-  else if (frame.type === 'done') onDone(frame);
-  else if (frame.type === 'heartbeat') onHeartbeat?.(frame); // liveness only: resetInactivity() already ran by the caller
+  else if (frame.type === FRAME_TYPE.STOPPED) onStopped(frame);
+  else if (frame.type === FRAME_TYPE.DONE) onDone(frame);
+  else if (frame.type === FRAME_TYPE.HEARTBEAT) onHeartbeat?.(frame); // liveness only: resetInactivity() already ran by the caller
 }
 
 // One SSE stream serves the whole session, so revealed text lands in the last
@@ -37,10 +39,10 @@ export function applyFrame(frame, handlers) {
 function withRevealedChunk(prev, chunk, startNewBubble) {
   const next = prev.slice();
   const last = next[next.length - 1];
-  if (!startNewBubble && last && last.role === 'assistant') {
+  if (!startNewBubble && last && last.role === MESSAGE_ROLE.ASSISTANT) {
     next[next.length - 1] = { ...last, text: last.text + chunk };
   } else {
-    next.push({ role: 'assistant', text: chunk });
+    next.push({ role: MESSAGE_ROLE.ASSISTANT, text: chunk });
   }
   return next;
 }
@@ -99,7 +101,7 @@ function createInactivityGuard({ inactivity, setError, endTurn }) {
     // EventSource with nothing left to reconnect it, wedging the drawer.
     // Leaving the connection open lets the next turn (or a heartbeat)
     // recover it.
-    inactivity.current = setTimeout(() => { setError(t('assistant.streamTimedOut')); endTurn(); }, INACTIVITY_MS);
+    inactivity.current = setTimeout(() => { setError(t('assistant.streamTimedOut')); endTurn(); }, STREAM_INACTIVITY_MS);
   };
 }
 
@@ -119,12 +121,12 @@ function makeFrameHandlers({ revealer, append, beginContent, setError, endPendin
       if (endPending.current) drain(true);
       beginContent(); revealText(f.text || '');
     },
-    onToolCall: (f) => { beginContent(); flushTokens(); append({ role: 'tool', name: f.name, argsSummary: f.argsSummary }); },
+    onToolCall: (f) => { beginContent(); flushTokens(); append({ role: MESSAGE_ROLE.TOOL, name: f.name, argsSummary: f.argsSummary }); },
     onActionDraft: (f) => { beginContent(); flushTokens();
-      append({ role: 'action', actionId: f.actionId, actionType: f.actionType, summary: f.summary }); },
-    onWarning: (f) => { beginContent(); flushTokens(); append({ role: 'warning', message: f.message }); },
+      append({ role: MESSAGE_ROLE.ACTION, actionId: f.actionId, actionType: f.actionType, summary: f.summary }); },
+    onWarning: (f) => { beginContent(); flushTokens(); append({ role: MESSAGE_ROLE.WARNING, message: f.message }); },
     onError: (f) => { flushTokens(); setError(f.message || 'error'); endTurn(); },
-    onStopped: () => { flushTokens(); append({ role: 'warning', message: t('assistant.turnStopped') }); endTurn(); },
+    onStopped: () => { flushTokens(); append({ role: MESSAGE_ROLE.WARNING, message: t('assistant.turnStopped') }); endTurn(); },
     onDone: () => { endTurn(); },
   };
 }

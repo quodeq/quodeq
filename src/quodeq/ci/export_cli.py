@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+_EXPORT_FORMAT_SARIF = "sarif"  # only export format today
+
 
 def _tool_version() -> str:
     from quodeq import __version__
@@ -15,7 +17,7 @@ def _tool_version() -> str:
 
 def handle_export(args: argparse.Namespace) -> int:
     """Handle `quodeq export <format>`. Returns an exit code."""
-    if getattr(args, "export_format", None) != "sarif":
+    if getattr(args, "export_format", None) != _EXPORT_FORMAT_SARIF:
         print("Usage: quodeq export sarif --evaluation-dir DIR -o FILE", file=sys.stderr)
         return 1
     return _handle_sarif(args)

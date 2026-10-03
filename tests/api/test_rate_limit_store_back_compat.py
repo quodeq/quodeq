@@ -61,3 +61,40 @@ def test_old_protocol_store_without_check_and_record_allows_under_limit(tmp_path
 
     resp = client.post("/api/evaluations", json={}, headers={"Origin": "http://localhost"})
     assert resp.status_code != 429
+
+
+def test_file_store_load_drops_malformed_per_ip_values(tmp_path, monkeypatch):
+    """The file backend's state file is user-writable JSON: a per-IP value
+    that is not a list of numbers is dropped on load instead of raising on
+    every request from that IP."""
+    import json
+
+    from quodeq.api.app import create_rate_limit_store
+
+    monkeypatch.setenv("QUODEQ_RATE_LIMIT_MAX", "2")
+    path = tmp_path / "rl.json"
+    path.write_text(json.dumps({"a": 5, "b": [1.0, "x", True], "c": [2.0]}))
+    store = create_rate_limit_store(
+        env={"QUODEQ_RATE_LIMIT_BACKEND": "file", "QUODEQ_RATE_LIMIT_FILE": str(path)},
+    )
+
+    assert store.check_and_record("a", now=3.0) is False
+    # "x" and True are dropped, 1.0 is kept: one slot left, then limited.
+    assert store.check_and_record("b", now=3.0) is False
+    assert store.check_and_record("b", now=3.0) is True
+    assert store.check_and_record("c", now=3.0) is False
+    assert store.check_and_record("c", now=3.0) is True
+
+
+def test_file_store_tolerates_a_state_file_that_is_not_utf8(tmp_path):
+    """A state file holding bytes that are not UTF-8 reads as empty state
+    instead of raising on every request."""
+    from quodeq.api.app import create_rate_limit_store
+
+    path = tmp_path / "rl.json"
+    path.write_bytes(b"\xff")
+    store = create_rate_limit_store(
+        env={"QUODEQ_RATE_LIMIT_BACKEND": "file", "QUODEQ_RATE_LIMIT_FILE": str(path)},
+    )
+
+    assert store.check_and_record("a", now=1.0) is False

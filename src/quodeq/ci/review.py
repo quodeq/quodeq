@@ -18,32 +18,69 @@ class ReviewError(RuntimeError):
     """Raised when the review command cannot proceed."""
 
 
+_GH_MISSING = "gh CLI not found. Install with 'brew install gh' and run 'gh auth login'."
+_GH_VIEW = "view"  # gh <resource> view
+_GH_JSON_FLAG = "--json"
+_DEFAULT_POOL_TIME_LIMIT_S = 300  # PR-diff eval budget when the caller sets none
+_GH_TIMEOUT_S = 60
+
+
+def _run_gh(args: list[str]) -> str:
+    """Run ``gh`` with *args* and return its stdout.
+
+    A missing gh binary becomes the one ReviewError every caller shares; a
+    non-zero exit propagates as ``subprocess.CalledProcessError`` so each
+    caller words its own failure. A hung ``gh`` call (bad auth, dead network)
+    is bounded to ``_GH_TIMEOUT_S`` rather than blocking the review forever.
+    """
+    try:
+        result = subprocess.run(
+            ["gh", *args], capture_output=True, text=True, encoding="utf-8", check=True,
+            timeout=_GH_TIMEOUT_S,
+        )
+    except FileNotFoundError:
+        raise ReviewError(_GH_MISSING)
+    except subprocess.TimeoutExpired:
+        raise ReviewError(f"gh command timed out after {_GH_TIMEOUT_S}s: gh {' '.join(args)}")
+    return result.stdout
+
+
+def _gh_json(args: list[str]) -> dict:
+    """Run ``gh`` with *args* and parse its stdout as a JSON object.
+
+    A ``subprocess.CalledProcessError`` from ``_run_gh`` is left for the
+    caller to word. Anything else wrong with the output -- invalid JSON, or
+    valid JSON that isn't an object -- becomes one ``ReviewError`` here
+    instead of three separate decode try blocks at each call site.
+    """
+    out = _run_gh(args)
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError as exc:
+        raise ReviewError(f"gh returned invalid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ReviewError("gh returned unexpected JSON (not an object)")
+    return data
+
+
 def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
     """Detect the open PR for the current branch. Returns (pr_number, base_branch).
 
     Raises ReviewError with a clear message if no PR is found or gh is unavailable.
     """
     if pr_override is not None:
-        # Still need baseRefName — query gh for this PR
+        # Still need baseRefName, so ask gh about this PR.
         try:
-            result = subprocess.run(
-                ["gh", "pr", "view", str(pr_override), "--json", "number,baseRefName"],
-                capture_output=True, text=True, encoding="utf-8", check=True,
-            )
-        except FileNotFoundError:
-            raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+            data = _gh_json(["pr", _GH_VIEW, str(pr_override), _GH_JSON_FLAG, "number,baseRefName"])
         except subprocess.CalledProcessError as exc:
             raise ReviewError(f"Could not find PR #{pr_override}: {exc.stderr.strip()}")
-        data = json.loads(result.stdout)
-        return data["number"], data["baseRefName"]
+        try:
+            return data["number"], data["baseRefName"]
+        except (KeyError, TypeError) as exc:
+            raise ReviewError(f"gh pr view returned unexpected JSON: missing {exc}") from exc
 
     try:
-        result = subprocess.run(
-            ["gh", "pr", "view", "--json", "number,baseRefName"],
-            capture_output=True, text=True, encoding="utf-8", check=True,
-        )
-    except FileNotFoundError:
-        raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+        data = _gh_json(["pr", _GH_VIEW, _GH_JSON_FLAG, "number,baseRefName"])
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         if "no pull requests found" in stderr.lower():
@@ -52,25 +89,18 @@ def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
                 "Open a PR first, or pass --pr <number>."
             )
         raise ReviewError(f"gh pr view failed: {stderr}")
-
-    data = json.loads(result.stdout)
-    return data["number"], data["baseRefName"]
+    try:
+        return data["number"], data["baseRefName"]
+    except (KeyError, TypeError) as exc:
+        raise ReviewError(f"gh pr view returned unexpected JSON: missing {exc}") from exc
 
 
 def get_github_token() -> str:
     """Get a GitHub token via `gh auth token`."""
     try:
-        result = subprocess.run(
-            ["gh", "auth", "token"],
-            capture_output=True, text=True, encoding="utf-8", check=True,
-        )
-    except FileNotFoundError:
-        raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+        token = _run_gh(["auth", "token"]).strip()
     except subprocess.CalledProcessError:
-        raise ReviewError(
-            "Not authenticated with GitHub. Run 'gh auth login' first."
-        )
-    token = result.stdout.strip()
+        raise ReviewError("Not authenticated with GitHub. Run 'gh auth login' first.")
     if not token:
         raise ReviewError("gh auth token returned empty. Run 'gh auth login'.")
     return token
@@ -79,26 +109,22 @@ def get_github_token() -> str:
 def get_repo_info() -> tuple[str, str]:
     """Get (owner, repo) from the current git repository via gh."""
     try:
-        result = subprocess.run(
-            ["gh", "repo", "view", "--json", "owner,name"],
-            capture_output=True, text=True, encoding="utf-8", check=True,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
+        data = _gh_json(["repo", _GH_VIEW, _GH_JSON_FLAG, "owner,name"])
+    except subprocess.CalledProcessError:
         raise ReviewError(
             "Could not determine GitHub repo. "
             "Run from inside a GitHub-connected git repo, or use 'gh repo set-default'."
         )
-    data = json.loads(result.stdout)
-    return data["owner"]["login"], data["name"]
+    try:
+        return data["owner"]["login"], data["name"]
+    except (KeyError, TypeError) as exc:
+        raise ReviewError(f"gh repo view returned unexpected JSON: missing {exc}") from exc
 
 
 def snapshot_run_dirs(output_dir: Path) -> set[Path]:
     """Snapshot existing run directories (those containing an evidence/ subdir).
 
-    Both full/incremental runs and diff-mode runs write ``evidence/``, so
-    globbing on it catches every run shape. Diff-mode runs do not write
-    ``evaluation/``, so the old "glob on evaluation" approach would miss
-    them.
+    Every run shape writes ``evidence/``; diff-mode runs skip ``evaluation/``.
     """
     if not output_dir.exists():
         return set()
@@ -141,7 +167,7 @@ def _run_pr_diff_and_locate_evidence(
         base_ref=f"origin/{base_branch}",
         output_dir=output_dir,
         dimensions=expand_dimension_aliases(dims) if dims else None,
-        time_limit=pool_budget if pool_budget is not None else 300,
+        time_limit=pool_budget if pool_budget is not None else _DEFAULT_POOL_TIME_LIMIT_S,
     )
     duration = int(time.time() - start)
     if exit_code != 0:
@@ -182,25 +208,83 @@ def _build_diff_report_and_payload(evidence_dir: Path, duration: int) -> tuple[d
     return report, payload
 
 
+_CONFIRM_ANSWERS = frozenset({"y", "yes"})
+
+
+def confirm_post(owner: str, repo: str, pr_number: int, *, stdin=None, ask=input) -> bool:
+    """Ask before publishing to a shared PR when a person is at the terminal.
+
+    A non-interactive run (CI, a pipe) has no one to ask and keeps posting;
+    an interactive one must answer yes. End of input or Ctrl-C declines.
+    """
+    stream = sys.stdin if stdin is None else stdin
+    if stream is None or not getattr(stream, "isatty", lambda: False)():
+        return True
+    try:
+        answer = ask(f"Post this review to {owner}/{repo} PR #{pr_number}? [y/N] ")
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return answer.strip().lower() in _CONFIRM_ANSWERS
+
+
 def _post_review_or_dry_run(args, payload: dict, owner: str, repo: str, pr_number: int) -> int:
-    """Print the review body for --dry-run, else post it to GitHub."""
+    """Print the review body for --dry-run, else post it to GitHub.
+
+    Posting to a real PR is the irreversible step, so an interactive run is
+    asked first unless --yes was given.
+    """
     if getattr(args, "dry_run", False):
         print("\n--- Review body (dry-run, not posted) ---")
         print(payload["body"])
         print("--- end review body ---")
         return 0
+    if not getattr(args, "yes", False) and not confirm_post(owner, repo, pr_number):
+        print("Review not posted. Re-run with --yes to skip the prompt, or --dry-run to print it.")
+        return 1
+    return _post_to_github(payload, owner, repo, pr_number)
 
+
+def _post_to_github(payload: dict, owner: str, repo: str, pr_number: int) -> int:
+    """Post *payload*; a gh or GitHub API failure prints a worded error, returns 1."""
     try:
         token = get_github_token()
     except ReviewError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-
     from quodeq.ci.reporter import post_review
     print(f"Posting review to {owner}/{repo} PR #{pr_number}...")
-    post_review(owner=owner, repo=repo, pr_number=pr_number, payload=payload, token=token)
+    try:
+        post_review(owner=owner, repo=repo, pr_number=pr_number, payload=payload, token=token)
+    except RuntimeError as exc:
+        print(f"Error: could not post the review: {exc}", file=sys.stderr)
+        return 1
     print(f"Review posted to https://github.com/{owner}/{repo}/pull/{pr_number}")
     return 0
+
+
+def _evaluate_pr_diff(args, base_branch: str) -> tuple[int, Path | None, int]:
+    """Run the PR-diff evaluation; (exit_code, evidence_dir, duration), with
+    evidence_dir None (and the reason printed) whenever exit_code is non-zero."""
+    output_dir = Path(getattr(args, "output", None) or get_evaluations_dir())
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dims, pool_budget = getattr(args, "dimensions", None), getattr(args, "pool_budget", None)
+    exit_code, evidence_dir, duration = _run_pr_diff_and_locate_evidence(
+        output_dir, base_branch, dims, pool_budget)
+    if exit_code != 0:
+        print(f"Evaluation failed with exit code {exit_code}", file=sys.stderr)
+        return exit_code, None, duration
+    if evidence_dir is None:
+        print("Error: no new evaluation directory produced.", file=sys.stderr)
+        return 1, None, duration
+    return 0, evidence_dir, duration
+
+
+def _summarize_review(evidence_dir: Path, duration: int) -> dict:
+    """Build the review payload and print the violation count and verdict."""
+    report, payload = _build_diff_report_and_payload(evidence_dir, duration)
+    print(f"Evaluation complete: {len(report['violations'])} violation(s) found in diff")
+    print(f"Verdict: {payload['event']}")
+    return payload
 
 
 def handle_review(args) -> int:
@@ -209,25 +293,8 @@ def handle_review(args) -> int:
     if resolved is None:
         return 1
     pr_number, base_branch, owner, repo = resolved
-
-    output_dir = Path(getattr(args, "output", None) or get_evaluations_dir())
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    dims = getattr(args, "dimensions", None)
-    pool_budget = getattr(args, "pool_budget", None)
-    exit_code, evidence_dir, duration = _run_pr_diff_and_locate_evidence(
-        output_dir, base_branch, dims, pool_budget,
-    )
-    if exit_code != 0:
-        print(f"Evaluation failed with exit code {exit_code}", file=sys.stderr)
-        return exit_code
+    exit_code, evidence_dir, duration = _evaluate_pr_diff(args, base_branch)
     if evidence_dir is None:
-        print("Error: no new evaluation directory produced.", file=sys.stderr)
-        return 1
-
-    report, payload = _build_diff_report_and_payload(evidence_dir, duration)
-    total_violations = len(report["violations"])
-    print(f"Evaluation complete: {total_violations} violation(s) found in diff")
-    print(f"Verdict: {payload['event']}")
-
+        return exit_code
+    payload = _summarize_review(evidence_dir, duration)
     return _post_review_or_dry_run(args, payload, owner, repo, pr_number)

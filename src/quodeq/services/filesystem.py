@@ -21,20 +21,23 @@ IDs resolve correctly inside ``cancel_evaluation`` without MRO coupling.
 
 from __future__ import annotations
 
+
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.types import ViolationSummary
+from quodeq.core.types import EvalPending, ViolationResponse, ViolationSummary
 from quodeq.core.types.job import JobSnapshot
-from quodeq.services import fs_reports, fs_projects
+from quodeq.services import fs_projects, fs_reports
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._post_run_hook import PostRunHook
 from quodeq.services._projects_cache import ProjectsCache
 from quodeq.services.base import ActionProvider, CreateProjectResult, EvaluationOptions, NewProjectSpec
+from quodeq.services._evaluation_dispatch import SubprocessDispatcher
 from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
 from quodeq.services.project_registration import register_project_with_rollback
 from quodeq.services.tooling_mixin import FsToolingMixin
+from quodeq.shared.env import get_clones_dir
 from quodeq.shared.log_sink import SHARED_LOG
 
 
@@ -89,9 +92,13 @@ class FilesystemActionProvider(ActionProvider):
         compiled_dir: Path | None = None,
         index_db_path: Path | None = None,
         reports_root: Path | None = None,
+        evaluators_dir: Path | None = None,
+        clones_dir: Path | None = None,
     ) -> None:
         self._reports_root = _resolve_reports_root(reports_root)
         self._compiled_dir = compiled_dir
+        self._evaluators_dir = evaluators_dir
+        self._clones_dir = clones_dir
         self._jobs = job_manager if job_manager is not None else _default_job_manager(self._reports_root)
         self._projects = ProjectsCache()
         self._evaluations = EvaluationsIndex(
@@ -105,6 +112,7 @@ class FilesystemActionProvider(ActionProvider):
             jobs=self._jobs,
             get_status_fn=lambda job_id, reports_dir=None:
                 self._evaluations.get_status(job_id, reports_dir=reports_dir),
+            dispatcher=SubprocessDispatcher(self._jobs),
         )
         self._tooling = _default_tooling()
 
@@ -120,14 +128,21 @@ class FilesystemActionProvider(ActionProvider):
         return self._evaluations.list(limit=limit, reports_dir=reports_dir, states=states)
 
     def delete_evaluation(self, job_id: str, reports_dir: Path | None = None) -> bool:
-        """Drop the run directory and its index row. Running jobs are refused."""
-        return self._evaluations.delete(job_id, reports_dir=reports_dir)
+        """Drop the run directory and its index row, and the projects-list cache with them."""
+        deleted = self._evaluations.delete(job_id, reports_dir=reports_dir)
+        if deleted:
+            self._projects.invalidate()
+        return deleted
 
     def get_evaluation_status(
         self, job_id: str, reports_dir: Path | None = None,
     ) -> JobSnapshot | None:
         """Return one run's snapshot. ``ext-`` ids resolve from the index after a scoped sync."""
         return self._evaluations.get_status(job_id, reports_dir=reports_dir)
+
+    def in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """The in-memory JobManager view of *job_id*; None for an ``ext-`` or unknown id."""
+        return self._eval_handler.in_memory_job(job_id)
 
     def start_evaluation(
         self, repo: str, reports_dir: str, options: EvaluationOptions,
@@ -141,7 +156,7 @@ class FilesystemActionProvider(ActionProvider):
 
     def cancel_evaluation(
         self, job_id: str, reports_dir: str | None = None,
-        *, discard_partial: bool = False,
+        *, discard_partial: bool = False, wait_for_exit: bool = False,
     ) -> bool:
         """Cancel a running job; promote stale rows when SIGTERM has nothing to signal.
 
@@ -158,7 +173,7 @@ class FilesystemActionProvider(ActionProvider):
         surface the discarded run again.
         """
         ok = self._eval_handler.cancel_evaluation(
-            job_id, reports_dir=reports_dir, discard_partial=discard_partial,
+            job_id, reports_dir=reports_dir, discard_partial=discard_partial, wait_for_exit=wait_for_exit,
         )
         if not ok:
             ok = self._evaluations.promote_stale_to_cancelled(job_id, reports_dir=reports_dir)
@@ -199,8 +214,17 @@ class FilesystemActionProvider(ActionProvider):
         self._projects.invalidate()
 
     def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:
-        """Clone if needed, scan, and register a project, rolling back every step on failure."""
-        return register_project_with_rollback(reports_dir, spec, log=SHARED_LOG)
+        """Clone if needed, scan, and register a project, rolling back every step on failure.
+
+        *clones_dir* (where an ephemeral URL clone lands) is resolved here --
+        the provider composition point -- from the constructor override, else
+        QUODEQ_CLONES_DIR: ``register_project``/``_project_registration_steps``
+        never read that env var themselves.
+        """
+        clones_dir = self._clones_dir if self._clones_dir is not None else get_clones_dir()
+        return register_project_with_rollback(
+            reports_dir, spec, clones_dir=clones_dir, log=SHARED_LOG,
+        )
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         """Repoint a registered project at *new_path*. Return True on success."""
@@ -220,18 +244,23 @@ class FilesystemActionProvider(ActionProvider):
         """Return the dashboard payload assembled from one run's on-disk artifacts."""
         return fs_reports.get_dashboard(reports_dir, project, run, log=SHARED_LOG)
 
+    def get_dashboard_overview(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
+        """The Overview's dashboard: same scalars, no violation/compliance bodies."""
+        return fs_reports.get_dashboard_overview(reports_dir, project, run, log=SHARED_LOG)
+
     def get_accumulated(
         self, reports_dir: str, project: str, as_of: str | None,
     ) -> dict[str, Any] | None:
         """Return dimension data accumulated across every run up to *as_of*, or None."""
-        return fs_reports.get_accumulated(reports_dir, project, as_of)
+        return fs_reports.get_accumulated(reports_dir, project, as_of, log=SHARED_LOG)
 
     def get_dimension_eval(
         self, reports_dir: str, project: str, run_id: str, dimension: str,
-    ) -> dict[str, Any] | None:
-        """Return one dimension's parsed evaluation, resolved against ``_compiled_dir``."""
+    ) -> ViolationResponse | dict[str, Any] | EvalPending | None:
+        """One dimension's parsed evaluation, resolved against the compiled and evaluators dirs."""
         return fs_reports.get_dimension_eval(
-            reports_dir, project, run_id, dimension, compiled_dir=self._compiled_dir,
+            reports_dir, project, run_id, dimension,
+            compiled_dir=self._compiled_dir, evaluators_dir=self._evaluators_dir,
         )
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:

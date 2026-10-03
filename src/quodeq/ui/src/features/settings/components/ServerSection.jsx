@@ -7,8 +7,14 @@ import { systemKeys } from '../../../api/queryKeys.js';
 import { getHealth } from '../../../api/index.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
+import { SERVER_STATUS } from '../settingsVocab.js';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 
 const LOCAL_SERVER_HINT = t('settings.localServerHint');
+
+// This component's own third status, layered on top of settingsVocab.js's
+// SERVER_STATUS (online/offline): the health query hasn't resolved yet.
+const SERVER_STATUS_CHECKING = 'checking';
 
 const HEALTH_POLL_MS = 10000;
 
@@ -27,12 +33,7 @@ function ServerDetails({ health }) {
 function OfflineRestartHint() {
   return (
     <div className="settings-row settings-row--last">
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.restart')}</span>
-        <span className="settings-description">
-          {tRich('settings.restartDesc')}
-        </span>
-      </div>
+      <SettingsRowLabel hintSlot={false} label={t('settings.restart')} description={tRich('settings.restartDesc')} />
     </div>
   );
 }
@@ -42,12 +43,16 @@ export default function ServerSection() {
 
   const { data: health, isLoading } = useQuery({
     queryKey: [...systemKeys.health(), 'settings-detail'],
-    queryFn: () => getHealth().then((d) => (d?.ok ? d : null)).catch(() => null),
+    queryFn: () => getHealth().then((d) => (d?.ok ? d : null)).catch((err) => {
+      // An unreachable server reads as "no health", which the section shows as offline.
+      console.debug('[ServerSection] health check failed:', err);
+      return null;
+    }),
     refetchInterval: HEALTH_POLL_MS,
     refetchOnWindowFocus: false,
   });
 
-  const status = isLoading && !health ? 'checking' : (health ? 'online' : 'offline');
+  const status = isLoading && !health ? SERVER_STATUS_CHECKING : (health ? SERVER_STATUS.ONLINE : SERVER_STATUS.OFFLINE);
 
   return (
     <section className="panel settings-section">
@@ -59,10 +64,10 @@ export default function ServerSection() {
       </div>
 
       <ServerStatusPill
-        status={status === 'online' ? 'online' : 'offline'}
+        status={status === SERVER_STATUS.ONLINE ? SERVER_STATUS.ONLINE : SERVER_STATUS.OFFLINE}
         address={health?.address}
         offlineMessage={
-          status === 'checking'
+          status === SERVER_STATUS_CHECKING
             ? <span>{t('settings.checkingEllipsis')}</span>
             : <span>{t('settings.connectionLost')}</span>
         }
@@ -70,9 +75,9 @@ export default function ServerSection() {
         consoleOpen={serverLog.open}
       />
 
-      {status === 'online' && health && <ServerDetails health={health} />}
+      {status === SERVER_STATUS.ONLINE && health && <ServerDetails health={health} />}
 
-      {status === 'offline' && <OfflineRestartHint />}
+      {status === SERVER_STATUS.OFFLINE && <OfflineRestartHint />}
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { DEFAULT_MAX_SUBAGENTS } from '../../../constants.js';
+import { DEFAULT_MAX_SUBAGENTS, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import { clampSubagentsTo } from '../components/localApiSubagents.js';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
 import { tRich } from '../../../strings/rich.jsx';
@@ -47,7 +47,7 @@ export function useCliProviderTab({ providerId, state }) {
   // that cannot be reached stays silent — the start-time validation still
   // guards, and a transport hiccup must not brand a good value invalid.
   function validateCmdPath() {
-    const value = state['cmd-path'];
+    const value = state[PROVIDER_SETTING_KEY.CMD_PATH];
     if (!value || value === providerId) {
       setCmdPathError(null);
       return;

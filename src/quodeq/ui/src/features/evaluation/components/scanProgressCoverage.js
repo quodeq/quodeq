@@ -6,6 +6,7 @@
  * unchanged from the pre-split version.
  */
 import { computeOverallProgress } from './scanProgressTotals.js';
+import { PERCENT } from '../../../constants.js';
 
 export function computeCoverageView(progress) {
   const { totalFiles, takenFiles, overallPct, projectTotal, cachedFiles, coveredFiles, coveredPct, excludedFiles } =
@@ -17,8 +18,8 @@ export function computeCoverageView(progress) {
   // never sum past 100 even when live queue counts drift from the estimate.
   // cachedPctWidth alone also can't exceed 100: the producer (_dim_estimates.py)
   // guarantees per-dim cached <= total, so summed cachedFiles <= projectTotal.
-  const cachedPctWidth = showCoverage ? (cachedFiles / projectTotal) * 100 : 0;
-  const runPctWidth = showCoverage ? ((coveredFiles - cachedFiles) / projectTotal) * 100 : 0;
+  const cachedPctWidth = showCoverage ? (cachedFiles / projectTotal) * PERCENT : 0;
+  const runPctWidth = showCoverage ? ((coveredFiles - cachedFiles) / projectTotal) * PERCENT : 0;
   return {
     totalFiles, takenFiles, overallPct, projectTotal, cachedFiles, coveredFiles, coveredPct, excludedFiles,
     showCoverage, cachedPctWidth, runPctWidth,

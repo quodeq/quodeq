@@ -42,12 +42,23 @@ on ``_TOPOLOGY_REQS``).
 from __future__ import annotations
 
 import re
+from enum import StrEnum
 
 from quodeq.analysis.mcp.provenance_gate import (
     names_external_source,
     names_operator_source,
 )
 from quodeq.context.trust_model import TrustModel
+
+
+class ScopeGateRule(StrEnum):
+    """The rule a finding's ``scope_downgrade`` marker names; the UI mirror is ``ui/src/vocab/scopeGateRule.js``."""
+
+    SOURCELESS_PATH = "sourceless_path"
+    CROSS_PRINCIPAL = "cross_principal"
+    SINGLE_HOST_TOPOLOGY = "single_host_topology"
+    LOOPBACK_TRANSPORT = "loopback_transport"
+
 
 # Path-shaped requirements. R-FT-2 is deliberately ABSENT: it is the
 # null-guard pattern, its severity does not turn on network exposure, and
@@ -228,7 +239,7 @@ def _loopback_transport_rule_applies(model: TrustModel, req: str | None, prose: 
     )
 
 
-def matched_rule(finding: dict, model: TrustModel) -> str | None:
+def matched_rule(finding: dict, model: TrustModel) -> ScopeGateRule | None:
     """Return the rule name that would relax *finding* under *model*, or
     ``None``. Pure evidence check -- independent of the finding's CURRENT
     severity, so :func:`apply_scope_gate` can reuse it both to decide whether
@@ -243,11 +254,11 @@ def matched_rule(finding: dict, model: TrustModel) -> str | None:
     prose = _prose(finding)
 
     if _cross_principal_rule_applies(model, req, prose):
-        return "cross_principal"
+        return ScopeGateRule.CROSS_PRINCIPAL
     if _sourceless_path_rule_applies(model, req, prose):
-        return "sourceless_path"
+        return ScopeGateRule.SOURCELESS_PATH
     if _topology_rule_applies(model, req):
-        return "single_host_topology"
+        return ScopeGateRule.SINGLE_HOST_TOPOLOGY
     if _loopback_transport_rule_applies(model, req, prose):
-        return "loopback_transport"
+        return ScopeGateRule.LOOPBACK_TRANSPORT
     return None

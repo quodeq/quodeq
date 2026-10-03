@@ -1,10 +1,36 @@
 """Assistant workspace routes: status/diff, apply, discard, PR and their error codes."""
+from unittest.mock import patch
+
 from tests.api._assistant_workspace_fixtures import (  # noqa: F401 -- app/client/repo are pytest fixtures
     _session_with_worktree,
     app,
     client,
     repo,
 )
+
+
+def test_worktree_summary_logs_and_reports_no_stats_on_diff_stats_failure(tmp_path):
+    from quodeq.assistant.worktree import WorktreeError
+    from quodeq.api import assistant_workspace_routes as routes
+
+    wt_path = tmp_path / "wt"
+    wt_path.mkdir()
+    row = {
+        "status": routes.WorktreeStatus.ACTIVE, "path": str(wt_path),
+        "branch": "quodeq/fix-1", "created_at": "2026-01-01T00:00:00Z",
+    }
+
+    def _raise(_path):
+        raise WorktreeError("git diff failed")
+
+    with patch.object(routes, "diff_stats", _raise), \
+            patch.object(routes._logger, "warning") as warning:
+        summary = routes._worktree_summary(row)
+
+    assert summary["stats"] == []
+    assert summary["filesChanged"] == 0
+    assert warning.called
+    assert "diff_stats failed" in warning.call_args.args[0]
 
 
 def test_workspace_status_and_diff(app, client, repo):
@@ -222,3 +248,21 @@ def test_workspace_apply_requires_csrf_origin(tmp_path, monkeypatch):
     resp = client.post("/api/assistant/sessions/x/workspace/apply",
                        headers={"Origin": "http://evil.example"})
     assert resp.status_code == 403
+
+
+def test_workspace_status_reads_the_session_once(app, client, repo, monkeypatch):
+    from quodeq.data.sqlite.assistant_repository import AssistantRepository
+    sid, _store, _manager = _session_with_worktree(app, client, repo)
+    calls: list[str] = []
+    real = AssistantRepository.get_session
+
+    def counting(self, session_id):
+        calls.append(session_id)
+        return real(self, session_id)
+
+    monkeypatch.setattr(AssistantRepository, "get_session", counting)
+
+    resp = client.get(f"/api/assistant/sessions/{sid}/workspace")
+
+    assert resp.status_code == 200
+    assert calls == [sid]

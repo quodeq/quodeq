@@ -8,8 +8,8 @@ from pathlib import Path
 from quodeq.core.types.standard import StandardDetail, StandardMeta
 logger = logging.getLogger(__name__)
 
-_TYPE_CUSTOM = "custom"
-_TYPE_BUILTIN = "builtin"
+TYPE_CUSTOM = "custom"
+_TYPE_ISO = "iso"
 
 
 def _require_id(data: dict, source: str) -> str:
@@ -68,6 +68,8 @@ def _custom_fields(data: dict, sid: str, type_default: str) -> dict[str, object]
         "managed": data.get("managed", False),
         "origin": data.get("origin"),
         "origin_hash": data.get("origin_hash"),
+        "subtype": data.get("subtype"),
+        "version": data.get("version"),
     }
 
 
@@ -86,14 +88,16 @@ def _builtin_fields(
         "description": description,
         "weight": weight,
         "source": source,
-        "type": data.get("type", _TYPE_BUILTIN),
+        "type": data.get("type", _TYPE_ISO),
         "managed": True,
         "origin": None,
         "origin_hash": None,
+        "subtype": data.get("subtype"),
+        "version": data.get("version"),
     }
 
 
-def build_detail(data: dict, *, type_default: str = _TYPE_CUSTOM) -> StandardDetail:
+def build_detail(data: dict, *, type_default: str = TYPE_CUSTOM) -> StandardDetail:
     """Construct a StandardDetail from a raw JSON dict."""
     sid = _require_id(data, "standard")
     return StandardDetail(
@@ -118,13 +122,13 @@ def build_custom_meta(data: dict, p_count: int, r_count: int) -> StandardMeta:
     """Build a StandardMeta for a user-created custom standard."""
     sid = _require_id(data, "custom standard")
     return StandardMeta(
-        **_custom_fields(data, sid, _TYPE_CUSTOM),
+        **_custom_fields(data, sid, TYPE_CUSTOM),
         principle_count=p_count, requirement_count=r_count,
     )
 
 
 def build_builtin_meta(
-    dim: dict, p_count: int, r_count: int, description: str = "",
+    dim: dict, p_count: int, r_count: int, description: str = "", version: str | None = None,
 ) -> StandardMeta:
     """Build a StandardMeta for a built-in dimension.
 
@@ -135,9 +139,10 @@ def build_builtin_meta(
     did = _require_id(dim, "built-in dimension")
     final_description = description or f'{dim.get("source", "Built-in")} standard'
     return StandardMeta(
+        # The registry entry carries no version; it comes from the compiled file.
         **_builtin_fields(
-            dim, did, dim.get("iso_25010") or dim.get("name", did), final_description,
-            dim.get("weight", 1.0), dim.get("source", ""),
+            {**dim, "version": version}, did, dim.get("iso_25010") or dim.get("name", did),
+            final_description, dim.get("weight", 1.0), dim.get("source", ""),
         ),
         principle_count=p_count, requirement_count=r_count,
     )

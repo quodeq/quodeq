@@ -6,6 +6,7 @@ propagate as a plain 500. After the fix it must return
 """
 from __future__ import annotations
 
+import sqlite3
 from http import HTTPStatus
 from unittest.mock import MagicMock
 
@@ -19,7 +20,10 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path / "reports"))
     monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "idx.db"))
     broken_provider = MagicMock()
-    broken_provider.rebuild_index.side_effect = RuntimeError("index exploded")
+    # sqlite3.Error, not RuntimeError: the route's except was narrowed to
+    # (sqlite3.Error, OSError) (R-FT-7), the realistic surface of
+    # rebuild_index()'s DELETE/re-sync against the sqlite index.
+    broken_provider.rebuild_index.side_effect = sqlite3.Error("index exploded")
     # Pass provider directly so create_app stores it in app.config["_provider"];
     # passing via test_config is overwritten by the provider= assignment in app.py.
     app = create_app(provider=broken_provider, test_config={"TESTING": True})

@@ -18,8 +18,25 @@ from quodeq.analysis._ignore import is_ignored
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec
 from quodeq.config.discipline_registry import DisciplineRegistry
 
-_MIN_FILES_PER_TARGET = 3
+MIN_FILES_PER_TARGET = 3
 _UNKNOWN_LANG = "unknown"
+# How much of a file to sniff for a NUL byte (git's own binary heuristic).
+_BINARY_SNIFF_BYTES = 8192
+
+
+def _looks_binary(path: str) -> bool:
+    """Return True when *path* has a NUL byte in its first few KB.
+
+    Extensions are ambiguous: ``.ts`` is TypeScript and MPEG transport
+    stream. A video segment queued as source can only fail (the model has
+    nothing to parse), and a run of them trips the failure-streak breaker.
+    An unreadable file is not called binary; it keeps its old fate.
+    """
+    try:
+        with open(path, "rb") as f:
+            return b"\x00" in f.read(_BINARY_SNIFF_BYTES)
+    except OSError:
+        return False
 
 
 def _matches_skip_pattern(rel_path: str, skip_patterns: list[str]) -> bool:
@@ -38,7 +55,7 @@ def target_name(language: str, category: str | None) -> str:
     return language
 
 
-def _build_targets_from_matches(
+def build_targets_from_matches(
     registry: DisciplineRegistry,
     matches: list[str],
     files_by_lang: dict[str, list[str]],
@@ -56,7 +73,7 @@ def _build_targets_from_matches(
         if lang in claimed_languages:
             continue
         lang_files = files_by_lang.get(lang, [])
-        if len(lang_files) < _MIN_FILES_PER_TARGET:
+        if len(lang_files) < MIN_FILES_PER_TARGET:
             continue
         claimed_languages.add(lang)
         topics = list(rule.suggested_topics) if rule.suggested_topics else []
@@ -96,21 +113,29 @@ def _prune_ignored_dirs(
 class WalkCounts:
     """What a walk tallied on the way past, for the caller to read afterwards.
 
-    ``_iter_source_files`` is a generator, so it cannot hand a total back
+    ``iter_source_files`` is a generator, so it cannot hand a total back
     through a return value. The caller owns this object, passes it in and
     reads it once the walk is exhausted.
     """
 
     skipped_untracked: int = 0
+    unreadable_dirs: int = 0
+    """Directories ``os.walk`` could not list (permission denied, vanished
+    mid-walk). Previously silent: os.walk without ``onerror`` just skips
+    the directory and moves on, so a partially-scanned repo looked
+    identical to a fully-scanned one. Tallied, not logged -- this module
+    reports the number and never logs it (inner-layer files take no
+    logging framework)."""
 
 
-def _iter_source_files(
+def iter_source_files(
     src: Path, walk_root: Path, walk: ManifestWalkSpec, counts: WalkCounts,
 ) -> Iterator[tuple[str, str, str]]:
     """Walk *walk_root* once, yielding ``(rel_path, suffix, language)`` per source file.
 
     Applies the walk spec's skip_dirs, skip_patterns and .quodeqignore
-    patterns (anchored at *src*, not *walk_root*). Paths come back POSIX-style
+    patterns (anchored at *src*, not *walk_root*), and drops binary files that
+    wear a source extension. Paths come back POSIX-style
     and relative to *src* so manifest paths are consistent across platforms —
     downstream consumers and scope-prefix matching all assume "/".
 
@@ -127,7 +152,11 @@ def _iter_source_files(
     ignore_patterns = walk.ignore_patterns or []
     tracked = walk.tracked_files
     src_abs = src.resolve()
-    for dirpath, dirnames, filenames in os.walk(walk_root):
+
+    def _on_walk_error(_exc: OSError) -> None:
+        counts.unreadable_dirs += 1
+
+    for dirpath, dirnames, filenames in os.walk(walk_root, onerror=_on_walk_error):
         dirnames[:] = [d for d in dirnames if d not in walk.skip_dirs and not d.startswith(".")]
         if ignore_patterns:
             _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
@@ -142,5 +171,7 @@ def _iter_source_files(
                 continue
             if tracked is not None and src_abs / rel not in tracked:
                 counts.skipped_untracked += 1
+                continue
+            if _looks_binary(os.path.join(dirpath, fname)):
                 continue
             yield rel, suffix, ext_map.get(suffix, _UNKNOWN_LANG)

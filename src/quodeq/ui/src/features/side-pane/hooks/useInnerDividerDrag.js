@@ -75,7 +75,7 @@ export function useInnerDividerDrag({ windowCount, containerRef, setResizingFlag
         });
       },
     });
-  }, [ratios, beginDrag]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ratios, beginDrag]); // eslint-disable-line react-hooks/exhaustive-deps -- containerRef and setRatios are stable (a ref and a state setter)
 
   return { ratios, setRatios, onInnerDividerPointerDown };
 }

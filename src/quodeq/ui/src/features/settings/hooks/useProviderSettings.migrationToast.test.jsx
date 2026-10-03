@@ -1,4 +1,4 @@
-// Post-PR review M7: the legacy-key migration runs inside the useState
+// The legacy-key migration runs inside the useState
 // initializer, i.e. during render. Its persist-error callback used to call
 // showToast right there, and showToast sets state in SidePaneContext, so
 // React logged "Cannot update a component while rendering a different

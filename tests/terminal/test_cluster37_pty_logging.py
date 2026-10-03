@@ -1,4 +1,4 @@
-"""Cluster 37: UnixPty best-effort handlers log at debug."""
+"""UnixPty best-effort handlers log at debug."""
 from __future__ import annotations
 
 import subprocess

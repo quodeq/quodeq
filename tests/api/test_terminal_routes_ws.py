@@ -41,7 +41,12 @@ class _LiveManager:
 
 
 class _FlakyManager(_LiveManager):
-    """Raises on the first ensure_session (spawn failure), succeeds afterwards."""
+    """Raises on the first ensure_session (spawn failure), succeeds afterwards.
+
+    OSError, not RuntimeError: this is what a real PtyBackend.spawn() raises
+    (os.openpty()/subprocess.Popen() failures are both OSError), and that is
+    the exception type setup_terminal_session's except now narrows to.
+    """
     def __init__(self):
         super().__init__()
         self._calls = 0
@@ -49,7 +54,7 @@ class _FlakyManager(_LiveManager):
     def ensure_session(self, *, cwd, cols, rows):
         self._calls += 1
         if self._calls == 1:
-            raise RuntimeError("boom: shell spawn failed")
+            raise OSError("boom: shell spawn failed")
         self._alive = True
 
 
@@ -166,7 +171,16 @@ def test_ws_gate_refusal_close_uses_dedicated_code():
     # Bad Origin -> gate refuses the handshake with close code 4003 so the
     # client reports it instead of retrying forever.
     with _serve(_LiveManager) as (port, _):
-        c = simple_websocket.Client(
+        # Must be the patched _Client, not simple_websocket.Client directly:
+        # the gate sends its close (4003) with no data frame ahead of it, so
+        # it lands microseconds after the 101 response -- exactly the
+        # handshake-coalescing bug _Client works around (see its docstring).
+        # Under xdist load the two frames land in the same recv(), the raw
+        # Client's handshake() only consumes the AcceptConnection event, and
+        # the close event is then silently dropped when the socket reaches
+        # EOF, leaving close_reason at its NO_STATUS_RCVD default instead of
+        # 4003. Reproduced 6/60 runs under -n 8 with added CPU load.
+        c = _Client(
             f"ws://127.0.0.1:{port}/api/terminal/ws",
             headers={"Origin": "http://evil.example"})
         try:

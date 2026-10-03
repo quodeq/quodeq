@@ -1,27 +1,34 @@
 import { useMemo } from 'react';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER } from '../../../utils/formatters.js';
 import { usePrincipleData } from './explorerDataHooks.js';
+import { useHydratedCompliance, useHydratedFindings } from '../hooks/useHydratedCompliance.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
+import { countKnownSeverities, emptySeverityLists, normalizeSeverity } from '../../../utils/severity.js';
+
+/** The violations split into one list per severity; anything the vocabulary
+ * does not know, or none at all, lands in the unknown bucket (the same
+ * normalization the worst-files aggregation applies), never dropped. */
+export function bucketBySeverity(violations) {
+  const bySeverity = emptySeverityLists();
+  for (const v of violations || []) bySeverity[normalizeSeverity(v.severity)].push(v);
+  return bySeverity;
+}
 
 /** Split an evalPrincipal's violations into per-severity buckets and totals. */
 export function computeEvalPrincipleData(evalPrincipal) {
   const { principleData, dimViolations = [], dimCompliance = [] } = evalPrincipal;
   const violations = (principleData?.violations?.length > 0) ? principleData.violations : dimViolations;
-  const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet);
-  const violationsBySeverity = {};
-  const sevCounts = { critical: 0, major: 0, minor: 0 };
-  for (const sev of EVAL_SEVERITY_ORDER) violationsBySeverity[sev] = [];
-  for (const v of violations) {
-    const sev = (v.severity || 'minor').toLowerCase();
-    if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);
-    if (sevCounts[sev] !== undefined) sevCounts[sev]++;
-  }
+  // A deferred /scores item has no reason/snippet yet but is still a real check.
+  const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet || c.detailDeferred);
+  const violationsBySeverity = bucketBySeverity(violations);
+  const sevCounts = countKnownSeverities(violations, { ignoreCase: true });
   return { violations, compliance, violationsBySeverity, sevCounts };
 }
 
 /** Narrow the per-severity buckets to the active filter (or pass through
  * for 'all'/no filter). */
 export function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
-  if (!activeSevFilter || activeSevFilter === 'all') return filteredBySeverity;
+  if (!activeSevFilter || activeSevFilter === SEVERITY_FILTER_ALL) return filteredBySeverity;
   const filtered = {};
   for (const sev of Object.keys(filteredBySeverity)) {
     filtered[sev] = sev === activeSevFilter ? filteredBySeverity[sev] : [];
@@ -36,7 +43,13 @@ export function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
  * active severity selection.
  */
 export function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
-  const { violations, compliance, violationsBySeverity } = useMemo(() => computeEvalPrincipleData(evalPrincipal), [evalPrincipal]);
+  const { violations: slimViolations, compliance: slimCompliance } = useMemo(() => computeEvalPrincipleData(evalPrincipal), [evalPrincipal]);
+  // /scores defers reason, snippet, context and links on both kinds; the
+  // cards render them, so both lists are hydrated here and the severity
+  // buckets are rebuilt from the hydrated rows.
+  const violations = useHydratedFindings(slimViolations, FINDING_TYPE.VIOLATION);
+  const compliance = useHydratedCompliance(slimCompliance);
+  const violationsBySeverity = useMemo(() => bucketBySeverity(violations), [violations]);
 
   const {
     liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
@@ -51,9 +64,7 @@ export function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) 
       );
     }
     const allFiltered = Object.values(bySev).flat();
-    const counts = { critical: 0, major: 0, minor: 0 };
-    allFiltered.forEach((v) => { const s = (v.severity || 'minor').toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
-    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
+    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: countKnownSeverities(allFiltered, { ignoreCase: true }) };
   }, [violationsBySeverity, dismissedSet]);
 
   const displayedBySeverity = useMemo(

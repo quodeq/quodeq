@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { useStandardsQuery } from './useStandardsQuery.js';
 
 /**
  * Manages per-project standards threshold overrides.
@@ -12,10 +12,7 @@ import { apiErrorMessage } from '../../../strings/apiErrors.js';
  */
 export function useStandardsOverrides(projectId) {
   const { getStandardsOverrides, putStandardsOverrides } = useApi();
-  const queryClient = useQueryClient();
-  const [mutationError, setMutationError] = useState(null);
-
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, setMutationError, queryClient } = useStandardsQuery({
     queryKey: standardsKeys.overrides(projectId),
     queryFn: () => getStandardsOverrides(projectId),
     enabled: Boolean(projectId),
@@ -44,7 +41,7 @@ export function useStandardsOverrides(projectId) {
     overrides: data?.overrides ?? {},
     counts: data?.counts ?? {},
     loading: isLoading,
-    error: mutationError || (error ? error.message : null),
+    error,
     save,
     preview,
   };

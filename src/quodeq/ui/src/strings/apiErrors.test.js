@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { apiErrorKey, apiErrorMessage } from './apiErrors.js';
+import { apiErrorKey, apiErrorMessage, apiErrorDetail, isAccessCode } from './apiErrors.js';
 import catalog from './en.json' with { type: 'json' };
 
 test('every mapped code resolves to a key that exists in the catalog', () => {
@@ -13,6 +13,15 @@ test('every mapped code resolves to a key that exists in the catalog', () => {
   }
 });
 
+test('the evaluate route\'s repository problems each have their own copy', () => {
+  assert.equal(apiErrorMessage({ code: 'URL_NOT_EVALUABLE', message: 'server text' }, 'apiError.generic'),
+    catalog['apiError.urlNotEvaluable']);
+  assert.equal(apiErrorMessage({ code: 'PATH_MISSING', message: 'server text' }, 'apiError.generic'),
+    catalog['apiError.pathMissing']);
+  assert.equal(apiErrorMessage({ code: 'NOT_DIR', message: 'server text' }, 'apiError.generic'),
+    catalog['apiError.notDirectory']);
+});
+
 test('lookup is case-insensitive, because the backend emits both conventions', () => {
   assert.equal(apiErrorKey('forbidden'), apiErrorKey('FORBIDDEN'));
   assert.ok(apiErrorKey('forbidden'));
@@ -21,7 +30,10 @@ test('lookup is case-insensitive, because the backend emits both conventions', (
 test('unmapped and malformed codes resolve to null', () => {
   // NOT_FOUND is deliberately unmapped: it covers seven distinct backend
   // messages, so mapping it would replace a specific sentence with a vague one.
-  for (const code of ['NOT_FOUND', 'INVALID_INPUT', 'INTERNAL_ERROR', 'WAT', '', null, undefined, 42]) {
+  // INTERNAL_ERROR is the same story: it is the app-wide fallback for any
+  // unhandled exception (api/_error_handlers.py), so the backend's own
+  // sentence is what should reach the user, not one generic translated line.
+  for (const code of ['NOT_FOUND', 'INTERNAL_ERROR', 'INVALID_INPUT', 'WAT', '', null, undefined, 42]) {
     assert.equal(apiErrorKey(code), null, `${String(code)} should not be mapped`);
   }
 });
@@ -57,6 +69,9 @@ test('every Group D code maps to a translated key distinct from its raw backend 
     ['REFRESH_FAILED', 'some refresh failure reason', 'apiError.sharedRepoRefreshFailed'],
     ['PUBLISH_IN_PROGRESS', 'a publish is already running', 'apiError.publishInProgress'],
     ['PUBLISH_START_FAILED', 'could not start the publish job, see server logs', 'apiError.publishStartFailed'],
+    ['CONNECT_IN_PROGRESS', 'a connect is already running', 'apiError.connectInProgress'],
+    ['CONNECT_START_FAILED', 'could not start the connect job, see server logs', 'apiError.connectStartFailed'],
+    ['CONNECT_FAILED', 'An unexpected error occurred while connecting.', 'apiError.connectFailed'],
     ['SCORES_READ_FAILED', 'could not read run scores', 'apiError.scoresReadFailed'],
     ['CONFIRMATION_REQUIRED', 'Use ?confirm=true to confirm deletion', 'apiError.confirmationRequired'],
   ];
@@ -86,4 +101,60 @@ test('the fallback key is used only when there is no message at all', () => {
   assert.equal(apiErrorMessage({ message: '' }, 'standards.deleteFailed'), catalog['standards.deleteFailed']);
   assert.equal(apiErrorMessage(null, 'standards.deleteFailed'), catalog['standards.deleteFailed']);
   assert.equal(apiErrorMessage(undefined, 'standards.deleteFailed'), catalog['standards.deleteFailed']);
+});
+
+test('KEYRING_UNAVAILABLE copy names the env var from the envelope', () => {
+  const err = { code: 'KEYRING_UNAVAILABLE', message: 'raw', body: { code: 'KEYRING_UNAVAILABLE', envVar: 'GEMINI_API_KEY' } };
+  const msg = apiErrorMessage(err, 'x.y');
+  assert.ok(msg.includes('GEMINI_API_KEY'), msg);
+  assert.ok(msg.includes('QUODEQ_ALLOW_PLAINTEXT_KEY=1'), msg);
+  assert.ok(!msg.includes('{envVar}'), msg);
+});
+
+test('maps every access and clone code to its own key', () => {
+  const pairs = {
+    ACCESS_AUTH_REQUIRED: 'apiError.accessAuthRequired', ACCESS_NOT_FOUND: 'apiError.accessNotFound',
+    ACCESS_HOST_KEY: 'apiError.accessHostKey', ACCESS_NETWORK: 'apiError.accessNetwork',
+    ACCESS_TIMEOUT: 'apiError.accessTimeout', ACCESS_GIT_MISSING: 'apiError.accessGitMissing',
+    ACCESS_GIT_TOO_OLD: 'apiError.accessGitTooOld', ACCESS_UNKNOWN: 'apiError.accessUnknown',
+    CLONE_UNKNOWN: 'apiError.cloneUnknown', CLONE_TIMEOUT: 'apiError.cloneTimeout',
+    HOST_KEY_UNVERIFIED: 'apiError.hostKeyUnverified', GIT_MISSING: 'apiError.gitMissing',
+    TOKEN_INVALID: 'apiError.tokenInvalid', TOKEN_SCOPE: 'apiError.tokenScope', TOKEN_REQUIRED: 'apiError.tokenRequired',
+    OFFLINE: 'apiError.githubOffline', GITHUB_NOT_CONFIGURED: 'apiError.githubNotConfigured',
+    NO_FLOW: 'apiError.noFlow', FLOW_START_FAILED: 'apiError.flowStartFailed',
+    GITHUB_REFUSED: 'apiError.githubRefused', FLOW_FAILED: 'apiError.flowFailed',
+  };
+  for (const [code, key] of Object.entries(pairs)) {
+    assert.equal(apiErrorKey(code), key);
+    assert.ok(key in catalog, `${key} missing from en.json`);
+  }
+});
+
+test('no onboarding clone code resolves to shared-repository copy', () => {
+  for (const code of ['CLONE_UNKNOWN', 'CLONE_TIMEOUT', 'AUTH_REQUIRED', 'REPO_NOT_FOUND']) {
+    assert.doesNotMatch(apiErrorKey(code), /sharedRepo/);
+  }
+});
+
+test('apiErrorDetail reads the envelope detail or empty', () => {
+  assert.equal(apiErrorDetail({ body: { detail: 'fatal: x' } }), 'fatal: x');
+  assert.equal(apiErrorDetail({ body: { detail: '' } }), '');
+  assert.equal(apiErrorDetail({}), '');
+  assert.equal(isAccessCode('ACCESS_NOT_FOUND'), true);
+  assert.equal(isAccessCode('REPO_NOT_FOUND'), false);
+});
+
+test('a file:// folder that is not a git repository gets its own copy', () => {
+  assert.equal(apiErrorKey('NOT_A_GIT_REPO'), 'apiError.notAGitRepo');
+  assert.equal(apiErrorMessage({ code: 'NOT_A_GIT_REPO', message: 'not a git repository' }, 'x.y'), catalog['apiError.notAGitRepo']);
+});
+
+test('CLONE_START_FAILED (the clone job never started) renders its own copy', () => {
+  assert.equal(apiErrorKey('CLONE_START_FAILED'), 'apiError.cloneStartFailed');
+  assert.equal(apiErrorMessage({ code: 'CLONE_START_FAILED', message: 'could not start the clone job' }, 'x.y'), 'Could not start the download.');
+});
+
+test('CLONE_IN_PROGRESS (a second clone while one runs) renders its own copy', () => {
+  assert.equal(apiErrorKey('CLONE_IN_PROGRESS'), 'apiError.cloneInProgress');
+  assert.equal(apiErrorMessage({ code: 'CLONE_IN_PROGRESS', message: 'a clone is already running' }, 'x.y'), 'A download is already running. Wait for it to finish.');
 });

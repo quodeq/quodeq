@@ -47,4 +47,30 @@ describe('Sidebar compare nav item — fleet gating', () => {
     expect(screen.getByTitle('compare')).toBeInTheDocument();
     expect(screen.queryByTitle('overview')).toBeNull();
   });
+
+  it('the violations badge says what it counts: majors', () => {
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} violationsCount={5} />);
+    expect(screen.getByText('5')).toHaveAttribute('title', '5 majors');
+  });
+
+  it('one major is singular', () => {
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} violationsCount={1} />);
+    expect(screen.getByText('1')).toHaveAttribute('title', '1 major');
+  });
+});
+
+describe('Sidebar active nav item', () => {
+  it('marks the active tab with aria-current so assistive tech announces it', () => {
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} />);
+    const current = screen.getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page');
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveClass('active');
+  });
+
+  it('inactive tabs carry no aria-current', () => {
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} />);
+    const inactive = screen.getAllByRole('button').filter((b) => !b.classList.contains('active'));
+    expect(inactive.length).toBeGreaterThan(0);
+    inactive.forEach((b) => expect(b).not.toHaveAttribute('aria-current'));
+  });
 });

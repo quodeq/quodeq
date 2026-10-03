@@ -43,7 +43,7 @@ jobs:
 
       - name: Install uv
         if: env.SNYK_TOKEN != ''
-        uses: astral-sh/setup-uv@v10.1.0
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Export pinned Python requirements
         if: env.SNYK_TOKEN != ''
@@ -87,26 +87,40 @@ jobs:
         # intentionally vulnerable fixtures; excluded via .snyk.
         run: snyk code test --severity-threshold=high --sarif-file-output=snyk-code.sarif
 
+      # Snyk Code models every Flask view return as an HTML sink, so every
+      # jsonify / json_error return reads as python/XSS to it: 71 such alerts
+      # so far, every reviewed one a false positive. The free plan has no
+      # .snyk ignore for Code findings and a GitHub dismissal re-opens as a
+      # new alert the moment the handler moves, so the rule is dropped from
+      # the SARIF before upload. CodeQL (py/reflective-xss) keeps XSS
+      # coverage and every other Snyk Code rule still uploads. Same treatment
+      # CodeQL's path-injection query got in #1028.
+      - name: Drop the python/XSS rule from the Snyk Code SARIF
+        if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-code.sarif') != ''
+        run: |
+          jq '(.runs[].results) |= map(select(.ruleId != "python/XSS"))' snyk-code.sarif > snyk-code.filtered.sarif
+          mv snyk-code.filtered.sarif snyk-code.sarif
+
       # Distinct categories keep the three analyses from overwriting each other
       # in the code scanning tab. hashFiles guards against a scan erroring out
       # before it writes SARIF.
       - name: Upload Snyk Python (deps) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-python.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.38.0
+        uses: github/codeql-action/upload-sarif@v4.38.2
         with:
           sarif_file: snyk-python.sarif
           category: snyk-python-deps
 
       - name: Upload Snyk UI (deps) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-ui.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.38.0
+        uses: github/codeql-action/upload-sarif@v4.38.2
         with:
           sarif_file: snyk-ui.sarif
           category: snyk-ui-deps
 
       - name: Upload Snyk Code (SAST) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-code.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.38.0
+        uses: github/codeql-action/upload-sarif@v4.38.2
         with:
           sarif_file: snyk-code.sarif
           category: snyk-code

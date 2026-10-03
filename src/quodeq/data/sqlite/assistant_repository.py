@@ -8,15 +8,14 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
-from quodeq.data.ports.assistant import SessionScope
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL
+from quodeq.core.types.project_source import ProjectSource
+from quodeq.data.ports.assistant import DEFAULT_EVENTS_LIMIT, SessionScope
 from quodeq.data.sqlite._assistant_schema import (
     ASSISTANT_DDL,
     ASSISTANT_MIGRATIONS,
     ASSISTANT_SCHEMA_VERSION,
 )
-
-_BUSY_TIMEOUT_MS = 5000
+from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
 
 
 def _dict_row(cursor: sqlite3.Cursor, row: tuple) -> dict:
@@ -46,26 +45,29 @@ class AssistantRepository:
     def _open_connection(self) -> sqlite3.Connection:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        conn.execute("PRAGMA journal_mode = WAL")
-        # NORMAL is durable against app crashes under WAL and skips the
-        # per-commit fsync. CLI streaming writes one event row per text
-        # delta, so a FULL fsync per commit would pace the reader thread.
-        conn.execute("PRAGMA synchronous = NORMAL")
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version == 0:
-            conn.executescript(ASSISTANT_DDL)
-        elif version > ASSISTANT_SCHEMA_VERSION:
-            raise sqlite3.DatabaseError(
-                f"assistant.db schema v{version} is newer than supported "
-                f"v{ASSISTANT_SCHEMA_VERSION}"
-            )
-        elif version < ASSISTANT_SCHEMA_VERSION:
-            for target, sql in ASSISTANT_MIGRATIONS:
-                if version < target:
-                    conn.executescript(sql)
-        conn.row_factory = _dict_row
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+            # NORMAL is durable against app crashes under WAL and skips the
+            # per-commit fsync; CLI streaming writes one event row per text
+            # delta, so a FULL fsync per commit would pace the reader thread.
+            conn.execute("PRAGMA synchronous = NORMAL")
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            if version == 0:
+                conn.executescript(ASSISTANT_DDL)
+            elif version > ASSISTANT_SCHEMA_VERSION:
+                raise sqlite3.DatabaseError(
+                    f"assistant.db schema v{version} is newer than supported v{ASSISTANT_SCHEMA_VERSION}")
+            elif version < ASSISTANT_SCHEMA_VERSION:
+                for target, sql in ASSISTANT_MIGRATIONS:
+                    if version < target:
+                        conn.executescript(sql)
+            conn.row_factory = _dict_row
+        except BaseException:
+            # A newer schema or a failed migration must not pin a half-opened connection to the file.
+            conn.close()
+            raise
         return conn
 
     @contextmanager
@@ -96,7 +98,7 @@ class AssistantRepository:
                 self._conn = None
 
     def create_session(self, *, session_id: str, provider: str,
-                       model: str | None = None, source: str = SESSION_SOURCE_LOCAL,
+                       model: str | None = None, source: str = ProjectSource.LOCAL,
                        scope: SessionScope | None = None) -> dict:
         """INSERT into ``sessions``, then read the row back for its defaults.
 
@@ -178,14 +180,7 @@ class AssistantRepository:
     def set_action_status(
         self, action_id: str, status: str, *, expected: str | None = None,
     ) -> bool:
-        """Set an action's status; return whether a row was updated.
-
-        With ``expected`` the write is a compare-and-set
-        (``WHERE id=? AND status=?``), so a caller can atomically claim a
-        transition — two concurrent applies of the same action can't both
-        win and double-run the side effect. Without ``expected`` the write
-        is unconditional (back-compat for the rollback path).
-        """
+        """Contract in ``AssistantStore.set_action_status``."""
         with self._connect() as conn:
             if expected is None:
                 cur = conn.execute(
@@ -213,7 +208,7 @@ class AssistantRepository:
             return int(cur.lastrowid)
 
     def events_after(self, session_id: str, after_seq: int,
-                     limit: int = 500) -> list[tuple[int, dict]]:
+                     limit: int = DEFAULT_EVENTS_LIMIT) -> list[tuple[int, dict]]:
         """Read up to *limit* frames with ``seq > after_seq``, in sequence order.
 
         The poller resumes from the last seq it saw; a caller behind by more

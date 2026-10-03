@@ -1,11 +1,13 @@
 """RunLifecycleContext — the run's lifecycle context manager.
 
-Composed from collaborators that each own one concern: ``_StatusWriter``
-(every status.json write), ``_SignalGuard`` (install/restore of the run's
-signal handlers), ``_AtexitGuard`` (the process-exit fallback hook), plus the
-shared heartbeat/resource samplers. The context wires them together and keeps
-the exception→state mapping in ``__exit__`` — deciding which terminal state
-an exit maps to is the context manager's own job.
+Composed from collaborators that each own one concern: ``StatusWriter``
+(every status.json write, in ``_run_lifecycle_support.py``), ``SignalGuard``
+(install/restore of the run's signal handlers), ``AtexitGuard`` (the
+process-exit fallback hook), plus the shared heartbeat/resource samplers. The
+context takes these collaborators via a ``LifecycleDeps`` bundle (None =
+production default) and wires them together, keeping the exception→state
+mapping in ``__exit__`` — deciding which terminal state an exit maps to is
+the context manager's own job.
 
 Intended usage:
 
@@ -25,89 +27,31 @@ from __future__ import annotations
 
 import logging
 import signal  # noqa: F401 -- test_run_lifecycle.py patches `rl.signal.signal`
-from datetime import datetime, timezone
 from pathlib import Path
 from types import TracebackType
 from typing import Any
 
 from quodeq.shared import cancellation
 from quodeq.analysis.errors import provider_exit_reason
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
 from quodeq.analysis._run_lifecycle_support import (
-    _AtexitGuard,
-    _SignalGuard,
-    _finalize_run_on_atexit,
-    _is_circuit_breaker_error,
-    _is_named_error,
-    _mark_unfinished_dims_incomplete,
-    _run_signal_shutdown,
-    _seed_dimension_states,
+    AtexitGuard,
+    LifecycleDeps,
+    SignalGuard,
+    StatusWriter,
+    finalize_run_on_atexit,
+    is_circuit_breaker_error,
+    is_named_error,
+    mark_unfinished_dims_incomplete,
+    run_signal_shutdown,
+    seed_dimension_states,
 )
-from quodeq.data.fs.run_status_store import (
-    RunState,
-    RunStatus,
-    TERMINAL_STATES,
-    validate_transition,
-    write_status,
-)
+from quodeq.core.run.state import RunState, TERMINAL_STATES, validate_transition
+from quodeq.data.fs.run_status_store import write_status
 
 _logger = logging.getLogger(__name__)
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-class _StatusWriter:
-    """Owns every status.json write for one run.
-
-    The run's identity (dir, job, start time, dimensions) is fixed at
-    construction; the presentation fields (phase, deadline, ...) are plain
-    mutable attributes the context updates as the run progresses. ``write``
-    is the single place that knows the full status row, so the normal-path,
-    signal-path, and atexit-path writes cannot drift apart.
-
-    Kept in this module (not the sibling support module): it calls
-    ``write_status`` by bare name, patched by tests at
-    ``quodeq.analysis.run_lifecycle.write_status``.
-    """
-
-    def __init__(
-        self,
-        run_dir: Path,
-        job_id: str,
-        dimensions: list[str],
-        *,
-        ai_provider: str | None = None,
-        ai_model: str | None = None,
-    ) -> None:
-        self.run_dir = run_dir
-        self.job_id = job_id
-        self.started_at = _now_iso()
-        self.dimensions = list(dimensions)
-        self.phase: str | None = None
-        self.current_dimension: str | None = None
-        self.deadline_at: str | None = None
-        self.time_limit_s: int | None = None
-        self.ai_provider = ai_provider
-        self.ai_model = ai_model
-
-    def write(self, state: RunState, *, exit_reason: str | None = None) -> None:
-        status = RunStatus(
-            state=state,
-            job_id=self.job_id,
-            started_at=self.started_at,
-            dimensions=self.dimensions,
-            phase=self.phase,
-            current_dimension=self.current_dimension,
-            exit_reason=exit_reason,
-            deadline_at=self.deadline_at,
-            ai_provider=self.ai_provider,
-            ai_model=self.ai_model,
-            time_limit_s=self.time_limit_s,
-        )
-        write_status(self.run_dir, status)
 
 
 class RunLifecycleContext:
@@ -121,18 +65,21 @@ class RunLifecycleContext:
         *,
         ai_provider: str | None = None,
         ai_model: str | None = None,
+        deps: LifecycleDeps | None = None,
     ) -> None:
+        deps = deps or LifecycleDeps()
         self._run_dir = run_dir
         self._dimensions = list(dimensions)
         self._current_state = RunState.PENDING
-        self._status = _StatusWriter(
+        self._status = StatusWriter(
             run_dir, job_id, dimensions,
             ai_provider=ai_provider, ai_model=ai_model,
+            write_status=deps.write_status or write_status,
         )
-        self._heartbeat = HeartbeatThread(run_dir)
-        self._resources = ResourceSampler()
-        self._signals = _SignalGuard(self._handle_signal, log=_logger)
-        self._atexit = _AtexitGuard(self._finalize_on_atexit)
+        self._heartbeat = (deps.heartbeat_factory or HeartbeatThread)(run_dir)
+        self._resources = (deps.resources_factory or ResourceSampler)()
+        self._signals = SignalGuard(self._handle_signal, log=_logger)
+        self._atexit = AtexitGuard(self._finalize_on_atexit)
         self._pending_exit_reason: str | None = None
 
     # ---- Context protocol --------------------------------------------------
@@ -147,16 +94,31 @@ class RunLifecycleContext:
         self._signals.install()
         self._atexit.register()
         self._write(RunState.PENDING)
-        _seed_dimension_states(self._run_dir, self._dimensions, log=_logger)
+        seed_dimension_states(self._run_dir, self._dimensions, log=_logger)
         self._transition(RunState.RUNNING)
         self._heartbeat.start()
         self._resources.start()
         return self
 
+    def _record_exit(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None,
+    ) -> None:
+        """Move a run that is not yet terminal to the end state its exit cause implies."""
+        if exc_type is None:
+            self._exit_clean()
+        elif issubclass(exc_type, SystemExit):
+            self._exit_system_exit()
+        elif issubclass(exc_type, BrokenPipeError):
+            self._exit_broken_pipe()
+        elif is_circuit_breaker_error(exc_type):
+            self._exit_circuit_breaker()
+        elif is_named_error(exc_type, "FatalProviderError"):
+            self._exit_fatal_provider(exc_value)
+        else:
+            self._exit_other_exception(exc_type)
+
     def _exit_clean(self) -> None:
         """No exception — pipeline is expected to have transitioned to finalizing."""
-        if self._current_state in TERMINAL_STATES:
-            return
         if self._current_state != RunState.FINALIZING:
             # Caller didn't explicitly call transition_to_finalizing(); do it now.
             self._transition(RunState.FINALIZING)
@@ -166,7 +128,7 @@ class RunLifecycleContext:
         # a done/None status that reads exactly like a full run — the
         # skipped dims are dropped from the run average, and they tend to
         # be the ones late in the order, not a random sample.
-        skipped = _mark_unfinished_dims_incomplete(self._run_dir, "not_reached", log=_logger)
+        skipped = mark_unfinished_dims_incomplete(self._run_dir, "not_reached", log=_logger)
         self._transition(
             RunState.DONE,
             exit_reason=self._pending_exit_reason
@@ -175,39 +137,34 @@ class RunLifecycleContext:
 
     def _exit_system_exit(self) -> None:
         """SystemExit raised by our signal handler; state already written there."""
-        if self._current_state not in TERMINAL_STATES:
-            self._transition(RunState.CANCELLED, exit_reason="systemexit")
+        self._transition(RunState.CANCELLED, exit_reason="systemexit")
 
     def _exit_broken_pipe(self) -> None:
         """The child's inherited stdout pipe closed under us (parent restarted
         mid-scan). The analysis itself already ran and the evidence is on
         disk, so this transitions to DONE rather than FAILED.
         """
-        if self._current_state not in TERMINAL_STATES:
-            if self._current_state != RunState.FINALIZING:
-                self._transition(RunState.FINALIZING)
-            self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
+        if self._current_state != RunState.FINALIZING:
+            self._transition(RunState.FINALIZING)
+        self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
 
     def _exit_circuit_breaker(self) -> None:
         """Circuit breaker tripped — auto-protection, not user cancel. Distinct
         exit_reason makes the History entry distinguishable from regular failures.
         """
-        if self._current_state not in TERMINAL_STATES:
-            self._transition(RunState.FAILED, exit_reason="failure_streak")
+        self._transition(RunState.FAILED, exit_reason=ExitReason.FAILURE_STREAK)
 
     def _exit_fatal_provider(self, exc: BaseException | None) -> None:
         """Provider reported an unrecoverable condition (quota, auth, credits).
         Distinct exit_reason so the History entry says why instead of a
         generic exception.
         """
-        if self._current_state not in TERMINAL_STATES:
-            self._transition(RunState.FAILED, exit_reason=provider_exit_reason(getattr(exc, "reason", None)))
+        self._transition(RunState.FAILED, exit_reason=provider_exit_reason(getattr(exc, "reason", None)))
 
     def _exit_other_exception(self, exc_type: type[BaseException] | None) -> None:
         """Any other exception → failed."""
-        if self._current_state not in TERMINAL_STATES:
-            exc_name = exc_type.__name__ if exc_type else "UnknownError"
-            self._transition(RunState.FAILED, exit_reason=f"exception: {exc_name}")
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        self._transition(RunState.FAILED, exit_reason=f"exception: {exc_name}")
 
     def __exit__(
         self,
@@ -217,18 +174,8 @@ class RunLifecycleContext:
     ) -> bool:
         self._heartbeat.stop()
         self._resources.stop()
-        if exc_type is None:
-            self._exit_clean()
-        elif issubclass(exc_type, SystemExit):
-            self._exit_system_exit()
-        elif issubclass(exc_type, BrokenPipeError):
-            self._exit_broken_pipe()
-        elif _is_circuit_breaker_error(exc_type):
-            self._exit_circuit_breaker()
-        elif _is_named_error(exc_type, "FatalProviderError"):
-            self._exit_fatal_provider(exc_value)
-        else:
-            self._exit_other_exception(exc_type)
+        if self._current_state not in TERMINAL_STATES:
+            self._record_exit(exc_type, exc_value)
         self._signals.restore()
         self._atexit.deregister()
         return False  # never swallow exceptions
@@ -244,6 +191,12 @@ class RunLifecycleContext:
         self._status.phase = phase
         self._status.current_dimension = current_dimension
         self._write(self._current_state)
+
+    def set_commit_sha(self, commit_sha: str | None, *, dirty: bool | None = None) -> None:
+        """Record the commit the run evaluates and whether the tree had uncommitted
+        changes; set before entering so the first write carries both."""
+        self._status.commit_sha = commit_sha
+        self._status.commit_dirty = dirty
 
     def set_deadline(self, deadline_at: str | None) -> None:
         """Record the run-level deadline. Visible immediately in status.json."""
@@ -280,18 +233,11 @@ class RunLifecycleContext:
     def _write(self, state: RunState, *, exit_reason: str | None = None) -> None:
         self._status.write(state, exit_reason=exit_reason)
 
-    @staticmethod
-    def _is_named_error(exc_type: type[BaseException] | None, name: str) -> bool:
-        """Delegates to ``_run_lifecycle_support._is_named_error``; kept as a
-        staticmethod because a test calls ``RunLifecycleContext._is_named_error``.
-        """
-        return _is_named_error(exc_type, name)
-
     def _handle_signal(self, signum: int, _frame: Any) -> None:
         """Write CANCELLED status, close out unfinished dims, then re-raise as SystemExit."""
-        _run_signal_shutdown(self._heartbeat, self._resources, self._status, signum, log=_logger)
+        run_signal_shutdown(self._heartbeat, self._resources, self._status, signum, log=_logger)
         self._current_state = RunState.CANCELLED
         raise SystemExit(128 + signum)
 
     def _finalize_on_atexit(self) -> None:
-        _finalize_run_on_atexit(self._run_dir, self._heartbeat, self._resources, self._status)
+        finalize_run_on_atexit(self._run_dir, self._heartbeat, self._resources, self._status)

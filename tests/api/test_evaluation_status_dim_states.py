@@ -58,7 +58,7 @@ class _Provider(ActionProvider):
             output_project="proj", output_run_id="run-1",
         )
 
-    def cancel_evaluation(self, job_id, reports_dir=None, *, discard_partial=False):
+    def cancel_evaluation(self, job_id, reports_dir=None, *, discard_partial=False, wait_for_exit=False):
         return False
 
     def list_evaluations(self, *, limit=0, reports_dir=None, states=None):

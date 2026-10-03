@@ -1,45 +1,41 @@
 """JSON serialization and disk-backed job store.
 
-Split from ``_job_model.py`` to keep that file under the size ratchet's
-300-line cap. ``FileJobStore``/``create_job_store`` stay re-exported from
-there. Moved verbatim.
+``FileJobStore``/``create_job_store`` are re-exported from ``_job_model.py``.
 """
 from __future__ import annotations
 
 import json
 import os
+import tempfile
 import time
 from collections import deque
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 
-# _logger threaded from _job_model.py (not a fresh logging.getLogger here) --
+# logger threaded from _job_model.py (not a fresh logging.getLogger here) --
 # this module stays inside the SEP-06 logging boundary that _job_model.py
 # already carries a declared exemption for (see
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
-from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, _MAX_LOG_LINES, _logger
-from quodeq.shared.env_resolve import resolve_env
+from quodeq.config.services_env import job_persist_dir as _resolve_job_persist_dir
+from quodeq.core.run.job_status import JobStatus, parse_job_status
+from quodeq.shared.clock import utc_now_iso
+from quodeq.shared.json_state import dump_json_and_replace
+from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, MAX_LOG_LINES, logger
 
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
+# A temp file older than this is an orphan from a write that crashed between
+# mkstemp and replace; a live write finishes in well under a second.
+_ORPHAN_TMP_AGE_S = 10 * 60
 
 
 def _default_persist_dir(env: Mapping[str, str] | None = None) -> Path:
     """Read persist dir from env at call time for lazy configuration.
 
     *env* overrides ``os.environ`` for the ``QUODEQ_JOB_PERSIST_DIR`` read.
-
-    Resolution: QUODEQ_JOB_PERSIST_DIR, else ``run/jobs`` next to the index
-    DB (mirroring get_score_cache_path, so the test suite's
-    QUODEQ_INDEX_DB_PATH override auto-isolates this store too), which
-    itself defaults to ``~/.quodeq``. Hardcoding the home fallback here let
-    pytest runs write fake jobs into the developer's real dashboard.
+    See ``config.services_env.job_persist_dir`` for the resolution order.
     """
-    explicit = resolve_env(env).get("QUODEQ_JOB_PERSIST_DIR")
-    if explicit:
-        return Path(explicit)
-    from quodeq.shared.env import get_index_db_path
-    return Path(get_index_db_path()).parent / "run" / "jobs"
+    return _resolve_job_persist_dir(env=env)
 
 
 def _job_to_json(job: Job) -> dict:
@@ -65,12 +61,27 @@ def _job_to_json(job: Job) -> dict:
     }
 
 
+def _status_from_json(raw: object) -> JobStatus | object:
+    """The JobStatus a job file's status means; an unknown or non-string value stays raw, logged.
+
+    A job file must never become unreadable over its status word.
+    """
+    if not isinstance(raw, str):
+        logger.warning("job file with non-string status %r kept as-is", raw)
+        return raw
+    try:
+        return parse_job_status(raw)
+    except ValueError:
+        logger.warning("job file with unknown status %r kept as-is", raw)
+        return raw
+
+
 def _job_from_json(data: dict) -> Job:
     """Deserialize a Job from a JSON dict."""
-    logs: deque[str] = deque(data.get("logs", []), maxlen=_MAX_LOG_LINES)
+    logs: deque[str] = deque(data.get("logs", []), maxlen=MAX_LOG_LINES)
     return Job(
         job_id=data["job_id"],
-        status=data["status"],
+        status=_status_from_json(data["status"]),
         command=data.get("command", []),
         started_at=data.get("started_at", ""),
         ended_at=data.get("ended_at"),
@@ -119,36 +130,65 @@ class FileJobStore(InMemoryJobStore):
         self._write_data(job.job_id, job_data)
 
     def delete(self, job_id: str) -> None:
+        """Drop *job_id* from memory and remove its file, best-effort.
+
+        A file that cannot be unlinked (EACCES, EBUSY on Windows) is logged
+        and left on disk: the job is gone for this process, but the next
+        start's ``_load_all`` reads it back, and ``_cleanup_stale`` removes
+        it once it ended more than 24 hours ago.
+        """
         with self._lock:
             self._jobs.pop(job_id, None)
-            path = self._persist_dir / f"{job_id}.json"
-            path.unlink(missing_ok=True)
+            try:
+                self._job_path(job_id).unlink(missing_ok=True)
+            except OSError:
+                logger.warning("job file for %s not removed", job_id, exc_info=True)
 
     # -- persistence helpers -------------------------------------------------
+
+    def _job_path(self, job_id: str) -> Path:
+        """Where *job_id*'s record lives: ``{persist_dir}/{job_id}.json``."""
+        return self._persist_dir / f"{job_id}.json"
 
     def _write(self, job: Job) -> None:
         """Write a single job to disk. Caller must hold the lock."""
         self._write_data(job.job_id, _job_to_json(job))
 
     def _write_data(self, job_id: str, data: dict) -> None:
-        """Write pre-serialized job data to disk. Does NOT require the lock."""
-        path = self._persist_dir / f"{job_id}.json"
-        tmp = path.with_suffix(".tmp")
+        """Write pre-serialized job data to disk. Does NOT require the lock.
+
+        Each call gets its own temp file (``tempfile.mkstemp``, not a fixed
+        ``{job_id}.tmp``): two writers persisting the same job id concurrently
+        must never share one temp path, or one writer's in-progress content
+        can be exposed under the published name by the other's rename before
+        it finishes writing. ``_load_all`` only globs ``*.json``, so a
+        leftover ``*.tmp`` name is never picked up as a job record, and
+        ``_cleanup_stale`` removes old ones.
+        """
+        path = self._job_path(job_id)
         try:
-            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            # SECURITY: restrict job files to owner-only read/write
-            os.chmod(tmp, 0o600)
-            tmp.replace(path)
-            os.chmod(path, 0o600)
+            fd, tmp = tempfile.mkstemp(dir=self._persist_dir, prefix=f"{job_id}.", suffix=".tmp")
         except OSError:
-            _logger.warning("Failed to persist job %s", job_id, exc_info=True)
-            tmp.unlink(missing_ok=True)
+            logger.warning("Failed to persist job %s", job_id, exc_info=True)
+            return
+        try:
+            # SECURITY: restrict job files to owner-only read/write
+            dump_json_and_replace(fd, tmp, path, data, indent=2, mode=0o600)
+        except OSError:
+            logger.warning("Failed to persist job %s", job_id, exc_info=True)
+            try:
+                os.unlink(tmp)
+            except OSError as unlink_exc:
+                logger.debug("temp job file %s not removed: %s", tmp, unlink_exc)
 
     def _load_all(self) -> None:
         """Load every .json file in the persist dir."""
         for path in self._persist_dir.glob("*.json"):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    logger.warning("Skipping non-object job file %s", path)
+                    continue
                 job = _job_from_json(data)
                 # Jobs that were 'running' when the server went down lose
                 # their monitor thread, but the subprocess itself was
@@ -157,26 +197,29 @@ class FileJobStore(InMemoryJobStore):
                 # the job 'lost' (tracking gone), NOT 'failed': the merged
                 # evaluations list then yields to the truthful ext- index
                 # row for the same run, which can still track and cancel it.
-                if job.status == "running":
-                    job.status = "lost"
+                if job.status == JobStatus.RUNNING:
+                    job.status = JobStatus.LOST
                     job.exit_code = None
                     # Stamp an end time or _cleanup_stale (which only prunes
                     # jobs with ended_at) keeps the flipped job forever.
                     if not job.ended_at:
-                        job.ended_at = datetime.now(timezone.utc).isoformat()
+                        job.ended_at = utc_now_iso()
                     self._jobs[job.job_id] = job
                     self._write(job)
                 else:
                     self._jobs[job.job_id] = job
-            except (json.JSONDecodeError, KeyError, OSError):
-                _logger.warning("Skipping corrupt job file %s", path, exc_info=True)
+            except (json.JSONDecodeError, KeyError, OSError, UnicodeDecodeError):
+                logger.warning("Skipping corrupt job file %s", path, exc_info=True)
 
     def _cleanup_stale(self) -> None:
-        """Remove completed/failed/cancelled jobs older than 24 hours."""
+        """Remove completed/failed/cancelled jobs older than 24 hours, and
+        orphan ``*.tmp`` files older than ``_ORPHAN_TMP_AGE_S``. A job file
+        that cannot be unlinked is logged and left for the next start."""
         now = time.time()
+        self._remove_orphan_temps(now)
         stale_ids: list[str] = []
         for job in self._jobs.values():
-            if job.status == "running":
+            if job.status == JobStatus.RUNNING:
                 continue
             if not job.ended_at:
                 continue
@@ -190,9 +233,22 @@ class FileJobStore(InMemoryJobStore):
             except (ValueError, TypeError):
                 continue
         for jid in stale_ids:
-            _logger.info("Cleaning up stale job %s", jid)
+            logger.info("Cleaning up stale job %s", jid)
             self._jobs.pop(jid, None)
-            (self._persist_dir / f"{jid}.json").unlink(missing_ok=True)
+            try:
+                self._job_path(jid).unlink(missing_ok=True)
+            except OSError:
+                logger.warning("stale job file for %s not removed", jid, exc_info=True)
+
+    def _remove_orphan_temps(self, now: float) -> None:
+        """Unlink ``*.tmp`` files a crashed write left behind. A recent one may
+        belong to a write still in progress, so only old ones go."""
+        for tmp in self._persist_dir.glob("*.tmp"):
+            try:
+                if now - tmp.stat().st_mtime > _ORPHAN_TMP_AGE_S:
+                    tmp.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.debug("orphan temp file %s not removed: %s", tmp, exc)
 
 
 def create_job_store() -> JobStore:

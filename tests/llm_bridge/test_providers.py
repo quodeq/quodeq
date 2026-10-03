@@ -130,3 +130,34 @@ class TestResolveApiKey:
         with patch.object(_providers, "get_provider_configs", return_value=_CFGS):
             key, env_name = resolve_api_key("acme")
         assert (key, env_name) == ("sk-from-os-environ", "ACME_API_KEY")
+
+
+class TestResolveTestEndpoint:
+    """The env key travels only to the provider's own endpoint."""
+
+    def _resolve(self, *args):
+        from quodeq.llm_bridge import resolve_test_endpoint
+        with patch("quodeq.llm_bridge._providers.get_provider_configs", return_value=_CFGS):
+            return resolve_test_endpoint(*args)
+
+    def test_empty_base_uses_catalog_base_and_env_key(self, monkeypatch):
+        monkeypatch.setenv("ACME_API_KEY", "sk-env")
+        assert self._resolve("acme", "", "") == ("https://acme.example/v1", "sk-env", "ACME_API_KEY")
+
+    def test_catalog_base_with_trailing_slash_still_gets_env_key(self, monkeypatch):
+        monkeypatch.setenv("ACME_API_KEY", "sk-env")
+        base, key, env = self._resolve("acme", "https://acme.example/v1/", "")
+        assert (base, key, env) == ("https://acme.example/v1/", "sk-env", "ACME_API_KEY")
+
+    def test_foreign_base_gets_no_env_key_and_no_env_name(self, monkeypatch):
+        monkeypatch.setenv("ACME_API_KEY", "sk-env")
+        assert self._resolve("acme", "https://attacker.example/v1", "") == ("https://attacker.example/v1", "", "")
+
+    def test_explicit_key_is_kept_for_any_base(self, monkeypatch):
+        monkeypatch.setenv("ACME_API_KEY", "sk-env")
+        assert self._resolve("acme", "https://other.example/v1", "sk-body") == ("https://other.example/v1", "sk-body", "")
+
+    def test_no_provider_id_matches_base_against_catalog(self, monkeypatch):
+        monkeypatch.setenv("ACME_API_KEY", "sk-env")
+        assert self._resolve("", "https://acme.example/v1", "")[1:] == ("sk-env", "ACME_API_KEY")
+        assert self._resolve("", "https://nowhere.example", "")[1:] == ("", "")

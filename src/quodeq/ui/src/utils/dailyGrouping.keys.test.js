@@ -59,8 +59,8 @@ test('collapseByPeriod: an in-progress newest entry does not represent its bucke
 
 test('collapseByPeriod: a bucket with only an in-progress entry is omitted', () => {
   const trend = [
-    { runId: 'live', dateISO: '2026-03-26T09:00:00', status: 'in_progress', numericAverage: 4.0 },
-    { runId: 'done1', dateISO: '2026-03-24T10:00:00', status: 'complete', numericAverage: 8.0 },
+    { runId: 'live', dateISO: '2026-03-26T09:00:00', status: 'running', numericAverage: 4.0 },
+    { runId: 'done1', dateISO: '2026-03-24T10:00:00', status: 'done', numericAverage: 8.0 },
   ];
   const result = collapseByPeriod(trend, 'day');
   assert.equal(result.length, 1);

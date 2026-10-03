@@ -9,3 +9,12 @@ export function useSidePane() {
   }
   return ctx;
 }
+
+/**
+ * The side-pane context, or null when no <SidePaneProvider> is mounted. For
+ * hooks that also run standalone (a pane rendered on its own in tests) and
+ * degrade instead of throwing.
+ */
+export function useOptionalSidePane() {
+  return useContext(SidePaneContext);
+}

@@ -2,20 +2,7 @@ import ProviderTabs from '../../../settings/components/ProviderTabs.jsx';
 import { TermHeader } from '../../../../components/terminal/index.js';
 import { t } from '../../../../strings/index.js';
 import { useActiveProviderState, readActiveProviderState } from '../../hooks/useActiveProviderState.js';
-
-// Product names, not copy.
-/* eslint-disable i18n/no-prose-literals */
-const PROVIDER_LABELS = {
-  claude: 'Claude Code',
-  codex: 'Codex CLI',
-  gemini: 'Gemini CLI',
-  copilot: 'GitHub Copilot',
-  ollama: 'Ollama',
-  openrouter: 'OpenRouter',
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-};
-/* eslint-enable i18n/no-prose-literals */
+import { providerLabel } from '../../providerLabels.js';
 
 function ProviderSummary({ activeProvider }) {
   if (!activeProvider.id) {
@@ -27,7 +14,7 @@ function ProviderSummary({ activeProvider }) {
   }
   return (
     <p className="onboarding-provider-active">
-      {t('onboarding.selectedPrefix')} <strong>{PROVIDER_LABELS[activeProvider.id] || activeProvider.id}</strong>
+      {t('onboarding.selectedPrefix')} <strong>{providerLabel(activeProvider.id)}</strong>
       {activeProvider.model && <> · <code>{activeProvider.model}</code></>}
     </p>
   );
@@ -63,6 +50,8 @@ function makeHandleContinue({ state, actions, onContinue }) {
  * tab below (CLI / Ollama / Cloud), and the time-limit + advanced settings
  * inside each tab.
  *
+ * `onBack` is optional: the resume flow opens on this step, with nothing behind it.
+ *
  * The wizard reads the active provider+model from localStorage (which
  * ProviderTabs writes into) and gates Continue until both are set.
  */
@@ -86,7 +75,7 @@ export default function ProviderStep({ state, actions, onContinue, onBack, stepI
 
       <div className="onboarding-step__actions">
         <button type="button" className="term-btn term-btn--primary term-btn--filled" disabled={continueDisabled} onClick={handleContinue}>{t('common.continue')}</button>
-        <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>{t('common.back')}</button>
+        {onBack && <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>{t('common.back')}</button>}
       </div>
     </div>
   );

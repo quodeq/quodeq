@@ -188,3 +188,24 @@ def test_restore_all_findings_uses_injected_writer(tmp_path: Path) -> None:
     assert len(list(events)) == 2
     for event in events:
         assert "FindingUndismissedEvent" in str(type(event))
+
+
+def test_dismissed_keys_folds_the_log_once_until_it_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import quodeq.services.dismissed as dismissed_mod
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+    calls = Mock(wraps=dismissed_mod.read_action_events)
+    monkeypatch.setattr(dismissed_mod, "read_action_events", calls)
+
+    first = dismissed_keys(project_dir)
+    second = dismissed_keys(project_dir)
+    dismiss_finding(project_dir, {"req": "R2", "file": "b.py", "line": 20})
+    third = dismissed_keys(project_dir)
+
+    assert second is first
+    assert third.line_keys() == {("R1", "a.py", 10), ("R2", "b.py", 20)}
+    assert calls.call_count == 2

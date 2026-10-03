@@ -1,4 +1,4 @@
-"""Extended tests for _api_runner.py: _parse_findings salvage of partial and malformed output."""
+"""Extended tests for _api_runner.py: parse_findings salvage of partial and malformed output."""
 from __future__ import annotations
 
 import time
@@ -7,22 +7,22 @@ import pytest
 
 pytest.importorskip("openai", reason="requires the openai SDK")
 
-from quodeq.analysis._api_schema import _parse_findings
+from quodeq.analysis._api_schema import parse_findings
 
 
 # ---------------------------------------------------------------------------
-# _parse_findings
+# parse_findings
 # ---------------------------------------------------------------------------
 
 class TestSalvagePartialFindings:
     def test_extracts_valid_findings_from_malformed_json(self):
         raw = '{"findings": [{"req":"S-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"test","snippet":"x = 1","reason":"bad"}, BROKEN'
-        result, _ = _parse_findings(raw)
+        result, _ = parse_findings(raw)
         assert len(result) >= 1
         assert result[0]["req"] == "S-1"
 
     def test_returns_empty_for_completely_invalid(self):
-        result, _ = _parse_findings("totally invalid no json here")
+        result, _ = parse_findings("totally invalid no json here")
         assert result == []
 
     def test_skips_invalid_objects(self):
@@ -31,7 +31,7 @@ class TestSalvagePartialFindings:
             '{"req":"X-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"ok","snippet":"x = 1","reason":"r"} '
             '{"not_a_finding": true}'
         )
-        result, _ = _parse_findings(raw)
+        result, _ = parse_findings(raw)
         assert len(result) == 1
         assert result[0]["req"] == "X-1"
 
@@ -40,7 +40,7 @@ class TestSalvagePartialFindings:
             '{"req":"A-1","t":"violation","file":"a.py","line":1,"severity":"minor","w":"one","snippet":"x = 1","reason":"r"} '
             '{"req":"B-2","t":"compliance","file":"b.py","line":2,"severity":"major","w":"two","snippet":"y = 2","reason":"r"}'
         )
-        result, _ = _parse_findings(raw)
+        result, _ = parse_findings(raw)
         assert len(result) == 2
 
     def test_handles_finding_with_nested_req_refs(self):
@@ -52,7 +52,7 @@ class TestSalvagePartialFindings:
             '"severity":"minor","w":"nested","snippet":"x = 1","reason":"r",'
             '"req_refs":[{"label":"CWE-79","url":"https://example.com"}]}'
         )
-        result, _ = _parse_findings(raw)
+        result, _ = parse_findings(raw)
         assert len(result) == 1
         assert result[0]["req"] == "R-MAT-5"
 
@@ -66,7 +66,7 @@ class TestSalvagePartialFindings:
             '{"req":"R-FT-1","t":"violation","file":"b.py","line":11,'
             '"severity":"minor","w":"second","snippet":"bar","reason":"two"}'
         )
-        result, _ = _parse_findings(raw)
+        result, _ = parse_findings(raw)
         assert len(result) == 2
         assert {r["req"] for r in result} == {"R-MAT-5", "R-FT-1"}
 
@@ -82,7 +82,7 @@ class TestSalvagePartialFindings:
             '"severity":"minor","w":"two","snippet":"y","reason":"r"}'
             ']}'
         )
-        result, _ = _parse_findings(raw)
+        result, _ = parse_findings(raw)
         assert len(result) == 2
 
     def test_handles_findings_buried_in_error_preamble(self):
@@ -96,7 +96,7 @@ class TestSalvagePartialFindings:
             '"severity":"minor","w":"ok","snippet":"x","reason":"r"}'
             "', input_type=str"
         )
-        result, _ = _parse_findings(raw)
+        result, _ = parse_findings(raw)
         assert len(result) == 1
         assert result[0]["req"] == "R-MAT-5"
 
@@ -109,7 +109,7 @@ class TestSalvagePartialFindings:
             '"severity":"minor","w":"bad","snippet":"y"}'  # missing reason
             ']}'
         )
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         assert len(findings) == 1
         assert findings[0]["req"] == "A-1"
         assert dropped == 1
@@ -119,12 +119,12 @@ class TestSalvagePartialFindings:
             '{"findings":[{"req":"A-1","t":"violation","file":"a.py","line":1,'
             '"severity":"minor","w":"w","snippet":"x","reason":"r"}]}'
         )
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         assert len(findings) == 1
         assert dropped == 0
 
     def test_parse_findings_container_not_counted_as_drop(self):
-        findings, dropped = _parse_findings('{"findings":[]}')
+        findings, dropped = parse_findings('{"findings":[]}')
         assert findings == []
         assert dropped == 0
 
@@ -132,7 +132,7 @@ class TestSalvagePartialFindings:
         # A req-bearing dict that fails validation and has a nested req-bearing
         # object must count as exactly ONE drop (we stop, don't recurse in).
         raw = '{"req":"A-1","t":"violation","extras":{"req":"B-2","t":"violation"}}'
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         assert findings == []
         assert dropped == 1
 
@@ -143,7 +143,7 @@ class TestSalvagePartialFindings:
             '{"wrapper":{"findings":[{"req":"A-1","t":"violation","file":"a.py",'
             '"line":1,"severity":"minor","w":"w","snippet":"x","reason":"r"}]}}'
         )
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         assert len(findings) == 1
         assert findings[0]["req"] == "A-1"
         assert dropped == 0
@@ -158,7 +158,7 @@ class TestSalvagePartialFindings:
         # stray opener is a failed decode the walk must step past without
         # losing the real findings behind it.
         raw = "{[" * 500 + self._VALID + " " + "]}" * 500 + self._VALID
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         assert [f["req"] for f in findings] == ["A-1", "A-1"]
         assert dropped == 0
 
@@ -168,7 +168,7 @@ class TestSalvagePartialFindings:
         # seconds; one forward search per hop keeps the walk linear.
         raw = "{" * 16_000 + "x" * 8_000_000 + "[" + self._VALID + "]"
         t0 = time.perf_counter()
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         elapsed = time.perf_counter() - t0
         assert [f["req"] for f in findings] == ["A-1"]
         assert dropped == 0

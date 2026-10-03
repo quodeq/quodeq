@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import {
-  SeverityTab, BoundariesTab, DimensionsTab,
-} from './tabs.jsx';
+import { DimensionsTab } from './tabs.jsx';
 import GradeBoundaryBar from './GradeBoundaryBar.jsx';
 
 const THRESHOLDS = [[9, 'Exemplary'], [7, 'Good'], [5, 'Adequate'], [3, 'Poor']];
@@ -22,42 +20,6 @@ function baseDraft(overrides = {}) {
     ...overrides,
   };
 }
-
-describe('SeverityTab', () => {
-  it('changing a slider calls update with a merged severityWeight', () => {
-    const update = vi.fn();
-    render(<SeverityTab draft={baseDraft()} update={update} />);
-    fireEvent.change(screen.getByLabelText('critical'), { target: { value: '6' } });
-    expect(update).toHaveBeenCalledWith({
-      severityWeight: { critical: 6, major: 3, minor: 1 },
-    });
-  });
-
-  it('shows the critical-to-minor ratio', () => {
-    render(<SeverityTab draft={baseDraft()} update={vi.fn()} />);
-    expect(screen.getByText(/weighs 8x a minor one/)).toBeInTheDocument();
-  });
-});
-
-describe('BoundariesTab floor sliders', () => {
-  // Clamping itself now lives in gradeFormulaRules.clampFloors, exercised by
-  // gradeFormulaRules.test.js (pure function) and useGradeFormula.test.jsx
-  // (the update() funnel that applies it). These sliders just forward the
-  // raw value -- pin that they don't (re)implement the clamp themselves.
-  it('floorMinor slider forwards the raw value to update, unclamped', () => {
-    const update = vi.fn();
-    render(<BoundariesTab draft={baseDraft()} update={update} />);
-    fireEvent.change(screen.getByLabelText('minor only'), { target: { value: '3' } });
-    expect(update).toHaveBeenCalledWith({ floorMinor: 3 });
-  });
-
-  it('floorMajor slider forwards the raw value to update, unclamped', () => {
-    const update = vi.fn();
-    render(<BoundariesTab draft={baseDraft()} update={update} />);
-    fireEvent.change(screen.getByLabelText('major'), { target: { value: '10' } });
-    expect(update).toHaveBeenCalledWith({ floorMajor: 10 });
-  });
-});
 
 describe('DimensionsTab', () => {
   it('toggle flips dimensionWeightsEnabled', () => {

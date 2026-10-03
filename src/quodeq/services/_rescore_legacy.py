@@ -8,12 +8,13 @@ _rescore_from_evidence in rescore.py is preferred whenever a run's
 from __future__ import annotations
 
 from quodeq.core.evidence.model import classify_confidence_level
+from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.principle import compute_tallies
 from quodeq.core.scoring.internals import finding_to_scoring_dict, principle_score_and_grade
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.report import PrincipleGrade
-from quodeq.core.types.scoring import PrincipleScore
+from quodeq.core.types.scoring import ConfidenceLevel, PrincipleScore
 
 
 def _score_principle(
@@ -35,20 +36,20 @@ def _score_principle(
     c_dicts = [finding_to_scoring_dict(c) for c in compliance]
     vt_counts, ct_counts, _using_taxonomy = compute_tallies(v_dicts, c_dicts)
     if not vt_counts and not ct_counts:
-        return None, "Insufficient"
+        return None, Grade.INSUFFICIENT
 
     confidence = classify_confidence_level(
         len(violations), len(compliance),
         scale_multiplier=scale_multiplier,
         source_file_count=source_file_count,
     )
-    if confidence == "low":
-        return None, "Insufficient"
+    if confidence == ConfidenceLevel.LOW:
+        return None, Grade.INSUFFICIENT
 
     return principle_score_and_grade(vt_counts, ct_counts, params=params)
 
 
-def _group_by_principle(
+def group_by_principle(
     findings: list[Finding],
 ) -> dict[str, list[Finding]]:
     """Group a list of findings by their principle name."""
@@ -58,7 +59,7 @@ def _group_by_principle(
     return groups
 
 
-def _score_all_principles(
+def score_all_principles(
     principles_violations: dict[str, list[Finding]],
     principles_compliance: dict[str, list[Finding]],
     *,

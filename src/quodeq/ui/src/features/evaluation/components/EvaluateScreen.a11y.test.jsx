@@ -11,7 +11,10 @@ vi.mock('../../../constants.js', () => ({
   ACTIVE_PROVIDER_KEY: 'active-provider',
   DEFAULT_TIME_LIMIT_S: 3600,
   DEFAULT_MAX_SUBAGENTS: 5,
-  LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
+  PROVIDER_SETTING_KEY: {
+    MODEL: 'model', MODEL_ANALYSIS: 'model-analysis', SUBAGENTS: 'subagents', TIME_LIMIT: 'time-limit',
+    PER_DIMENSION: 'per-dimension', VERIFY: 'verify', POOL_BUDGET: 'pool-budget',
+  },
   providerKey: (p, k) => `${p}-${k}`,
 }));
 
@@ -30,7 +33,7 @@ const baseActions = {
 describe('EvaluateScreen error toast a11y', () => {
   it('is announced as an alert so a screen reader user is notified without stumbling onto it, while the dismiss control still reads as a button', () => {
     // role="alert" on the dismiss <button> itself would override its button
-    // role for assistive tech (fix round 1, review finding). A sibling
+    // role for assistive tech. A sibling
     // sr-only alert carries the same text so the message is announced on
     // insertion without taking over the control's semantics.
     render(

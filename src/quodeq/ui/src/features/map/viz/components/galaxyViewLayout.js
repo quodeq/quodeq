@@ -12,6 +12,8 @@ const REPULSION_PASSES_SMALL = 6;
 // Extra room a constellation's ring and its label need beyond its spread.
 const CONSTELLATION_MARGIN_X_PX = 40;
 const CONSTELLATION_MARGIN_Y_PX = 50;
+// Default minimum distance enforced between star edges by applyRepulsionAndRecenter.
+const DEFAULT_MIN_GAP_PX = 60;
 
 /**
  * Compute seeded cluster positions for constellation groups.
@@ -83,9 +85,9 @@ export function buildMSTLines(clusterStars, startIdx) {
  * Apply repulsion between stars to enforce a minimum gap, then re-center.
  * Mutates _ox/_oy on each star in place.
  * @param {Array} clusterStars - Stars with _ox, _oy, radius
- * @param {number} [minGap=60] - Minimum distance between star edges
+ * @param {number} [minGap=DEFAULT_MIN_GAP_PX] - Minimum distance between star edges
  */
-export function applyRepulsionAndRecenter(clusterStars, minGap = 60) {
+export function applyRepulsionAndRecenter(clusterStars, minGap = DEFAULT_MIN_GAP_PX) {
   const iters = clusterStars.length > LARGE_CLUSTER_STARS ? REPULSION_PASSES_LARGE : REPULSION_PASSES_SMALL;
   for (let iter = 0; iter < iters; iter++) {
     for (let a = 0; a < clusterStars.length; a++) {

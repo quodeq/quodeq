@@ -36,7 +36,7 @@ describe('useStandards', () => {
 
   it('fetches standards on mount and groups them by type', async () => {
     fakeApi.listStandards.mockResolvedValue([
-      { id: 'a', name: 'A', type: STANDARD_TYPES.BUILTIN },
+      { id: 'a', name: 'A', type: STANDARD_TYPES.ISO },
       { id: 'b', name: 'B', type: STANDARD_TYPES.CUSTOM },
       { id: 'c', name: 'C', type: STANDARD_TYPES.CUSTOM },
     ]);
@@ -44,7 +44,7 @@ describe('useStandards', () => {
     await waitFor(() => {
       expect(result.current.standards).toHaveLength(3);
     });
-    expect(result.current.grouped[STANDARD_TYPES.BUILTIN]).toHaveLength(1);
+    expect(result.current.grouped[STANDARD_TYPES.ISO]).toHaveLength(1);
     expect(result.current.grouped[STANDARD_TYPES.CUSTOM]).toHaveLength(2);
     expect(result.current.error).toBeNull();
   });
@@ -53,7 +53,7 @@ describe('useStandards', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       fakeApi.listStandards.mockResolvedValue([
-        { id: 'a', name: 'A', type: STANDARD_TYPES.BUILTIN },
+        { id: 'a', name: 'A', type: STANDARD_TYPES.ISO },
         { id: 'z', name: 'Z', type: 'mystery-type' },
       ]);
       const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
@@ -139,5 +139,30 @@ describe('useStandards', () => {
       await result.current.handleDelete('a');
     });
     expect(result.current.error).toBe('cannot delete');
+  });
+
+  it('refresh fetches the list once, not twice', async () => {
+    fakeApi.listStandards.mockResolvedValue([]);
+    const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(2);
+  });
+
+  it('refresh resolves only after the new list has landed', async () => {
+    fakeApi.listStandards.mockResolvedValueOnce([]);
+    fakeApi.listStandards.mockResolvedValueOnce([{ id: 'n', name: 'N', type: STANDARD_TYPES.CUSTOM }]);
+    const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.refresh();
+    });
+    // react-query notifies observers through a real setTimeout(0), so the
+    // hook's own re-render can land one tick after refresh()'s promise
+    // settles; waitFor covers that tick instead of asserting mid-flight.
+    await waitFor(() => expect(result.current.standards).toHaveLength(1));
   });
 });

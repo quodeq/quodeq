@@ -16,7 +16,7 @@ from ._scope_gate_helpers import LAN, LOCAL, _finding
 # --- rule 4: loopback transport -------------------------------------------
 
 def _transport_finding(**kw) -> dict:
-    # The boilerplate qwen3.8 stamped on 37 findings of run 5dc4b8b5,
+    # The boilerplate qwen3.8 stamped on many findings of one real run,
     # verbatim: the exact class this rule exists to cap.
     base = _finding(
         req="S-CON-10",

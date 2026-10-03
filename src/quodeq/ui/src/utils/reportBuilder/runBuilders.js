@@ -9,6 +9,7 @@ import {
   buildCritMajorSection,
   buildOverviewSummarySection,
 } from './dimensionSummary.js';
+import { buildTilesLine, buildStripLine, buildSinceBaselineSection } from './headline.js';
 
 /**
  * The full Markdown report for one dimension of one run.
@@ -25,7 +26,7 @@ import {
  */
 export function buildDimensionReport({ evalData, principleGrades, allViolations, overallGrade, dateLabel, runId }) {
   const dim = (evalData?.dimension || 'unknown').toLowerCase();
-  const score = overallGrade?.score || EMPTY_VALUE_PLACEHOLDER;
+  const score = overallGrade?.score ?? EMPTY_VALUE_PLACEHOLDER;
   const grade = overallGrade?.grade || EMPTY_VALUE_PLACEHOLDER;
   const compliance = evalData?.compliance || [];
   const date = dateLabel || formatDate();
@@ -56,14 +57,22 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
 }
 
 // The cross-dimension report body shared by the overview and run reports:
-// title, the date/run/score line, then the same four sections in the same
-// order. Only the header wording and where the numbers come from differ.
-function buildScoredReport({ title, dateLabel, rid, score, grade, summary, dimensions }) {
+// title, the date/run line, the Overview's tiles line (score, violations,
+// compliance, ratio), its strip line (critical, majors, open types, density),
+// the since-baseline section, then the same four sections in the same order.
+// The raw violations total stays in the summary at the end. Only the header
+// wording and where the numbers come from differ.
+function buildScoredReport({ title, dateLabel, rid, score, grade, summary, dimensions, headline, since, commitSha }) {
   const lines = [];
   lines.push(`# ${title}`);
   lines.push('');
-  lines.push(`**Date:** ${dateLabel}${rid} · **Overall Score:** ${score} ${grade}`);
+  lines.push(`**Date:** ${dateLabel}${rid}`);
   lines.push('');
+  lines.push(buildTilesLine({ summary, score, grade }));
+  const strip = buildStripLine(headline);
+  if (strip) lines.push('', strip);
+  lines.push('');
+  lines.push(...buildSinceBaselineSection(since, commitSha));
 
   lines.push(...buildDimensionSummaryTable(dimensions));
   lines.push(...buildTopOffendingFiles(dimensions));
@@ -80,9 +89,11 @@ function buildScoredReport({ title, dateLabel, rid, score, grade, summary, dimen
  * @param {{score: number, grade: string, summary: Object}} accumulated
  * @param {Array} accumulatedDimensions - per-dimension scores and findings.
  * @param {string} projectName - the report's title.
+ * @param {{headline?: Object|null, since?: Object|null, commitSha?: string}} [extras] - the strip's
+ *   headline numbers and the folded since-baseline summary, when the caller has them.
  * @returns {string}
  */
-export function buildOverviewReport(accumulated, accumulatedDimensions, projectName) {
+export function buildOverviewReport(accumulated, accumulatedDimensions, projectName, extras = {}) {
   const summary = accumulated?.summary || {};
   return buildScoredReport({
     title: `${projectName || 'Project'} report`,
@@ -92,6 +103,9 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
     grade: summary.overallGrade || EMPTY_VALUE_PLACEHOLDER,
     summary,
     dimensions: accumulatedDimensions,
+    headline: extras.headline || null,
+    since: extras.since || null,
+    commitSha: extras.commitSha,
   });
 }
 
@@ -102,9 +116,11 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
  * @param {object} args.dashboard - the run's dashboard payload.
  * @param {object} args.runSummary - the run's header numbers.
  * @param {string} args.projectName - the report's title.
+ * @param {Object|null} [args.headline] - the strip's headline numbers.
+ * @param {Object|null} [args.since] - the folded since-baseline summary.
  * @returns {string}
  */
-export function buildRunReport({ dashboard, runSummary, projectName }) {
+export function buildRunReport({ dashboard, runSummary, projectName, headline = null, since = null }) {
   const selectedRun = dashboard?.selectedRun || {};
   return buildScoredReport({
     title: `${projectName || 'Run'} run report`,
@@ -114,5 +130,8 @@ export function buildRunReport({ dashboard, runSummary, projectName }) {
     grade: runSummary?.overallGrade || EMPTY_VALUE_PLACEHOLDER,
     summary: runSummary || {},
     dimensions: dashboard?.dimensions || [],
+    headline,
+    since,
+    commitSha: selectedRun.commitSha,
   });
 }

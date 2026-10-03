@@ -1,0 +1,4 @@
+# Grandfathered magic strings: rule C (a bare string the code compares
+# against) and rule R (the same string 3+ times in one module). The fix
+# is a named constant or an enum member. Burn to zero; never add.
+# Regenerate intentionally: python tools/check_magic_strings.py --update-baseline

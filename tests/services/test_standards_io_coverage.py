@@ -157,7 +157,7 @@ class TestBuildBuiltinDetail:
         assert detail.weight == 1.5
         assert detail.managed is True
         assert detail.source == "ISO"
-        assert detail.type == "builtin"
+        assert detail.type == "iso"
 
     def test_sources_list(self):
         data = {"name": "Reliability", "sources": ["CWE", "OWASP"], "principles": []}

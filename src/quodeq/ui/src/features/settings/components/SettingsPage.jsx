@@ -9,10 +9,13 @@ import AssistantProviderTabs from './AssistantProviderTabs.jsx';
 import EvaluationSection from './EvaluationSection.jsx';
 import TerminalSection from './TerminalSection.jsx';
 import ServerSection from './ServerSection.jsx';
+import GitHubAccessSection from './GitHubAccessSection.jsx';
 import SharedRepoSection from './SharedRepoSection.jsx';
+import OnboardingSection from './OnboardingSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 
 const _SETTINGS_PHRASE_KEYS = [
   'settingsPhrase.cuore',
@@ -22,7 +25,7 @@ const _SETTINGS_PHRASE_KEYS = [
   'settingsPhrase.compass',
 ];
 
-export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDisconnected }) {
+export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDisconnected, onShowWelcome }) {
   const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
@@ -46,18 +49,15 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
         <EvaluationSection />
         <TerminalSection />
         <ServerSection />
+        <GitHubAccessSection />
         <SharedRepoSection onDisconnected={onSharedDisconnected} />
+        <OnboardingSection onShowWelcome={onShowWelcome} />
         <section className="panel settings-section">
           <div className="panel-header">
             <SectionLabel marker="▶">{t('settings.gradeFormula')}</SectionLabel>
           </div>
           <div className="settings-row">
-            <div className="settings-row-label">
-              <span className="settings-label">{t('settings.gradeFormula')}</span>
-              <span className="settings-description">
-                {t('settings.gradeFormulaDesc')}
-              </span>
-            </div>
+            <SettingsRowLabel hintSlot={false} label={t('settings.gradeFormula')} description={t('settings.gradeFormulaDesc')} />
             <button type="button" className="settings-pill" onClick={onOpenGradeFormula}>
               {t('settings.openEditor')}
             </button>

@@ -1,6 +1,6 @@
 """Tests for quodeq.analysis._dim_estimates — upfront per-dim file estimation.
 
-After B6 the estimate is just the V2 cache-miss count per dimension.
+The estimate is just the V2 cache-miss count per dimension.
 """
 from __future__ import annotations
 

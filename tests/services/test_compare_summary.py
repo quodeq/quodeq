@@ -1,80 +1,110 @@
 """Tests for services.compare.build_compare_summary (Compare tab payload).
 
-The contract under test: the slim payload is the full /scores payload minus
-the finding arrays -- scores, grades, principles, totals and trend all pass
-through untouched, and the heavy keys are gone at every level.
+The contract under test: the slim payload is the /scores shape minus the
+finding arrays, built from the project's rows (``ProjectRows``) for a plain
+project and from ``get_project_scores`` for a parent; the fleet build isolates
+each project's failure and runs under one score-cache session.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 
+from quodeq.core.run.state import RunState
+from quodeq.data.fs.report_parser import RunInfo
 from quodeq.services import compare
 
 
-_SCORES_PAYLOAD = {
-    "accumulated": {
-        "dimensions": [
-            {
-                "dimension": "Security",
-                "overallScore": "7.0/10",
-                "overallGrade": "Good",
-                "principles": [{"principle": "Integrity", "score": "7.0", "grade": "Good"}],
-                "totals": {
-                    "violationCount": 3,
-                    "complianceCount": 9,
-                    "severity": {"critical": 1, "major": 1, "minor": 1},
-                },
-                "filesRead": 40,
-                "sourceFileCount": 50,
-                "violations": [{"file": "a.py", "line": 10, "reason": "weak hash"}],
-                "compliance": [{"file": "b.py", "line": 2, "reason": "ok"}],
-            },
-        ],
-        "summary": {
-            "overallGrade": "Good",
-            "numericAverage": 7.0,
-            "totalViolations": 3,
-            "totalCompliance": 9,
-            "severity": {"critical": 1, "major": 1, "minor": 1},
-        },
+_DIMENSION = {
+    "dimension": "Security",
+    "overallScore": "7.0/10",
+    "overallGrade": "Good",
+    "principles": [{"principle": "Integrity", "score": "7.0", "grade": "Good"}],
+    "totals": {
+        "violationCount": 3,
+        "complianceCount": 9,
+        "severity": {"critical": 1, "major": 1, "minor": 1},
     },
-    "trend": [
-        {
-            "runId": "run-1",
-            "dateISO": "2026-08-01T10:00:00",
-            "dateLabel": "01 Aug",
-            "status": "complete",
-            "numericAverage": 7.0,
-            "overallGrade": "Good",
-            "runNumericAverage": 7.0,
-            "dimensionDetails": [
-                {"dimension": "Security", "score": 7.0, "grade": "Good", "delta": 0.2},
-            ],
-        },
-    ],
-    "availableRuns": [
-        {"runId": "run-1", "dateLabel": "01 Aug", "status": "complete"},
-    ],
-    "scoring": {"customFormula": False},
+    "filesRead": 40,
+    "sourceFileCount": 50,
+    "evidenceDate": "2026-08-01T10:00:00",
+    "violations": [],
+    "compliance": [],
 }
+_ACCUMULATED = {
+    "dimensions": [_DIMENSION],
+    "summary": {
+        "overallGrade": "Good",
+        "numericAverage": 7.0,
+        "totalViolations": 3,
+        "totalCompliance": 9,
+        "severity": {"critical": 1, "major": 1, "minor": 1},
+    },
+}
+_TREND = [
+    {
+        "runId": "run-1",
+        "dateISO": "2026-08-01T10:00:00",
+        "dateLabel": "01 Aug",
+        "status": "done",
+        "numericAverage": 7.0,
+        "overallGrade": "Good",
+        "runNumericAverage": 7.0,
+        "dimensionDetails": [
+            {"dimension": "Security", "score": 7.0, "grade": "Good", "delta": 0.2},
+        ],
+    },
+]
+RUN = RunInfo(run_id="run-1", date_iso="2026-08-01T10:00:00", date_label="01 Aug", status=RunState.DONE)
+
+
+class _Rows:
+    """A ``ProjectRows`` double: canned accumulated + trend, records what was asked."""
+
+    loaded: list[tuple[Path, str]] = []
+
+    def __init__(self, runs: list[RunInfo]) -> None:
+        self.runs = runs
+        self.as_of_calls: list[str | None] = []
+
+    @classmethod
+    def load(cls, reports_root: Path, project: str, deps=None) -> "_Rows":
+        cls.loaded.append((reports_root, project))
+        return cls(cls.runs_for(project))
+
+    @staticmethod
+    def runs_for(project: str) -> list[RunInfo]:
+        return [] if project == "empty" else [RUN]
+
+    def accumulated(self, as_of: str | None = None) -> dict:
+        self.as_of_calls.append(as_of)
+        return _ACCUMULATED
+
+    def trend(self) -> list[dict]:
+        return _TREND
 
 
 @pytest.fixture()
-def scores_stub(monkeypatch):
-    calls = []
+def rows_stub(monkeypatch, tmp_path):
+    """A non-parent project served from rows; ``get_project_scores`` must stay untouched."""
+    _Rows.loaded = []
+    for name in ("proj-a", "empty"):
+        (tmp_path / name).mkdir()
+    monkeypatch.setattr(compare, "ProjectRows", _Rows)
+    monkeypatch.setattr(compare, "find_children", lambda root, project: [])
+    monkeypatch.setattr(compare, "is_custom", lambda: False)
+    monkeypatch.setattr(compare, "get_project_scores", _fail_full_path)
+    return tmp_path
 
-    def fake_get_project_scores(reports_root, project):
-        calls.append((reports_root, project))
-        return _SCORES_PAYLOAD
 
-    monkeypatch.setattr(compare, "get_project_scores", fake_get_project_scores)
-    return calls
+def _fail_full_path(*a, **kw):
+    raise AssertionError("a non-parent project must not take the full get_project_scores path")
 
 
-def test_strips_finding_arrays_from_dimensions(scores_stub):
-    result = compare.build_compare_summary(Path("/tmp/evals"), "proj-a")
+def test_strips_finding_arrays_from_dimensions(rows_stub):
+    result = compare.build_compare_summary(rows_stub, "proj-a")
     dim = result["dimensions"][0]
     assert "violations" not in dim
     assert "compliance" not in dim
@@ -82,27 +112,79 @@ def test_strips_finding_arrays_from_dimensions(scores_stub):
     assert dim["overallScore"] == "7.0/10"
     assert dim["principles"] == [{"principle": "Integrity", "score": "7.0", "grade": "Good"}]
     assert dim["totals"]["severity"] == {"critical": 1, "major": 1, "minor": 1}
+    assert dim["evidenceDate"] == "2026-08-01T10:00:00"
 
 
-def test_summary_and_scoring_pass_through(scores_stub):
-    result = compare.build_compare_summary(Path("/tmp/evals"), "proj-a")
+def test_summary_and_scoring_pass_through(rows_stub):
+    result = compare.build_compare_summary(rows_stub, "proj-a")
     assert result["project"] == "proj-a"
     assert result["summary"]["numericAverage"] == 7.0
     assert result["scoring"] == {"customFormula": False}
     assert result["runsCount"] == 1
-    assert result["lastRun"]["runId"] == "run-1"
+    assert result["lastRun"] == {"runId": "run-1", "dateLabel": "01 Aug", "status": RunState.DONE}
+    assert _Rows.loaded == [(rows_stub, "proj-a")]
 
 
-def test_trend_detail_keeps_only_dimension_and_score(scores_stub):
-    result = compare.build_compare_summary(Path("/tmp/evals"), "proj-a")
+def test_trend_detail_keeps_only_dimension_and_score(rows_stub):
+    result = compare.build_compare_summary(rows_stub, "proj-a")
     entry = result["trend"][0]
     assert entry["numericAverage"] == 7.0
     assert entry["dimensionDetails"] == [{"dimension": "Security", "score": 7.0}]
 
 
-def test_unknown_project_returns_none(monkeypatch):
-    monkeypatch.setattr(compare, "get_project_scores", lambda *a, **kw: None)
-    assert compare.build_compare_summary(Path("/tmp/evals"), "ghost") is None
+def test_unknown_project_returns_none(rows_stub):
+    assert compare.build_compare_summary(rows_stub, "ghost") is None
+    assert _Rows.loaded == []
+
+
+def test_parent_project_takes_the_full_path(rows_stub, monkeypatch):
+    """A parent folds in its children, which live outside its rows."""
+    monkeypatch.setattr(compare, "find_children", lambda root, project: ["child"])
+    monkeypatch.setattr(compare, "get_project_scores", lambda root, project: {
+        "accumulated": _ACCUMULATED, "trend": _TREND,
+        "availableRuns": [{"runId": "run-1", "dateLabel": "01 Aug", "status": "done"}],
+    })
+    result = compare.build_compare_summary(rows_stub, "proj-a")
+    assert result["summary"]["numericAverage"] == 7.0
+    assert result["runsCount"] == 1
+    assert _Rows.loaded == []
+
+
+def test_no_runs_shape(rows_stub):
+    result = compare.build_compare_summary(rows_stub, "empty")
+    assert result["dimensions"] == []
+    assert result["trend"] == []
+    assert result["runsCount"] == 0
+    assert result["lastRun"] is None
+    assert result["summary"] == {}
+
+
+def test_fleet_builds_each_project_once_and_isolates_failures(rows_stub, monkeypatch):
+    real = compare.build_compare_summary
+
+    def build(root, project):
+        if project == "boom":
+            raise OSError("disk")
+        return real(root, project)
+
+    monkeypatch.setattr(compare, "build_compare_summary", build)
+    result = compare.build_fleet_compare(rows_stub, ["proj-a", "ghost", "boom", "proj-a", "empty"])
+    assert [s["project"] for s in result["summaries"]] == ["proj-a", "empty"]
+    assert result["errors"] == {"ghost": "Project not found", "boom": "Failed to load compare summary"}
+    assert _Rows.loaded == [(rows_stub, "proj-a"), (rows_stub, "empty")]
+
+
+def test_fleet_runs_under_one_score_cache_session(rows_stub, monkeypatch):
+    entered = []
+
+    @contextmanager
+    def session():
+        entered.append(True)
+        yield
+
+    monkeypatch.setattr(compare, "score_cache_session", session)
+    compare.build_fleet_compare(rows_stub, ["proj-a", "empty"])
+    assert entered == [True]
 
 
 def test_commits_since_counts_against_a_real_repo(tmp_path):
@@ -134,33 +216,16 @@ def test_commits_since_counts_against_a_real_repo(tmp_path):
     assert compare._commits_since(tmp_path / "not-a-repo", "2026-08-10T00:00:00") is None
 
 
-def test_summary_carries_commits_since_last_scored_run(monkeypatch, scores_stub):
+def test_summary_carries_commits_since_last_scored_run(monkeypatch, rows_stub):
     seen = {}
 
     def fake_commits(repo_root, since_iso):
         seen["since"] = since_iso
         return 7
 
-    monkeypatch.setattr(compare, "_local_repo_root", lambda root, project: Path("/tmp/repo"))
+    monkeypatch.setattr(compare, "local_repo_root", lambda root, project: Path("/tmp/repo"))
     monkeypatch.setattr(compare, "_commits_since", fake_commits)
-    result = compare.build_compare_summary(Path("/tmp/evals"), "proj-a")
+    result = compare.build_compare_summary(rows_stub, "proj-a")
     assert result["commitsSinceLastRun"] == 7
     # Counted from the newest scored run's date, not the raw last run.
     assert seen["since"] == "2026-08-01T10:00:00"
-
-
-def test_no_runs_shape(monkeypatch):
-    monkeypatch.setattr(
-        compare, "get_project_scores",
-        lambda *a, **kw: {
-            "accumulated": {"dimensions": [], "summary": {}},
-            "trend": [],
-            "availableRuns": [],
-            "scoring": {"customFormula": False},
-        },
-    )
-    result = compare.build_compare_summary(Path("/tmp/evals"), "empty")
-    assert result["dimensions"] == []
-    assert result["trend"] == []
-    assert result["runsCount"] == 0
-    assert result["lastRun"] is None

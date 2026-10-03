@@ -17,13 +17,13 @@ pytestmark = pytest.mark.usefixtures("restore_environ")
 # ---------------------------------------------------------------------------
 
 class TestRunPipelineWithCleanup:
-    @patch("quodeq.cli_evaluation._execute_pipeline", return_value=0)
-    @patch("quodeq.cli_evaluation._build_run_config")
-    @patch("quodeq.cli_evaluation._save_manifest")
+    @patch("quodeq.cli_evaluation.execute_pipeline", return_value=0)
+    @patch("quodeq.cli_evaluation.build_run_config")
+    @patch("quodeq.cli_evaluation.save_manifest")
     @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
     @patch("quodeq.cli_evaluation.cleanup_cloned_repo")
-    @patch("quodeq.cli_evaluation._cleanup_worktree")
+    @patch("quodeq.cli_evaluation.cleanup_worktree")
     def test_local_repo_no_cleanup(
         self, mock_wt_cleanup, mock_cleanup, mock_url, mock_marker, mock_save, mock_config, mock_exec, tmp_path,
     ):
@@ -41,9 +41,9 @@ class TestRunPipelineWithCleanup:
         mock_cleanup.assert_not_called()
         mock_wt_cleanup.assert_not_called()
 
-    @patch("quodeq.cli_evaluation._execute_pipeline", return_value=0)
-    @patch("quodeq.cli_evaluation._build_run_config")
-    @patch("quodeq.cli_evaluation._save_manifest")
+    @patch("quodeq.cli_evaluation.execute_pipeline", return_value=0)
+    @patch("quodeq.cli_evaluation.build_run_config")
+    @patch("quodeq.cli_evaluation.save_manifest")
     @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
     @patch("quodeq.cli_evaluation.cleanup_cloned_repo")
@@ -58,12 +58,12 @@ class TestRunPipelineWithCleanup:
         run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
         mock_cleanup.assert_called_once()
 
-    @patch("quodeq.cli_evaluation._execute_pipeline", return_value=0)
-    @patch("quodeq.cli_evaluation._build_run_config")
-    @patch("quodeq.cli_evaluation._save_manifest")
+    @patch("quodeq.cli_evaluation.execute_pipeline", return_value=0)
+    @patch("quodeq.cli_evaluation.build_run_config")
+    @patch("quodeq.cli_evaluation.save_manifest")
     @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
-    @patch("quodeq.cli_evaluation._cleanup_worktree")
+    @patch("quodeq.cli_evaluation.cleanup_worktree")
     def test_worktree_cleanup(self, mock_wt_cleanup, mock_url, mock_marker, mock_save, mock_config, mock_exec, tmp_path):
         from quodeq.cli import run_pipeline_with_cleanup, ResolvedInputs
         evidence_dir = tmp_path / "proj-uuid" / "run-id" / "evidence"
@@ -132,14 +132,14 @@ class TestResolveEvaluationInputs:
         mock_paths.return_value = paths_obj
         return paths_obj
 
-    @patch("quodeq._cli_resolution._resolve_repo", return_value=None)
+    @patch("quodeq._cli_resolution.resolve_repo", return_value=None)
     def test_returns_none_on_repo_failure(self, mock_repo):
         from quodeq.cli import resolve_evaluation_inputs
         args = argparse.Namespace()
         assert resolve_evaluation_inputs(args) is None
 
     @patch("quodeq._cli_resolution.default_paths")
-    @patch("quodeq._cli_resolution._resolve_repo")
+    @patch("quodeq._cli_resolution.resolve_repo")
     def test_returns_none_when_config_missing(self, mock_repo, mock_paths, tmp_path):
         from quodeq.cli import resolve_evaluation_inputs
         self._standing_config(mock_repo, mock_paths, tmp_path, config_present=False)
@@ -147,10 +147,10 @@ class TestResolveEvaluationInputs:
         result = resolve_evaluation_inputs(args)
         assert result is None
 
-    @patch("quodeq._cli_resolution._build_manifest", return_value=None)
-    @patch("quodeq._cli_resolution._resolve_language", return_value=None)
+    @patch("quodeq._cli_resolution.build_cli_manifest", return_value=None)
+    @patch("quodeq._cli_resolution.resolve_language", return_value=None)
     @patch("quodeq._cli_resolution.default_paths")
-    @patch("quodeq._cli_resolution._resolve_repo")
+    @patch("quodeq._cli_resolution.resolve_repo")
     def test_returns_none_when_language_detection_fails(self, mock_repo, mock_paths, mock_lang, mock_manifest, tmp_path):
         from quodeq.cli import resolve_evaluation_inputs
         self._standing_config(mock_repo, mock_paths, tmp_path)
@@ -158,11 +158,11 @@ class TestResolveEvaluationInputs:
         result = resolve_evaluation_inputs(args)
         assert result is None
 
-    @patch("quodeq._cli_resolution._build_manifest", return_value=None)
+    @patch("quodeq._cli_resolution.build_cli_manifest", return_value=None)
     @patch("quodeq._cli_resolution.load_universal_dimensions", return_value={"dims": []})
-    @patch("quodeq._cli_resolution._resolve_language", return_value="python")
+    @patch("quodeq._cli_resolution.resolve_language", return_value="python")
     @patch("quodeq._cli_resolution.default_paths")
-    @patch("quodeq._cli_resolution._resolve_repo")
+    @patch("quodeq._cli_resolution.resolve_repo")
     def test_success_path(self, mock_repo, mock_paths, mock_lang, mock_dims, mock_manifest, tmp_path):
         from quodeq.cli import resolve_evaluation_inputs
         self._standing_config(mock_repo, mock_paths, tmp_path)
@@ -172,11 +172,11 @@ class TestResolveEvaluationInputs:
         assert result.language == "python"
         assert result.src == tmp_path
 
-    @patch("quodeq._cli_resolution._build_manifest", return_value=None)
+    @patch("quodeq._cli_resolution.build_cli_manifest", return_value=None)
     @patch("quodeq._cli_resolution.load_universal_dimensions", return_value={"dims": []})
-    @patch("quodeq._cli_resolution._resolve_language", return_value="python")
+    @patch("quodeq._cli_resolution.resolve_language", return_value="python")
     @patch("quodeq._cli_resolution.default_paths")
-    @patch("quodeq._cli_resolution._resolve_repo")
+    @patch("quodeq._cli_resolution.resolve_repo")
     def test_scope_nonexistent(self, mock_repo, mock_paths, mock_lang, mock_dims, mock_manifest, tmp_path, capsys):
         from quodeq.cli import resolve_evaluation_inputs
         self._standing_config(mock_repo, mock_paths, tmp_path)
@@ -185,11 +185,11 @@ class TestResolveEvaluationInputs:
         assert result is None
         assert "Scope path does not exist" in capsys.readouterr().err
 
-    @patch("quodeq._cli_resolution._build_manifest", return_value=None)
+    @patch("quodeq._cli_resolution.build_cli_manifest", return_value=None)
     @patch("quodeq._cli_resolution.load_universal_dimensions", return_value={})
-    @patch("quodeq._cli_resolution._resolve_language", return_value="python")
+    @patch("quodeq._cli_resolution.resolve_language", return_value="python")
     @patch("quodeq._cli_resolution.default_paths")
-    @patch("quodeq._cli_resolution._resolve_repo")
+    @patch("quodeq._cli_resolution.resolve_repo")
     def test_scope_success(self, mock_repo, mock_paths, mock_lang, mock_dims, mock_manifest, tmp_path, capsys):
         from quodeq.cli import resolve_evaluation_inputs
         scope_dir = tmp_path / "src" / "backend"
@@ -201,11 +201,11 @@ class TestResolveEvaluationInputs:
         err = capsys.readouterr().err
         assert "Scoped evaluation" in err
 
-    @patch("quodeq._cli_resolution._build_manifest", return_value=None)
+    @patch("quodeq._cli_resolution.build_cli_manifest", return_value=None)
     @patch("quodeq._cli_resolution.load_universal_dimensions", side_effect=ValueError("bad dims"))
-    @patch("quodeq._cli_resolution._resolve_language", return_value="python")
+    @patch("quodeq._cli_resolution.resolve_language", return_value="python")
     @patch("quodeq._cli_resolution.default_paths")
-    @patch("quodeq._cli_resolution._resolve_repo")
+    @patch("quodeq._cli_resolution.resolve_repo")
     def test_invalid_dimensions_config(self, mock_repo, mock_paths, mock_lang, mock_dims, mock_manifest, tmp_path, capsys):
         from quodeq.cli import resolve_evaluation_inputs
         self._standing_config(mock_repo, mock_paths, tmp_path)

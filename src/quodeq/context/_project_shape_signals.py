@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.context._project_shape_io import (
-    _flat_dep_names, _matches_any, _read_json, _read_text, _read_toml, _strip_dep_spec,
+    flat_dep_names, matches_any, read_json, read_text, read_toml, strip_dep_spec,
 )
 from quodeq.context._project_shape_types import Deployment
 
@@ -35,7 +35,7 @@ _JS_MOBILE_HINTS = (
 _JS_UI_LIBS = ("react", "vue", "svelte", "preact", "@angular/core", "solid-js")
 
 
-def _python_signals(repo: Path) -> tuple[Deployment | None, list[str], list[str]]:
+def python_signals(repo: Path) -> tuple[Deployment | None, list[str], list[str]]:
     """Return ``(deployment_hint, web_frameworks, desktop_hints)`` from pyproject.
 
     A deployment hint is not only set when the manifest is unambiguous: when a
@@ -43,7 +43,7 @@ def _python_signals(repo: Path) -> tuple[Deployment | None, list[str], list[str]
     (see the comment below) rather than the hint going unset. The caller
     still fuses hints across all manifests before settling on a verdict.
     """
-    pyproject = _read_toml(repo / "pyproject.toml")
+    pyproject = read_toml(repo / "pyproject.toml")
     if pyproject is None:
         return None, [], []
     project_raw = pyproject.get("project") or {}
@@ -61,9 +61,9 @@ def _python_signals(repo: Path) -> tuple[Deployment | None, list[str], list[str]
             if isinstance(group, list):
                 optional_flat.extend(group)
     raw = deps_list + optional_flat
-    names = [_strip_dep_spec(d).lower() for d in raw if isinstance(d, str)]
-    web = _matches_any(names, _PY_WEB_FRAMEWORKS)
-    desktop = _matches_any(names, _PY_DESKTOP_HINTS)
+    names = [strip_dep_spec(d).lower() for d in raw if isinstance(d, str)]
+    web = matches_any(names, _PY_WEB_FRAMEWORKS)
+    desktop = matches_any(names, _PY_DESKTOP_HINTS)
     # Desktop wins outright when both are present. A desktop app routinely
     # embeds a web framework for its own UI (pywebview + flask, Electron +
     # express); a hosted service does not pull in pywebview. Returning None
@@ -76,20 +76,20 @@ def _python_signals(repo: Path) -> tuple[Deployment | None, list[str], list[str]
     return None, web, desktop
 
 
-def _node_signals(
+def node_signals(
     repo: Path,
 ) -> tuple[Deployment | None, list[str], list[str], str | None]:
-    pkg = _read_json(repo / "package.json")
+    pkg = read_json(repo / "package.json")
     if pkg is None:
         return None, [], [], None
-    deps = _flat_dep_names(
+    deps = flat_dep_names(
         pkg.get("dependencies"),
         pkg.get("devDependencies"),
         pkg.get("peerDependencies"),
     )
-    web = _matches_any(deps, _JS_WEB_FRAMEWORKS)
-    desktop = _matches_any(deps, _JS_DESKTOP_HINTS)
-    mobile = _matches_any(deps, _JS_MOBILE_HINTS)
+    web = matches_any(deps, _JS_WEB_FRAMEWORKS)
+    desktop = matches_any(deps, _JS_DESKTOP_HINTS)
+    mobile = matches_any(deps, _JS_MOBILE_HINTS)
     ui = next((u for u in _JS_UI_LIBS if u.lower() in deps), None)
     if mobile:
         return Deployment.MOBILE, web, desktop, ui
@@ -100,8 +100,8 @@ def _node_signals(
     return None, web, desktop, ui
 
 
-def _rust_signals(repo: Path) -> Deployment | None:
-    cargo = _read_toml(repo / "Cargo.toml")
+def rust_signals(repo: Path) -> Deployment | None:
+    cargo = read_toml(repo / "Cargo.toml")
     if cargo is None:
         return None
     package_raw = cargo.get("package") or {}
@@ -124,12 +124,12 @@ _GO_WEB_IMPORTS = (
 )
 
 
-def _go_signals(repo: Path) -> Deployment | None:
+def go_signals(repo: Path) -> Deployment | None:
     if not (repo / "go.mod").exists():
         return None
     main_go = repo / "main.go"
     if main_go.exists():
-        text = _read_text(main_go) or ""
+        text = read_text(main_go) or ""
         if any(imp in text for imp in _GO_WEB_IMPORTS):
             return Deployment.WEB_SERVICE
         return Deployment.CLI
@@ -151,7 +151,7 @@ _LANG_MARKERS: tuple[tuple[str, str], ...] = (
 )
 
 
-def _detect_runtime_langs(repo: Path) -> list[str]:
+def detect_runtime_langs(repo: Path) -> list[str]:
     seen: list[str] = []
     for lang, marker in _LANG_MARKERS:
         if (repo / marker).exists() and lang not in seen:

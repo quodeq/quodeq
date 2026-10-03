@@ -5,8 +5,9 @@ import logging
 import re
 import threading
 from collections import deque
-from datetime import datetime, timezone
 from http import HTTPStatus
+
+from quodeq.shared.clock import utc_now_iso
 
 _DEFAULT_MAX_LINES = 500
 
@@ -29,6 +30,8 @@ _NOISY_POLL_PATHS = (
 )
 _API_ENTRY_PATH_RE = re.compile(r"^API: \S+ (\S+)")
 _WERKZEUG_PATH_RE = re.compile(r'"\S+ (\S+) HTTP/')
+_LOGGER_NAME_API = "quodeq.api"  # security.configure_security's _add_security_headers logger
+_LOGGER_NAME_WERKZEUG = "werkzeug"  # Flask's request-log logger
 
 
 class LogBuffer:
@@ -60,7 +63,7 @@ class LogBuffer:
         with self._lock:
             self._entries.append({
                 "index": self._index,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": utc_now_iso(),
                 "line": line,
                 "level": level,
             })
@@ -99,7 +102,7 @@ def _is_success_or_redirect(status: int) -> bool:
 
 
 def _is_noisy_werkzeug_access(record: logging.LogRecord) -> bool:
-    if record.name != "werkzeug":
+    if record.name != _LOGGER_NAME_WERKZEUG:
         return False
     m = _WERKZEUG_ACCESS_RE.search(record.getMessage())
     if not m:
@@ -113,11 +116,11 @@ def _is_noisy_werkzeug_access(record: logging.LogRecord) -> bool:
 
 def _is_noisy_poll(record: logging.LogRecord) -> bool:
     msg = record.getMessage()
-    if record.name == "quodeq.api":
+    if record.name == _LOGGER_NAME_API:
         m = _API_ENTRY_PATH_RE.match(msg)
         if m and _path_no_query(m.group(1)) in _NOISY_POLL_PATHS:
             return True
-    if record.name == "werkzeug":
+    if record.name == _LOGGER_NAME_WERKZEUG:
         m = _WERKZEUG_PATH_RE.search(msg)
         if not m:
             return False

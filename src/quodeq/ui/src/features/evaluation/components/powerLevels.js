@@ -28,4 +28,4 @@ export function getLevels(storage = typeof localStorage !== 'undefined' ? localS
 // Static reference for components that don't need live overrides
 export const LEVELS = getLevels();
 
-export const STORAGE_KEY = 'quodeq-analysis-power';
+export { ANALYSIS_POWER_STORAGE_KEY as STORAGE_KEY } from '../../../constants.js';

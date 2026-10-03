@@ -6,7 +6,7 @@ oversized files cannot be dispatched and are capped by
 files through their own tools and have no such cap.
 
 The queue builder / estimates (``list_source_files``) and the dispatch-time
-worker (``_gather_api_source_files``) MUST share this predicate. When they
+worker (``gather_api_source_files``) MUST share this predicate. When they
 diverged, files entered the queue, were taken, then silently dropped at
 dispatch: no ``file_done`` marker, no cache entry, re-queued as misses on
 every incremental run — and dim coverage never converged to 100%.
@@ -16,9 +16,8 @@ every incremental run — and dim coverage never converged to 100%.
 so a ``RunConfig``, the queue builder, and the dispatch-time worker can all
 resolve the SAME values for one run instead of each independently
 re-reading env/provider-cache state. ``default_dispatch_policy()`` is the
-factory that resolves those live values; the three module-level functions
-below are thin back-compat wrappers over a freshly-built policy, kept for
-existing callers that don't carry a ``RunConfig``/``DispatchPolicy`` around.
+factory that resolves those live values; callers read the run's policy off
+``RunConfig.dispatch_policy()`` rather than re-resolving it per call.
 """
 from __future__ import annotations
 
@@ -28,6 +27,7 @@ from typing import Callable
 
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.analysis_env import max_api_file_size
+from quodeq.config.provider import ProviderType
 from quodeq.shared.utils import get_ai_cmd
 
 StatFn = Callable[[Path], int]
@@ -61,7 +61,7 @@ class DispatchPolicy:
 
     def provider_is_api(self) -> bool:
         """True when the active provider dispatches via direct API."""
-        return self.provider_configs.get(self.ai_cmd, {}).get("type", "cli") == "api"
+        return self.provider_configs.get(self.ai_cmd, {}).get("type", ProviderType.CLI) == ProviderType.API
 
     def split_api_dispatchable(
         self, root: Path, rel_files: list[str],
@@ -104,21 +104,3 @@ def default_dispatch_policy(
         stat_size=stat_size,
     )
 
-
-def provider_is_api(ai_cmd: str | None = None) -> bool:
-    """True when the active (or given) provider dispatches via direct API.
-
-    Thin back-compat wrapper over a freshly-built :func:`default_dispatch_policy`.
-    """
-    cmd = ai_cmd or get_ai_cmd()
-    return default_dispatch_policy(ai_cmd=cmd).provider_is_api()
-
-
-def split_api_dispatchable(
-    root: Path, rel_files: list[str],
-) -> tuple[list[str], list[str]]:
-    """Split *rel_files* into (dispatchable, excluded), preserving order.
-
-    Thin back-compat wrapper over a freshly-built :func:`default_dispatch_policy`.
-    """
-    return default_dispatch_policy().split_api_dispatchable(root, rel_files)

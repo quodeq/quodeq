@@ -22,6 +22,7 @@ import time
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from quodeq.analysis._dim_estimates import DimEstimateReason
 from quodeq.analysis.run_types import RunConfig
 from quodeq.core.observability import NULL_LOG, LogSink
 
@@ -48,7 +49,7 @@ def _backlog_counts(
     counts: dict[str, int] = {}
     for dim in dimensions:
         estimate = estimates.get(dim)
-        if not isinstance(estimate, dict) or estimate.get("reason") != "incremental":
+        if not isinstance(estimate, dict) or estimate.get("reason") != DimEstimateReason.INCREMENTAL:
             return None
         count = estimate.get("count")
         if not isinstance(count, int) or isinstance(count, bool):
@@ -57,7 +58,7 @@ def _backlog_counts(
     return counts
 
 
-def _order_by_backlog(
+def order_by_backlog(
     dimensions: Sequence[str], estimates: DimEstimates | None, *, log: LogSink = NULL_LOG,
 ) -> tuple[list[str], dict[str, int] | None]:
     """Return (dimensions biggest-backlog-first, per-dim pending counts).
@@ -113,7 +114,7 @@ def _dimension_deadline(
     return min(now + slice_s, run_deadline)
 
 
-def _apply_dim_deadline(
+def apply_dim_deadline(
     config: RunConfig, remaining: Sequence[str], run_deadline: float | None,
     counts: Mapping[str, int] | None,
 ) -> None:

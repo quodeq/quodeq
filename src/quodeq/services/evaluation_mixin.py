@@ -4,8 +4,8 @@ Split to stay under the file-size cap: the dispatch abstraction and CLI
 command building live in ``_evaluation_dispatch.py``, env-var building in
 ``_evaluation_env.py``, and the cancel-wait/discard machinery in
 ``_run_discard.py``. All are re-exported here — tests import
-``SubprocessDispatcher``/``_build_evaluate_cmd`` and patch
-``_wait_for_terminal_status``/``_discard_run_state`` at this module's path.
+``SubprocessDispatcher``/``build_evaluate_cmd`` and patch
+``wait_for_terminal_status``/``discard_run_state`` at this module's path.
 """
 
 from __future__ import annotations
@@ -13,20 +13,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.services._job_model import JobLaunchOptions
 from quodeq.services.base import EvaluationOptions, NewProjectSpec
 from quodeq.services.project_registration import mark_onboarding_complete, register_project
 from quodeq.services.score_run import score_completed_evidence
+from quodeq.shared.env import get_clones_dir
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url
 
-from quodeq.services._evaluation_dispatch import EvaluationDispatcher, SubprocessDispatcher, _build_evaluate_cmd  # re-export
+from quodeq.services._evaluation_dispatch import EvaluationDispatcher, SubprocessDispatcher, build_evaluate_cmd  # re-export
 from quodeq.services._evaluation_env import build_eval_env
 from quodeq.services._run_discard import (  # noqa: F401 — re-export
-    _CacheEraser,
-    _discard_run_state,
-    _open_cache,
-    _wait_for_terminal_status,
+    CacheEraser,
+    discard_run_state,
+    open_cache,
+    wait_for_terminal_status,
 )
 
 if TYPE_CHECKING:
@@ -57,10 +59,11 @@ class FsEvaluationMixin:
         self,
         jobs: "JobManager | None" = None,
         get_status_fn: Callable | None = None,
+        dispatcher: EvaluationDispatcher | None = None,
     ) -> None:
         if jobs is not None:
             self._jobs = jobs
-        self._dispatcher = None
+        self._dispatcher = dispatcher
         self._get_status_fn = get_status_fn
 
     @property
@@ -84,8 +87,8 @@ class FsEvaluationMixin:
     def _resolve_repo_target(repo: str) -> Path:
         if is_repo_url(repo):
             raise ValueError(
-                "URL repos are not supported here. Register the project via "
-                "POST /api/projects (which clones to disk) and pass the local path."
+                "URL repos are not supported here. Register the project first "
+                "(which clones it to disk) and pass the resulting local path."
             )
         resolved = Path(repo).resolve()
         if not resolved.exists():
@@ -99,8 +102,15 @@ class FsEvaluationMixin:
     def _register_target_project(
         repo: str, reports_dir: str, options: EvaluationOptions,
     ) -> None:
+        # repo is always a local path here (the caller's _resolve_repo_target
+        # rejects URLs first), so clones_dir is never actually read by
+        # register_project on this path -- resolved anyway, for the same
+        # reason _build_eval_env resolves get_ai_cmd()/get_ai_model() inline:
+        # this mixin has no composition-time source for it (no constructor
+        # param), so it is the call-time-default shape's owner here.
         project_uuid = register_project(
             reports_dir, NewProjectSpec(repo, options.discipline, scope_path=options.scope_path),
+            clones_dir=get_clones_dir(),
         )
         # Launching an evaluation is the terminal step of project setup, so
         # the 'Resume setup' badge must clear here. Without this stamp the
@@ -141,7 +151,7 @@ class FsEvaluationMixin:
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
         """Start an asynchronous evaluation subprocess for a repository."""
         resolved = self._resolve_repo_target(repo)
-        cmd = _build_evaluate_cmd(repo, options, reports_dir)
+        cmd = build_evaluate_cmd(repo, options, reports_dir)
         self._register_target_project(repo, reports_dir, options)
         return self._launch_evaluation_job(cmd, reports_dir, options, resolved)
 
@@ -159,9 +169,18 @@ class FsEvaluationMixin:
             return fn(job_id, reports_dir=reports_dir)
         return self._jobs.get_job(job_id)
 
+    def in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """The in-memory JobManager view of *job_id*, or None.
+
+        Unlike ``get_evaluation_status`` this never consults the run index,
+        so an ``ext-`` id or an unknown id returns None. The log-stream routes
+        use it for the freshest status of an internal run.
+        """
+        return self._jobs.get_job(job_id)
+
     def cancel_evaluation(
         self, job_id: str, reports_dir: str | None = None,
-        *, discard_partial: bool = False,
+        *, discard_partial: bool = False, wait_for_exit: bool = False,
     ) -> bool:
         """Cancel a running evaluation job; score completed dims unless discarding.
 
@@ -170,15 +189,20 @@ class FsEvaluationMixin:
         resolve correctly via the SQLite index (``FilesystemActionProvider``
         overrides the status lookup). Before this, ``get_job`` returned
         ``None`` for ``ext-`` ids and the scoring block was dead for them.
-        ``score_completed_evidence`` is idempotent (skips dimensions whose
-        report file already exists), so double-firing with the route-level
-        scoring in ``_evaluation_routes`` is a no-op.
+
+        Keep-findings scoring runs as ``cancel_job``'s *on_exit*: only after
+        the process is gone, since it writes its own cancel-time reports
+        until then. For an external run that is on the escalation thread, so
+        this returns without waiting the SIGTERM grace window. The GET-route
+        salvage scoring (``score_terminal_run_once``) holds off the same way
+        while the run's process is alive. ``score_completed_evidence`` skips
+        dimensions whose report already exists, so the two firing is a no-op.
 
         After ``cancel_job`` returns we wait briefly for the run lifecycle
         handler in the subprocess to write ``status.json`` to a terminal
         state. Without this wait, the API returns while observers reading
         ``status.json`` (UI dashboard query, SSE stream, etc.) still see
-        the run as ``in_progress`` for a window of ~100ms-1s, producing
+        the run as ``running`` for a window of ~100ms-1s, producing
         the "two running rows" UX after a cancel-then-start.
 
         When ``discard_partial`` is True the run must end up as if it never
@@ -195,19 +219,30 @@ class FsEvaluationMixin:
         run_dir: Path | None = None
         if reports_dir and job and job.output_project and job.output_run_id:
             run_dir = Path(reports_dir) / job.output_project / job.output_run_id
-        ok = self._jobs.cancel_job(job_id, reports_root=reports_root, run_dir=run_dir)
+        on_exit = None
+        if run_dir is not None and not discard_partial:
+            ref = _run_ref(job)
+
+            def on_exit() -> None:
+                score_completed_evidence(reports_dir, ref)
+        # A discard deletes the run's files next, so it must not race a
+        # process still inside its SIGTERM grace window; a keep-findings
+        # cancel returns at once and scores once the escalation is done,
+        # unless the caller (window close, about to kill this server) waits.
+        ok = self._jobs.cancel_job(
+            job_id, reports_root=reports_root, run_dir=run_dir,
+            wait_for_exit=discard_partial or wait_for_exit, on_exit=on_exit,
+        )
         if ok and run_dir is not None:
-            _wait_for_terminal_status(run_dir)
+            wait_for_terminal_status(run_dir)
             if discard_partial:
-                _discard_run_state(reports_dir, _run_ref(job))
-            else:
-                score_completed_evidence(reports_dir, _run_ref(job))
+                discard_run_state(reports_dir, _run_ref(job))
         return ok
 
     def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
         """Score any completed dimensions from a failed evaluation."""
         job = self._jobs.get_job(job_id)
-        if not job or job.status not in ("failed", "cancelled"):
+        if not job or job.status not in (JobStatus.FAILED, JobStatus.CANCELLED):
             return False
         if job.output_project and job.output_run_id:
             score_completed_evidence(reports_dir, _run_ref(job))

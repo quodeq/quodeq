@@ -1,6 +1,6 @@
 """Shared fixtures and test doubles for the test_dimension_runner* siblings.
 
-process_dimension_with_cache — V2 dimension processor. Composes the B4
+process_dimension_with_cache — V2 dimension processor. Composes the cache
 helpers (classify, persist, key) with the existing dispatcher boundary
 (process_dimension_with_subagents) into a cache-aware dimension runner.
 This module holds the scaffolding shared across the split test files:
@@ -21,6 +21,7 @@ from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
+from quodeq.core.observability import NULL_LOG, LogSink
 
 
 def _make_manifest(file_names: list[str]) -> SourceManifest:
@@ -71,8 +72,8 @@ def _setup(
 
 def _make_ctx():
     from quodeq.analysis._dimensions import DimensionsConfig
-    from quodeq.analysis.run_types import _AnalysisContext
-    return _AnalysisContext(
+    from quodeq.analysis.run_types import AnalysisContext
+    return AnalysisContext(
         dimensions_data=DimensionsConfig(dimensions={}),
         date_str="2026-01-01",
         template="",
@@ -81,17 +82,23 @@ def _make_ctx():
     )
 
 
-def _make_callbacks() -> DimensionCallbacks:
-    """Real callbacks aren't needed when the dispatcher boundary is mocked."""
+def _make_callbacks(*, log: LogSink = NULL_LOG) -> DimensionCallbacks:
+    """Real callbacks aren't needed when the dispatcher boundary is mocked.
+
+    *log* defaults to the silent sink; pass a ``RecordingLog`` to assert on
+    the classify/invalidate log lines ``_dimension_context.py`` emits
+    through ``opts.callbacks.log``.
+    """
     from quodeq.analysis._dimension_steps import (
-        _build_dimension_prompt,
-        _parse_dimension_evidence,
-        _run_dimension_analysis,
+        build_dimension_prompt,
+        parse_dimension_evidence,
+        run_dimension_analysis,
     )
     return DimensionCallbacks(
-        build_prompt=_build_dimension_prompt,
-        run_analysis=_run_dimension_analysis,
-        parse_evidence=_parse_dimension_evidence,
+        build_prompt=build_dimension_prompt,
+        run_analysis=run_dimension_analysis,
+        parse_evidence=parse_dimension_evidence,
+        log=log,
     )
 
 

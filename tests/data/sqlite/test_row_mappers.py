@@ -90,7 +90,8 @@ def test_judgment_to_row_uses_long_names():
     assert row["requirement"] == "R1"
     assert row["title"] == "t"
     assert row["snippet"] == "s"
-    assert row["dedup_key"] == "P1|f.py|3|violation"
+    # One finding per requirement, not per principle.
+    assert row["dedup_key"] == "R1|f.py|3|violation"
 
 
 def test_finding_dict_to_row_defaults_confidence_to_100_when_missing():

@@ -148,3 +148,26 @@ describe('StandardsTable download error handling (#500)', () => {
     }, { timeout: 2000 });
   });
 });
+
+describe('StandardsTable WCAG standard', () => {
+  const wcag = {
+    id: 'accessibility', name: 'Accessibility', type: 'wcag', subtype: '2.2',
+    description: '', principleCount: 5, requirementCount: 34,
+  };
+
+  it('shows the family and edition and, like ISO, offers no delete', () => {
+    render(<StandardsTable grouped={{ wcag: [wcag] }} actions={actions} customizedCounts={{}} />);
+    expect(screen.getByText('wcag-2.2')).toBeInTheDocument();
+    expect(screen.queryByLabelText(`${t('violations.delete')} Accessibility`)).not.toBeInTheDocument();
+  });
+});
+
+describe('StandardsTable families', () => {
+  it('lists the ISO family alongside the others', () => {
+    const iso = { ...STANDARD, id: 'reliability', name: 'Reliability', type: 'iso', subtype: '25010' };
+    const grouped = { iso: [iso], wcag: [], quodeq: [], community: [], custom: [STANDARD] };
+    render(<StandardsTable grouped={grouped} actions={actions} customizedCounts={{}} />);
+    expect(screen.getByText('Reliability')).toBeInTheDocument();
+    expect(screen.getByText('My Standard')).toBeInTheDocument();
+  });
+});

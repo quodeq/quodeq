@@ -2,7 +2,7 @@
   "id": "usability",
   "name": "Usability",
   "iso_25010": "Usability",
-  "version": "2023",
+  "version": "2023.11",
   "sub_characteristics": [
     {
       "name": "Appropriateness Recognisability",

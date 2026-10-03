@@ -62,7 +62,7 @@ dependencies = ["pywebview>=5.0"]
 dev = ["flask"]
 """)
     shape = detect_shape(tmp_path)
-    # Both signals present -> desktop wins outright (see _python_signals).
+    # Both signals present -> desktop wins outright (see python_signals).
     # This assertion used to be UNKNOWN, which was the bug: it made
     # detect_shape discard a manifest that unambiguously ships a desktop
     # app just because a web framework also showed up as a dev dependency.
@@ -74,7 +74,7 @@ def test_desktop_beats_web_in_one_manifest(tmp_path):
 
     detect_shape's own comment says desktop signals beat web signals because
     web hints show up in the dev dependencies of desktop apps. That priority
-    was unreachable: _python_signals collapsed the both-present case to None.
+    was unreachable: python_signals collapsed the both-present case to None.
     """
     (tmp_path / "pyproject.toml").write_text(
         '[project]\nname = "app"\n'
@@ -213,14 +213,26 @@ def test_signal_detector_exception_degrades_to_unknown(
 ) -> None:
     """The per-manifest readers already guard every known pathological input
     (see ``TestPathologicalManifestsDegrade`` below), so this exercises the
-    top-level backstop directly: something unanticipated escaping a signal
-    detector must still degrade the whole verdict to UNKNOWN rather than
-    raise, per detect_shape's own "nothing in this module may raise"
-    contract.
+    top-level backstop directly: a TypeError (e.g. a scalar where a signal
+    detector expects a list) must still degrade the whole verdict to
+    UNKNOWN rather than raise.
     """
+    def _boom(repo: Path) -> None:
+        raise TypeError("unexpected failure in signal detection")
+
+    monkeypatch.setattr("quodeq.context.project_shape.python_signals", _boom)
+    shape = detect_shape(tmp_path)
+    assert shape == ProjectShape()
+
+
+def test_an_unnamed_signal_detector_exception_propagates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """detect_shape's except narrows to (OSError, TypeError); anything else
+    from a signal detector must propagate, not be swallowed."""
     def _boom(repo: Path) -> None:
         raise RuntimeError("unexpected failure in signal detection")
 
-    monkeypatch.setattr("quodeq.context.project_shape._python_signals", _boom)
-    shape = detect_shape(tmp_path)
-    assert shape == ProjectShape()
+    monkeypatch.setattr("quodeq.context.project_shape.python_signals", _boom)
+    with pytest.raises(RuntimeError, match="unexpected failure in signal detection"):
+        detect_shape(tmp_path)

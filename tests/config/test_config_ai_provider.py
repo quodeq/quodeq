@@ -58,9 +58,58 @@ class TestExpandedProviders:
         assert "custom" in PROVIDERS
 
     def test_ollama_no_api_key_required(self):
-        api_key_var, cmd = PROVIDERS["ollama"]
-        assert api_key_var == ""
+        assert PROVIDERS["ollama"] == ""
 
     def test_openrouter_api_key_env(self):
-        api_key_var, cmd = PROVIDERS["openrouter"]
-        assert api_key_var == "OPENROUTER_API_KEY"
+        assert PROVIDERS["openrouter"] == "OPENROUTER_API_KEY"
+
+
+def test_configure_provider_writes_the_whole_env_on_short_writes(tmp_path, monkeypatch):
+    """os.write may write fewer bytes than asked; the env file still holds all of them."""
+    import os
+    expected = ConfigPaths.from_root(tmp_path / "full")
+    expected.env_file.parent.mkdir()
+    configure_provider_noninteractive("claude", expected)
+
+    real_write = os.write
+    monkeypatch.setattr(os, "write", lambda fd, data: real_write(fd, bytes(data[:1])))
+    paths = ConfigPaths.from_root(tmp_path / "short")
+    paths.env_file.parent.mkdir()
+    assert configure_provider_noninteractive("claude", paths) == 0
+    assert paths.env_file.read_text() == expected.env_file.read_text()
+
+
+def test_get_current_provider_survives_an_unreadable_env_file(tmp_path, monkeypatch):
+    """An env file that exists but cannot be read (permissions, removed after
+    the exists() check) falls back to the default instead of raising."""
+    from pathlib import Path
+
+    paths = ConfigPaths.from_root(tmp_path)
+    paths.env_file.write_text("export AI_PROVIDER=codex\n")
+
+    def _denied(self, *args, **kwargs):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(Path, "read_text", _denied)
+    assert get_current_provider(paths, default_provider="claude") == "claude"
+
+
+def test_configure_provider_returns_1_when_the_write_fails(tmp_path, monkeypatch):
+    """The contract is an int status: a disk error is 1, not a traceback."""
+    from quodeq.config import ai_provider
+
+    def _disk_full(*args, **kwargs):
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(ai_provider, "_write_env", _disk_full)
+    assert configure_provider_noninteractive("claude", ConfigPaths.from_root(tmp_path)) == 1
+
+
+def test_configure_provider_returns_1_when_gitignore_update_fails(tmp_path, monkeypatch):
+    from quodeq.config import ai_provider
+
+    def _read_only(*args, **kwargs):
+        raise PermissionError("read-only file system")
+
+    monkeypatch.setattr(ai_provider, "_ensure_gitignore", _read_only)
+    assert configure_provider_noninteractive("claude", ConfigPaths.from_root(tmp_path)) == 1

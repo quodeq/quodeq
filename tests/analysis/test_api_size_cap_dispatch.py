@@ -1,7 +1,7 @@
 """The API-provider file-size cap must be enforced at enumeration, not
 silently at dispatch (the perpetual-97%-coverage bug).
 
-Bug: ``_gather_api_source_files`` dropped files over ``QUODEQ_MAX_API_FILE_SIZE``
+Bug: ``gather_api_source_files`` dropped files over ``QUODEQ_MAX_API_FILE_SIZE``
 *after* taking them from the queue, without writing any ``file_done`` marker.
 The files never entered the cache, so every incremental run re-counted them as
 misses, re-queued them, and re-skipped them. The same ~3% of files haunted
@@ -127,7 +127,7 @@ class TestCoverageDenominator:
 class TestDispatchPolicyParity:
     """The queue/denominator divergence-bug guard (the "perpetual 97%"
     coverage bug): ``list_source_files`` (queue/estimates enumeration) and
-    ``RunConfig._policy()`` (the coverage denominator) must agree on which
+    ``RunConfig.dispatch_policy()`` (the coverage denominator) must agree on which
     files are dispatchable for the SAME RunConfig. A future change that lets
     one of these paths resolve a different DispatchPolicy than the other
     reintroduces the bug this module's docstring describes.
@@ -140,6 +140,6 @@ class TestDispatchPolicyParity:
         all_files = config.manifest.source_files
 
         files, _ext, _excluded = list_source_files(config, "security")
-        dispatchable, _excluded2 = config._policy().split_api_dispatchable(config.src, all_files)
+        dispatchable, _excluded2 = config.dispatch_policy().split_api_dispatchable(config.src, all_files)
 
         assert files == dispatchable

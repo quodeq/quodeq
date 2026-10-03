@@ -72,8 +72,8 @@ class TestFetchAsvsL1:
     def test_urlopen_called_with_timeout(self, tmp_path: Path, _mock_urlopen) -> None:
         mock_urlopen, _ = _mock_urlopen
         fetch_asvs_l1(tmp_path, skip_integrity=True)
-        from quodeq.config.standards_fetcher import _DEFAULT_FETCH_TIMEOUT_S
-        assert mock_urlopen.call_args.kwargs.get("timeout") == _DEFAULT_FETCH_TIMEOUT_S
+        from quodeq.config.standards_fetcher import DEFAULT_FETCH_TIMEOUT_S
+        assert mock_urlopen.call_args.kwargs.get("timeout") == DEFAULT_FETCH_TIMEOUT_S
 
     def test_first_download_rejected_without_hash(
         self, tmp_path: Path, monkeypatch, _mock_urlopen,

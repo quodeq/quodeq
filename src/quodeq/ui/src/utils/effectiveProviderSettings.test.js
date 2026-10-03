@@ -86,3 +86,9 @@ test('readActiveProviderModel returns the stored model for the provider', () => 
 test('readActiveProviderModel returns null when unset', () => {
   assert.equal(readActiveProviderModel('claude', storage({})), null);
 });
+
+test('resolveProviderSettings resolves the defaults when storage is blocked', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const blocked = { getItem: () => { throw new Error('blocked'); } };
+  assert.deepEqual(resolveProviderSettings('claude', blocked), effectiveProviderDefaults('claude'));
+});

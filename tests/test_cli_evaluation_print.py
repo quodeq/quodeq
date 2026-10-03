@@ -1,8 +1,9 @@
-"""`_print_scores` prints suppression-adjusted scores after a scan.
+"""`print_scores` prints suppression-adjusted scores after a scan.
 
-Covers the target behaviour: every line carries the report's violation
-count, major count and density (violations per 100 files read) when the
-report exists; when a dismissal matches a just-scanned run's evidence, the
+Covers the target behaviour: every line carries the report's majors
+(critical + major), open requirement types, density (violations per 100
+files read) and coverage when the report exists; the raw count is not on
+the line; when a dismissal matches a just-scanned run's evidence, the
 evidence-based rescore replaces the grade and a `(N dismissed findings
 excluded)` suffix is appended; a dimension without a report prints the
 plain `  {dim}: {score}` line.
@@ -12,7 +13,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.cli_evaluation import _print_scores
+import pytest
+
+from quodeq.cli_evaluation import print_scores
 from quodeq._cli_scoring import _format_score_line
 from quodeq.analysis._report_io import write_dimension_report
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
@@ -85,12 +88,12 @@ def test_dismissal_prints_adjusted_score_with_suffix(tmp_path, capsys):
     # pass vacuously even if suppression exclusion were broken.
     assert f"{expected.overall.weighted_score}/10" != original_score
 
-    _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
     assert out == (
         f"  {DIM}: {expected.overall.weighted_score}/10"
-        "  (3 violations, 2 major, 60.0 per 100 files) (1 dismissed findings excluded)\n"
+        "  (2 major, 2 open types, 60.0 per 100 files, 50% coverage) (1 dismissed findings excluded)\n"
     )
 
 
@@ -103,10 +106,10 @@ def test_no_suppressions_prints_score_with_volume(tmp_path, capsys):
     ]
     score = _build_run(run_dir, DIM, lines)
 
-    _print_scores({DIM: score}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({DIM: score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
-    assert out == f"  {DIM}: {score}  (1 violation, 1 major, 20.0 per 100 files)\n"
+    assert out == f"  {DIM}: {score}  (1 major, 1 open type, 20.0 per 100 files, 50% coverage)\n"
 
 
 def test_dimension_without_evidence_falls_back_to_original_line(tmp_path, capsys):
@@ -121,19 +124,24 @@ def test_dimension_without_evidence_falls_back_to_original_line(tmp_path, capsys
     dismiss_finding(project_dir, {"req": "R-9", "file": "z.kt", "line": 1})
     assert dismissed_keys(project_dir), "dismiss did not register"
 
-    _print_scores({"security": "8.0/10"}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({"security": "8.0/10"}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
     assert out == "  security: 8.0/10\n"
 
 
 def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeypatch):
-    """A scoring-engine exception during the suppression-aware rescore must
-    never propagate. The rescore is a console embellishment layered on top
-    of reports already written to disk -- nothing upstream of
-    `_execute_pipeline` catches a generic exception (only AnalysisError /
+    """A ValueError during the suppression-aware rescore must never
+    propagate. The rescore is a console embellishment layered on top of
+    reports already written to disk -- nothing upstream of
+    `execute_pipeline` catches a generic exception (only AnalysisError /
     EvaluationError), so a bug here would otherwise crash an
     otherwise-successful scan's exit path with a raw traceback.
+
+    ValueError is what the real call chain can raise: rescore_dimension_
+    from_evidence's only unguarded path is validate_path_segment(dim_id)
+    rejecting a path-traversal/separator character (everything else it
+    calls is already fail-soft internally).
     """
     project_dir = tmp_path / "proj"
     run_dir = project_dir / "run1"
@@ -144,8 +152,33 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
     ]
     original_score = _build_run(run_dir, DIM, lines)
 
-    # A dismissal that matches this run's evidence, so `_print_scores` takes
+    # A dismissal that matches this run's evidence, so `print_scores` takes
     # the rescore branch (not the "no suppressions" or "no match" fallback).
+    dismiss_finding(project_dir, {"req": "R-2", "file": "a.kt", "line": 20})
+    assert dismissed_keys(project_dir), "dismiss did not register"
+
+    def _boom(*args, **kwargs):
+        raise ValueError("dim_id contains a path separator")
+
+    monkeypatch.setattr("quodeq.cli_evaluation.rescore_dimension_from_evidence", _boom)
+
+    print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
+
+    out = capsys.readouterr().out
+    assert out == f"  {DIM}: {original_score}  (2 major, 2 open types, 40.0 per 100 files, 50% coverage)\n"
+
+
+def test_rescore_out_of_scope_error_propagates(tmp_path, monkeypatch):
+    """R-FT-7 — an error outside (ValueError,) (e.g. a programming bug) must
+    now propagate instead of being swallowed."""
+    project_dir = tmp_path / "proj"
+    run_dir = project_dir / "run1"
+    lines = [
+        _ev_line("R-1", "a.kt", 10, sev="major", vt="VT-COUPLING"),
+        _ev_line("R-2", "a.kt", 20, sev="critical", vt="VT-GODCLASS"),
+        _ev_line("C-1", "a.kt", 1, t="compliance"),
+    ]
+    original_score = _build_run(run_dir, DIM, lines)
     dismiss_finding(project_dir, {"req": "R-2", "file": "a.kt", "line": 20})
     assert dismissed_keys(project_dir), "dismiss did not register"
 
@@ -154,10 +187,8 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
 
     monkeypatch.setattr("quodeq.cli_evaluation.rescore_dimension_from_evidence", _boom)
 
-    _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
-
-    out = capsys.readouterr().out
-    assert out == f"  {DIM}: {original_score}  (2 violations, 1 major, 40.0 per 100 files)\n"
+    with pytest.raises(RuntimeError, match="scoring engine exploded"):
+        print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
 
 def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
@@ -186,22 +217,37 @@ def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
     assert rescored.excluded == 0
 
 
+_TOTALS_FRESH = {"violationCount": 945, "severity": {"critical": 0, "major": 2, "minor": 943},
+                 "violationsPer100Files": 32.3}
+
+
+def test_line_leads_with_majors_types_density_coverage():
+    line = _format_score_line("maintainability", "9.1/10", _TOTALS_FRESH, open_types=30,
+                              coverage_pct=95.2)
+    assert line == "  maintainability: 9.1/10  (2 major, 30 open types, 32.3 per 100 files, 95% coverage)"
+
+
+def test_line_counts_critical_as_major():
+    totals = {**_TOTALS_FRESH, "severity": {"critical": 1, "major": 2, "minor": 0}}
+    assert "3 major" in _format_score_line("d", "5.0/10", totals, open_types=3, coverage_pct=100.0)
+
+
 def test_format_score_line_without_totals_is_plain():
     assert _format_score_line("security", "8.0/10", {}) == "  security: 8.0/10"
 
 
 def test_format_score_line_omits_density_when_none():
     totals = {"violationCount": 2, "severity": {"major": 1}, "violationsPer100Files": None}
-    assert _format_score_line("security", "8.0/10", totals) == "  security: 8.0/10  (2 violations, 1 major)"
+    assert _format_score_line("security", "8.0/10", totals) == "  security: 8.0/10  (1 major)"
 
 
 def test_format_score_line_appends_suffix():
     totals = {"violationCount": 1, "severity": {}}
     line = _format_score_line("security", "7.9/10", totals, suffix=" (1 dismissed findings excluded)")
-    assert line == "  security: 7.9/10  (1 violation, 0 major) (1 dismissed findings excluded)"
+    assert line == "  security: 7.9/10  (0 major) (1 dismissed findings excluded)"
 
 
 def test_format_score_line_tolerates_corrupt_counts():
     totals = {"violationCount": "many", "severity": {"major": None}}
     line = _format_score_line("security", "8.0/10", totals)
-    assert line == "  security: 8.0/10  (0 violations, 0 major)"
+    assert line == "  security: 8.0/10  (0 major)"

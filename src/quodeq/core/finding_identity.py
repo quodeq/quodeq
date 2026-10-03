@@ -72,7 +72,7 @@ def coerce_line(line: object) -> int:
     """
     try:
         return int(line)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 

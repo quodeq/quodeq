@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import FadeIn from './components/FadeIn.jsx';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
@@ -14,8 +15,11 @@ import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
 import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
+import { RescoreTrackerProvider } from './features/grade-formula/rescore/RescoreTrackerProvider.jsx';
 import { MainContent } from './routes/renderers.jsx';
 import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
+import { useSyncActivity } from './hooks/useSyncActivity.js';
+import { NAV_TAB } from './vocab/navTab.js';
 
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 
@@ -24,20 +28,13 @@ const OnboardingWizard = lazy(() => import('./features/onboarding/components/Onb
  *   startupLoader: JSX.Element|null, booting: boolean }} props
  * @returns {JSX.Element}
  */
-function AppShell({ sidebar, header, content, drawer, navPending, startupLoader, booting }) {
+function AppShell({ sidebar, header, content, drawer, startupLoader, booting }) {
   return (
     <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
       {header && <div className="app-shell__topbar">{header}</div>}
       <div className="app-shell__body">
         {sidebar}
         <div className="app-shell__main-column" inert={booting || undefined}>
-          {/* Feedback while a navigation's target page renders (useNavStack
-              transition). Must live HERE, outside the scrolling <main>: the
-              .dashboard is position:relative, so an absolutely-positioned bar
-              inside it anchors to the top of the scrollable CONTENT and
-              scrolls out of view — exactly where every detail-page card
-              lives, so the one navigation that needed feedback never got it. */}
-          {navPending && <div className="nav-pending-bar" aria-hidden="true" />}
           <UpdateBanner />
           <main className="dashboard">
             {content}
@@ -70,6 +67,7 @@ function AppSidebar({ shell }) {
         sharedProjectInfo: state.sharedProjectInfo,
         projects: state.projects,
         sharedHasContent: sharedSignal.hasContent,
+        sharedPublishedCount: sharedSignal.publishedCount,
         resolvedDisplayName,
         headerMeta: state.headerMeta,
         version: APP_VERSION,
@@ -84,21 +82,26 @@ function AppSidebar({ shell }) {
 
 function AppTopBar({ shell }) {
   const {
-    state, activeTab, navTab, resolvedDisplayName, sidebarProvider, sidebarModel, topbarRunProgress,
+    state, activeTab, navTab, resolvedDisplayName, sidebarProvider, sidebarModel, isEvaluating,
     activePage, navStack, navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, setSidebarPinned,
   } = shell;
+  // A running team-results job (connect, refresh, pull) sweeps the same
+  // loading hairline as pending page data, so the top bar moves while the
+  // strip says "downloading" or "reading projects".
+  const syncActive = useSyncActivity();
   return (
     <TopBar
       {...buildTopBarProps({
         resolvedDisplayName,
         serverConnected: state.serverConnected,
+        serverUrl: typeof window !== 'undefined' ? window.location.origin : null,
         sidebarProvider,
         sidebarModel,
         selectedSource: state.selectedSource,
         projectsCount: state.projects?.length,
-        onEvaluateClick: () => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) }),
-        evaluating: state.evalLifecycle?.job?.status === 'running',
-        topbarRunProgress,
+        onEvaluateClick: () => navTab(NAV_TAB.EVALUATE, { preselectDims: deriveEvaluatePreselect(activePage) }),
+        evaluating: !!isEvaluating,
+        pending: state.navPending || state.isDataPending || syncActive,
         navTab,
         setSidebarPinned,
         breadcrumb: (
@@ -106,7 +109,7 @@ function AppTopBar({ shell }) {
             stack={navStack}
             onGoTo={navGoTo}
             projectName={resolvedDisplayName}
-            onSelectProject={() => navTab('projects')}
+            onSelectProject={() => navTab(NAV_TAB.PROJECTS)}
             siblingsFor={breadcrumbSiblingsFor}
           />
         ),
@@ -118,6 +121,11 @@ function AppTopBar({ shell }) {
       })}
     />
   );
+}
+
+/** Fades the routed page in on every tab change without remounting it. */
+export function TabFade({ activeTab, children }) {
+  return <FadeIn restartKey={activeTab} className="tab-fade">{children}</FadeIn>;
 }
 
 function AppRouteContent({ shell }) {
@@ -132,9 +140,9 @@ function AppRouteContent({ shell }) {
       {!state.serverConnected && (
         <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
       )}
-      <div className="tab-fade" key={activeTab}>
+      <TabFade activeTab={activeTab}>
         <MainContent activePage={activePage} props={contentProps} />
-      </div>
+      </TabFade>
       {wizardEntry && (
         <OnboardingWizard
           entry={wizardEntry}
@@ -162,26 +170,29 @@ export default function AppMain({ shell }) {
           <OllamaLogProvider>
             <LlamaCppLogProvider>
               <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
-                <AppShell
-                  navPending={state.navPending}
-                  booting={shell.showStartupLoader}
-                  drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
-                    onOpenSettings={() => navTab('settings')} />}
-                  sidebar={<AppSidebar shell={shell} />}
-                  header={<AppTopBar shell={shell} />}
-                  content={<AppRouteContent shell={shell} />}
-                  startupLoader={
-                    /* One stable mount for the startup loader, OUTSIDE the
-                       routed Suspense: inside it, a lazy chunk's suspension
-                       unmounts the loader itself and the plain fallback
-                       restarts the fade and tips from zero (a loader-to-loader
-                       flash). Out here it covers chunk loads AND holds through
-                       the Overview's first data (shouldShowStartupLoader), so
-                       boot goes loader -> content with no skeleton in
-                       between. */
-                    <FadingLoadingScreen show={shell.showStartupLoader} variant="shell" tips />
-                  }
-                />
+                {/* Above every page: a grade-formula rescore keeps polling and
+                    drops the stale score caches after the user leaves the page. */}
+                <RescoreTrackerProvider>
+                  <AppShell
+                    booting={shell.showStartupLoader}
+                    drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
+                      onOpenSettings={() => navTab(NAV_TAB.SETTINGS)} />}
+                    sidebar={<AppSidebar shell={shell} />}
+                    header={<AppTopBar shell={shell} />}
+                    content={<AppRouteContent shell={shell} />}
+                    startupLoader={
+                      /* One stable mount for the startup loader, OUTSIDE the
+                         routed Suspense: inside it, a lazy chunk's suspension
+                         unmounts the loader itself and the plain fallback
+                         restarts the fade and tips from zero (a loader-to-loader
+                         flash). Out here it covers chunk loads AND holds through
+                         the Overview's first data (shouldShowStartupLoader), so
+                         boot goes loader -> content with no skeleton in
+                         between. */
+                      <FadingLoadingScreen show={shell.showStartupLoader} variant="shell" tips />
+                    }
+                  />
+                </RescoreTrackerProvider>
               </VerifiedFindingsProvider>
             </LlamaCppLogProvider>
           </OllamaLogProvider>

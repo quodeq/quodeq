@@ -1,5 +1,5 @@
-import { render, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Stub heavy sub-components used by EvaluateScreen
 vi.mock('./EvaluationStatus.jsx', () => ({ default: () => null }));
@@ -11,7 +11,10 @@ vi.mock('../../../constants.js', () => ({
   ACTIVE_PROVIDER_KEY: 'active-provider',
   DEFAULT_TIME_LIMIT_S: 3600,
   DEFAULT_MAX_SUBAGENTS: 5,
-  LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
+  PROVIDER_SETTING_KEY: {
+    MODEL: 'model', MODEL_ANALYSIS: 'model-analysis', SUBAGENTS: 'subagents', TIME_LIMIT: 'time-limit',
+    PER_DIMENSION: 'per-dimension', VERIFY: 'verify', POOL_BUDGET: 'pool-budget',
+  },
   providerKey: (p, k) => `${p}-${k}`,
 }));
 
@@ -75,5 +78,23 @@ describe('readBudgetSeconds', () => {
 
   it('honours an explicitly stored unlimited value', () => {
     expect(readBudgetSeconds(storage({ 'active-provider': 'claude', 'claude-time-limit': '0' }))).toBe(0);
+  });
+});
+
+describe('ErrorToast auto-dismiss', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('hides 5 s after it appeared even if the screen re-renders meanwhile', () => {
+    const screenFor = (evaluation) => (
+      <EvaluateScreen evaluation={evaluation} context={baseContext} actions={baseActions} />
+    );
+    const { rerender } = render(screenFor({ ...baseEvaluation, jobError: 'boom' }));
+    expect(document.querySelector('.job-error-toast')).not.toBeNull();
+    act(() => { vi.advanceTimersByTime(3000); });
+    // A live update: new evaluation object, same error.
+    rerender(screenFor({ ...baseEvaluation, jobError: 'boom', liveViolations: [] }));
+    act(() => { vi.advanceTimersByTime(2500); });
+    expect(document.querySelector('.job-error-toast')).toBeNull();
   });
 });

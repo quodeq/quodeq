@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
@@ -61,6 +61,65 @@ describe('LiveViolationsFeed', () => {
     expect(row).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(row);
     expect(row).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  // The tab switch unmounts the feed. On the way back the per-dimension
+  // activity clock starts empty, every group ties, and the stable sort put
+  // the first dimension evaluated on top and open while another one was
+  // being analyzed.
+  describe('which group is open on mount while a run is on', () => {
+    const twoDims = {
+      security: [{ severity: 'major', principle: 'input validation', file: 'S.swift', line: 1 }],
+      reliability: [{ severity: 'critical', principle: 'fault tolerance', file: 'A.swift', line: 56 }],
+    };
+    const group = (name) => Array.from(document.querySelectorAll('.vlive-dimension-label'))
+      .find((b) => b.querySelector('.vlive-dimension-name')?.textContent === name);
+    const groupNames = () => Array.from(document.querySelectorAll('.vlive-dimension-name')).map((n) => n.textContent);
+
+    it('opens the dimension being analyzed, on top, not the first one evaluated', async () => {
+      getEvaluationProgress.mockResolvedValue({ currentDimension: 'reliability', dimensions: [{ id: 'reliability', state: 'running' }] });
+      renderFeed({ liveViolations: twoDims, job: { jobId: 'j3', status: 'running' } });
+      await waitFor(() => expect(group('reliability')).toHaveAttribute('aria-expanded', 'true'));
+      expect(group('security')).toHaveAttribute('aria-expanded', 'false');
+      expect(groupNames()).toEqual(['reliability', 'security']);
+    });
+
+    it('opens none when the dimension being analyzed has no findings yet', async () => {
+      getEvaluationProgress.mockResolvedValue({ currentDimension: 'maintainability', dimensions: [{ id: 'maintainability', state: 'running' }] });
+      renderFeed({ liveViolations: twoDims, job: { jobId: 'j4', status: 'running' } });
+      await screen.findByText(/scanning for more/);
+      await waitFor(() => expect(group('security')).toHaveAttribute('aria-expanded', 'false'));
+      expect(group('reliability')).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('opens the top group once the run is over', () => {
+      renderFeed({ liveViolations: twoDims, job: { jobId: 'j5', status: 'done' } });
+      const [first, second] = groupNames();
+      expect(group(first)).toHaveAttribute('aria-expanded', 'true');
+      expect(group(second)).toHaveAttribute('aria-expanded', 'false');
+    });
+  });
+
+  it('shows the passing checks next to the violations while running', async () => {
+    // The console line prints "40 v · 1056 c"; the header says the same
+    // thing in words, so the feed never reads as "the run found 40 things".
+    getEvaluationProgress.mockResolvedValue({
+      currentDimension: 'reliability',
+      dimensions: [
+        { id: 'reliability', state: 'running', files: { taken: 30, total: 100 }, compliance: 1056 },
+        { id: 'security', state: 'done', files: { taken: 10, total: 10 }, compliance: 200 },
+      ],
+    });
+    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
+    expect(await screen.findByText(/1256 checks passed/)).toBeInTheDocument();
+  });
+
+  it('keeps the passing checks on a finished job', async () => {
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ id: 'reliability', state: 'done', files: { taken: 1, total: 1 }, compliance: 1 }],
+    });
+    renderFeed({ liveViolations: violations, job: { jobId: 'j3', status: 'done' } });
+    expect(await screen.findByText(/1 check passed/)).toBeInTheDocument();
   });
 
   it('counts only what it renders', () => {

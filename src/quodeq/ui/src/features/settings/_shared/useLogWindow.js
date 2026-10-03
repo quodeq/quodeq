@@ -4,8 +4,8 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 /**
  * Shared side-pane "log console" window: an open flag, a source hook that
  * streams/polls while open, and a buildSpec(source) that turns the source's
- * fields into a window spec. Used by OllamaLogProvider and ServerLogProvider,
- * which differ only in windowId, useLogSource and buildSpec.
+ * fields into a window spec. The Ollama, llama.cpp and server log providers
+ * differ only in windowId, useLogSource and buildSpec.
  *
  * The `useLogSource` param name (not e.g. `logSourceHook`) keeps the
  * react-hooks lint heuristic — which flags hook calls by name — happy about

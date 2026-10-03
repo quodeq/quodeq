@@ -4,11 +4,13 @@ import '@testing-library/jest-dom/vitest';
 import { useState } from 'react';
 import ViolationsPage from './ViolationsPage.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
+import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { VIOLATIONS_SUB_TAB } from '../violationsVocab.js';
 
-// Final whole-branch review: Critical 1 (evaluate CTA gating), Finding 3
-// (teammate persona -- shared selection + zero local projects), Finding 6
-// (shared read-only chip). ViolationsPage's default export needs a
-// QueryClientProvider (useDismissedFindings calls useQueryClient()).
+// Covers evaluate CTA gating, teammate persona (shared selection + zero
+// local projects), and the shared read-only chip. ViolationsPage's default
+// export needs a QueryClientProvider (useDismissedFindings calls
+// useQueryClient()).
 function baseData(overrides = {}) {
   return {
     accumulatedDimensions: [],
@@ -64,24 +66,19 @@ describe('ViolationsPage — teammate persona: shared selection + zero local pro
   });
 });
 
-// Item 1 regression: ViolationsPage fires its mount effect (onRefresh) on
-// EVERY mount, including plain drill-down/back navigation with no mutation
-// -- the page remounts on every round trip through a file/principle detail.
-// A prior revision wired the route's onRefresh to the ACTIVE
-// scheduleDashboardReconcile, turning routine navigation into a forced
-// refetch of the 10-20 MB dashboard payload (the freeze refetchType:'none'
-// exists to avoid). The mount effect must only ever reach onRefresh -- never
-// onReconcile, which is reserved for the Dismissed sub-tab's mutation
-// handlers (see useDismissedFindings.js).
-describe('ViolationsPage — mount-effect onRefresh does not reach onReconcile (Item 1 regression)', () => {
-  it('calls onRefresh on mount but never onReconcile, even though both are supplied', () => {
+// Mounting the page is plain navigation, not a mutation. It must not mark
+// the dashboard stale (a stale dashboard refetches 10-20 MB the moment the
+// Overview remounts its observer) and must never reach onReconcile, which is
+// reserved for the Dismissed sub-tab's mutation handlers.
+describe('ViolationsPage — mounting does not refresh', () => {
+  it('calls neither onRefresh nor onReconcile on mount', () => {
     const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     renderPage(
       baseData({ selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }] }),
       { onRefresh, onReconcile },
     );
-    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onRefresh).not.toHaveBeenCalled();
     expect(onReconcile).not.toHaveBeenCalled();
   });
 });
@@ -105,7 +102,7 @@ describe('ViolationsPage — scenario 9: loader gate, containment, refresh dim',
 
   it('applies the refresh dim class to the empty state during a background refetch', () => {
     const { container } = renderPage(baseData({ loading: false, isFetching: true }));
-    expect(container.querySelector('.violations-page--terminal').className).toContain('dashboard-refreshing');
+    expect(container.querySelector('.violations-page--terminal').className).toContain('section-pending');
   });
 
   it('applies the refresh dim class to real content during a background refetch', () => {
@@ -113,7 +110,7 @@ describe('ViolationsPage — scenario 9: loader gate, containment, refresh dim',
       accumulatedDimensions: [{ dimension: 'security', violations: [], compliance: [] }],
       loading: false, isFetching: true,
     }));
-    expect(container.querySelector('.violations-page--terminal').className).toContain('dashboard-refreshing');
+    expect(container.querySelector('.violations-page--terminal').className).toContain('section-pending');
   });
 });
 
@@ -242,5 +239,27 @@ describe('ViolationsPage — shared read-only chip (Finding 6)', () => {
       accumulatedDimensions: [{ dimension: 'security', violations: [], compliance: [] }],
     }));
     expect(screen.queryByText('remote · read-only')).toBeNull();
+  });
+});
+
+describe('ViolationsPage — by-type sub-tab', () => {
+  it('shows the by-type pill pressed and a row per requirement code', async () => {
+    const dim = { dimension: 'security', fromRunId: 'run-1', fromDateLabel: '26 Sep', principles: [{ name: 'Integrity', grade: 'B', score: '7.5' }],
+      violations: [{ req: 'S-1', principle: 'Integrity', file: 'a.py', line: 1, severity: 'minor' }] };
+    const api = { getRunDiff: async () => ({ dimensions: {} }), getStandard: async () => ({ principles: [] }), listDismissedFindings: async () => [] };
+    const QC = withQueryClient();
+    render(
+      <QC>
+        <ApiProvider value={api}>
+          <ViolationsPage
+            data={baseData({ selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }], accumulatedDimensions: [dim] })}
+            callbacks={{ onTypeClick: vi.fn(), onReconcile: vi.fn(), onRefresh: vi.fn() }}
+            subTab={VIOLATIONS_SUB_TAB.TYPE}
+          />
+        </ApiProvider>
+      </QC>,
+    );
+    expect(screen.getByRole('button', { name: 'by-type' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText('S-1')).toBeInTheDocument();
   });
 });

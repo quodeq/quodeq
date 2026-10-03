@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from quodeq.data.fs.run_status_store import read_status
-from quodeq.data.sqlite.index_sync import _check_stale_and_promote
+from quodeq.data.sqlite.index_sync import check_stale_and_promote
 from quodeq.data.sqlite.run_index import open_index
 
 
@@ -47,7 +47,7 @@ def test_stale_promotion_survives_status_json_missing_state(tmp_path: Path) -> N
         old = time.time() - 60
         os.utime(heartbeat, (old, old))
 
-        promoted = _check_stale_and_promote(
+        promoted = check_stale_and_promote(
             db, run, project_uuid="p", run_id="r-no-state", stale_seconds=30,
         )
         assert promoted is True
@@ -85,7 +85,7 @@ def test_stale_promotion_survives_status_json_empty_state(tmp_path: Path) -> Non
         old = time.time() - 60
         os.utime(heartbeat, (old, old))
 
-        promoted = _check_stale_and_promote(
+        promoted = check_stale_and_promote(
             db, run, project_uuid="p", run_id="r-empty-state", stale_seconds=30,
         )
         assert promoted is True

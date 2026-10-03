@@ -7,9 +7,9 @@ Re-exported from ``cli_evaluation.py`` so existing
 
 The names tests patch at ``quodeq.cli_evaluation.<name>``
 (``resolve_project_uuid``, ``project_name_from_repo``, ``is_repo_url``,
-``emit_marker``, ``cleanup_cloned_repo``, ``_cleanup_worktree``,
-``get_ai_model``, ``_save_manifest``, ``_build_run_config``,
-``_execute_pipeline``) reach this module as a :class:`LifecycleHooks`
+``emit_marker``, ``cleanup_cloned_repo``, ``cleanup_worktree``,
+``get_ai_model``, ``save_manifest``, ``build_run_config``,
+``execute_pipeline``) reach this module as a :class:`LifecycleHooks`
 bundle that ``cli_evaluation`` assembles at call time, so this module never
 imports its own importer.
 """
@@ -33,9 +33,12 @@ from quodeq.analysis.errors import (
 )
 from quodeq.analysis.runner import EvaluationError, RunConfig
 from quodeq.analysis.subprocess import AnalysisError
-from quodeq._cli_env import _resolve_time_limit
+from quodeq.core.run.job_status import external_job_id
+from quodeq.core.types.project_source import ProjectLocation
+from quodeq._cli_env import resolve_time_limit
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.data.fs.project_resolver import ProjectIdentity
+from quodeq.data.git_cli import git_head_sha, git_worktree_dirty
 from quodeq.shared.constants import CC_PHASE_REPORT_PATH
 from quodeq.shared.logging import log_error, log_info
 from quodeq.shared.utils import get_ai_cmd, is_repo_url
@@ -63,19 +66,19 @@ class LifecycleHooks:
 # Run directory setup
 # ---------------------------------------------------------------------------
 
-def _setup_run_dirs(args: argparse.Namespace, src: Path, hooks: LifecycleHooks) -> tuple[Path, Path, Path]:
+def setup_run_dirs(args: argparse.Namespace, src: Path, hooks: LifecycleHooks) -> tuple[Path, Path, Path]:
     """Resolve project UUID and create evidence/evaluation directories."""
     reports_root = Path(args.output)
     reports_root.mkdir(parents=True, exist_ok=True)
 
     project_name = hooks.project_name_from_repo(args.repo)
-    location = "online" if is_repo_url(args.repo) else "local"
+    location = ProjectLocation.ONLINE if is_repo_url(args.repo) else ProjectLocation.LOCAL
     scope = getattr(args, "scope", None)
 
     # Detect the git 'origin' remote so two clones of the same repo in
     # different local paths share a single project identity.
     remote_url = None
-    if location == "local":
+    if location == ProjectLocation.LOCAL:
         from quodeq.data.git_cli import git_remote_url
         remote_url = git_remote_url(str(src))
 
@@ -96,7 +99,7 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path, hooks: LifecycleHooks) 
 # Deadline / provider-fatal exit_reason tagging
 # ---------------------------------------------------------------------------
 
-def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig") -> None:
+def record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig") -> None:
     """Tag the lifecycle with exit_reason='deadline' if the run's
     --max-duration was reached before natural completion.
 
@@ -114,10 +117,10 @@ def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig
         lifecycle.set_exit_reason("deadline")
 
 
-def _record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> None:
+def record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> None:
     """Tag a completed run that a dead provider cut short.
 
-    ``_raise_on_fatal_cancel`` lets the pipeline finish when files were
+    ``raise_on_fatal_cancel`` lets the pipeline finish when files were
     already analysed before the provider died (partial data is worth
     keeping). Without this hook such a run finalizes with
     ``exit_reason=null``, indistinguishable from a clean completion, and
@@ -181,7 +184,7 @@ def _apply_time_budget(args: argparse.Namespace, lifecycle: "RunLifecycleContext
     via env, not the CLI flag. Wires the pool auto-scale extension callback so
     a deadline widened mid-run lands in status.json too.
     """
-    budget_s = _resolve_time_limit(args)
+    budget_s = resolve_time_limit(args)
     if budget_s is not None:
         lifecycle.set_time_limit(budget_s)
     if budget_s is not None and budget_s > 0:
@@ -211,20 +214,24 @@ def _run_lifecycle_body(
     try:
         ai_provider = get_ai_cmd()
         ai_model = hooks.get_ai_model()
-        with RunLifecycleContext(
+        context = RunLifecycleContext(
             run_dir=paths.run_dir,
-            job_id=f"ext-{paths.run_id}",
+            job_id=external_job_id(paths.run_id),
             dimensions=dimensions_list,
             ai_provider=ai_provider,
             ai_model=ai_model,
-        ) as lifecycle:
+        )
+        if not is_repo_url(args.repo):
+            source = str(inputs.src)
+            context.set_commit_sha(git_head_sha(source), dirty=git_worktree_dirty(source))
+        with context as lifecycle:
             try:
                 # "analyzing" gates dashboard per-dimension polling.
                 lifecycle.set_phase("analyzing")
                 _apply_time_budget(args, lifecycle, config)
                 result = hooks.execute_pipeline(args, config, paths.evidence_dir, paths.evaluation_dir)
-                _record_deadline_if_hit(lifecycle, config)
-                _record_provider_fatal_if_cancelled(lifecycle)
+                record_deadline_if_hit(lifecycle, config)
+                record_provider_fatal_if_cancelled(lifecycle)
                 # run_full writes per-dimension reports as it goes, so scoring
                 # is already done by the time it returns.
                 lifecycle.set_phase("scoring")
@@ -265,7 +272,7 @@ def _write_pid_file(run_dir: Path) -> Path:
     return pid_file
 
 
-def _run_pipeline_with_cleanup(
+def run_pipeline_with_cleanup(
     args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path], hooks: LifecycleHooks,
 ) -> int:
     """Set up directories, build config, run the pipeline, and clean up cloned repos."""

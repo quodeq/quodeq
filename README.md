@@ -317,7 +317,7 @@ Quodeq scores each principle on a 0 to 10 scale using four independent constrain
 
 ### Standards
 
-By default, Quodeq evaluates the six ISO 25010 dimensions. It also ships with **Clean Architecture** and **Domain-Driven Design** standards. You can create your own from the dashboard, or ask any AI to generate one as a `.json` file and import it.
+By default, Quodeq evaluates the six ISO 25010 dimensions. It also ships with **Clean Architecture**, **Domain-Driven Design** and **Accessibility** (WCAG 2.2) standards, off until you enable them. You can create your own from the dashboard, or ask any AI to generate one as a `.json` file and import it.
 
 Numeric thresholds on the built-in standards (max function lines, max parameters, ...) can be tuned per project from the dashboard. Overrides live in `.quodeq/standards-overrides.json` at the repo root, so the whole team scans with the same numbers.
 

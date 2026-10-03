@@ -47,12 +47,18 @@ also the spec for a future automated capture script.
   fetch (~2.5s) before taking the screenshot, otherwise it may still
   show the loading/empty state.
 
-## grade-formula.{dark,light}.webp
+## grade-formula.{dark,light}.webp (retired 2026-09-27, recapture pending)
+
+The editor was rebuilt by scoring stage (FORMULA / TYPES / DIMENSIONS tabs)
+and the old shot no longer matches. It was removed from grade-formula.md and
+from the bundle; recapture with the notes below updated to the new layout
+(the FORMULA tab with its four stage rows) and wire it back through IMAGES
+in HelpMarkdown.jsx.
 
 - Route: Projects, select the quodeq self-scan project, then Settings,
   "Grade formula" section, "open editor".
-- Must show: the SEVERITY tab active with its three weight sliders
-  (critical, major, minor), the preview strip populated with real
+- Must show: the FORMULA tab active with its four stage rows (the
+  severity sliders in row 1), the preview strip populated with real
   per-dimension gauges (OVERALL plus one per dimension, each with a
   score and grade label), APPLY and RESET Q² buttons visible.
 - Full page including sidebar (it is an orientation shot).

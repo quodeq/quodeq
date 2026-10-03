@@ -1,4 +1,4 @@
-"""Cluster 30: data/ best-effort handlers log at debug instead of swallowing."""
+"""data/ best-effort handlers log at debug instead of swallowing."""
 from __future__ import annotations
 
 import sqlite3

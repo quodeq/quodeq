@@ -22,12 +22,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from quodeq.core.evidence.model import classify_confidence_level
+from quodeq.core.run.exit_reason import ExitReason
+from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.principle import compute_tallies
 from quodeq.core.scoring.internals import (
     finding_to_scoring_dict,
     principle_score_and_grade,
     score_to_grade_label,
 )
+from quodeq.core.types.scoring import ConfidenceLevel
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
     ScoringParams,
@@ -46,14 +49,14 @@ from quodeq.core.types.finding import Finding
 #
 # 1: implicit pre-stamp state (any DB without the run_meta key).
 # 2: ceiling beats floor in the principle-score clamp.
-GRADE_ALGO_VERSION = 2
+GRADE_ALGO_VERSION = 3  # v3: tally groups findings by req before vt (issue #1274)
 
 
 def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: int) -> dict[str, Any]:
     return {
         "principle_id": principle_id,
         "score": None,
-        "grade": "Insufficient",
+        "grade": Grade.INSUFFICIENT,
         "finding_count": finding_count,
         "dismissed_count": dismissed_count,
     }
@@ -102,7 +105,7 @@ def compute_principle_grade(
         scale_multiplier=scale.scale_multiplier,
         source_file_count=scale.source_file_count,
     )
-    if confidence_level == "low":
+    if confidence_level == ConfidenceLevel.LOW:
         return _insufficient_grade(principle_id, len(findings), dismissed_count)
 
     v_dicts = [finding_to_scoring_dict(v) for v in findings]
@@ -136,7 +139,7 @@ def compute_dimension_score(
     """
     scored = [p for p in principle_grades if p.get("score") is not None]
     if not scored:
-        return {"dimension": dimension, "score": None, "grade": "Insufficient"}
+        return {"dimension": dimension, "score": None, "grade": Grade.INSUFFICIENT}
     avg = round(sum(p["score"] for p in scored) / len(scored), 1)
     return {"dimension": dimension, "score": avg, "grade": score_to_grade_label(avg, params=params)}
 
@@ -156,7 +159,7 @@ def compute_run_score(
     pairs = [
         (d.get("dimension"), d["score"])
         for d in dimension_scores
-        if d.get("score") is not None and d.get("exit_reason") != "failure_streak"
+        if d.get("score") is not None and d.get("exit_reason") != ExitReason.FAILURE_STREAK
     ]
     avg = dimension_weighted_average(pairs, params)
     if avg is None:

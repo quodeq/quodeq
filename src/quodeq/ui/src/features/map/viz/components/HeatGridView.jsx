@@ -1,18 +1,20 @@
 import { useMemo, useState } from 'react';
-import HeatGridCells from '../../../../components/HeatGridCells.jsx';
+import HeatGridCells, { HEAT_GRID_VARIANT, makeColumnSortHandler } from '../../../../components/HeatGridCells.jsx';
+import { COL_NAME, COL_VIOLATIONS, COL_HEALTH, COL_ALIGN_LEFT } from '../../../../components/heatGridColumns.js';
 import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
-import { activateOnKey } from '../../../../utils/a11y.js';
+import { activationHandlers } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
+import { SORT_DIR } from '../../../../vocab/sortDirection.js';
+import { isDrillableFolder } from '../core/fileTree.js';
 
-const COL_NAME = 'name';
+// This module's own severity column ids (the rest of its columns are
+// covered by HeatGridCells.jsx's shared COL_NAME/COL_VIOLATIONS/COL_HEALTH).
 const COL_CRITICAL = 'critical';
 const COL_MAJOR = 'major';
 const COL_MINOR = 'minor';
-const COL_VIOLATIONS = 'violations';
-const COL_HEALTH = 'health';
 
 const COLUMNS = [
-  { id: COL_NAME, label: t('map.colFileFolder'), align: 'left' },
+  { id: COL_NAME, label: t('map.colFileFolder'), align: COL_ALIGN_LEFT },
   { id: COL_CRITICAL, label: 'Critical' },
   { id: COL_MAJOR, label: 'Major' },
   { id: COL_MINOR, label: 'Minor' },
@@ -24,7 +26,7 @@ function sortRows(items, sortCol, sortDir) {
   return [...items].sort((a, b) => {
     let va, vb;
     switch (sortCol) {
-      case COL_NAME: va = a.name || ''; vb = b.name || ''; return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      case COL_NAME: va = a.name || ''; vb = b.name || ''; return sortDir === SORT_DIR.ASC ? va.localeCompare(vb) : vb.localeCompare(va);
       case COL_CRITICAL: va = a.severity.critical; vb = b.severity.critical; break;
       case COL_MAJOR: va = a.severity.major; vb = b.severity.major; break;
       case COL_MINOR: va = a.severity.minor; vb = b.severity.minor; break;
@@ -32,7 +34,7 @@ function sortRows(items, sortCol, sortDir) {
       case COL_HEALTH: va = a.complianceRate; vb = b.complianceRate; break;
       default: return 0;
     }
-    const diff = sortDir === 'asc' ? va - vb : vb - va;
+    const diff = sortDir === SORT_DIR.ASC ? va - vb : vb - va;
     return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
   });
 }
@@ -40,7 +42,7 @@ function sortRows(items, sortCol, sortDir) {
 /** Sort state + the sorted, violation/compliance-filtered rows for one node. */
 function useHeatGridSort(node) {
   const [sortCol, setSortCol] = useState(COL_VIOLATIONS);
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortDir, setSortDir] = useState(SORT_DIR.DESC);
 
   const rows = useMemo(() => {
     const items = node.children.length > 0 ? node.children : [node];
@@ -48,14 +50,7 @@ function useHeatGridSort(node) {
     return sortRows(filtered, sortCol, sortDir);
   }, [node, sortCol, sortDir]);
 
-  const handleSort = (col) => {
-    if (sortCol === col) {
-      setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortCol(col);
-      setSortDir(col === COL_NAME ? 'asc' : 'desc');
-    }
-  };
+  const handleSort = makeColumnSortHandler({ sortCol, setSortCol, setSortDir, ascCol: COL_NAME });
 
   return { rows, sortCol, sortDir, handleSort };
 }
@@ -66,13 +61,12 @@ function HeatGridHeaderRow({ sortCol, sortDir, onSort }) {
       {COLUMNS.map((col) => (
         <th
           key={col.id}
-          className={`heat-grid-th-sort viz-focusable${col.align === 'left' ? ' left' : ''}`}
-          onClick={() => onSort(col.id)}
-          onKeyDown={activateOnKey(() => onSort(col.id))}
+          className={`heat-grid-th-sort viz-focusable${col.align === COL_ALIGN_LEFT ? ' left' : ''}`}
+          {...activationHandlers(() => onSort(col.id))}
           tabIndex={0}
-          aria-sort={sortCol === col.id ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+          aria-sort={sortCol === col.id ? (sortDir === SORT_DIR.ASC ? 'ascending' : 'descending') : 'none'}
         >
-          {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+          {col.label}{sortCol === col.id ? (sortDir === SORT_DIR.ASC ? ' ↑' : ' ↓') : ''}
         </th>
       ))}
     </tr>
@@ -80,7 +74,7 @@ function HeatGridHeaderRow({ sortCol, sortDir, onSort }) {
 }
 
 function HeatGridRow({ row, onDrillDown, onFileClick, onCellClick, variant }) {
-  const canDrill = !row.isFile && row.children?.length > 0;
+  const canDrill = isDrillableFolder(row);
   return (
     <tr>
       <td>
@@ -88,8 +82,7 @@ function HeatGridRow({ row, onDrillDown, onFileClick, onCellClick, variant }) {
           className={`heat-grid-file${canDrill || row.isFile ? ' clickable viz-focusable' : ''}`}
           role={canDrill || row.isFile ? 'button' : undefined}
           tabIndex={canDrill || row.isFile ? 0 : undefined}
-          onClick={() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row)}
-          onKeyDown={activateOnKey(() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
+          {...activationHandlers(() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
           title={row.path}
         >
           {row.isFile ? null : <span className="heat-grid-folder-icon" aria-hidden="true">{ICON_FOLDER}</span>}
@@ -101,14 +94,14 @@ function HeatGridRow({ row, onDrillDown, onFileClick, onCellClick, variant }) {
   );
 }
 
-export default function HeatGridView({ node, onDrillDown, onFileClick, onCellClick, variant = 'heat' }) {
+export default function HeatGridView({ node, onDrillDown, onFileClick, onCellClick, variant = HEAT_GRID_VARIANT.HEAT }) {
   const { rows, sortCol, sortDir, handleSort } = useHeatGridSort(node);
 
   if (rows.length === 0) {
     return <p className="empty-state">{t('map.noData')}</p>;
   }
 
-  const flat = variant === 'flat';
+  const flat = variant === HEAT_GRID_VARIANT.FLAT;
   const wrapCls = `heat-grid-wrap${flat ? ' heat-grid-wrap--flat' : ''}`;
   const tableCls = `heat-grid${flat ? ' heat-grid--flat' : ''}`;
 

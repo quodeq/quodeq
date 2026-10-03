@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
-from quodeq.core.types import JobSnapshot, ViolationSummary
+from quodeq.core.types.sync_phase import SyncPhase
+from quodeq.services.wiring_sync import ProgressUpdate
+from quodeq.core.types import EvalPending, JobSnapshot, ViolationResponse, ViolationSummary
+from quodeq.shared.git_errors import GitFailureKind
 from quodeq.shared.constants import (  # re-export for backward compat
     DEFAULT_MAX_SUBAGENTS,
     DEFAULT_TIME_LIMIT,
@@ -34,6 +39,10 @@ class EvaluationOptions:
     provider_api_base: str = ""
 
 
+ProgressCallback = Callable[[ProgressUpdate], None]
+PhaseCallback = Callable[[SyncPhase], None]
+
+
 @dataclass(frozen=True)
 class NewProjectSpec:
     """Request-boundary-validated inputs for registering a new project.
@@ -49,21 +58,34 @@ class NewProjectSpec:
     scope_path: str | None = None
     clone_dest: str | None = None
     ephemeral: bool = False
+    # Environment for the clone subprocess, from the access ladder; None = ambient git.
+    git_env: dict[str, str] | None = field(default=None, repr=False)
+    # What to clone when it differs from ``repo`` (the ladder's HTTPS form); None = clone ``repo``.
+    clone_url: str | None = None
+    # Live clone progress and the scan phase, for a caller running registration as a job.
+    progress: ProgressCallback | None = field(default=None, repr=False, compare=False)
+    on_phase: PhaseCallback | None = field(default=None, repr=False, compare=False)
+
+
+class CreateProjectStatus(StrEnum):
+    """``CreateProjectResult.status``: drives the route's HTTP translation."""
+
+    CREATED = "created"
+    DUPLICATE = "duplicate"
+    INVALID_REPO = "invalid_repo"
+    CLONE_FAILED = "clone_failed"
 
 
 @dataclass(frozen=True)
 class CreateProjectResult:
-    """Outcome of ``ProjectActions.create_project``.
-
-    ``status`` drives the route's HTTP translation:
-    created | duplicate | invalid_repo | clone_failed | internal_error.
-    """
-    status: str
+    """Outcome of ``ProjectActions.create_project``. See ``CreateProjectStatus``."""
+    status: CreateProjectStatus
     project_id: str | None = None
     scan_data: dict | None = None
     existing_project_id: str | None = None
     message: str = ""
-    clone_error_kind: str | None = None
+    clone_error_kind: GitFailureKind | None = None
+    clone_stderr: str = ""  # git's output for a CLONE_FAILED result; routes show its tail
 
 
 class ProjectActions(Protocol):
@@ -115,11 +137,17 @@ class ReportActions(Protocol):
         """Return the dashboard payload for a specific project run."""
         ...
 
+    def get_dashboard_overview(self, reports_dir: str, project: str, run: str) -> dict:
+        """Return the dashboard payload without dimension bodies."""
+        ...
+
     def get_accumulated(self, reports_dir: str, project: str, as_of: str | None) -> dict:
         """Return accumulated dimension data across all runs up to as_of."""
         ...
 
-    def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str) -> dict:
+    def get_dimension_eval(
+        self, reports_dir: str, project: str, run_id: str, dimension: str,
+    ) -> ViolationResponse | dict | EvalPending | None:
         """Return parsed evaluation data for a single dimension in a run."""
         ...
 
@@ -139,11 +167,21 @@ class EvaluationActions(Protocol):
         """Return current status of an evaluation job."""
         ...
 
+    def in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """Return the in-memory job view of *job_id*, never consulting the run index.
+
+        None for an ``ext-`` id or an id the JobManager does not hold.
+        """
+        ...
+
     def cancel_evaluation(
         self, job_id: str, reports_dir: str | None = None,
-        *, discard_partial: bool = False,
+        *, discard_partial: bool = False, wait_for_exit: bool = False,
     ) -> bool:
         """Cancel a running evaluation job. Return True on success.
+
+        ``wait_for_exit`` returns only once the run's process is gone (and a
+        keep-findings cancel has scored), for a caller about to shut down.
 
         When ``discard_partial`` is True, any in-flight dim's
         ``<dim>_queue.json`` and ``<dim>_fingerprint.json`` are deleted so
@@ -153,6 +191,9 @@ class EvaluationActions(Protocol):
         """
         ...
 
+    # The protocol states the signature FsEvaluationMixin implements; the two
+    # must match token for token, so this stub is a clone by design.
+    # jscpd:ignore-start
     def list_evaluations(
         self,
         *,
@@ -163,6 +204,7 @@ class EvaluationActions(Protocol):
         """Return evaluation jobs. If *states* is given, only jobs whose status
         is in the set are returned (e.g. {"running", "done"} to hide cancelled/failed)."""
         ...
+    # jscpd:ignore-end
 
     def delete_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
         """Delete a finished evaluation's on-disk artifacts and index row.

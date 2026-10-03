@@ -2,7 +2,7 @@
 
 Split from ``scan_progress.py`` (into its own module rather than folded into
 ``_scan_progress_dims.py``) so both that module and the ``scan_progress.py``
-facade can import them without a cycle. ``_ProgressContext`` lives here for
+facade can import them without a cycle. ``ProgressContext`` lives here for
 the same reason: both ``scan_progress.py`` and ``_scan_progress_dims.py``
 build or consume it.
 """
@@ -10,18 +10,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-# A dimension's live progress state, computed by _scan_progress_dims._dim_state
-# and threaded through _dim_files_summary/_dim_counts/_dim_elapsed_s. Distinct
-# from the persisted DimState in core.run.dimensions (dimensions.json's
-# RUNNING/DONE/INCOMPLETE/PENDING machinery): this is the derived display
-# state the live-progress UI reads.
-DimProgressState = Literal["done", "running", "pending"]
+from quodeq.core.run.dimensions import DimState
+from quodeq.services._live_tally_memo import LiveTallyMemo
 
 
 @dataclass(frozen=True)
-class _ProgressContext:
+class ProgressContext:
     """Run-level scalars gathered once per tick, threaded through the
     progress builders instead of re-passed as individual positional args."""
     run_dir: Path
@@ -37,12 +33,16 @@ class _ProgressContext:
     evidence_dir: Path
     evaluators_dir: Path | None
     compiled_dir: Path | None
+    # None resolves to the one process-wide DEFAULT_LIVE_TALLY_MEMO at the
+    # point of use (services/_process_owners.py); tests inject a fresh
+    # LiveTallyMemo() instead for isolation.
+    live_tallies: LiveTallyMemo | None = None
 
 
 @dataclass
-class _DimProgress:
+class DimProgress:
     id: str
-    state: DimProgressState
+    state: DimState
     files: dict
     violations: int = 0
     compliance: int = 0
@@ -59,7 +59,7 @@ class _DimProgress:
 
 
 @dataclass
-class _ScanProgress:
+class ScanProgress:
     job_id: str
     state: str
     phase: str | None
@@ -73,4 +73,4 @@ class _ScanProgress:
     # "failure_streak"). Lets the UI say WHY a failed run stopped instead of
     # only that it did.
     exit_reason: str | None = None
-    dimensions: list[_DimProgress] = field(default_factory=list)
+    dimensions: list[DimProgress] = field(default_factory=list)

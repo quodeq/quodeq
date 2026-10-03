@@ -11,6 +11,8 @@ import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { computeCoverageInfo, buildPartialTooltip } from './dimensionGaugeMath.js';
 import { activateOnKey } from '../../../utils/a11y.js';
+import { SCORE_SCALE_MAX } from '../../../constants.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 /**
  * Findings the scan produced but scoring never saw, because the principle they
@@ -23,7 +25,7 @@ import { activateOnKey } from '../../../utils/a11y.js';
  */
 function UnmappedSegment({ count }) {
   if (!count) return null;
-  const tooltipKey = count === 1 ? 'overview.unmappedTooltipOne' : 'overview.unmappedTooltipMany';
+  const tooltipKey = pluralKey(count, 'overview.unmappedTooltipOne', 'overview.unmappedTooltipMany');
   return (
     <> · <span
       className="dim-gauge-card__unmapped"
@@ -137,7 +139,7 @@ function computeGaugeRing(overallScore) {
   const { value: scoreDisplay } = splitScore(overallScore);
   const scoreNum = parseFloat(overallScore);
   const hasScore = !Number.isNaN(scoreNum);
-  const pct = hasScore ? Math.max(0, Math.min(scoreNum / 10, 1)) : 0;
+  const pct = hasScore ? Math.max(0, Math.min(scoreNum / SCORE_SCALE_MAX, 1)) : 0;
   const label = hasScore ? scoreToGradeLabel(scoreNum) : null;
   return {
     scoreDisplay,
@@ -190,7 +192,7 @@ export default function DimensionGaugeCard({
   // role="button" gives the article children-presentational semantics, and the
   // explicit aria-label above already skips its content -- so the sr-only score
   // summary needs its own id wired up via aria-describedby to reach assistive
-  // tech at all (a11y review, fix round 1). No description when insufficient:
+  // tech at all. No description when insufficient:
   // InsufficientGauge's own caption isn't aria-hidden, so it's already exposed.
   const summaryId = useId();
 

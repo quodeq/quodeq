@@ -17,7 +17,7 @@ from tests.data._shared_repo_helpers import _make_minimal_project, _publish_proj
 
 def test_readable_and_index_sync_on_published_clone(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
-    # build a real published origin using the Phase 1 publish path
+    # build a real published origin using the publish path
     from quodeq.services.shared_publish import publish_project
     origin = tmp_path / "origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
@@ -152,7 +152,7 @@ def test_published_meta_two_authors_each_keeps_own_attribution(tmp_path, monkeyp
 
 
 def test_published_meta_legacy_fallback_correct_per_path_author_with_full_history(tmp_path, monkeypatch):
-    """THE regression test for audit finding C1, verified experimentally:
+    """THE regression test, verified experimentally:
 
     `git clone --depth 1` of a remote already holding multiple commits keeps
     only the tip commit, as a parentless ("grafted") commit. A parentless

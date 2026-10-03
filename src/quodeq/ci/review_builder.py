@@ -7,7 +7,7 @@ verdict rendering). This module stays so existing imports
 """
 from __future__ import annotations
 
-from quodeq.ci.violation_classifier import _normalize_snippet, classify_violations
+from quodeq.ci.violation_classifier import normalize_snippet, classify_violations
 from quodeq.ci.github_render import (
     ReviewOptions,
     build_review_summary,
@@ -16,7 +16,7 @@ from quodeq.ci.github_render import (
 )
 
 __all__ = [
-    "_normalize_snippet",
+    "normalize_snippet",
     "classify_violations",
     "violation_to_comment",
     "ReviewOptions",

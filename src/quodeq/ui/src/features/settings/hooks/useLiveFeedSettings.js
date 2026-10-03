@@ -1,18 +1,15 @@
-import { useState, useCallback, useEffect } from 'react';
-import { readString, writeString } from '../../../adapters/storage.js';
+import { useState, useCallback } from 'react';
+import { readString, writeString, STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
+import { broadcastSettingsChange, useSettingsChangeSync } from './settingsSync.js';
 
 export const NEW_FINDINGS_ONLY_KEY = 'cc-eval-new-findings-only';
 const CHANGE_EVENT = 'live-feed-settings-changed';
-// How the boolean is encoded in localStorage. Read and write must agree, so
-// both go through these rather than spelling the strings out twice.
-const STORED_ON = 'true';
-const STORED_OFF = 'false';
-const STORAGE_EVENT = 'storage';
+const SYNC_EVENTS = [CHANGE_EVENT];
 
 function loadNewOnly(storage) {
   // On by default: only an explicit opt-out ('false') shows findings
   // carried forward from the incremental cache.
-  return readString(NEW_FINDINGS_ONLY_KEY, null, storage) !== STORED_OFF;
+  return readString(NEW_FINDINGS_ONLY_KEY, null, storage) !== STORED_FALSE;
 }
 
 /**
@@ -28,25 +25,13 @@ export default function useLiveFeedSettings({ storage = localStorage } = {}) {
   const [newOnly, setNewOnlyState] = useState(() => loadNewOnly(storage));
 
   const setNewOnly = useCallback((value) => {
-    const ok = writeString(NEW_FINDINGS_ONLY_KEY, value ? STORED_ON : STORED_OFF, storage);
+    const ok = writeString(NEW_FINDINGS_ONLY_KEY, value ? STORED_TRUE : STORED_FALSE, storage);
     if (!ok) console.warn('[useLiveFeedSettings] could not persist new-findings-only setting');
     setNewOnlyState(value);
-    // A 'storage' event does not fire in the tab that wrote the value, so
-    // the Settings page and the evaluation screen need this to stay in
-    // sync within one window.
-    if (typeof window !== 'undefined') window.dispatchEvent(new Event(CHANGE_EVENT));
+    broadcastSettingsChange(CHANGE_EVENT);
   }, [storage]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const onChange = () => setNewOnlyState(loadNewOnly(storage));
-    window.addEventListener(CHANGE_EVENT, onChange);
-    window.addEventListener(STORAGE_EVENT, onChange);
-    return () => {
-      window.removeEventListener(CHANGE_EVENT, onChange);
-      window.removeEventListener(STORAGE_EVENT, onChange);
-    };
-  }, [storage]);
+  useSettingsChangeSync(SYNC_EVENTS, { load: loadNewOnly, setState: setNewOnlyState, storage });
 
   return { newOnly, setNewOnly };
 }

@@ -9,6 +9,11 @@
  */
 import { chooseDialog } from '../../utils/chooseDialog.js';
 import { t } from '../../strings/index.js';
+import { DIALOG_VARIANT } from '../../vocab/dialogVariant.js';
+
+// The dialog's two non-null resolutions: useEvaluation's cancel mutation
+// reads this back to decide whether to discard in-flight findings.
+export const CANCEL_CHOICE = Object.freeze({ PRESERVE: 'preserve', DISCARD: 'discard' });
 
 /**
  * Three-button form: dismiss + two cancel variants. The title carries the
@@ -25,8 +30,8 @@ export function buildCancelEvaluationDialog() {
     message: t('evaluate.cancelBody'),
     cancelLabel: t('evaluate.keepRunning'),
     actions: [
-      { key: 'preserve', label: t('evaluate.keepFindings'), variant: 'default' },
-      { key: 'discard', label: t('evaluate.discardFindings'), variant: 'danger' },
+      { key: CANCEL_CHOICE.PRESERVE, label: t('evaluate.keepFindings'), variant: DIALOG_VARIANT.DEFAULT },
+      { key: CANCEL_CHOICE.DISCARD, label: t('evaluate.discardFindings'), variant: DIALOG_VARIANT.DANGER },
     ],
   };
 }

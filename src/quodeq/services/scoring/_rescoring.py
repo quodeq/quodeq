@@ -2,9 +2,8 @@
 
 Applies the project-wide dismiss/delete rescore to accumulated payloads,
 tracking coverage so a partial rescore is served but never persisted
-(the 2026-07-29 cache-poison incident). Moved out of the package
-``__init__`` in the ScoringReader decomposition; the facade re-exports
-every name, so callers and patch targets are unchanged.
+(the 2026-07-29 cache-poison incident). The package ``__init__`` re-exports
+every name, so callers and patch targets use the package path.
 """
 from __future__ import annotations
 
@@ -28,24 +27,36 @@ from quodeq.shared.validation import validate_path_segment
 _logger = logging.getLogger(__name__)
 
 
-def _rescore_runs_by_dimension(
+def _dim_key(dim: dict) -> str:
+    """A serialized dimension's lookup key: its name, lower-cased ("" when absent)."""
+    return (dim.get("dimension") or "").lower()
+
+
+def _source_run_id(dim: dict) -> str | None:
+    """The run an accumulated dimension was sourced from (``fromRunId``, else ``runId``)."""
+    return dim.get("fromRunId") or dim.get("runId")
+
+
+def rescore_runs_by_dimension(
     dims: list[dict], reports_root: Path, project: str,
     keys: SuppressionKeys, params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, dict]:
     """Rescore each unique run and return a map of dim_key -> rescored dict.
 
     *keys* carries the project's dismissals and deletions; the pattern rules
-    are read from the project here, once per run.
+    are read from the project here, once.
     """
     validate_path_segment(project)
     dim_to_run: dict[str, str] = {}
     for d in dims:
-        key = (d.get("dimension") or "").lower()
-        rid = d.get("fromRunId") or d.get("runId")
+        key = _dim_key(d)
+        rid = _source_run_id(d)
         if key and rid:
             dim_to_run[key] = rid
 
     fetcher = make_run_dimension_fetcher(reports_root, project)
+    # One project-wide rules read for every run below (the file is per project).
+    run_keys = replace(keys, rules=load_suppression_rules(reports_root / project)) if dim_to_run else keys
     rescored_by_dim: dict[str, dict] = {}
     seen_runs: dict[str, dict[str, dict]] = {}
     for dim_key, run_id in dim_to_run.items():
@@ -55,34 +66,25 @@ def _rescore_runs_by_dimension(
             # Grouped per run, so this run's own directory is the evidence
             # basis for every dimension sourced from it.
             result = rescore_dimensions(
-                run_dims,
-                replace(keys, rules=load_suppression_rules(reports_root / project)),
+                run_dims, run_keys,
                 params=params, run_dir=reports_root / project / run_id)
-            seen_runs[run_id] = {
-                (rd.get("dimension") or "").lower(): rd
-                for rd in result.get("dimensions", [])
-            }
+            seen_runs[run_id] = {_dim_key(rd): rd for rd in result.get("dimensions", [])}
         rd = seen_runs[run_id].get(dim_key)
         if rd:
             rescored_by_dim[dim_key] = rd
     return rescored_by_dim
 
 
-def _dims_expecting_rescore(dims: list[dict]) -> set[str]:
+def dims_expecting_rescore(dims: list[dict]) -> set[str]:
     """Dimension keys that carry a source run and therefore expect a rescore."""
-    return {
-        (d.get("dimension") or "").lower()
-        for d in dims
-        if (d.get("dimension") or "") and (d.get("fromRunId") or d.get("runId"))
-    }
+    return {_dim_key(d) for d in dims if _dim_key(d) and _source_run_id(d)}
 
 
-def _merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> list[dict]:
+def merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> list[dict]:
     """Merge rescored data into accumulated dimensions."""
     new_dims = []
     for d in dims:
-        key = (d.get("dimension") or "").lower()
-        rd = rescored_by_dim.get(key)
+        rd = rescored_by_dim.get(_dim_key(d))
         if rd:
             new_dims.append({
                 **d,
@@ -98,7 +100,7 @@ def _merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> 
     return new_dims
 
 
-def _rescore_accumulated_with_coverage(
+def rescore_accumulated_with_coverage(
     accumulated: dict[str, Any],
     reports_root: Path,
     project: str,
@@ -127,17 +129,17 @@ def _rescore_accumulated_with_coverage(
     if not dims:
         return accumulated, True
 
-    rescored_by_dim = (d.rescore_runs_by_dimension or _rescore_runs_by_dimension)(
+    rescored_by_dim = (d.rescore_runs_by_dimension or rescore_runs_by_dimension)(
         dims, reports_root, project, SuppressionKeys(dismissed, deleted), params=params,
     )
-    missing = _dims_expecting_rescore(dims) - set(rescored_by_dim)
+    missing = dims_expecting_rescore(dims) - set(rescored_by_dim)
     if missing:
         _logger.warning(
             "accumulated rescore for %s covered %d of %d dimensions (missing: %s); "
             "serving the partial result without caching it",
             project, len(rescored_by_dim), len(dims), sorted(missing),
         )
-    new_dims = _merge_rescored_dims(dims, rescored_by_dim)
+    new_dims = merge_rescored_dims(dims, rescored_by_dim)
 
     new_summary = (d.recompute_summary or recompute_summary)(
         new_dims, accumulated.get("summary", {}), params=params,
@@ -145,15 +147,15 @@ def _rescore_accumulated_with_coverage(
     return {**accumulated, "dimensions": new_dims, "summary": new_summary}, not missing
 
 
-def _rescore_accumulated_response(
+def rescore_accumulated_response(
     accumulated: dict[str, Any],
     reports_root: Path,
     project: str,
     params: ScoringParams = DEFAULT_PARAMS,
     deps: ScoringDeps | None = None,
 ) -> dict[str, Any]:
-    """`_rescore_accumulated_with_coverage` for callers that don't persist."""
-    payload, _complete = _rescore_accumulated_with_coverage(
+    """`rescore_accumulated_with_coverage` for callers that don't persist."""
+    payload, _complete = rescore_accumulated_with_coverage(
         accumulated, reports_root, project, params=params, deps=deps,
     )
     return payload

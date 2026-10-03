@@ -12,7 +12,7 @@ from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
 from quodeq.data.actions_log import ActionLogWriter
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services.violations import (
-    _ResolveOptions,
+    ResolveOptions,
     _resolve_from_source,
     _suppression_keys,
 )
@@ -59,7 +59,7 @@ def test_resolve_from_source_prefers_json_eval(tmp_path: Path) -> None:
     }))
     (base / "evaluation" / "testdim_eval.md").write_text("# markdown fallback")
 
-    result = _resolve_from_source(base, _ctx(), _ResolveOptions(), _suppression_keys(base))
+    result = _resolve_from_source(base, _ctx(), ResolveOptions(), _suppression_keys(base))
 
     assert isinstance(result, dict)
     assert result["dimension"] == "testdim"
@@ -72,7 +72,7 @@ def test_resolve_from_source_falls_back_to_markdown(tmp_path: Path) -> None:
     markdown = "# Testdim Evaluation\n\n**Overall Score**: 8.0/10\n"
     (base / "evaluation" / "testdim_eval.md").write_text(markdown)
 
-    result = _resolve_from_source(base, _ctx(), _ResolveOptions(), _suppression_keys(base))
+    result = _resolve_from_source(base, _ctx(), ResolveOptions(), _suppression_keys(base))
 
     assert result is not None
     assert result["dimension"] == "testdim"
@@ -89,5 +89,5 @@ def test_resolve_from_source_returns_none_when_nothing_exists(tmp_path: Path) ->
     base.mkdir(parents=True)
 
     assert _resolve_from_source(
-        base, _ctx(), _ResolveOptions(), _suppression_keys(base),
+        base, _ctx(), ResolveOptions(), _suppression_keys(base),
     ) is None

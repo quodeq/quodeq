@@ -4,12 +4,13 @@
  * sidebar/topbar/landing wiring. All exported so they stay unit-testable
  * without mounting the whole App (which needs ~8 providers).
  */
-import { PROJECT_SOURCE } from './constants.js';
+import { PROJECT_SOURCE } from './vocab/projectSource.js';
+import { NAV_TAB } from './vocab/navTab.js';
 
 // Project-data tabs (overview/violations/map/history) — module scope so both
 // the App component's bounce effect and the exported shouldBounceToEvaluate
 // helper below share one definition.
-const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+const PROJECT_DATA_TABS = [NAV_TAB.OVERVIEW, NAV_TAB.VIOLATIONS, NAV_TAB.MAP, NAV_TAB.HISTORY];
 
 /**
  * Whether the "no runs yet" bounce-to-Evaluate effect should fire. Exported
@@ -97,40 +98,56 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
  * screen until the new project's fetch lands. Exported so this contract is
  * unit-testable without mounting the whole App.
  */
+// The badge counts majors (critical + major), the number that only moves when
+// the code moves; the raw violations total lives on the Violations page.
+function majorsOf(summary) {
+  const severity = summary?.severity;
+  if (!severity || typeof severity !== 'object') return null;
+  return (severity.critical || 0) + (severity.major || 0);
+}
+
 export function selectSidebarCounts({ filteredAccumulated, accumulated, filteredTrend, dashboard }) {
   return {
-    violationsCount: filteredAccumulated?.summary?.totalViolations ?? accumulated?.summary?.totalViolations ?? null,
+    violationsCount: majorsOf(filteredAccumulated?.summary) ?? majorsOf(accumulated?.summary) ?? null,
     historyCount: (filteredTrend || []).length || dashboard?.trend?.length || null,
   };
 }
 
+// Compare ranks projects against each other, so it needs at least two.
+const COMPARE_MIN_PROJECTS = 2;
+
 /**
  * Compare needs two analyzed projects to rank anything; below that the tab
- * is redundant and stays hidden. Remote projects from the shared repository
- * count toward the pair: one local project plus published teammates is a
- * comparable fleet. Exported so this contract is unit-testable without
- * mounting the whole App.
+ * is redundant and stays hidden. Every project that can be ranked counts:
+ * local projects with runs and projects published in the connected
+ * evaluations repository, in any mix (two published ones with nothing local
+ * is a comparable fleet). The inputs are live query data, so the tab appears
+ * the moment a connect or a pull brings the count to two. Exported so this
+ * contract is unit-testable without mounting the whole App.
  */
-export function shouldShowCompareTab({ projects, sharedHasContent }) {
+export function shouldShowCompareTab({ projects, sharedHasContent, sharedPublishedCount }) {
   const localWithRuns = (projects || []).filter((p) => (p.runsCount ?? 0) > 0).length;
-  return localWithRuns >= 2 || (localWithRuns >= 1 && !!sharedHasContent);
+  // Callers that only know "there is published content" count it as one project.
+  const published = sharedPublishedCount ?? (sharedHasContent ? 1 : 0);
+  return localWithRuns + published >= COMPARE_MIN_PROJECTS;
 }
 
 /**
- * One-shot initial-landing decision. With zero local projects the default
+ * The landing decision. With zero local projects the default
  * 'overview' landing is a dead-end empty state; when a configured shared
  * repo has published content, land on the repositories tab instead so the
  * remote projects are visible without scanning anything locally. Only the
  * default 'overview' landing redirects: a user who already navigated
  * elsewhere (settings, help) before the signals settled keeps their page,
  * and a restored 'shared' selection is already a working view. The caller
- * latches the decision once inputs settle, so mid-session deletions or
- * disconnects never yank the user. Exported for unit tests.
+ * (useInitialLandingEffect) re-runs it when the project list or the shared
+ * signal changes, never on a tab change, and only while the user is still on
+ * the landing. Exported for unit tests.
  */
 export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCount, selectedSource, sharedSettled, sharedHasContent, activeTab }) {
   if (!projectsLoaded || !sharedSettled) return false;
   if ((projectsCount ?? 0) > 0) return false;
   if (selectedSource === PROJECT_SOURCE.SHARED) return false;
   if (!sharedHasContent) return false;
-  return activeTab === 'overview';
+  return activeTab === NAV_TAB.OVERVIEW;
 }

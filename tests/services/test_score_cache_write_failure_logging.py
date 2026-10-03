@@ -1,8 +1,8 @@
-"""Cluster 16: score-cache write failures must log, not just silently degrade.
+"""score-cache write failures must log, not just silently degrade.
 
-Each of the three write-side except blocks in ``_score_cache_fetch`` (write
-cached_accumulated, write cached_project_summary, write_cached_rows inside
-make_cache_backed_fetcher's fetch closure) must log a warning before falling
+Each write-side except block in ``_score_cache_fetch`` (write
+cached_project_summary, write_cached_rows inside make_cache_backed_fetcher's
+fetch closure) must log a warning before falling
 through to the plain-recompute result. The degrade-to-recompute behavior
 itself must be unchanged: the caller still gets the freshly computed value,
 never an exception.
@@ -13,9 +13,9 @@ tests/tools/test_logging_boundary.py), so these tests pass a fake sink
 instead of using caplog.
 
 The tests above prove the mechanism works when a caller passes ``log=``.
-They do NOT prove any production caller actually does -- final review item B
-(fault-tolerance cycle 1) found that every production caller left ``log`` at
-its silent ``NULL_LOG`` default, so cluster 16's logging never fired outside
+They do NOT prove any production caller actually does -- a review found that
+every production caller left ``log`` at its silent ``NULL_LOG`` default,
+so this logging never fired outside
 tests. ``TestProductionCallerReachesRealSink`` below drives a real production
 caller (``_fs_metadata.py``, which now threads ``log=SHARED_LOG``) with no
 ``log=`` override at all, to prove the wiring -- not just the mechanism --
@@ -24,6 +24,7 @@ reaches a real sink.
 from __future__ import annotations
 
 import sqlite3
+
 
 from quodeq.core.types import DimensionResult
 from quodeq.services import _fs_metadata as _md
@@ -57,17 +58,23 @@ class _FakeLog:
         pass
 
 
-def test_cached_accumulated_logs_on_write_failure(monkeypatch, tmp_path):
+def test_make_cache_backed_fetcher_logs_on_bulk_read_failure(monkeypatch, tmp_path):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
-    monkeypatch.setattr(_score_cache_fetch, "write_cached_accumulated", _boom)
+    monkeypatch.setattr(_score_cache_fetch, "read_all_cached_rows", _boom)
+
+    scalars = [DimensionResult(dimension="security", overall_score="8.0/10", overall_grade="Good")]
+
+    def base_fetcher(_run_id):
+        return scalars
 
     log = _FakeLog()
-    computed = {"score": 7.0}
-    result = _score_cache_fetch.cached_accumulated("proj", "v1", lambda: computed, log=log)
+    fetch = _score_cache_fetch.make_cache_backed_fetcher(
+        "proj", lambda _rid: "v1", base_fetcher, log=log,
+    )
+    out = fetch("r1")
 
-    # Degrade-to-recompute is unchanged: the computed value is still returned.
-    assert result is computed
-    assert any("write_cached_accumulated" in msg for msg in log.warnings)
+    assert [d.overall_score for d in out] == ["8.0/10"]
+    assert any("score-cache bulk read failed" in msg for msg in log.warnings)
 
 
 def test_cached_project_summary_logs_on_write_failure(monkeypatch, tmp_path):
@@ -103,12 +110,11 @@ def test_make_cache_backed_fetcher_logs_on_write_failure(monkeypatch, tmp_path):
 
 
 class TestProductionCallerReachesRealSink:
-    """Final review Important 2: cluster 16's logging was inert because every
+    """This logging was inert because every
     production caller left ``log`` at its ``NULL_LOG`` default. These drive a
     real caller (``_fs_metadata.py``) with NO ``log=`` override, proving the
-    module-level ``SHARED_LOG`` wiring added in item B actually reaches a
-    caller-supplied sink in production, not just when a test hands one in
-    directly."""
+    module-level ``SHARED_LOG`` wiring actually reaches a caller-supplied
+    sink in production, not just when a test hands one in directly."""
 
     def test_compute_on_miss_summary_logs_through_shared_log(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
@@ -120,7 +126,7 @@ class TestProductionCallerReachesRealSink:
         log = _FakeLog()
         # Patch the name _fs_metadata.py resolves at call time, not the
         # log_sink module's copy -- proves the import-and-thread wiring in
-        # that file, exactly what item B changed.
+        # that file reaches a real sink.
         monkeypatch.setattr(_md, "SHARED_LOG", log)
 
         result = _md._compute_on_miss_summary(
@@ -135,3 +141,33 @@ class TestProductionCallerReachesRealSink:
         # sink (not a copy/shim) absent any monkeypatching -- the object
         # identity that makes the test above representative of production.
         assert _md.SHARED_LOG is SHARED_LOG
+
+
+def test_cached_project_summary_goes_through_read_through(monkeypatch):
+    seen: list[tuple[str, str, str]] = []
+
+    def fake_read_through(slot, compute, cacheable, log, enabled):
+        seen.append((slot.table.kind, slot.project, slot.version))
+        return {"via": "read_through"}
+
+    monkeypatch.setattr(_score_cache_fetch, "read_through", fake_read_through)
+    assert _score_cache_fetch.cached_project_summary("proj", "v1", dict) == {"via": "read_through"}
+    assert seen == [("summary", "proj", "v1")]
+
+
+def test_kill_switch_computes_without_touching_the_cache(monkeypatch):
+    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+    monkeypatch.setattr(_score_cache_fetch, "open_score_cache", _boom)
+    computed = {"score": 1.0}
+    assert _score_cache_fetch.cached_project_summary("proj", "v1", lambda: computed) is computed
+
+
+def test_first_read_error_computes_and_skips_the_write(monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    monkeypatch.setattr(_score_cache_fetch, "read_cached_project_summary", _boom)
+    writes: list[str] = []
+    monkeypatch.setattr(_score_cache_fetch, "write_cached_project_summary",
+                        lambda *a, **k: writes.append("write"))
+    computed = {"score": 2.0}
+    assert _score_cache_fetch.cached_project_summary("proj", "v1", lambda: computed) is computed
+    assert writes == []

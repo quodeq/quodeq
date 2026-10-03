@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import sys
 from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.shared.env_resolve import resolve_env
+
+_CI_ACTION_REPORT = "report"  # only ci subcommand today
 
 
 def handle_ci(args: argparse.Namespace, env: Mapping[str, str] | None = None) -> int:
@@ -15,7 +18,7 @@ def handle_ci(args: argparse.Namespace, env: Mapping[str, str] | None = None) ->
     *env* is this subcommand's composition root: the only place GITHUB_TOKEN
     is read, ``None`` meaning the real environment.
     """
-    if args.ci_action == "report":
+    if args.ci_action == _CI_ACTION_REPORT:
         return _handle_report(args, env)
     print("Usage: quodeq ci report [options]", file=sys.stderr)
     return 1
@@ -98,7 +101,7 @@ def _fetch_report_changed_lines(args: argparse.Namespace, token: str) -> dict[st
         return fetch_pr_changed_lines(
             owner=args.owner, repo=args.repo, pr_number=args.pr, token=token,
         )
-    except Exception as exc:
+    except (RuntimeError, OSError, http.client.HTTPException, ValueError) as exc:
         print(
             f"Warning: could not fetch PR diff to scope comments ({exc.__class__.__name__}: {exc}); "
             "posting summary-only review.",

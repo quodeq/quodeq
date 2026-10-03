@@ -8,7 +8,7 @@ model-calling code.
 
 The fixtures under ``fixtures/provenance_gate/`` are a matrix of cases:
 
-  internal_*  — code that run fa56db32 rated `critical` but whose flagged
+  internal_*  — code that a real evaluation run rated `critical` but whose flagged
                 value is provably INTERNAL (a defaulted prop/arg, a content
                 hash). Vendored byte-for-byte from commit a84ab6f8 (before the
                 later code-hardening at c0edcd6f / 521f46c6) so the fixture is
@@ -44,7 +44,7 @@ class GateCase:
 
 
 def discover_cases() -> list[GateCase]:
-    """Glob the fixture matrix. Returns [] if the dir is missing (never raises)."""
+    """Glob the fixture matrix. Returns [] if the dir is missing; a malformed expected.json raises."""
     cases: list[GateCase] = []
     if not FIXTURES_ROOT.is_dir():
         return cases
@@ -71,7 +71,7 @@ def discover_cases() -> list[GateCase]:
 def severity_str(finding: dict) -> str | None:
     """Normalise a finding's severity to a plain string ('critical'/'major'/'minor').
 
-    ``_call_api`` returns ``_Finding.model_dump()`` dicts whose ``severity`` is a
+    ``call_api`` returns ``_Finding.model_dump()`` dicts whose ``severity`` is a
     ``(str, Enum)`` member; ``.value`` yields the bare string. Falls back to the
     value as-is if it is already a string.
     """

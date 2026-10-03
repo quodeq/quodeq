@@ -75,4 +75,37 @@ describe('galaxyViewScene — parseFloat NaN guards', () => {
     updateSceneLiveData(scene, dimsUpdated);
     expect(scene.stars[0].score).toBe(0);
   });
+
+  function principleDim() {
+    return {
+      dimension: 'clean',
+      overallScore: 5,
+      violations: [{ principle: 'P1', severity: 'minor' }],
+      compliance: [],
+      // grade 'A' resolves to a high gradeToScore(). A principle score of 0
+      // is a real score: it must be kept, not treated as missing and
+      // replaced by this grade.
+      principles: [{ name: 'P1', grade: 'A', score: 0 }],
+    };
+  }
+
+  it('buildScene keeps a principle score of 0 as 0, not falling through to the grade', () => {
+    const scene = buildScene([principleDim()], 800, 600, {});
+    expect(scene.principles[0][0].score).toBe(0);
+    expect(scene.principles[0][0].rawScore).toBe(0);
+  });
+
+  it('updateSceneLiveData keeps a live principle score of 0 as 0, not falling through to the grade', () => {
+    // Build with a nonzero initial score so the P1 principle star exists,
+    // then push a live update where it scores 0.
+    const initialDim = {
+      dimension: 'clean', overallScore: 5,
+      violations: [{ principle: 'P1', severity: 'minor' }], compliance: [],
+      principles: [{ name: 'P1', grade: 'B', score: 5 }],
+    };
+    const scene = buildScene([initialDim], 800, 600, {});
+    updateSceneLiveData(scene, [principleDim()]);
+    expect(scene.principles[0][0].score).toBe(0);
+    expect(scene.principles[0][0].rawScore).toBe(0);
+  });
 });

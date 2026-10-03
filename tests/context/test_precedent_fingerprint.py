@@ -61,9 +61,9 @@ def test_locked_db_is_skipped_not_raised(tmp_path: Path) -> None:
 
 
 def test_wrapped_open_db_failure_is_skipped_not_raised(tmp_path: Path) -> None:
-    """Cluster 13 (R-FT-7) — ``open_evaluation_db`` wraps locked/missing-file
-    and generic sqlite3.Error failures in ``RuntimeError`` for a clearer,
-    path-scoped message (see data/sqlite/connection.py). That RuntimeError
+    """``open_evaluation_db`` wraps locked/missing-file and generic
+    sqlite3.Error failures in ``RuntimeError`` for a clearer, path-scoped
+    message (R-FT-7; see data/sqlite/connection.py). That RuntimeError
     must still be caught here, not just the raw sqlite3 types."""
     project_dir = tmp_path / "project"
     _run(project_dir, "r1")
@@ -79,8 +79,8 @@ def test_wrapped_open_db_failure_is_skipped_not_raised(tmp_path: Path) -> None:
 
 
 def test_out_of_scope_error_propagates(tmp_path: Path) -> None:
-    """Cluster 13 (R-FT-7) — the catch was narrowed from bare ``Exception``
-    to ``(RuntimeError, sqlite3.Error, OSError)``. Anything else (e.g. a
+    """The catch was narrowed from bare ``Exception``
+    to ``(RuntimeError, sqlite3.Error, OSError)`` (R-FT-7). Anything else (e.g. a
     programming bug) must now propagate instead of being swallowed."""
     project_dir = tmp_path / "project"
     _run(project_dir, "r1")

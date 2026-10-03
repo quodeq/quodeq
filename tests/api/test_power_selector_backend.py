@@ -187,8 +187,8 @@ class TestRunnerSubagentModelResolution:
     @staticmethod
     def _resolve(opts: AnalysisOptions) -> str | None:
         """Mirror the production resolution path in _subagent_runner."""
-        from quodeq.analysis.subagents.runner import _default_subagent_model
-        return opts.subagent_model or _default_subagent_model()
+        from quodeq.analysis.subagents.runner import default_subagent_model
+        return opts.subagent_model or default_subagent_model()
 
     def test_options_takes_priority(self) -> None:
         opts = AnalysisOptions(subagent_model=_MODEL_OPUS)

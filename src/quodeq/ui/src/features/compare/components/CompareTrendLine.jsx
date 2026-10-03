@@ -5,6 +5,7 @@
  * the grade colour of the LATEST score and a dot marks it.
  */
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
+import { SCORE_SCALE_MAX } from '../../../constants.js';
 
 const HEIGHT = 20;
 const PAD = 2;
@@ -16,7 +17,7 @@ export default function CompareTrendLine({ scores, width = 90 }) {
   // is the one deliberately zoomed view.
   const point = (s, i) => {
     const x = PAD + (i / (scores.length - 1)) * (width - PAD * 2);
-    const y = HEIGHT - PAD - (s / 10) * (HEIGHT - PAD * 2);
+    const y = HEIGHT - PAD - (s / SCORE_SCALE_MAX) * (HEIGHT - PAD * 2);
     return [x, y];
   };
   const pts = scores.map((s, i) => point(s, i).map((v) => v.toFixed(1)).join(',')).join(' ');

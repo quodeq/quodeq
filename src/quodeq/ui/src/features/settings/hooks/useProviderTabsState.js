@@ -1,37 +1,25 @@
-import { useState, useEffect } from 'react';
-import { useApi } from '../../../api/ApiContext.jsx';
+import { useState } from 'react';
 import { ACTIVE_PROVIDER_KEY, notifyProviderSettingsChanged } from '../../../constants.js';
 import { useMigrateLegacySettings } from './useMigrateLegacySettings.js';
-import { t } from '../../../strings/index.js';
-import { sortClientsByProviderOrder } from './providerClientOrder.js';
+import { useAiClientList } from './useAiClientList.js';
 import { readString, writeString } from '../../../adapters/storage.js';
 
 /**
- * ProviderTabs.jsx's client-list fetch, active-tab state and tab-selection
- * handler. Extracted verbatim.
+ * The analysis provider picker's state: the AI-client list, the active tab
+ * (persisted, defaulting to the first installed client once the list
+ * loads) and the tab-selection handler.
  */
 export function useProviderTabsState(providerConfigs) {
-  const { getAiClients } = useApi();
-  const [clients, setClients] = useState([]);
-  const [clientsError, setClientsError] = useState(null);
   const [activeTab, setActiveTab] = useState(() => readString(ACTIVE_PROVIDER_KEY) || '');
+  const { clients, clientsError } = useAiClientList(providerConfigs, (list) => {
+    if (!activeTab && list.length > 0) {
+      const firstInstalled = list.find((c) => c.installed !== false) || list[0];
+      setActiveTab(firstInstalled.id);
+      writeString(ACTIVE_PROVIDER_KEY, firstInstalled.id);
+    }
+  });
 
   useMigrateLegacySettings(clients);
-
-  useEffect(() => {
-    getAiClients().then((data) => {
-      const raw = data.clients || [];
-      // Sort by 'order' field from provider configs (ai_providers.json)
-      const list = sortClientsByProviderOrder(raw, providerConfigs);
-      setClients(list);
-      if (!activeTab && list.length > 0) {
-        const firstInstalled = list.find((c) => c.installed !== false) || list[0];
-        setActiveTab(firstInstalled.id);
-        writeString(ACTIVE_PROVIDER_KEY, firstInstalled.id);
-      }
-      setClientsError(null);
-    }).catch(() => { setClients([]); setClientsError(t('settings.providersLoadFailed')); });
-  }, []);
 
   const selectTab = (id) => {
     setActiveTab(id);

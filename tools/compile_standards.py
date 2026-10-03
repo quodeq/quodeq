@@ -163,6 +163,10 @@ def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
     }
     if dim_description:
         result["description"] = dim_description
+    # Family, edition and that edition's revision, as every built-in carries them.
+    result["type"] = "iso"
+    result["subtype"] = "25010"
+    result["version"] = iso_data.get("version")
     result["sources"] = sources
     result["principles"] = principles
     return result

@@ -133,3 +133,11 @@ def test_get_scores_no_scope_errors(tmp_path):
     out = build_registry(ctx).dispatch("get_scores", {})
     assert out["ok"] is False
     assert "get_context" in out["error"]
+
+
+def test_unknown_dimension_messages_share_one_prefix(acc_ctx):
+    registry = build_registry(acc_ctx)
+    report_error = registry.dispatch("get_report", {"dimension": "nope"})["error"]
+    violations_error = registry.dispatch("get_violations", {"dimension": "nope"})["error"]
+    assert report_error.startswith("no report for dimension: nope. Available: ")
+    assert violations_error == report_error + ". Or try get_overview for accumulated scores."

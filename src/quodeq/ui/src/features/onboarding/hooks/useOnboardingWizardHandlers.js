@@ -1,15 +1,29 @@
 import { clearDraft, markWelcomeSkipped } from './useWizardDraft.js';
-import { STEP_ORDER, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
+import { SETUP_ORDER } from '../wizardSteps.js';
+import { SCAN_SUB_STATE } from '../onboardingVocab.js';
 
 /**
- * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted
- * verbatim.
+ * The wizard's exits and launch: skipping the welcome (to Repositories, and
+ * remembered unless opened from Settings), stepping aside for an archive
+ * import, closing (a scanned project counts as saved), starting the
+ * evaluation with the wizard's scope, branch, provider and time limit, and
+ * the resume-setup walk's step navigation. Each exit clears the draft.
  */
-export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, providerConfigured }) {
+export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToRepositories, fromSettings = false }) {
+  // A welcome opened from Settings offers no skip; even if one fires, a user
+  // who went looking for the welcome has not opted out. Skip lands on Repositories.
   function handleSkipWelcome() {
-    markWelcomeSkipped();
+    if (!fromSettings) markWelcomeSkipped();
+    clearDraft();
+    onGoToRepositories();
+  }
+
+  // The welcome's "or import an exported archive": the import runs its own
+  // native dialog and toasts, so the wizard steps aside first (no skip flag).
+  function handleImport(onImportProject) {
     clearDraft();
     onClose({ saved: false });
+    onImportProject?.();
   }
 
   function handleSavedExit() {
@@ -18,7 +32,7 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, provide
   }
 
   function handleClose() {
-    if (wizard.state.repoScanSubState === 'scanned') {
+    if (wizard.state.repoScanSubState === SCAN_SUB_STATE.SCANNED) {
       handleSavedExit();
     } else {
       clearDraft();
@@ -26,12 +40,14 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, provide
     }
   }
 
-  function handleLaunch(standardIds) {
+  // The analyze screen passes the project and the repo that landed (not the
+  // editable field); the resume walk passes only the standards.
+  function handleLaunch({ projectId = wizard.state.projectId, repo = wizard.state.repo.value, standardIds }) {
     wizard.startLaunch();
     clearDraft();
     onLaunch({
-      projectId: wizard.state.projectId,
-      repo: wizard.state.repo.value,
+      projectId,
+      repo,
       scopePath: wizard.state.repo.scopePath || null,
       branch: wizard.state.repo.branch || null,
       provider: wizard.state.provider,
@@ -40,18 +56,16 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, provide
     });
   }
 
+  // The resume-setup walk (SETUP_ORDER: provider, then standard and launch).
   function nextStep() {
-    const i = STEP_ORDER.indexOf(wizard.state.step);
-    let next = STEP_ORDER[i + 1] || wizard.state.step;
-    // Auto-skip Provider if already configured.
-    if (next === STEP_PROVIDER && providerConfigured) next = STEP_STANDARD_LAUNCH;
-    wizard.goToStep(next);
+    const i = SETUP_ORDER.indexOf(wizard.state.step);
+    wizard.goToStep(SETUP_ORDER[i + 1] || wizard.state.step);
   }
 
   function prevStep() {
-    const i = STEP_ORDER.indexOf(wizard.state.step);
-    if (i > 0) wizard.goToStep(STEP_ORDER[i - 1]);
+    const i = SETUP_ORDER.indexOf(wizard.state.step);
+    if (i > 0) wizard.goToStep(SETUP_ORDER[i - 1]);
   }
 
-  return { handleSkipWelcome, handleSavedExit, handleClose, handleLaunch, nextStep, prevStep };
+  return { handleSkipWelcome, handleImport, handleSavedExit, handleClose, handleLaunch, nextStep, prevStep };
 }

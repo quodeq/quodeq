@@ -11,47 +11,19 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
-import time as _time
-
 from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
+from quodeq.shared.json_state import dump_json_to_fd
 
 
-_QUEUE_VERSION = 1
+QUEUE_VERSION = 1
 
 _LOCK_FILE_MODE = 0o600
-_STALE_LOCK_THRESHOLD_SECS = 60
 
 _log = logging.getLogger(__name__)
 
 
 class FileQueueError(RuntimeError):
     """Raised on queue corruption or I/O failures."""
-
-
-def cleanup_stale_lock(lock_path: Path, threshold: float = _STALE_LOCK_THRESHOLD_SECS) -> bool:
-    """Remove a stale lock file if it exists and is older than *threshold* seconds.
-
-    Returns ``True`` if a stale lock was removed.  This is a defensive measure
-    for environments where ``flock`` may not release properly (e.g. networked
-    file-systems) or where the lock file was left behind by a hard crash.
-    """
-    try:
-        stat = lock_path.stat()
-    except FileNotFoundError:
-        return False
-
-    age = _time.time() - stat.st_mtime
-    if age > threshold:
-        try:
-            lock_path.unlink()
-        except FileNotFoundError as exc:
-            _log.debug("stale lock already removed by another process: %s", exc)
-        _log.debug(
-            "Removed stale lock file %s (age=%.1fs, threshold=%.0fs)",
-            lock_path, age, threshold,
-        )
-        return True
-    return False
 
 
 @contextmanager
@@ -83,9 +55,11 @@ def read_state(path: Path) -> dict:
         state = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise FileQueueError(f"Queue file is corrupted: {exc}") from exc
+    if not isinstance(state, dict):
+        raise FileQueueError("Queue file is not a JSON object")
     version = state.get("version")
-    if version != _QUEUE_VERSION:
-        raise FileQueueError(f"Unsupported queue version: {version} (expected {_QUEUE_VERSION})")
+    if version != QUEUE_VERSION:
+        raise FileQueueError(f"Unsupported queue version: {version} (expected {QUEUE_VERSION})")
     if not isinstance(state.get("pending"), list):
         raise FileQueueError("Queue file missing 'pending' list")
     if not isinstance(state.get("taken"), list):
@@ -104,10 +78,7 @@ def write_state(state: dict, path: Path) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=str(parent), suffix=".tmp", prefix=".queue_")
     cleanup_tmp: str | None = tmp_path
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(state, f)
-            f.flush()
-            os.fsync(f.fileno())
+        dump_json_to_fd(fd, state, fsync=True)
         # os.replace is atomic and overwrites on all platforms;
         # os.rename raises FileExistsError on Windows when the destination exists.
         os.replace(tmp_path, str(path))

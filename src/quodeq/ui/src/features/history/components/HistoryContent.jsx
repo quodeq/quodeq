@@ -1,18 +1,25 @@
 import { Component, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import HistoryChartPanelPlaceholder from './HistoryChartPanelPlaceholder.jsx';
-import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
+import RunNavigator from '../../../components/RunNavigator.jsx';
+import DeferredMount from '../../../components/DeferredMount.jsx';
+import CardListSkeleton from '../../../components/CardListSkeleton.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
+import { computeCountDeltas } from './historyCountDeltas.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { roundOneDecimal } from '../../../utils/rounding.js';
+import { pluralKey } from '../../../utils/plural.js';
+import { NOT_READY_MESSAGE } from '../historyHelpers.js';
 
 // Deferred so the History page's first paint doesn't carry the chart library.
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
-// The lazy-loaded chart panel had no error boundary around its Suspense: a
-// chunk-load failure (offline, deploy skew) or a render throw inside the
-// chart used to crash the whole History page instead of just the chart.
+// Error boundary around the lazy-loaded chart's Suspense: a chunk-load
+// failure (offline, deploy skew) or a render throw inside the chart takes
+// down only the chart, not the whole History page.
 class ChartErrorBoundary extends Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
@@ -24,7 +31,6 @@ class ChartErrorBoundary extends Component {
 }
 
 const TOAST_DISMISS_MS = 2600;
-const NOT_READY_MESSAGE = t('history.notReadyMessage');
 
 // Exported for HistoryContent.deltas.test.jsx.
 export function computeDeltas(rows) {
@@ -39,7 +45,7 @@ export function computeDeltas(rows) {
   for (let i = rows.length - 1; i >= 0; i--) {
     const curr = parseFloat(rows[i].numericAverage);
     if (Number.isNaN(curr)) continue;
-    if (!Number.isNaN(nextScored)) deltas[i] = Math.round((curr - nextScored) * 10) / 10;
+    if (!Number.isNaN(nextScored)) deltas[i] = roundOneDecimal(curr - nextScored);
     nextScored = curr;
   }
   return deltas;
@@ -58,15 +64,15 @@ function NotReadyToast({ message, onDismiss }) {
 }
 
 // Header block: the terminal header + (when there's more than zero runs) the
-// run navigator. Extracted verbatim from HistoryContent's JSX.
+// run navigator.
 function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, runNav, onRunClick }) {
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   return (
     <div className="history-page__top">
       <TermHeader
         name={t('history.termName')}
-        sub={`${trend.length === 1 ? t('history.evalsCountOne', { count: trend.length }) : t('history.evalsCountMany', { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
-        badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
+        sub={`${t(pluralKey(trend.length, 'history.evalsCountOne', 'history.evalsCountMany'), { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
+        badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
       {availableRuns && availableRuns.length > 0 && (
         <div className="history-run-nav">
@@ -89,8 +95,11 @@ function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, r
 
 // The visible (non-hidden) rows plus their run-over-run deltas. Rows whose
 // run is in a hidden status (queued, cancelled) never reach the table.
-function useHistoryVisibleRows({ availableRuns, trend }) {
-  const historyRows = useMemo(() => assembleHistoryRows(availableRuns, trend), [availableRuns, trend]);
+function useHistoryVisibleRows({ availableRuns, trend, partialRuns }) {
+  const historyRows = useMemo(
+    () => assembleHistoryRows(availableRuns, trend, partialRuns),
+    [availableRuns, trend, partialRuns],
+  );
   const statusByRunId = useMemo(() => {
     const map = new Map();
     (availableRuns || []).forEach((r) => { if (r.runId) map.set(r.runId, r.status); });
@@ -103,14 +112,15 @@ function useHistoryVisibleRows({ availableRuns, trend }) {
     return historyRows.filter((entry) => !HIDDEN_STATUSES.has(statusByRunId.get(entry.runId)));
   }, [historyRows, statusByRunId]);
   const deltas = useMemo(() => computeDeltas(visible), [visible]);
-  return { statusByRunId, visible, deltas };
+  const countDeltas = useMemo(() => computeCountDeltas(visible), [visible]);
+  return { statusByRunId, visible, deltas, countDeltas };
 }
 
 /**
  * The History page's main (non-empty) content: chart, run navigator and the
  * evaluations table.
  * @param {object} props
- * @param {{trend: Array, selectedRunId: string, availableRuns: Array}} props.data
+ * @param {{trend: Array, partialRuns: Array, selectedRunId: string, availableRuns: Array}} props.data
  * @param {object} props.callbacks - row click/hover, run change and delete handlers.
  * @param {object} props.runNav - the run navigator's prev/next/latest state.
  * @param {string} props.languageSub - the header's language subtitle.
@@ -118,8 +128,8 @@ function useHistoryVisibleRows({ availableRuns, trend }) {
  * @param {boolean} props.isRefreshing - dims the page while a refetch is in flight.
  */
 export function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource, isRefreshing }) {
-  const { trend, selectedRunId, availableRuns } = data;
-  const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun } = callbacks;
+  const { trend, partialRuns, selectedRunId, availableRuns } = data;
+  const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun, deletingRunIds } = callbacks;
   // Toast state for clicks on running runs that have no scored dimensions yet.
   // toastKey forces remount so consecutive clicks restart the auto-dismiss timer.
   const [toastKey, setToastKey] = useState(0);
@@ -128,10 +138,10 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
     setToastVisible(true);
     setToastKey((k) => k + 1);
   };
-  const { statusByRunId, visible, deltas } = useHistoryVisibleRows({ availableRuns, trend });
+  const { statusByRunId, visible, deltas, countDeltas } = useHistoryVisibleRows({ availableRuns, trend, partialRuns });
 
   return (
-    <div className={`history-page history-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
+    <div className={`history-page history-page--terminal${isRefreshing ? ' section-pending' : ''}`}>
       <HistoryTopHeader
         trend={trend} languageSub={languageSub} selectedSource={selectedSource}
         availableRuns={availableRuns} runNav={runNav} onRunClick={onRunClick}
@@ -143,17 +153,23 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
         </Suspense>
       </ChartErrorBoundary>
 
-      <EvaluationsTable
-        visible={visible}
-        selectedRunId={selectedRunId}
-        deltas={deltas}
-        statusByRunId={statusByRunId}
-        onRunClick={onRunClick}
-        onRunHover={onRunHover}
-        onRunHoverEnd={onRunHoverEnd}
-        onDeleteRun={onDeleteRun}
-        onNotReadyClick={handleNotReadyClick}
-      />
+      {/* Header and chart slot paint on the click; the run table (one row
+          per run, with deltas) follows in the next commit. */}
+      <DeferredMount fallback={<CardListSkeleton />}>
+        <EvaluationsTable
+          visible={visible}
+          selectedRunId={selectedRunId}
+          deltas={deltas}
+          countDeltas={countDeltas}
+          statusByRunId={statusByRunId}
+          onRunClick={onRunClick}
+          onRunHover={onRunHover}
+          onRunHoverEnd={onRunHoverEnd}
+          onDeleteRun={onDeleteRun}
+          deletingRunIds={deletingRunIds}
+          onNotReadyClick={handleNotReadyClick}
+        />
+      </DeferredMount>
 
       {toastVisible && (
         <NotReadyToast

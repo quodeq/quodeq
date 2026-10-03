@@ -20,16 +20,16 @@ exports[`galaxyViewLayout value characterization > applyRepulsionAndRecenter enf
 exports[`galaxyViewLayout value characterization > computeClusterPositions seeds distances inside the recorded range > cluster-positions 1`] = `
 [
   [
-    0.193558,
-    -0.327177,
+    -0.249817,
+    -0.444574,
   ],
   [
-    -0.455289,
-    -0.108737,
+    -0.129722,
+    0.403656,
   ],
   [
-    0.261731,
-    0.435914,
+    0.379539,
+    0.040919,
   ],
 ]
 `;
@@ -132,8 +132,8 @@ exports[`galaxyViewScene value characterization > buildScene falls back to the c
 exports[`galaxyViewScene value characterization > buildScene places constellation stars at the recorded spread and offsets > constellation-geometry 1`] = `
 [
   {
-    "cx": -253.652384,
-    "cy": 59.738844,
+    "cx": 110.379441,
+    "cy": 50.425702,
     "lines": [
       {
         "a": 0,
@@ -141,11 +141,11 @@ exports[`galaxyViewScene value characterization > buildScene places constellatio
       },
     ],
     "spread": 204,
-    "type": "builtin",
+    "type": "iso",
   },
   {
-    "cx": 253.652384,
-    "cy": -59.738844,
+    "cx": -110.379441,
+    "cy": -50.425702,
     "lines": [],
     "spread": 192,
     "type": "community",
@@ -153,15 +153,15 @@ exports[`galaxyViewScene value characterization > buildScene places constellatio
 ]
 `;
 
-exports[`galaxyViewScene value characterization > buildScene places constellation stars at the recorded spread and offsets > constellation-max-extent 1`] = `497.652384`;
+exports[`galaxyViewScene value characterization > buildScene places constellation stars at the recorded spread and offsets > constellation-max-extent 1`] = `354.379441`;
 
 exports[`galaxyViewScene value characterization > buildScene places constellation stars at the recorded spread and offsets > constellation-star-geometry 1`] = `
 [
   {
-    "_clusterCx": -253.652384,
-    "_clusterCy": 59.738844,
-    "_ox": 53.456808,
-    "_oy": -63.842464,
+    "_clusterCx": 110.379441,
+    "_clusterCy": 50.425702,
+    "_ox": -105.516851,
+    "_oy": -49.943961,
     "ba": 0,
     "j": 0,
     "name": "clean",
@@ -170,10 +170,10 @@ exports[`galaxyViewScene value characterization > buildScene places constellatio
     "score": 7.5,
   },
   {
-    "_clusterCx": -253.652384,
-    "_clusterCy": 59.738844,
-    "_ox": -53.456808,
-    "_oy": 63.842464,
+    "_clusterCx": 110.379441,
+    "_clusterCy": 50.425702,
+    "_ox": 105.516851,
+    "_oy": 49.943961,
     "ba": 0,
     "j": 0,
     "name": "solid",
@@ -182,8 +182,8 @@ exports[`galaxyViewScene value characterization > buildScene places constellatio
     "score": 7.5,
   },
   {
-    "_clusterCx": 253.652384,
-    "_clusterCy": -59.738844,
+    "_clusterCx": -110.379441,
+    "_clusterCy": -50.425702,
     "_ox": 0,
     "_oy": 0,
     "ba": 0,

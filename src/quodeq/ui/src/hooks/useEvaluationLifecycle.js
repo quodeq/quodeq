@@ -5,6 +5,8 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
 import { safeGetItem, readAnalysisPower, writeAnalysisPower, resolveSubagentModel } from './evaluationLifecycleHelpers.js';
 import { useJobCompletionEffect } from './useJobCompletionEffect.js';
 import { t } from '../strings/index.js';
+import { JOB_STATUS } from '../vocab/jobStatus.js';
+import { EVAL_DISMISS_ACTION } from '../features/evaluation/evaluationVocab.js';
 
 /**
  * Manages the full evaluation lifecycle: start, poll, dismiss, cancel.
@@ -24,7 +26,7 @@ function makeStartEvaluationHandler({ job, setBlockedStartError, storage, analys
     // otherwise overwrite the live job state and confuse the lifecycle.
     // Returns false so callers can keep one-shot UI state (the clean-scan
     // "once" toggle) instead of consuming it for a start that never ran.
-    if (job && job.status === 'running') {
+    if (job && job.status === JOB_STATUS.RUNNING) {
       setBlockedStartError(
         t('evaluate.alreadyRunning'),
       );
@@ -38,14 +40,14 @@ function makeStartEvaluationHandler({ job, setBlockedStartError, storage, analys
     // already surfaces failures via jobError. Callers get the original
     // promise so they can react to success/failure themselves.
     const started = startEvaluation({ ...payload, subagentModel });
-    Promise.resolve(started).catch(() => {});
+    Promise.resolve(started).catch((err) => console.debug('[useEvaluationLifecycle] start failed, surfaced via jobError:', err));
     return started;
   };
 }
 
 function makeEvalDismissHandler({ job, startedProject, selectedProject, selectProjectAndRun, navReset, setBlockedStartError, clearJob }) {
   return function handleEvalDismiss(action) {
-    if (action === 'view') {
+    if (action === EVAL_DISMISS_ACTION.VIEW) {
       // The completion effect deliberately leaves the selection alone when
       // the user browsed to another project mid-run; this button is the
       // explicit jump to the evaluated project's results. Prefer the job's
@@ -75,7 +77,7 @@ function makeEvalDismissHandler({ job, startedProject, selectedProject, selectPr
 export function useEvaluationLifecycle({ navigation, projects, selectedProject = null, storage: _storage }) {
   const storage = _storage || localStorage;
   const { navTab, navReset } = navigation;
-  const { loadProjects, setProjects, selectProjectAndRun } = projects;
+  const { selectProjectAndRun } = projects;
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation, startedProject } = useEvaluation();
   const queryClient = useQueryClient();
   // Set when a start request is refused because another evaluation is
@@ -90,7 +92,7 @@ export function useEvaluationLifecycle({ navigation, projects, selectedProject =
     writeAnalysisPower(storage, level);
   }
 
-  useJobCompletionEffect({ job, navTab, loadProjects, setProjects, queryClient, selectedProject, selectProjectAndRun });
+  useJobCompletionEffect({ job, navTab, queryClient, selectedProject, selectProjectAndRun });
 
   const handleStartEvaluation = makeStartEvaluationHandler({ job, setBlockedStartError, storage, analysisPower, startEvaluation });
   const handleEvalDismiss = makeEvalDismissHandler({ job, startedProject, selectedProject, selectProjectAndRun, navReset, setBlockedStartError, clearJob });

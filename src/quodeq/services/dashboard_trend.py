@@ -1,47 +1,26 @@
 """Accumulated-trend builder for the dashboard module."""
 from __future__ import annotations
 
-from typing import Callable, TypedDict
+from typing import Callable
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import ScoringParams
+from quodeq.core.scoring.report_grades import most_frequent_grade, parse_numeric_score
 from quodeq.core.types import DimensionResult
-from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
+from quodeq.core.types.severity import Severity
+from quodeq.core.types.trend import DimensionDetail, RunInfoPayload, TrendEntry
 from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services.accumulated import numeric_average
 
 
-class DimensionDetail(TypedDict):
-    """One dimension's score/grade/delta within a single run's trend entry.
-
-    Shape only -- this IS the frozen HTTP body (``trend[].dimensionDetails``);
-    the TypedDict documents it without changing what gets built or returned.
-    """
-    dimension: str
-    score: float | None
-    grade: str | None
-    delta: float | None
-
-
-class TrendEntry(TypedDict):
-    """One run's accumulated-trend row, in the shape the dashboard HTTP
-    response and the UI's history chart consume.
-
-    Shape only -- this IS the frozen HTTP body (``trend``); the TypedDict
-    documents it without changing what gets built or returned.
-    """
-    runId: str
-    dateISO: str | None
-    dateLabel: str
-    status: str
-    dimensionsCount: int
-    dimensions: list[str]
-    dimensionDetails: list[DimensionDetail]
-    accumulatedDimensionsCount: int
-    runNumericAverage: float | None
-    runOverallGrade: str | None
-    numericAverage: float | None
-    overallGrade: str | None
+def run_info_payload(info: RunInfo) -> RunInfoPayload:
+    """*info*'s ``runId``, ``dateISO`` and ``dateLabel`` wire keys."""
+    return {
+        "runId": info.run_id,
+        "dateISO": info.date_iso,
+        "dateLabel": info.date_label,
+    }
 
 
 def _build_dimension_details(
@@ -62,8 +41,39 @@ def _build_dimension_details(
             "score": score,
             "grade": dim.overall_grade,
             "delta": delta,
+            **dimension_counts(dim),
         })
     return details
+
+
+_BLOCKING = frozenset({Severity.CRITICAL, Severity.MAJOR})
+_COUNT_KEYS = ("violations", "majors", "openTypes", "critical")
+
+
+def dimension_counts(dim: DimensionResult) -> dict[str, int]:
+    """The counts a user can watch converge: active violations, criticals,
+    majors (critical + major) and open requirement types (distinct ``req``).
+
+    Scalar reads drop the findings but carry ``totals`` and ``open_types``;
+    a full read has the findings and may lack both. Either source works."""
+    active = list(dim.violations or [])
+    totals = dim.totals
+    if totals is not None:
+        violations = totals.violation_count
+        critical = totals.severity.critical
+        majors = critical + totals.severity.major
+    else:
+        violations = len(active)
+        critical = sum(1 for f in active if f.severity == Severity.CRITICAL)
+        majors = sum(1 for f in active if f.severity in _BLOCKING)
+    open_types = dim.open_types if dim.open_types is not None else len({f.req for f in active if f.req})
+    return {"violations": violations, "majors": majors, "openTypes": open_types, "critical": critical}
+
+
+def _run_counts(details: list[DimensionDetail]) -> dict[str, int]:
+    """Sums over the run's dimensions; open types are summed per dimension,
+    since a requirement code belongs to one dimension."""
+    return {key: sum(int(d.get(key) or 0) for d in details) for key in _COUNT_KEYS}
 
 
 def _build_trend_entry(
@@ -88,13 +98,12 @@ def _build_trend_entry(
         if dim.dimension:
             prev_by_dim[dim.dimension] = dim
     return {
-        "runId": item.run_id,
-        "dateISO": item.date_iso,
-        "dateLabel": item.date_label,
-        # Surface the run's lifecycle state so the History row can
-        # render "running" instead of a misleading completion time
-        # while the evaluation is still in progress (some dims have
-        # scored, others haven't).
+        **run_info_payload(item),
+        # Surface the run's RunState so the History row can render
+        # "running" instead of a misleading completion time while the
+        # evaluation is still RunState.RUNNING (some dims have scored,
+        # others haven't). Serializes as its wire value (e.g. "running"),
+        # see quodeq.core.run.state.RunState.
         "status": item.status,
         "dimensionsCount": len(run_dim_names),
         "dimensions": run_dim_names,
@@ -110,6 +119,7 @@ def _build_trend_entry(
             score_to_grade_label(acc_avg, params=params) if acc_avg is not None
             else (most_frequent_grade(acc_grades) if acc_grades else None)
         ),
+        **_run_counts(dim_details),
     }
 
 
@@ -139,3 +149,30 @@ def build_accumulated_trend(
         trend.append(_build_trend_entry(item, run_dims, acc_by_dim, prev_by_dim, params))
     trend.reverse()
     return trend
+
+
+def build_partial_run_entries(
+    runs: list[RunInfo],
+    get_run_dimensions: Callable[[str], list[DimensionResult]],
+    params: ScoringParams | None = None,
+) -> list[TrendEntry]:
+    """Own-score rows for the cancelled runs in *runs* that scored a dimension.
+
+    Kept apart from the trend on purpose: a cancelled run is not a history
+    point, so its accumulated fields and deltas are None and nothing that
+    reads ``trend`` sees it. It is still an evaluation the user kept, and
+    this is what lets History list it with its own grade. Same order as
+    *runs*; cancelled runs with nothing scored are left out.
+    """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
+    entries: list[TrendEntry] = []
+    for item in runs:
+        if item.status is not RunState.CANCELLED:
+            continue
+        run_dims = get_run_dimensions(item.run_id)
+        if not run_dims:
+            continue
+        entries.append(_build_trend_entry(item, run_dims, {}, {}, params))
+    return entries

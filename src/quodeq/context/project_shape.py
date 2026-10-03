@@ -11,21 +11,22 @@ web service" assumptions on what is in fact a desktop / CLI / library.
 
 Every manifest here is *analyzed*, untrusted input from the repository under
 evaluation, and detection is advisory with a well-defined UNKNOWN fallback.
-So nothing in this module may raise: a manifest that cannot be read or whose
-shape is nonsense degrades that one signal and leaves the rest intact. That
-has to hold against every failure mode, not the well-behaved ones -- deeply
-nested JSON or TOML overflows the parser's call stack and raises
-``RecursionError``, a ``RuntimeError`` subclass, and a scalar where a list
-belongs raises ``TypeError`` with every parser succeeding. ``detect_shape``
-has four callers that guard nothing (``_api_runner``, ``api_prompt_assembly``,
-``mcp/findings_server``, and the ``context`` re-export), so an escape here
-fails the whole run.
+A manifest that cannot be read or whose shape is nonsense degrades that one
+signal and leaves the rest intact: a per-manifest read failure (``OSError``,
+a decode error) is absorbed in ``_project_shape_io.py``, deeply nested JSON
+or TOML overflows the parser's call stack and is absorbed there too
+(``RecursionError``), and a scalar where a list belongs raises ``TypeError``
+with every parser succeeding, caught by ``detect_shape``'s own narrowed
+``except (OSError, TypeError)``. ``detect_shape``'s four callers
+(``_api_runner``, ``api_prompt_assembly``,
+``mcp/findings_server``, and the ``context`` re-export) do not add their own
+guard, so those are the failure modes this module absorbs; anything else
+propagates to the caller's own fault-isolation boundary.
 
-``Deployment`` / ``ProjectShape`` live in ``_project_shape_types.py``;
-manifest-reading helpers live in ``_project_shape_io.py``; per-ecosystem
-signal detectors live in ``_project_shape_signals.py`` -- all split out to
-keep this module under the size ratchet's 300-line cap and re-exported (or,
-for the private signal functions, imported and called) from here.
+``Deployment`` / ``ProjectShape`` live in ``_project_shape_types.py`` and are
+re-exported from here; manifest-reading helpers live in
+``_project_shape_io.py``; per-ecosystem signal detectors live in
+``_project_shape_signals.py`` and are imported and called from here.
 """
 from __future__ import annotations
 
@@ -34,7 +35,7 @@ from pathlib import Path
 
 from quodeq.context._project_shape_types import Deployment, ProjectShape  # re-export
 from quodeq.context._project_shape_signals import (
-    _detect_runtime_langs, _go_signals, _node_signals, _python_signals, _rust_signals,
+    detect_runtime_langs, go_signals, node_signals, python_signals, rust_signals,
 )
 
 _logger = logging.getLogger(__name__)
@@ -52,11 +53,11 @@ def detect_shape(repo_path: Path) -> ProjectShape:
         return ProjectShape()
 
     try:
-        py_dep, py_web, _ = _python_signals(repo)
-        js_dep, js_web, _, ui_lang = _node_signals(repo)
-        rust_dep = _rust_signals(repo)
-        go_dep = _go_signals(repo)
-    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
+        py_dep, py_web, _ = python_signals(repo)
+        js_dep, js_web, _, ui_lang = node_signals(repo)
+        rust_dep = rust_signals(repo)
+        go_dep = go_signals(repo)
+    except (OSError, TypeError) as exc:
         _logger.warning(
             "Manifest signal detection failed for %s, degrading to UNKNOWN: %s", repo, exc,
         )
@@ -83,7 +84,7 @@ def detect_shape(repo_path: Path) -> ProjectShape:
                 deployment = candidate
 
     web_frameworks = sorted({*py_web, *js_web})
-    runtime_langs = _detect_runtime_langs(repo)
+    runtime_langs = detect_runtime_langs(repo)
     is_single_user = deployment is not Deployment.WEB_SERVICE
 
     return ProjectShape(

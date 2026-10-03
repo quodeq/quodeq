@@ -4,6 +4,7 @@ import { clampSidePaneWidth } from './paneWidthMath.js';
 import { readString, removeKey, writeString } from '../../adapters/storage.js';
 import { t } from '../../strings/index.js';
 import { useRegisteredSpecs } from './hooks/useRegisteredSpecs.js';
+import { KEY } from '../../vocab/keyboard.js';
 
 const STORAGE_KEY = 'quodeq.sidePaneWidth';
 const LEGACY_STORAGE_KEY = 'quodeq.reportPaneWidth';
@@ -176,7 +177,7 @@ function useEscapeClosesAll(isOpen, setWindows) {
   useEffect(() => {
     if (!isOpen) return undefined;
     function onKey(e) {
-      if (e.key === 'Escape') {
+      if (e.key === KEY.ESCAPE) {
         e.stopPropagation();
         setWindows([]);
       }

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations, formatPer100Files } from './dimensionCardModel.js';
+import { toggleInList, computePrincipleOptions, filterViolations, formatPer100Files } from './dimensionCardModel.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 
-test('SEVERITY_OPTIONS: the fixed severity vocabulary', () => {
-  assert.deepEqual(SEVERITY_OPTIONS, ['critical', 'major', 'minor', 'unknown']);
+test('KNOWN_SEVERITIES: the fixed severity vocabulary DimensionCard filters against', () => {
+  assert.deepEqual(KNOWN_SEVERITIES, ['critical', 'major', 'minor', 'unknown']);
 });
 
 // ---------------------------------------------------------------------------

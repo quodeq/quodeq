@@ -5,10 +5,11 @@ from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from quodeq.data.git_cli import stream_log_names
+from quodeq.data.git_cli import DEFAULT_GIT_LOOKBACK_MONTHS, stream_log_names
 
 _GIT_LOG_TIMEOUT_S = 10
 _GIT_HASH_LENGTH = 40
+_HEX_DIGITS = "0123456789abcdef"
 _GIT_DATE_PREFIX_LEN = 10  # YYYY-MM-DD
 _DEFAULT_CHURN_DIVISOR = 4
 _DEFAULT_CHURN_MAX = 5
@@ -33,7 +34,7 @@ def _has_git(src: Path) -> bool:
     return False
 
 
-def _iter_git_log(src: Path, months: int = 3):
+def _iter_git_log(src: Path, months: int = DEFAULT_GIT_LOOKBACK_MONTHS):
     """Yield git log lines one at a time (streaming, no full materialization).
 
     Process execution lives in ``data/git_cli.stream_log_names``; this
@@ -65,7 +66,7 @@ def _accumulate_churn(
         if not line:
             continue
         # 40-char hex = commit hash, skip
-        if len(line) == _GIT_HASH_LENGTH and all(c in "0123456789abcdef" for c in line):
+        if len(line) == _GIT_HASH_LENGTH and all(c in _HEX_DIGITS for c in line):
             continue
         # Date lines: "YYYY-MM-DD HH:MM:SS +ZZZZ"
         if _is_date_line(line):
@@ -114,7 +115,7 @@ def compute_git_scores(
     cfg = config or {}
     file_set = set(files)
     accumulated = _accumulate_churn(
-        file_set, src, cfg.get("git_lookback_months", 3), log_source,
+        file_set, src, cfg.get("git_lookback_months", DEFAULT_GIT_LOOKBACK_MONTHS), log_source,
     )
     if accumulated is None:
         return {}

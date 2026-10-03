@@ -15,7 +15,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     import quodeq
     from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import (
-        _hash_prompts_combined,
+        hash_prompts_combined,
         build_cache_key_for_file,
     )
     from quodeq.analysis.cache.local import LocalFileBackend
@@ -45,7 +45,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     prov = entry.provenance
     assert prov["model_id"] == "sonnet"
     assert prov["standards_hash"] == ""  # standards_dir=None
-    assert prov["prompts_hash"] == _hash_prompts_combined(default_paths().prompts_dir)
+    assert prov["prompts_hash"] == hash_prompts_combined(default_paths().prompts_dir)
     assert prov["quodeq_version"] == (quodeq.__version__ or "")
 
 

@@ -19,11 +19,10 @@ from quodeq.config.paths import default_paths
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import (
     EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
-from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
-from quodeq.services.wiring import evidence_file_size
+from quodeq.services.wiring import evidence_file_size, load_compiled_refs, read_req_to_principle_map
 from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
@@ -97,7 +96,7 @@ def _recompute_metrics(evidence, source_file_count: int) -> None:
 
 def _parse_evidence_jsonl(jsonl: Path, run_dir: Path, dim_id: str, request: EvidenceScoreRequest):
     """Parse the evidence jsonl into an Evidence object, or None on any
-    parse failure (logged at debug)."""
+    parse failure (logged at warning)."""
     compiled_dir, evaluators_dir = (request.standard_dirs_fn or standard_dirs)()
     try:
         return parse_jsonl_to_evidence(jsonl, EvidenceContext(
@@ -105,13 +104,13 @@ def _parse_evidence_jsonl(jsonl: Path, run_dir: Path, dim_id: str, request: Evid
             source_file_count=request.source_file_count, files_read=request.files_read,
         ), EvidenceParseOptions(
             compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
-            req_map_reader=read_req_to_principle_map,
-            refs_reader=load_compiled_refs,
+            req_map_reader=request.req_map_reader or read_req_to_principle_map,
+            refs_reader=request.refs_reader or load_compiled_refs,
             cwe_url_template=cwe_url_template(),
             on_quarantine=log_quarantined_findings,
             on_malformed_line=log_malformed_jsonl_line))
     except (OSError, ValueError, KeyError) as exc:
-        _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
+        _logger.warning("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return None
 
 
@@ -122,6 +121,11 @@ class EvidenceScoreRequest:
     *standard_dirs_fn* resolves ``(compiled_dir, evaluators_dir)``; None keeps
     the module-level :func:`standard_dirs` (global config resolution) so
     existing callers stay valid while tests can substitute fixed dirs.
+
+    *req_map_reader* and *refs_reader* are the same seams
+    ``EvidenceParseOptions`` exposes; None keeps the wiring default
+    (``read_req_to_principle_map`` / ``load_compiled_refs``) so existing
+    callers stay valid while tests can substitute fakes.
     """
 
     dismissed: set[tuple]
@@ -130,6 +134,8 @@ class EvidenceScoreRequest:
     files_read: int
     params: ScoringParams
     standard_dirs_fn: Callable[[], tuple[Path | None, Path | None]] | None = None
+    req_map_reader: Callable | None = None
+    refs_reader: Callable | None = None
 
 
 @dataclass(frozen=True)
@@ -187,7 +193,7 @@ def rescore_dimension_from_evidence(
     # to the stored score" — one bad dimension must not fail the whole run.
     try:
         result = score_evidence(evidence, mode="numerical", params=request.params)
-    except Exception as exc:  # noqa: BLE001
+    except (ValueError, KeyError, TypeError, ArithmeticError) as exc:
         _logger.warning("Evidence rescore failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return EvidenceRescore(None, excluded)
     return EvidenceRescore(result, excluded)

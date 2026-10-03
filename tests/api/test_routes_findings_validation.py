@@ -55,6 +55,16 @@ class TestBodyTypeValidation:
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "INVALID_PARAM"
 
+    def test_restore_all_rejects_list_project(self, client):
+        resp = client.post("/api/findings/restore-all", json={"project": ["my-project"]})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
+    def test_delete_all_rejects_int_project(self, client):
+        resp = client.post("/api/findings/delete-all?confirm=true", json={"project": 7})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
     def test_missing_fields_still_report_missing_param(self, client):
         # The MISSING_PARAM contract for absent fields is unchanged.
         resp = client.post("/api/findings/dismiss", json={"project": "x"})

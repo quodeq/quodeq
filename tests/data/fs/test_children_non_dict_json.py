@@ -1,4 +1,4 @@
-"""Cluster 24 (R-FT-2) — find_children's non-dict JSON crash.
+"""find_children's non-dict JSON crash (R-FT-2).
 
 ``find_children`` used to run ``json.loads(...).get("parent")`` on each
 project's ``repository_info.json``. A file that is valid JSON but not a JSON

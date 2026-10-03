@@ -10,7 +10,8 @@
     "order": 1,
     "model": "",
     "api_base": "http://localhost:8000/v1",
-    "requires_platform": "darwin-arm64"
+    "requires_platform": "darwin-arm64",
+    "credential_env": {"key": "OMLX_API_KEY", "base": "OMLX_BASE_URL"}
   },
   "llamacpp": {
     "type": "api",

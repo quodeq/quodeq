@@ -6,7 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.services._violations_jsonl import _parse_jsonl_findings
+from quodeq.services._violations_jsonl import _jsonl_parser
+
+
+def _parse_jsonl_findings(lines, dimension, *, resolver=None, keys=None):
+    """One-shot parse through the live parser, as the report path did before the fold."""
+    return _jsonl_parser(dimension, None, resolver, keys)(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +39,12 @@ class TestNonDictJsonlLineIsSkipped:
         _, compliance = _parse_jsonl_findings(lines, "security")
         assert len(compliance) == 1
 
+    def test_non_dict_line_logs_a_warning(self):
+        with patch("quodeq.services._violations_jsonl._logger.warning") as warning:
+            _parse_jsonl_findings(['[1, 2, 3]'], "security")
+        assert warning.call_count == 1
+        assert "non-object" in warning.call_args_list[0].args[0].lower()
+
 
 class TestParseJsonlFindings:
     def test_empty_lines(self):
@@ -45,6 +56,13 @@ class TestParseJsonlFindings:
         v, c = _parse_jsonl_findings(["not json", "{bad"], "security")
         assert v == []
         assert c == []
+
+    def test_invalid_json_logs_a_warning_per_malformed_line(self):
+        with patch("quodeq.services._violations_jsonl._logger.warning") as warning:
+            _parse_jsonl_findings(["not json", "{bad"], "security")
+        assert warning.call_count == 2
+        assert "not json" in warning.call_args_list[0].args[1]
+        assert "malformed" in warning.call_args_list[0].args[0].lower()
 
     def test_missing_principle(self):
         v, c = _parse_jsonl_findings([json.dumps({"t": "violation"})], "sec")
@@ -116,6 +134,19 @@ class TestBuildResolver:
         assert resolver.resolve("Authentication") == "Authentication"
         assert resolver.resolve("N/A") is None
 
+        # #10568 — evaluators_dir is injectable (defaults to
+        # default_paths().evaluators_dir, resolved at call time) and is
+        # authoritative over compiled_dir when it defines the dimension.
+        custom_evaluators = tmp_path / "custom-evaluators"
+        custom_evaluators.mkdir()
+        (custom_evaluators / "security.json").write_text(json.dumps({
+            "principles": [
+                {"name": "InjectedPrinciple", "requirements": [{"id": "REQ-9"}]},
+            ]
+        }))
+        injected = _build_resolver("security", compiled, evaluators_dir=custom_evaluators)
+        assert injected.resolve("REQ-9") == "InjectedPrinciple"
+
     def test_no_standard_stays_permissive(self, tmp_path):
         from quodeq.services._violations_jsonl import _build_resolver
         resolver = _build_resolver("security", tmp_path / "nonexistent")
@@ -149,6 +180,23 @@ class TestParseViolationsFromJsonl:
             assert result is not None
             assert result.dimension == "sec"
             assert len(result.violations) == 1
+
+        # #10568 — evaluators_dir flows from this public entry point into
+        # _build_resolver, instead of always reading default_paths().
+        custom_evaluators = tmp_path / "custom-evaluators"
+        custom_evaluators.mkdir()
+        (custom_evaluators / "sec").with_suffix(".json").write_text(json.dumps({
+            "principles": [
+                {"name": "InjectedPrinciple", "requirements": [{"id": "REQ-9"}]},
+            ]
+        }))
+        req_jsonl = tmp_path / "req-findings.jsonl"
+        req_jsonl.write_text(json.dumps({"req": "REQ-9", "t": "violation", "file": "a.py", "line": 1}) + "\n")
+        with patch("quodeq.services._violations_jsonl.build_req_refs_lookup", return_value=None):
+            injected = parse_violations_from_jsonl(req_jsonl, None, ctx, evaluators_dir=custom_evaluators)
+        assert injected is not None
+        assert len(injected.violations) == 1
+        assert injected.violations[0].practice_id == "InjectedPrinciple"
 
 
 # ---------------------------------------------------------------------------

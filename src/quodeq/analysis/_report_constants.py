@@ -15,7 +15,6 @@ from quodeq.data.fs.dimension_report.report_constants import (  # noqa: F401
     FIELD_FINAL_SCORE_SNAKE,
     FIELD_WEIGHTED_SCORE,
     FIELD_WEIGHTED_SCORE_SNAKE,
-    GRADE_INSUFFICIENT,
     REPORT_SCHEMA_VERSION,
     VIOLATION_FIELDS,
 )

@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { SEVERITY_ORDER } from '../../../utils/formatters.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
+import { ROW_KIND } from './findingListRows.js';
+import { useHydratedCompliance, useHydratedFindings } from '../hooks/useHydratedCompliance.js';
+import { bucketBySeverity } from './principleFiltering.js';
+import { emptySeverityCounts } from '../../../utils/severity.js';
 
 const dismissKey = (v) => `${v.file}:${v.line}`;
 
@@ -9,9 +15,9 @@ const dismissKey = (v) => `${v.file}:${v.line}`;
 function computeLiveBuckets(violationsBySeverity, dismissedSet) {
   const low = [];
   const high = {};
-  const counts = { critical: 0, major: 0, minor: 0 };
+  const counts = emptySeverityCounts();
   let total = 0;
-  for (const sev of SEVERITY_ORDER) {
+  for (const sev of KNOWN_SEVERITIES) {
     const bucket = (violationsBySeverity?.[sev] || []).filter((v) => !dismissedSet.has(dismissKey(v)));
     const highBucket = [];
     for (const v of bucket) {
@@ -27,23 +33,23 @@ function computeLiveBuckets(violationsBySeverity, dismissedSet) {
 
 // Header + rows for each severity bucket the active filter lets through.
 function pushSeverityRows(arr, { highConfidenceBySeverity, activeFilter }) {
-  for (const sev of SEVERITY_ORDER) {
+  for (const sev of KNOWN_SEVERITIES) {
     const bucket = highConfidenceBySeverity[sev] || [];
     if (bucket.length === 0) continue;
-    if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) continue;
-    arr.push({ kind: 'sev-header', sev, count: bucket.length });
-    for (const v of bucket) arr.push({ kind: 'violation', v });
+    if (activeFilter && activeFilter !== SEVERITY_FILTER_ALL && activeFilter !== sev) continue;
+    arr.push({ kind: ROW_KIND.SEV_HEADER, sev, count: bucket.length });
+    for (const v of bucket) arr.push({ kind: FINDING_TYPE.VIOLATION, v });
   }
 }
 
 // The low-confidence toggle, plus its rows when expanded. Suppressed while a
 // severity filter is on: the low-confidence split cuts across severities.
 function pushLowConfidenceRows(arr, { activeFilter, lowConfidenceViolations, lowConfExpanded }) {
-  if (activeFilter && activeFilter !== 'all') return;
+  if (activeFilter && activeFilter !== SEVERITY_FILTER_ALL) return;
   if (lowConfidenceViolations.length === 0) return;
-  arr.push({ kind: 'low-conf-toggle', count: lowConfidenceViolations.length, expanded: lowConfExpanded });
+  arr.push({ kind: ROW_KIND.LOW_CONF_TOGGLE, count: lowConfidenceViolations.length, expanded: lowConfExpanded });
   if (!lowConfExpanded) return;
-  for (const v of lowConfidenceViolations) arr.push({ kind: 'low-conf-row', v });
+  for (const v of lowConfidenceViolations) arr.push({ kind: ROW_KIND.LOW_CONF_ROW, v });
 }
 
 // Flatten everything into a single virtualizable items array. Mixing
@@ -60,8 +66,8 @@ function buildFileDetailItems({
     pushLowConfidenceRows(arr, { activeFilter, lowConfidenceViolations, lowConfExpanded });
   }
   if (showCompliance && totalCompliance > 0) {
-    arr.push({ kind: 'compliance-header', count: totalCompliance });
-    for (const c of compliance) arr.push({ kind: 'compliance', c });
+    arr.push({ kind: ROW_KIND.COMPLIANCE_HEADER, count: totalCompliance });
+    for (const c of compliance) arr.push({ kind: FINDING_TYPE.COMPLIANCE, c });
   }
   return arr;
 }
@@ -79,27 +85,36 @@ export function useFileDetailFiltering({ file, onDismiss, activeFilter, lowConfE
     setDismissedSet((prev) => new Set(prev).add(dismissKey(v)));
   }, [onDismiss]);
 
+  // /scores defers reason, snippet, context and links; the cards render
+  // them and a dismiss posts them, so the buckets are rebuilt from the
+  // hydrated rows before anything reads them.
+  const slimViolations = useMemo(() => Object.values(file.violationsBySeverity || {}).flat(), [file.violationsBySeverity]);
+  const hydratedViolations = useHydratedFindings(slimViolations, FINDING_TYPE.VIOLATION);
+  const violationsBySeverity = useMemo(() => bucketBySeverity(hydratedViolations), [hydratedViolations]);
   const { lowConfidenceViolations, highConfidenceBySeverity, liveSevCounts, liveTotal } = useMemo(
-    () => computeLiveBuckets(file.violationsBySeverity, dismissedSet),
-    [file.violationsBySeverity, dismissedSet],
+    () => computeLiveBuckets(violationsBySeverity, dismissedSet),
+    [violationsBySeverity, dismissedSet],
   );
 
+  const compliance = useHydratedCompliance(file.compliance);
   const totalCompliance = file.compliance?.length || 0;
-  const distinctSeverities = SEVERITY_ORDER.filter((s) => liveSevCounts[s] > 0).length;
+  const distinctSeverities = KNOWN_SEVERITIES.filter((s) => liveSevCounts[s] > 0).length;
   const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
-  const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === 'compliance';
-  const showViolations = activeFilter !== 'compliance';
+  const showCompliance = !activeFilter || activeFilter === SEVERITY_FILTER_ALL || activeFilter === FINDING_TYPE.COMPLIANCE;
+  const showViolations = activeFilter !== FINDING_TYPE.COMPLIANCE;
 
   const items = useMemo(
     () => buildFileDetailItems({
       showViolations, showCompliance, activeFilter, highConfidenceBySeverity,
-      lowConfidenceViolations, lowConfExpanded, compliance: file.compliance, totalCompliance,
+      lowConfidenceViolations, lowConfExpanded, compliance, totalCompliance,
     }),
-    [showViolations, showCompliance, activeFilter, highConfidenceBySeverity, lowConfidenceViolations, lowConfExpanded, file.compliance, totalCompliance],
+    [showViolations, showCompliance, activeFilter, highConfidenceBySeverity, lowConfidenceViolations, lowConfExpanded, compliance, totalCompliance],
   );
 
   return {
     dismissedSet, handleDismiss, liveSevCounts, liveTotal,
     totalCompliance, showFilters, items,
+    // The hydrated buckets, for the report and fix-plan panes.
+    violationsBySeverity,
   };
 }

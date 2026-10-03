@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from quodeq.shared._config import _get_config
+from quodeq.shared._config import get_config
 from quodeq.shared.env import (
     env_float,
     env_int,
@@ -37,6 +37,15 @@ class TestEnvInt:
     def test_at_minimum_is_accepted(self):
         assert env_int("X", 5, minimum=1, env={"X": "1"}) == 1
 
+    def test_extremely_large_value_is_accepted_not_treated_as_non_finite(self):
+        """Ints are always finite (arbitrary precision); the finiteness
+        check added for env_float must not run for env_int, since
+        math.isfinite raises OverflowError on an int too large to convert
+        to a float. A huge int parses and is returned like any other int,
+        matching int()'s own contract (no upper bound)."""
+        huge = "9" * 400
+        assert env_int("X", 5, env={"X": huge}) == int(huge)
+
 
 class TestEnvFloat:
     def test_valid_value(self):
@@ -53,6 +62,24 @@ class TestEnvFloat:
     def test_below_minimum_returns_default(self):
         assert env_float("X", 1.5, minimum=0.0, env={"X": "-3"}) == 1.5
 
+    def test_infinity_returns_default_and_warns(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="quodeq.shared.env"):
+            assert env_float("X", 1.5, env={"X": "inf"}) == 1.5
+        assert "Invalid X=" in caplog.text
+
+    def test_nan_returns_default_and_warns(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="quodeq.shared.env"):
+            assert env_float("X", 1.5, env={"X": "nan"}) == 1.5
+        assert "Invalid X=" in caplog.text
+
+    def test_infinity_rejected_even_when_above_minimum(self):
+        """`inf` always clears a `< minimum` check, so the minimum guard
+        alone would let it through; isfinite must be checked regardless."""
+        assert env_float("X", 1.5, minimum=0.0, env={"X": "inf"}) == 1.5
+
+    def test_negative_infinity_rejected_even_without_a_minimum(self):
+        assert env_float("X", 1.5, env={"X": "-inf"}) == 1.5
+
 
 _SENTINEL_PROCESS_VALUE = "__process_value_must_be_ignored__"
 
@@ -60,13 +87,13 @@ _ENV_INT_REGRESSION_VAR = "QUODEQ_ENV_NUMERIC_REGRESSION_INT"
 _ENV_FLOAT_REGRESSION_VAR = "QUODEQ_ENV_NUMERIC_REGRESSION_FLOAT"
 
 _GETTER_CASES = [
-    (get_action_api_port, "QUODEQ_ACTION_API_PORT", lambda: _get_config()["action_api_port"], _SENTINEL_PROCESS_VALUE),
-    (get_action_api_host, "QUODEQ_ACTION_API_HOST", lambda: _get_config()["default_host"], _SENTINEL_PROCESS_VALUE),
-    (get_dashboard_port, "QUODEQ_DASHBOARD_PORT", lambda: _get_config()["dashboard_port"], _SENTINEL_PROCESS_VALUE),
+    (get_action_api_port, "QUODEQ_ACTION_API_PORT", lambda: get_config()["action_api_port"], _SENTINEL_PROCESS_VALUE),
+    (get_action_api_host, "QUODEQ_ACTION_API_HOST", lambda: get_config()["default_host"], _SENTINEL_PROCESS_VALUE),
+    (get_dashboard_port, "QUODEQ_DASHBOARD_PORT", lambda: get_config()["dashboard_port"], _SENTINEL_PROCESS_VALUE),
     (get_anthropic_api_key, "ANTHROPIC_API_KEY", lambda: None, _SENTINEL_PROCESS_VALUE),
-    (get_asvs_url, "QUODEQ_ASVS_URL", lambda: _get_config()["asvs_url"], _SENTINEL_PROCESS_VALUE),
-    (get_github_search_url, "QUODEQ_GITHUB_SEARCH_URL", lambda: _get_config()["github_search_url"], _SENTINEL_PROCESS_VALUE),
-    (get_github_raw_base_url, "QUODEQ_GITHUB_RAW_BASE_URL", lambda: _get_config()["github_raw_base_url"], _SENTINEL_PROCESS_VALUE),
+    (get_asvs_url, "QUODEQ_ASVS_URL", lambda: get_config()["asvs_url"], _SENTINEL_PROCESS_VALUE),
+    (get_github_search_url, "QUODEQ_GITHUB_SEARCH_URL", lambda: get_config()["github_search_url"], _SENTINEL_PROCESS_VALUE),
+    (get_github_raw_base_url, "QUODEQ_GITHUB_RAW_BASE_URL", lambda: get_config()["github_raw_base_url"], _SENTINEL_PROCESS_VALUE),
     # env_int/env_float themselves, called with their real (var, default, env=) signature via
     # a thin lambda. The process value here must be a *valid* number (not a parse-failure
     # sentinel): a non-numeric sentinel would return the default under the old `env or

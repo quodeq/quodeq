@@ -3,25 +3,31 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../components/ConsoleLogViewer.jsx';
 import { EvalLogContext, EvalLogLogsContext, useEvalLogLogs } from './EvalLogContext.js';
 import { useJobLogStream } from './useJobLogStream.js';
+import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 import { JOB_STATUS_WORD, terminalLine } from './logPresentation.js';
+import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { t } from '../../../strings/index.js';
 
 // Read logs from the dedicated logs context so the side-pane's spec stays
 // stable across log appends — only this leaf re-renders on each batch. The
-// terminal line (once the run reaches a terminal state) is rendered here
-// rather than appended into the logs array itself, so it never becomes part
-// of the actual transcript useJobLogStream hands out.
-function EvalLogPaneBody({ terminalState }) {
-  const { logs } = useEvalLogLogs();
-  const displayLogs = terminalState ? logs.concat(terminalLine(terminalState)) : logs;
-  return <ConsoleLogViewer logs={displayLogs} />;
+// terminal line (once the run reaches a terminal state) is rendered as the
+// viewer's trailer rather than appended into the logs array, so it never
+// becomes part of the transcript and never shifts the seq of a late line.
+//
+// `sourceId={jobId}` tells the viewer's pipeline to reset instead of
+// treating a job switch (window stays open, source swaps) as a
+// continuation of the previous job's log.
+function EvalLogPaneBody({ jobId, terminalState }) {
+  const { logs, firstSeq } = useEvalLogLogs();
+  const trailer = useMemo(() => (terminalState ? terminalLine(terminalState) : null), [terminalState]);
+  return <ConsoleLogViewer logs={logs} firstSeq={firstSeq} trailer={trailer} sourceId={jobId} />;
 }
 
 const STREAM_STATUS_WORD = {
-  idle: '',
-  streaming: 'running',
-  done: 'completed',
-  error: 'error',
+  [LOG_STREAM_STATUS.IDLE]: '',
+  [LOG_STREAM_STATUS.STREAMING]: 'running',
+  [LOG_STREAM_STATUS.DONE]: 'completed',
+  [LOG_STREAM_STATUS.ERROR]: 'error',
 };
 
 function statusWord(jobStatus, streamStatus, terminalState) {
@@ -31,14 +37,14 @@ function statusWord(jobStatus, streamStatus, terminalState) {
   // ScanProgress isn't mounted to push the lifecycle reason.
   if (terminalState && JOB_STATUS_WORD[terminalState]) return JOB_STATUS_WORD[terminalState];
   // Specific terminal job states win over a generic stream "done".
-  if (jobStatus === 'failed' || jobStatus === 'cancelled' || jobStatus === 'lost') {
+  if (jobStatus === JOB_STATUS.FAILED || jobStatus === JOB_STATUS.CANCELLED || jobStatus === JOB_STATUS.LOST) {
     return JOB_STATUS_WORD[jobStatus];
   }
   // Otherwise the stream's terminal states override a stale "running"
   // jobStatus (e.g. progress poll hasn't caught up, or ScanProgress
   // unmounted before flipping status).
-  if (streamStatus === 'done') return 'completed';
-  if (streamStatus === 'error') return 'error';
+  if (streamStatus === LOG_STREAM_STATUS.DONE) return 'completed';
+  if (streamStatus === LOG_STREAM_STATUS.ERROR) return 'error';
   if (jobStatus && JOB_STATUS_WORD[jobStatus]) return JOB_STATUS_WORD[jobStatus];
   return STREAM_STATUS_WORD[streamStatus] || '';
 }
@@ -55,7 +61,7 @@ function buildSpec({ jobId, jobStatus, status, terminalState }) {
     id: WINDOW_ID,
     type: 'eval-log',
     title: parts.join(' · '),
-    render: () => <EvalLogPaneBody terminalState={terminalState} />,
+    render: () => <EvalLogPaneBody jobId={jobId} terminalState={terminalState} />,
   };
 }
 
@@ -99,7 +105,7 @@ export function EvalLogProvider({ children }) {
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeJobLabel, setActiveJobLabel] = useState(null);
   const [activeJobStatus, setActiveJobStatus] = useState(null);
-  const { logs, status, terminalState } = useJobLogStream(activeJobId);
+  const { logs, firstSeq, status, terminalState } = useJobLogStream(activeJobId);
   const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
 
   const spec = useMemo(
@@ -132,7 +138,7 @@ export function EvalLogProvider({ children }) {
     [activeJobId, activeJobLabel, activeJobStatus, status, openLog, closeLog, updateJobStatus],
   );
 
-  const logsValue = useMemo(() => ({ logs }), [logs]);
+  const logsValue = useMemo(() => ({ logs, firstSeq }), [logs, firstSeq]);
 
   return (
     <EvalLogContext.Provider value={value}>

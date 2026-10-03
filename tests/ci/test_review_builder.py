@@ -1,6 +1,8 @@
 """Tests for quodeq.ci.review_builder."""
 from __future__ import annotations
 
+import pytest
+
 from quodeq.ci.review_builder import (
     ReviewOptions,
     build_review_summary,
@@ -59,6 +61,16 @@ def test_build_review_summary():
 def test_determine_verdict_critical():
     violations = [{"severity": "critical"}]
     assert determine_verdict(violations) == "REQUEST_CHANGES"
+
+
+@pytest.mark.parametrize("sev", ["major", "high", "CRITICAL", " critical "])
+def test_determine_verdict_blocks_on_critical_and_major(sev):
+    assert determine_verdict([{"severity": sev}]) == "REQUEST_CHANGES"
+
+
+@pytest.mark.parametrize("sev", ["minor", "low", None, "weird"])
+def test_determine_verdict_comments_below_major(sev):
+    assert determine_verdict([{"severity": sev}]) == "COMMENT"
 
 
 def test_determine_verdict_no_violations():
@@ -141,6 +153,21 @@ def test_build_review_summary_shows_new_and_existing_counts():
     summary = build_review_summary(reports, new, existing, options=ReviewOptions(duration_seconds=60))
     assert "2 new" in summary.lower() or "2 New" in summary or "**2 new**" in summary
     assert "1 pre-existing" in summary.lower() or "1 Pre-existing" in summary or "**1 pre-existing**" in summary
+
+
+def test_build_review_summary_notes_performance_is_advisory():
+    reports = [{"dimension": "security", "overallScore": "7.5/10", "overallGrade": "B"}]
+    new = [{"severity": "critical", "dimension": "performance"}, {"severity": "critical", "dimension": "security"}]
+    summary = build_review_summary(reports, new, [], options=ReviewOptions(duration_seconds=60))
+    assert "advisory" in summary.lower()
+    assert "never request changes" in summary.lower()
+
+
+def test_build_review_summary_no_advisory_note_without_performance_findings():
+    reports = [{"dimension": "security", "overallScore": "7.5/10", "overallGrade": "B"}]
+    new = [{"severity": "critical", "dimension": "security"}]
+    summary = build_review_summary(reports, new, [], options=ReviewOptions(duration_seconds=60))
+    assert "advisory" not in summary.lower()
 
 
 def test_build_review_summary_shows_no_baseline_note_when_unavailable():

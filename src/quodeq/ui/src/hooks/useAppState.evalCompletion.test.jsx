@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAppState } from './useAppState.js';
+import { EvaluationLiveProvider } from '../features/evaluation/EvaluationLiveContext.jsx';
 import { ApiProvider } from '../api/ApiContext.jsx';
 import { SidePaneProvider } from '../features/side-pane/SidePaneProvider.jsx';
 
 // Split from useAppState.test.jsx: useAppState's eval-completion single-
-// refetch path (P5-T1) and the projects-load re-arm-on-reconnect behavior.
+// refetch path and the projects-load re-arm-on-reconnect behavior.
 
 // useAppState composes useEvaluationLifecycle (-> useEvaluation) and
 // useServerHealth. Mocked the same way useEvaluationLifecycle.test.jsx mocks
@@ -18,10 +19,13 @@ const evaluationState = {
   startEvaluation: vi.fn(), clearJob: vi.fn(), cancelEvaluation: vi.fn(),
   startedProject: null,
 };
-vi.mock('../features/evaluation/hooks/useEvaluation.js', () => ({
-  useEvaluation: () => evaluationState,
-  LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
-}));
+vi.mock('../features/evaluation/hooks/useEvaluation.js', async () => {
+  const actual = await vi.importActual('../features/evaluation/hooks/useEvaluation.js');
+  return {
+    ...actual,
+    useEvaluation: () => evaluationState,
+  };
+});
 // Mutable so the reconnect re-arm regression below can flip connectivity;
 // defaults to connected for every other test.
 const healthState = { connected: true };
@@ -29,7 +33,43 @@ vi.mock('./useServerHealth.js', () => ({
   useServerHealth: () => [healthState.connected, vi.fn(), null],
 }));
 
-// P5-T1: single refetch path on run completion. Before this task, useAppState
+// Mirrors App.jsx: the root holds the state, the provider below it owns the
+// evaluation lifecycle. The completion effects live in the provider, so a
+// bare renderHook(useAppState) would never run them.
+const capturedState = { current: null };
+
+function AppStateHarness() {
+  const state = useAppState();
+  capturedState.current = state;
+  return (
+    <EvaluationLiveProvider store={state.liveEvaluation} {...state.evaluationDeps}>
+      <span />
+    </EvaluationLiveProvider>
+  );
+}
+
+function renderAppState(fakeApi, client) {
+  // A fresh element per render: passing the same element object back to
+  // rerender lets React bail out of the subtree, so the mocked job change
+  // would never reach the hook.
+  const tree = () => (
+    <QueryClientProvider client={client}>
+      <ApiProvider value={fakeApi}>
+        <SidePaneProvider><AppStateHarness /></SidePaneProvider>
+      </ApiProvider>
+    </QueryClientProvider>
+  );
+  const utils = render(tree());
+  return { result: capturedState, rerender: () => utils.rerender(tree()) };
+}
+
+function makeTestClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+  });
+}
+
+// Single refetch path on run completion. Before this task, useAppState
 // ran its OWN eval-completion effect (refreshDashboardActive, keyed off
 // job.outputRunId) in the same effect-flush as useEvaluationLifecycle's
 // selectProjectAndRun. That effect fired before selectedRun's state update
@@ -64,18 +104,7 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
 
   it('refetches only the new run key on completion -- no redundant active refetch of the pre-run key', async () => {
     const fakeApi = makeAppStateFakeApi();
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
-    });
-    const { result, rerender } = renderHook(() => useAppState(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>
-          <ApiProvider value={fakeApi}>
-            <SidePaneProvider>{children}</SidePaneProvider>
-          </ApiProvider>
-        </QueryClientProvider>
-      ),
-    });
+    const { result, rerender } = renderAppState(fakeApi, makeTestClient());
 
     await waitFor(() => expect(result.current.selectedProject).toBe('project-a'));
     await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalledTimes(1));
@@ -96,18 +125,7 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
 
   it('still refreshes the project list and moves the selection on completion (selectProjectAndRun/loadProjects remain wired)', async () => {
     const fakeApi = makeAppStateFakeApi();
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
-    });
-    const { result, rerender } = renderHook(() => useAppState(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>
-          <ApiProvider value={fakeApi}>
-            <SidePaneProvider>{children}</SidePaneProvider>
-          </ApiProvider>
-        </QueryClientProvider>
-      ),
-    });
+    const { result, rerender } = renderAppState(fakeApi, makeTestClient());
 
     await waitFor(() => expect(result.current.selectedProject).toBe('project-a'));
     const listCallsBefore = fakeApi.listProjects.mock.calls.length;
@@ -119,7 +137,7 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
     await waitFor(() => expect(fakeApi.listProjects.mock.calls.length).toBeGreaterThan(listCallsBefore));
   });
 
-  // Finding 1 (P5 final review): P5-T1 above only proved the DASHBOARD key
+  // The single refetch path above only proved the DASHBOARD key
   // refetches on completion. It missed that the SCORES key -- the `latest`
   // query behind `accumulated`/`availableRuns` -- has no dependency on
   // selectedRun at all, so nothing refetched it once useAppState stopped
@@ -138,7 +156,7 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
       sharedGetDashboard: vi.fn(),
       getProjectScores: vi.fn(async () => (
         backend.newRun
-          ? { accumulated: { score: 95 }, trend: [], availableRuns: [{ runId: backend.newRun, dateLabel: '2026-07-01', status: 'complete' }] }
+          ? { accumulated: { score: 95 }, trend: [], availableRuns: [{ runId: backend.newRun, dateLabel: '2026-07-01', status: 'done' }] }
           : { accumulated: { score: 70 }, trend: [], availableRuns: [] }
       )),
       sharedGetProjectScores: vi.fn(),
@@ -149,18 +167,7 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
 
   it('refetches scores on completion -- accumulated and availableRuns pick up the new run without a tab round-trip', async () => {
     const fakeApi = makeRunAwareFakeApi();
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
-    });
-    const { result, rerender } = renderHook(() => useAppState(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>
-          <ApiProvider value={fakeApi}>
-            <SidePaneProvider>{children}</SidePaneProvider>
-          </ApiProvider>
-        </QueryClientProvider>
-      ),
-    });
+    const { result, rerender } = renderAppState(fakeApi, makeTestClient());
 
     await waitFor(() => expect(result.current.selectedProject).toBe('project-a'));
     await waitFor(() => expect(result.current.accumulated).toEqual({ score: 70 }));
@@ -199,18 +206,7 @@ describe('useAppState projects-load re-arm on server reconnect', () => {
     const fakeApi = makeAppStateFakeApi();
     fakeApi.listProjects.mockRejectedValue(new Error('backend still starting'));
     healthState.connected = false;
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
-    });
-    const { result, rerender } = renderHook(() => useAppState(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>
-          <ApiProvider value={fakeApi}>
-            <SidePaneProvider>{children}</SidePaneProvider>
-          </ApiProvider>
-        </QueryClientProvider>
-      ),
-    });
+    const { result, rerender } = renderAppState(fakeApi, makeTestClient());
 
     await waitFor(() => expect(result.current.projectsLoadFailed).toBe(true), { timeout: 5000 });
     const callsWhileDown = fakeApi.listProjects.mock.calls.length;

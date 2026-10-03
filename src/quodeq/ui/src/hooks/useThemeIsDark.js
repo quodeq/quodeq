@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DATA_THEME_ATTR, PREFERS_DARK_QUERY } from '../constants.js';
+import { THEME_MODE } from '../vocab/theme.js';
 
 // Resolves whether the ACTIVE theme is dark by observing the applied
 // DATA_THEME_ATTR attribute on <html> rather than re-reading settings state.
@@ -9,7 +10,7 @@ import { DATA_THEME_ATTR, PREFERS_DARK_QUERY } from '../constants.js';
 // (the OS preference decides); otherwise 'light' | 'dark' | '<family>-<mode>'.
 function computeIsDark() {
   const attr = document.documentElement.getAttribute(DATA_THEME_ATTR);
-  if (attr) return attr === 'dark' || attr.endsWith('-dark');
+  if (attr) return attr === THEME_MODE.DARK || attr.endsWith(`-${THEME_MODE.DARK}`);
   return window.matchMedia(PREFERS_DARK_QUERY).matches;
 }
 

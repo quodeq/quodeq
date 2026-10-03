@@ -2,10 +2,11 @@ import { useEffect } from 'react';
 import { listStandards, getProjectScan } from '../../../api/index.js';
 import { saveDraft } from './useWizardDraft.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
+import { defaultStandardIds } from '../standardSelection.js';
 
 /**
- * The wizard's three boot/persist effects: fetch the standards list once,
- * save a draft on every step transition, and fetch the scan for a preset
+ * The wizard's three boot/persist effects: fetch the standards list once
+ * (and seed the default pick from it), save a draft on every step transition, and fetch the scan for a preset
  * project when the wizard is resumed into one.
  * @param {object} args
  * @param {object} args.wizard - useWizardState's bundle; its `state` drives
@@ -23,8 +24,17 @@ export function useOnboardingEffects({ wizard, entry, setStandards }) {
   useEffect(() => {
     const visibleSet = new Set(readVisibleStandardIds().map((id) => (id || '').toLowerCase()));
     listStandards()
-      .then((all) => setStandards(all.filter((s) => visibleSet.has((s.id || '').toLowerCase()))))
-      .catch(() => setStandards([]));
+      .then((all) => {
+        const visible = all.filter((s) => visibleSet.has((s.id || '').toLowerCase()));
+        setStandards(visible);
+        // The analyze screen opens on the default standard; a pick the user
+        // already made before the list arrived is kept.
+        wizard.seedStandards(defaultStandardIds(visible));
+      })
+      .catch((err) => {
+        console.warn('[useOnboardingEffects] standards fetch failed:', err);
+        setStandards([]);
+      });
   }, []);
 
   // Persist a draft on every step transition or relevant state change.
@@ -50,5 +60,5 @@ export function useOnboardingEffects({ wizard, entry, setStandards }) {
       .catch((err) => {
         console.warn('[useOnboardingEffects] resume-scan fetch failed:', err); // tolerate: onboarding still proceeds without the summary
       });
-  }, [entry.presetProjectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entry.presetProjectId]); // eslint-disable-line react-hooks/exhaustive-deps -- runs once per preset project; wizard is a new object every render and would refire the fetch
 }

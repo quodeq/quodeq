@@ -7,6 +7,7 @@ the publish flow converts them to PublishError at its own boundary.
 from __future__ import annotations
 
 import json
+import logging
 
 import pytest
 
@@ -14,6 +15,7 @@ from quodeq.data.fs.run_artifacts import (
     copy_file_if_exists,
     copy_matching_files,
     ensure_dir,
+    read_json_object,
     replace_json_file,
 )
 
@@ -60,6 +62,31 @@ class TestCopyMatchingFiles:
         assert sorted(p.name for p in dest_dir.iterdir()) == [
             "a_evidence.jsonl", "b_evidence.jsonl",
         ]
+
+
+class TestReadJsonObject:
+    def test_none_when_missing(self, tmp_path):
+        assert read_json_object(tmp_path / "missing.json") is None
+
+    def test_none_when_corrupt_json(self, tmp_path):
+        path = tmp_path / "bad.json"
+        path.write_text("{not valid json")
+        assert read_json_object(path) is None
+
+    def test_none_when_not_an_object(self, tmp_path):
+        path = tmp_path / "list.json"
+        path.write_text("[1, 2, 3]")
+        assert read_json_object(path) is None
+
+    def test_none_when_not_utf8(self, tmp_path):
+        path = tmp_path / "binary.json"
+        path.write_bytes(b"\xff\xfe\x00\x01")
+        assert read_json_object(path) is None
+
+    def test_returns_parsed_object(self, tmp_path):
+        path = tmp_path / "ok.json"
+        path.write_text('{"a": 1}')
+        assert read_json_object(path) == {"a": 1}
 
 
 class TestReplaceJsonFile:
@@ -114,3 +141,28 @@ class TestReplaceJsonFile:
 
         # No leftover temp file, and the destination was never created.
         assert list(tmp_path.iterdir()) == []
+
+    def test_cleanup_unlink_failure_is_logged_not_swallowed_silently(
+        self, tmp_path, monkeypatch, caplog,
+    ):
+        """A double failure (the write fails, then cleanup of its temp file
+        also fails) must not vanish. The write's own OSError still
+        propagates -- that is the module's whole contract -- and the
+        cleanup failure is now a warning instead of a silent suppress()."""
+        import quodeq.data.fs.run_artifacts as run_artifacts_mod
+
+        def boom_replace(*args, **kwargs):
+            raise OSError("disk full")
+
+        def boom_unlink(*args, **kwargs):
+            raise OSError("cannot remove leftover")
+
+        monkeypatch.setattr(run_artifacts_mod.os, "replace", boom_replace)
+        monkeypatch.setattr(run_artifacts_mod.os, "unlink", boom_unlink)
+
+        path = tmp_path / "published.json"
+        with caplog.at_level(logging.WARNING, logger="quodeq.data.fs.run_artifacts"):
+            with pytest.raises(OSError, match="disk full"):
+                replace_json_file(path, {"a": 1})
+
+        assert any("not removed" in r.message for r in caplog.records)

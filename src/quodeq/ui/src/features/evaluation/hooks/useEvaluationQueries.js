@@ -1,68 +1,21 @@
 /**
  * useEvaluation's status/findings queries.
  *
- * Split out of useEvaluation.js (see that file's header for the hook's
- * overall data-flow doc). Moved verbatim: the SSE_ENABLED branches here are
- * unchanged from the pre-split version. queryFn/effect/grouping bodies are
- * additionally factored into named functions (still logic-identical) so
- * useEvaluationQueries itself clears the max-lines-per-function gate.
+ * See useEvaluation.js's header for the hook's overall data-flow doc.
+ *
+ * The findings query is subscribe-only. useRunEventStream writes every
+ * admitted `finding` frame into its cache slot and this hook groups what is
+ * there. There is no polled fallback for findings: the REST live-findings
+ * path was a second implementation of "which judgments are findings" that
+ * nothing ran under the default build, and the two drifted (#1383). The
+ * server decides what a finding is, once, on the stream.
  */
-import { useEffect, useRef } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NO_JOB_ID, evaluationKeys } from "../../../api/queryKeys.js";
-import { SSE_ENABLED, findingsRefetchInterval } from "./useEvaluation.helpers.js";
-import { createViolation } from "../../../models/violation.js";
+import { statusRefetchInterval } from "./useEvaluation.helpers.js";
 
-const JOB_POLL_MS = 1500;
-
-// Under SSE the cache is filled by useRunEventStream; this queryFn is a
-// no-op. Under polling, fetch each dimension's eval and flatten violations.
-async function fetchFindings(api, job) {
-  if (SSE_ENABLED) return [];
-  if (!job?.outputProject || !job?.outputRunId || !job?.dimensions?.length) {
-    return [];
-  }
-  const results = await Promise.all(
-    job.dimensions.map((d) =>
-      api.getDimensionEval(job.outputProject, job.outputRunId, d)
-        // Canonical fields merged ONTO the raw row, not substituted for it.
-        // The backend calls a finding's principle `practiceId` while every
-        // component reads `principle`, so the raw spread left the feed's rule
-        // column blank and collapsed the row key to
-        // `${dim}-${file}-undefined-${line}`. Merging rather than replacing
-        // keeps wire-only fields the model does not model (confidence, and
-        // the SSE frame's id/verdict) available to other readers.
-        .then((data) => (data?.violations || []).map(
-          (v) => ({ ...v, ...createViolation(v), dimension: d }),
-        ))
-        // Tolerate not-yet-written dimension evals during live polling,
-        // but leave a diagnostic so a real fetch failure is visible.
-        .catch((err) => {
-          console.warn(`Failed to fetch ${d} evaluation:`, err);
-          return [];
-        }),
-    ),
-  );
-  return results.flat();
-}
-
-// One final fetch on the running->terminal edge: the last dimension's
-// report usually lands between the final running poll and the terminal
-// transition, and stopping cold would freeze the feed just short of it.
-function useTerminalFindingsRefetch(jobId, isJobTerminal, refetchFindings) {
-  const findingsSettledRef = useRef(false);
-  useEffect(() => {
-    if (!jobId || SSE_ENABLED) return;
-    if (isJobTerminal && !findingsSettledRef.current) {
-      findingsSettledRef.current = true;
-      refetchFindings();
-    } else if (!isJobTerminal) {
-      findingsSettledRef.current = false;
-    }
-  }, [jobId, isJobTerminal, refetchFindings]);
-}
-
-// Group findings into the legacy { [dim]: [violations] } shape.
+// The rows the cache already holds, per dimension, in cache order.
 function groupFindingsByDimension(findings) {
   const liveViolations = {};
   for (const f of findings) {
@@ -72,23 +25,28 @@ function groupFindingsByDimension(findings) {
   return liveViolations;
 }
 
+// The slot is never fetched (enabled: false below): the stream fills it with
+// setQueryData and useQuery is here for its subscription only, the same way
+// useHistoryRunLive reads it. A fetch that resolved to [] after the first
+// frame landed would wipe that frame.
+const NEVER_QUERIED = () => {
+  throw new Error("findings slot is stream-fed; queryFn must not run");
+};
+
 /**
  * The job status and its findings, grouped by dimension.
  *
- * With SSE enabled the cache is fed by the event stream and these queries only
- * subscribe; otherwise they poll. Either way a terminal job gets one final
- * findings refetch, so the last results are never missed.
- *
+ * @param {string} [streamState] the run's STREAM_STATE, from useRunEventStream
  * @returns {{job: object|null, liveViolations: Record<string, object[]>}}
  */
-export function useEvaluationQueries(api, jobId) {
+export function useEvaluationQueries(api, jobId, streamState) {
   // --- Status (the "job" object) ---------------------------------------
   const statusQuery = useQuery({
     queryKey: evaluationKeys.status(jobId || NO_JOB_ID),
     queryFn: () => api.getEvaluation(jobId),
     enabled: !!jobId,
-    staleTime: SSE_ENABLED ? Infinity : 0,
-    refetchInterval: SSE_ENABLED ? false : JOB_POLL_MS,
+    staleTime: Infinity,
+    refetchInterval: statusRefetchInterval(streamState),
   });
 
   const job = statusQuery.data || null;
@@ -96,16 +54,16 @@ export function useEvaluationQueries(api, jobId) {
   // --- Findings (a flat list, then grouped into liveViolations) --------
   const findingsQuery = useQuery({
     queryKey: evaluationKeys.findings(jobId || NO_JOB_ID),
-    queryFn: () => fetchFindings(api, job),
-    enabled: !!jobId && (SSE_ENABLED || !!job?.outputProject),
-    staleTime: SSE_ENABLED ? Infinity : 0,
-    refetchInterval: findingsRefetchInterval(job),
+    queryFn: NEVER_QUERIED,
+    enabled: false,
+    staleTime: Infinity,
   });
 
-  const isJobTerminal = !!job?.status && job.status !== "running";
-  useTerminalFindingsRefetch(jobId, isJobTerminal, findingsQuery.refetch);
-
-  const liveViolations = groupFindingsByDimension(findingsQuery.data || []);
+  // Keyed on the query data, which React Query keeps by reference while the
+  // rows are unchanged. A fresh object on every render would defeat the memos
+  // in the stat strip and the live feed, which compare this by identity.
+  const findings = findingsQuery.data;
+  const liveViolations = useMemo(() => groupFindingsByDimension(findings || []), [findings]);
 
   return { job, liveViolations };
 }

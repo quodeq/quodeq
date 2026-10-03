@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { nf, score1 } from '../compareFormatters.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 
 function ScopePickerRow({ row, on, toggleProject }) {
@@ -66,7 +67,7 @@ export default function ScopePicker({
   useEffect(() => {
     if (!pickerOpen) return undefined;
     const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setPickerOpen(false); };
-    const onEsc = (e) => { if (e.key === 'Escape') setPickerOpen(false); };
+    const onEsc = (e) => { if (e.key === KEY.ESCAPE) setPickerOpen(false); };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onEsc);
     return () => {

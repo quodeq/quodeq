@@ -19,7 +19,7 @@ class TestWorkerNeverDropsSilently:
         self, tmp_path: Path, api_provider,
     ):
         from quodeq.analysis.subagents.file_queue import FileQueue
-        from quodeq.analysis.subprocess import _gather_api_source_files
+        from quodeq.analysis.subprocess import gather_api_source_files
 
         src = tmp_path / "src"
         _write_repo(src)
@@ -28,7 +28,7 @@ class TestWorkerNeverDropsSilently:
         jsonl_file = tmp_path / "security_evidence.jsonl"
         stream_file = tmp_path / "a1.stream"
 
-        source_files = _gather_api_source_files(
+        source_files = gather_api_source_files(
             src, self._analysis_config(queue_path, jsonl_file), jsonl_file, stream_file,
         )
 
@@ -48,7 +48,7 @@ class TestWorkerNeverDropsSilently:
         self, tmp_path: Path, api_provider,
     ):
         from quodeq.analysis.subagents.file_queue import FileQueue
-        from quodeq.analysis.subprocess import _gather_api_source_files
+        from quodeq.analysis.subprocess import gather_api_source_files
 
         src = tmp_path / "src"
         _write_repo(src)
@@ -57,7 +57,7 @@ class TestWorkerNeverDropsSilently:
         jsonl_file = tmp_path / "security_evidence.jsonl"
         stream_file = tmp_path / "a1.stream"
 
-        source_files = _gather_api_source_files(
+        source_files = gather_api_source_files(
             src, self._analysis_config(queue_path, jsonl_file), jsonl_file, stream_file,
         )
 
@@ -110,25 +110,25 @@ class TestSizeAwareBatching:
         return out
 
     def test_greedy_packing_preserves_order(self, tmp_path: Path):
-        from quodeq.analysis.subprocess import _batch_files_by_size
+        from quodeq.analysis.subprocess import batch_files_by_size
 
         files = self._files(tmp_path, [100, 100, 100, 100])
-        batches = _batch_files_by_size(files, budget=250)
+        batches = batch_files_by_size(files, budget=250)
 
         assert batches == [files[0:2], files[2:4]]
 
     def test_oversized_file_goes_solo(self, tmp_path: Path):
-        from quodeq.analysis.subprocess import _batch_files_by_size
+        from quodeq.analysis.subprocess import batch_files_by_size
 
         files = self._files(tmp_path, [50, 900, 50])
-        batches = _batch_files_by_size(files, budget=300)
+        batches = batch_files_by_size(files, budget=300)
 
         assert batches == [[files[0]], [files[1]], [files[2]]]
 
     def test_empty_input_yields_no_batches(self, tmp_path: Path):
-        from quodeq.analysis.subprocess import _batch_files_by_size
+        from quodeq.analysis.subprocess import batch_files_by_size
 
-        assert _batch_files_by_size([], budget=300) == []
+        assert batch_files_by_size([], budget=300) == []
 
     def test_bridge_makes_one_api_call_per_sub_batch(
         self, tmp_path: Path, api_provider,

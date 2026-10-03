@@ -12,10 +12,17 @@
  * isolation.
  */
 
-// Onboarding-side IDs differ from the server's ai_providers.json IDs.
-const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
+import { PROVIDER_TYPE } from '../../../vocab/providerType.js';
+import { SETTLED_FULFILLED } from '../../../constants.js';
+import { serverProviderId } from '../providerLabels.js';
 /** How long each detection probe waits before aborting its fetch. */
 export const PROBE_TIMEOUT_MS = 5000;
+
+// This module's own probe classification: how a detected provider is
+// reached. Coincidentally shares two spellings with settings' own
+// PROVIDER_CLASSIFICATION, but its cloud member is 'cloud' here, not
+// 'cloud-api' — a different set, not a copy of that one.
+const PROBE_CLASSIFICATION = Object.freeze({ CLI: 'cli', LOCAL_API: 'local-api', CLOUD: 'cloud' });
 
 // Every probe is a timed GET whose failure is "not detected", never an
 // error the caller has to handle: one unreachable provider must not fail the
@@ -34,22 +41,26 @@ async function probe(id, classification, url, read) {
 }
 
 async function detectCliProvider(id) {
-  const serverId = CLI_SERVER_ID[id] || id;
-  return probe(id, 'cli', '/api/ai-clients', async (res) => {
+  // Onboarding-side IDs differ from the server's ai_providers.json IDs.
+  const serverId = serverProviderId(id);
+  return probe(id, PROBE_CLASSIFICATION.CLI, '/api/ai-clients', async (res) => {
     const data = await res.json();
-    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli' && c.installed !== false);
+    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === PROVIDER_TYPE.CLI && c.installed !== false);
     return { detected, defaultModel: null };
   });
 }
 
-// The only probe whose answer is the response status itself: a reachable
-// health endpoint means the daemon is up.
+// The backend answers 200 whether or not it could reach the daemon; the
+// `running` flag carries the verdict.
 async function detectOllamaDaemon() {
-  return probe('ollama', 'local-api', '/api/ollama/health', () => ({ detected: true, defaultModel: null }));
+  return probe('ollama', PROBE_CLASSIFICATION.LOCAL_API, '/api/ollama/status', async (res) => {
+    const data = await res.json();
+    return { detected: Boolean(data.running), defaultModel: null };
+  });
 }
 
 async function detectStoredCloudKey(providerId) {
-  return probe(providerId, 'cloud', `/api/provider/key-status?provider=${encodeURIComponent(providerId)}`, async (res) => {
+  return probe(providerId, PROBE_CLASSIFICATION.CLOUD, `/api/provider/key-status?provider=${encodeURIComponent(providerId)}`, async (res) => {
     const data = await res.json();
     return { detected: Boolean(data.configured), defaultModel: null };
   });
@@ -71,5 +82,5 @@ export async function runDetection() {
     detectStoredCloudKey('openai'),
     detectStoredCloudKey('anthropic'),
   ]);
-  return probes.map((p) => (p.status === 'fulfilled' ? p.value : { detected: false }));
+  return probes.map((p) => (p.status === SETTLED_FULFILLED ? p.value : { detected: false }));
 }

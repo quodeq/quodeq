@@ -46,10 +46,10 @@ test('in-progress entries never contribute to a bucket accumulated average', () 
   // cards deliberately exclude in-progress runs, so a partial score here
   // makes the headline disagree with the cards mid-scan.
   const trend = [
-    { runId: 'live', dateISO: '2026-04-14T20:00:00', status: 'in_progress',
+    { runId: 'live', dateISO: '2026-04-14T20:00:00', status: 'running',
       dimensions: ['security'],
       dimensionDetails: [{ dimension: 'security', score: 2 }] },
-    { runId: 'done', dateISO: '2026-04-14T10:00:00', status: 'complete',
+    { runId: 'done', dateISO: '2026-04-14T10:00:00', status: 'done',
       dimensions: ['security'],
       dimensionDetails: [{ dimension: 'security', score: 8 }] },
   ];

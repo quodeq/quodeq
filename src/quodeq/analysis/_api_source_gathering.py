@@ -3,22 +3,29 @@
 Split out of subprocess.py: per-provider credential loaders keyed by AI_CMD,
 queue-aware source-file gathering for API dispatch, and greedy size-budgeted
 batching of files so one model call's inlined content stays within budget.
-``_CREDENTIAL_LOADERS`` is a patch target's dependency (read by
+``CREDENTIAL_LOADERS`` is a patch target's dependency (read by
 ``subprocess._resolve_provider_config``, which stays in subprocess.py), so it
 is re-exported there; nothing here is itself patched by name.
 """
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from quodeq.analysis import dispatch_policy
-from quodeq.analysis._api_standards_text import _gather_source_files
+from quodeq.analysis._api_standards_text import gather_source_files
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 
 _log = logging.getLogger(__name__)
+
+# The API runner's stream-done marker: a distinct artifact from the run-list/
+# RunState vocabulary (it is never written to status.json), so it gets its
+# own name rather than borrowing a RunState-shaped string. Shared by
+# subprocess.py's clean-finish write and this module's queue-exhausted write.
+API_RUNNER_STREAM_DONE = "complete"
 
 
 def _read_omlx_key(env: Mapping[str, str] | None = None) -> str | None:
@@ -30,24 +37,30 @@ def _read_omlx_key(env: Mapping[str, str] | None = None) -> str | None:
 # run's injected environment (None means the process environment) and returns
 # the API key string (or None/empty string) for that provider. New providers
 # can be added here without touching _resolve_provider_config.
-_CREDENTIAL_LOADERS: dict[str, Callable[[Mapping[str, str] | None], str | None]] = {
+CREDENTIAL_LOADERS: dict[str, Callable[[Mapping[str, str] | None], str | None]] = {
     "omlx": _read_omlx_key,
 }
 
 
-def _gather_api_source_files(
+def gather_api_source_files(
     work_dir: Path, cfg: AnalysisConfig, jsonl_file: Path, stream_file: Path,
+    *, queue_factory: Callable[[Path], FileQueue] | None = None,
 ) -> list[Path] | None:
     """Gather source files from queue or by scanning.
 
     Returns None (and writes empty output) when the queue is exhausted.
+    *queue_factory* defaults to ``FileQueue`` (tests pass a fake).
     """
+    factory = queue_factory if queue_factory is not None else FileQueue
     if cfg.queue_path and cfg.queue_path.exists():
-        queue = FileQueue(cfg.queue_path)
+        queue = factory(cfg.queue_path)
         taken = queue.take(count=min(cfg.max_files_per_agent or 10, 3), agent_id=cfg.agent_id)
-        # Enumeration applies the same predicate, so dropped files here mean
-        # the file changed (or vanished) between queue build and dispatch.
-        dispatchable, dropped = dispatch_policy.split_api_dispatchable(work_dir, taken)
+        # Enumeration applies the same predicate (the run's own policy when a
+        # RunConfig is carried), so dropped files here mean the file changed
+        # (or vanished) between queue build and dispatch.
+        policy = (cfg.run_config.dispatch_policy() if cfg.run_config is not None
+                  else dispatch_policy.default_dispatch_policy())
+        dispatchable, dropped = policy.split_api_dispatchable(work_dir, taken)
         if dropped:
             # Lazy import keeps the baseline-pinned llm_bridge line above
             # from shifting; the marker helper is router-owned wire format.
@@ -56,7 +69,7 @@ def _gather_api_source_files(
                 jsonl_file, dropped,
                 reason=(
                     f"skipped: missing or over the API file-size cap "
-                    f"({dispatch_policy.api_file_size_cap()} bytes)"
+                    f"({policy.file_size_cap} bytes)"
                 ),
             )
         source_files = [work_dir / f for f in dispatchable]
@@ -65,13 +78,13 @@ def _gather_api_source_files(
             # Don't touch jsonl_file — it's the SHARED `{dim}_evidence.jsonl`
             # that every agent in the pool appends to via MCP. Truncating it
             # here wipes findings from every other agent in the pool.
-            stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
+            write_stream_done_marker(stream_file)
             return None
         return source_files
-    return _gather_source_files(work_dir)
+    return gather_source_files(work_dir)
 
 
-def _batch_files_by_size(files: list[Path], budget: int) -> list[list[Path]]:
+def batch_files_by_size(files: list[Path], budget: int) -> list[list[Path]]:
     """Greedy, order-preserving split so one model call's inlined file
     content stays within *budget* bytes.
 
@@ -95,3 +108,8 @@ def _batch_files_by_size(files: list[Path], budget: int) -> list[list[Path]]:
     if current:
         batches.append(current)
     return batches
+
+
+def write_stream_done_marker(stream_file: Path) -> None:
+    """Overwrite *stream_file* with the API runner's one-line done marker."""
+    stream_file.write_text(json.dumps({"type": "api_runner", "status": API_RUNNER_STREAM_DONE}) + "\n", encoding="utf-8")

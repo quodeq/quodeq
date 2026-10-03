@@ -23,3 +23,17 @@ def test_kill_proc_tree_tolerates_a_fake_proc():
     fake = FakeProc()
     kill_proc_tree(fake)  # must not raise
     assert fake.killed
+
+
+def test_kill_tree_on_windows_logs_a_failed_taskkill(monkeypatch, caplog):
+    """kill_tree on Windows checks taskkill's result instead of dropping it."""
+    import logging
+
+    from quodeq.shared import process_kill
+    from quodeq.shared.constants import PLATFORM_WIN32
+
+    monkeypatch.setattr(process_kill.sys, "platform", PLATFORM_WIN32)
+    monkeypatch.setattr(process_kill, "_taskkill_tree", lambda pid: False)
+    caplog.set_level(logging.DEBUG, logger=process_kill.__name__)
+    process_kill.kill_tree(4242)
+    assert "taskkill did not kill tree 4242" in caplog.text

@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { ApiProvider } from '../../api/ApiContext.jsx';
 import { useTerminalSessions } from './useTerminalSessions.js';
+import catalog from '../../strings/en.json' with { type: 'json' };
+
+const showToast = vi.fn();
+vi.mock('../side-pane/SidePaneContext.jsx', () => ({
+  useOptionalSidePane: () => ({ showToast }),
+}));
 
 function makeWrapper(fakeApi) {
   return function Wrapper({ children }) {
@@ -18,6 +24,7 @@ function deferred() {
 describe('useTerminalSessions', () => {
   beforeEach(() => {
     localStorage.clear();
+    showToast.mockClear();
   });
 
   // reconcilingRef serializes concurrent reconciles: a server restart can
@@ -198,6 +205,27 @@ describe('useTerminalSessions', () => {
     await act(async () => {
       secondList.resolve({ sessions: [{ id: 's1' }, { id: 's2' }], max: 6 });
     });
+    warnSpy.mockRestore();
+  });
+
+  it('toasts when opening a new session fails, then resyncs with the server', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fakeApi = {
+      listTerminalSessions: vi.fn().mockResolvedValue({ sessions: [{ id: 's1' }], max: 1 }),
+      createTerminalSession: vi.fn().mockRejectedValue({ status: 409 }),
+      killTerminalSession: vi.fn(),
+    };
+    const { result } = renderHook(() => useTerminalSessions({ enabled: false }), {
+      wrapper: makeWrapper(fakeApi),
+    });
+
+    await act(async () => { await result.current.openSession(); });
+
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith(catalog['terminal.newSessionFailed']);
+    expect(warnSpy).toHaveBeenCalledWith('[useTerminalSessions] create session failed:', { status: 409 });
+    expect(fakeApi.listTerminalSessions).toHaveBeenCalledTimes(1);
+    expect(result.current.sessions).toEqual([{ id: 's1' }]);
     warnSpy.mockRestore();
   });
 });

@@ -6,7 +6,7 @@ tests/menubar/test_app.py uses for rumps -- letting these guards be exercised
 on any dev/CI platform. This complements test_pty_windows_smoke.py, which
 exercises the real ConPTY backend but only runs on win32.
 
-Part of Cluster 12 (terminal PTY reliability): see also
+This ties into the terminal PTY reliability fix; see also
 tests/integration/test_terminal_pty_reliability_e2e.py for the shared
 end-to-end regression test that ties this fix together with the
 terminal_read_loop / pump_terminal_out stop-signal fix.
@@ -99,3 +99,19 @@ def test_kill_logs_a_swallowed_terminate_failure(windows_pty_module, caplog):
         r.levelno >= logging.WARNING and "terminate" in r.message.lower()
         for r in caplog.records
     )
+
+
+def test_kill_propagates_a_terminate_failure_outside_the_narrowed_tuple(windows_pty_module):
+    """A RuntimeError from terminate() is not OSError, so it is a real bug,
+    not an already-gone-process race, and now escapes instead of being
+    swallowed as a warning."""
+    pty = windows_pty_module.WindowsPty(argv=["cmd.exe"])
+    pty.spawn(cwd="C:\\", cols=80, rows=24)
+
+    def _boom(force=False):
+        raise RuntimeError("unexpected bug")
+
+    pty._proc.terminate = _boom
+
+    with pytest.raises(RuntimeError):
+        pty.kill()

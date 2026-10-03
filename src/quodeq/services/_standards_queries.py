@@ -27,25 +27,25 @@ def list_builtin(dimensions_file: Path, compiled_dir: Path,
     out: list[StandardMeta] = []
     for dim in data.get("applies", []):
         try:
-            p_count, r_count, description = _read_compiled_meta(dim["id"], compiled_dir, read_json)
-            out.append(build_builtin_meta(dim, p_count, r_count, description))
+            p_count, r_count, description, version = _read_compiled_meta(dim["id"], compiled_dir, read_json)
+            out.append(build_builtin_meta(dim, p_count, r_count, description, version))
         except (OSError, ValueError, KeyError) as exc:
             logger.warning("Skipping invalid dimension entry %r: %s", dim, exc)
     return out
 
 
 def _read_compiled_meta(dimension_id: str, compiled_dir: Path,
-                        read_json: Callable) -> tuple[int, int, str]:
-    """Return (principle_count, requirement_count, description) for *dimension_id*."""
+                        read_json: Callable) -> tuple[int, int, str, str | None]:
+    """Return (principle_count, requirement_count, description, version) for *dimension_id*."""
     path = compiled_dir / f"{dimension_id}.json"
     if not path.is_file():
-        return 0, 0, ""
+        return 0, 0, "", None
     try:
         compiled = read_json(path)
     except (OSError, ValueError):
-        return 0, 0, ""
+        return 0, 0, "", None
     p_count, r_count = count_principles_and_requirements(compiled)
-    return p_count, r_count, compiled.get("description", "")
+    return p_count, r_count, compiled.get("description", ""), compiled.get("version")
 
 
 def list_custom(evaluators_dir: Path, read_json: Callable) -> list[StandardMeta]:

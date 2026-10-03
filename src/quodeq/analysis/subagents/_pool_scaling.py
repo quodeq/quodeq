@@ -1,6 +1,7 @@
 """Scaling logic: respawn decisions, scale-up computation, future collection."""
 from __future__ import annotations
 
+import subprocess
 import time
 from collections import OrderedDict
 from concurrent.futures import Future
@@ -11,13 +12,22 @@ from typing import Callable
 from quodeq.analysis.subagents._pool_models import (
     ScaleUpState,
     SubagentResult,
-    _AGENT_ID_PREFIX,
+    agent_id_for,
+    agent_stream_file,
 )
 from quodeq.analysis.errors import REASON_AGENT_FAILURE_STREAK
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
-from quodeq.config.analysis_env import agent_failure_streak_limit
+from quodeq.config.analysis_env import AGENT_FAILURE_STREAK_DEFAULT
 from quodeq.shared import cancellation
+from quodeq.shared.fault_isolation import run_isolated
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.logging import log_warning
+from quodeq.core.utils.numbers import clamp
+
+# Exceptions an agent's own work (its subprocess/CLI call, or the run_analysis
+# plumbing around it) is expected to surface as a plain failed agent, logged
+# with the exception type so the message stays specific to what happened.
+_EXPECTED_AGENT_FAILURES = (OSError, RuntimeError, ValueError, subprocess.SubprocessError)
 
 
 @dataclass
@@ -28,6 +38,7 @@ class ScaleUpContext:
     queue_path: Path
     submit_fn: Callable[[], None]
     deadline_at: float | None = None
+    run_deadline_at: float | None = None
 
 
 @dataclass
@@ -78,18 +89,26 @@ def get_queue(
 def should_respawn(
     queue: WorkQueue | None, queue_path: Path,
     pool_start: float, max_duration: float,
-    *, deadline_at: float | None = None,
+    *, deadline_at: float | None = None, run_deadline_at: float | None = None,
 ) -> int:
     """Return remaining file count if a new agent should be spawned, else 0.
 
     Spawning is gated by two ceilings:
     - the pool-local *max_duration* (elapsed since *pool_start*), and
-    - the run-level *deadline_at* (a monotonic wall-clock from the run config).
+    - *deadline_at*, a monotonic wall-clock from the run config: the run
+      deadline, or one dimension's slice of it when *run_deadline_at* (the
+      whole-run deadline) is later.
 
     Without the deadline gate, agents whose per-agent budget was clamped to
     "remaining run budget" (1s past the deadline) would die and immediately
     be respawned, producing an infinite stream of 1-second agents that never
     do useful work.
+
+    The "time budget reached" log names the gate "run deadline" rather than
+    "dimension slice" whenever *run_deadline_at* is None (consolidated mode
+    never sets it) or the auto-scale ratchet has moved *deadline_at* to or
+    past it, since only a *deadline_at* strictly earlier than the whole-run
+    deadline is actually a per-dimension slice.
     """
     remaining = get_queue(queue, queue_path).remaining()
     if cancellation.is_cancelled():
@@ -101,8 +120,10 @@ def should_respawn(
         return 0
     if deadline_at is not None and time.monotonic() >= deadline_at:
         if remaining > 0:
+            sliced = run_deadline_at is not None and deadline_at < run_deadline_at
+            budget = "dimension slice" if sliced else "run deadline"
             log_warning(
-                f"  Run deadline reached -- {remaining} files left, "
+                f"  Time budget reached ({budget}) -- {remaining} files left, "
                 f"not spawning new agents"
             )
         return 0
@@ -119,16 +140,9 @@ def should_respawn(
     return remaining
 
 
-def _agent_failure_streak_limit(env: dict[str, str] | None = None) -> int:
-    """Consecutive whole-agent failures tolerated before the run is cancelled.
-
-    Env override QUODEQ_AGENT_FAILURE_STREAK (resolved by the config layer);
-    0 disables the backstop.
-    """
-    return agent_failure_streak_limit(env)
-
-
-def check_agent_failure_streak(results: list[SubagentResult]) -> None:
+def check_agent_failure_streak(
+    results: list[SubagentResult], limit: int = AGENT_FAILURE_STREAK_DEFAULT,
+) -> None:
     """Cancel the run when every recent agent died without a single success.
 
     Provider-agnostic backstop for failure modes the fatal-error
@@ -136,8 +150,10 @@ def check_agent_failure_streak(results: list[SubagentResult]) -> None:
     provider cannot serve this run, and respawning only burns wall-clock and
     spams the console. Cancellation is enforced by the spawn gate
     (``should_respawn``) and the dimension loops.
+
+    *limit* is the run's QUODEQ_AGENT_FAILURE_STREAK (resolved once by the
+    CLI and carried on the pool's options); 0 disables the backstop.
     """
-    limit = _agent_failure_streak_limit()
     if limit <= 0 or cancellation.is_cancelled():
         return
     streak = 0
@@ -160,7 +176,28 @@ def compute_scale_up(remaining: int, free_slots: int) -> int:
     queue can still feed. No files-per-agent estimate; a slot launched for
     a file that another agent takes first exits on its empty take (one
     turn for a CLI agent, nothing for the API runner)."""
-    return max(0, min(remaining, free_slots))
+    return clamp(remaining, 0, free_slots)
+
+
+def _failed_result(agent_id: str, paths: EvidencePaths, exc: Exception) -> SubagentResult:
+    """The failed SubagentResult a dead pool agent's task boundary reports."""
+    return SubagentResult(
+        agent_id=agent_id,
+        jsonl_file=paths.shared_jsonl_path,
+        stream_file=agent_stream_file(paths.evidence_dir, paths.dimension_key, agent_id),
+        success=False,
+        error=str(exc),
+    )
+
+
+def _collect_one(future: Future[SubagentResult], agent_id: str, paths: EvidencePaths) -> SubagentResult:
+    """One pool agent's outcome. Its expected failure modes (a subprocess/CLI
+    call gone wrong) degrade in place with a message naming the exception."""
+    try:
+        return future.result()
+    except _EXPECTED_AGENT_FAILURES as exc:
+        log_warning(f"  {agent_id} raised {type(exc).__name__}: {exc}")
+        return _failed_result(agent_id, paths, exc)
 
 
 def collect_done(
@@ -169,22 +206,21 @@ def collect_done(
     results: list[SubagentResult],
     paths: EvidencePaths,
 ) -> set[Future[SubagentResult]]:
-    """Collect completed futures, updating results and finished map."""
+    """Collect completed futures, updating results and finished map.
+
+    Each future is one pool agent's task-entry boundary: an exception
+    ``_collect_one`` doesn't already recognise still degrades to a failed
+    agent via ``run_isolated`` instead of stopping the whole pool.
+    """
     done_futures = {f for f in futures if f.done()}
     for future in done_futures:
         idx = futures[future]
-        agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
-        try:
-            result = future.result()
-        except (OSError, RuntimeError, ValueError) as exc:
-            log_warning(f"  {agent_id} raised {type(exc).__name__}: {exc}")
-            result = SubagentResult(
-                agent_id=agent_id,
-                jsonl_file=paths.shared_jsonl_path,
-                stream_file=paths.evidence_dir / f"{paths.dimension_key}_{agent_id}.stream",
-                success=False,
-                error=str(exc),
-            )
+        agent_id = agent_id_for(idx)
+        result = run_isolated(
+            lambda f=future, a=agent_id: _collect_one(f, a, paths),
+            label=f"pool agent {agent_id}", log=SHARED_LOG,
+            on_error=lambda exc, a=agent_id: _failed_result(a, paths, exc),
+        )
         finished[result.agent_id] = True
         results.append(result)
         del futures[future]
@@ -216,7 +252,7 @@ def maybe_scale_up(
         return False
     remaining = should_respawn(
         ctx.queue, ctx.queue_path, state.pool_start, state.max_duration,
-        deadline_at=ctx.deadline_at,
+        deadline_at=ctx.deadline_at, run_deadline_at=ctx.run_deadline_at,
     )
     for _ in range(compute_scale_up(remaining, n_agents - running)):
         ctx.submit_fn()

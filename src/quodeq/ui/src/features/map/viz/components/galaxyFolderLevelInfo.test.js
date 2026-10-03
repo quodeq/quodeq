@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildLevelInfo } from './galaxyFolderLevelInfo.js';
+import { t } from '../../../../strings/index.js';
 
 const noScene = { rootStars: [] };
 
@@ -94,4 +95,18 @@ test('buildLevelInfo: folder hint appears only when the level holds folders', ()
   const scene = { rootStars: [{ isFolder: true }, { isFolder: false }] };
   assert.equal(typeof folderInfo(node, { scene }).hint, 'string');
   assert.equal(folderInfo(node).hint, null);
+});
+
+test('buildLevelInfo: counts folders and files in the contents line', () => {
+  const scene = { rootStars: [{ isFolder: true }, { isFolder: false }, { isFolder: true }, {}] };
+  const info = folderInfo({ name: 'src', complianceRate: 1, violations: 0 }, { scene });
+  const contents = info.lines.find((l) => l.label === t('map.contents'));
+  assert.equal(contents.value, 4);
+  assert.equal(info.hint, t('map.folderHint'));
+});
+
+test('buildLevelInfo: no folders means no folder hint', () => {
+  const scene = { rootStars: [{ isFolder: false }] };
+  const info = folderInfo({ name: 'src', complianceRate: 1, violations: 0 }, { scene });
+  assert.equal(info.hint, null);
 });

@@ -11,12 +11,22 @@ import SharedRepoSection from './SharedRepoSection.jsx';
  */
 
 export function makeFakeApi(overrides = {}) {
-  return {
+  const api = {
     getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
-    connectShared: vi.fn(async (url) => ({ configured: true, url })),
+    connectShared: vi.fn(async (url) => ({ started: true, url })),
+    startRefresh: vi.fn(async () => ({ started: true })),
+    startPull: vi.fn(async (project) => ({ started: true, project })),
+    getInvite: vi.fn(async () => ({ text: '' })),
     disconnectShared: vi.fn(async () => ({ configured: false })),
+    probeGit: vi.fn(),
+    getGithubAccount: vi.fn(),
+    startDeviceFlow: vi.fn(),
+    getDeviceFlow: vi.fn(),
+    pasteGithubToken: vi.fn(),
     ...overrides,
   };
+  // SharedRepoSection polls getSyncStatus; these tests set the status through getSharedStatus.
+  return { getSyncStatus: (...a) => api.getSharedStatus(...a), ...api };
 }
 
 export function renderWithApi(fakeApi, props = {}) {

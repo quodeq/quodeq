@@ -22,7 +22,7 @@
 }
 
 /* Instant tactile acknowledgement: the pages a card opens can take a
-   beat to render (nav-pending-bar covers the wait) — the press itself
+   beat to render (the top bar pending line covers the wait) — the press itself
    must react in the same frame. */
 .dim-gauge-card:active {
   background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));

@@ -215,7 +215,7 @@ it('routes OSC 8 hyperlink clicks through the pywebview bridge, not window.open'
     expect(linkHandler).toBeTruthy();
     linkHandler.activate({}, 'https://example.com/release');
 
-    expect(open_browser).toHaveBeenCalledWith('https://example.com/release');
+    await waitFor(() => expect(open_browser).toHaveBeenCalledWith('https://example.com/release'));
     expect(windowOpen).not.toHaveBeenCalled();
   } finally {
     windowOpen.mockRestore();

@@ -124,14 +124,15 @@ def read_finding_details(run_dir: Path, keys: set[DismissKey]) -> dict[DismissKe
     matched in Python; the file list is chunked to stay under SQLite's
     per-statement bind-parameter limit.
     """
-    db_path = run_dir / "evaluation.db"
+    db_path = run_dir / EVALUATION_DB_FILENAME
     if not db_path.is_file() or not keys:
         return {}
     out: dict[DismissKey, dict] = {}
     try:
         with open_evaluation_db(run_dir) as conn:
             _fetch_detail_rows(conn, set(keys), out)
-    except (sqlite3.DatabaseError, RuntimeError):
+    except (sqlite3.DatabaseError, RuntimeError) as exc:
+        _logger.warning("Could not read finding details from %s: %s", run_dir, exc, exc_info=True)
         return out
     return out
 
@@ -172,7 +173,8 @@ def _read_run_key_sets_from_db(run_dir: Path) -> tuple[set[tuple], set[tuple]] |
                 dismiss |= finding_dismiss_keys(
                     req=req, principle=pid, file=file, line=line, snippet=snippet)
                 cls.add((str(dim or ""), str(pid or ""), str(file or "")))
-    except (sqlite3.DatabaseError, RuntimeError):
+    except (sqlite3.DatabaseError, RuntimeError) as exc:
+        _logger.warning("Could not read run key sets from %s: %s", run_dir, exc)
         return None
     return dismiss, cls
 
@@ -212,7 +214,7 @@ def read_dismissed_snippets(run_dir: Path) -> list[tuple[str | None, str | None]
     let precedent matching break a scan."""
     try:
         return read_dismissed_snippets_strict(run_dir)
-    except Exception as exc:  # noqa: BLE001 — precedent must never break a scan
+    except (sqlite3.Error, OSError, RuntimeError) as exc:
         _logger.warning("Could not read dismissed snippets from %s: %s", run_dir, exc)
         return []
 
@@ -255,12 +257,12 @@ def read_semantic_eligible_dismissals(run_dir: Path) -> list[tuple[str | None, s
     without the filter a single empty-snippet dismissal would cosine-match
     every future finding under that requirement.
     """
-    if not (run_dir / "evaluation.db").is_file():
+    if not (run_dir / EVALUATION_DB_FILENAME).is_file():
         return []
     try:
         with open_evaluation_db(run_dir) as conn:
             return [(req, snippet) for req, snippet in conn.execute(_SEMANTIC_ELIGIBLE_SQL)]
-    except Exception as exc:  # noqa: BLE001 — precedent must never break a scan
+    except (sqlite3.Error, OSError, RuntimeError) as exc:
         _logger.warning("Could not read dismissed texts from %s: %s", run_dir, exc)
         return []
 
@@ -272,7 +274,7 @@ def find_dismissed_matching(
     DISMISSED finding in *run_dir* matching the ``(dimension, practice_id,
     file)`` deletion key. The caller derives the dismiss identities from the
     row (``finding_dismiss_keys``) to find the entries to undismiss."""
-    db_path = run_dir / "evaluation.db"
+    db_path = run_dir / EVALUATION_DB_FILENAME
     if not db_path.is_file():
         return []
     try:

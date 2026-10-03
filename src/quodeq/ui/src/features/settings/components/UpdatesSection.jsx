@@ -5,7 +5,7 @@ import { useUpdateStatus } from '../../updates/useUpdateStatus.js';
 import { useSelfUpdate } from '../../updates/useSelfUpdate.js';
 import { openExternal } from '../../updates/openExternal.js';
 import { t } from '../../../strings/index.js';
-import { SettingsOnOffPills } from './settingsRowParts.jsx';
+import { SettingsOnOffPills, SettingsRowLabel } from './settingsRowParts.jsx';
 
 // Up to date, an update waiting, or a security update waiting.
 function versionDescription({ available, status, current }) {
@@ -18,12 +18,7 @@ function versionDescription({ available, status, current }) {
 function VersionRow({ available, status, current, checking, onCheck }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.versionLabel')}</span>
-        <span className="settings-description">
-          {versionDescription({ available, status, current })}
-        </span>
-      </div>
+      <SettingsRowLabel hintSlot={false} label={t('settings.versionLabel')} description={versionDescription({ available, status, current })} />
       <button type="button" className="settings-pill" onClick={onCheck} disabled={checking}>
         {checking ? t('settings.checking') : t('settings.checkNow')}
       </button>
@@ -51,10 +46,7 @@ function UpdateAvailableRow({ status, selfUpdate }) {
   const description = updateDescription(status, selfUpdate);
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.getTheUpdate')}</span>
-        <span className="settings-description">{description}</span>
-      </div>
+      <SettingsRowLabel hintSlot={false} label={t('settings.getTheUpdate')} description={description} />
       {selfUpdate.supported && !selfUpdate.failed ? (
         <button
           type="button"
@@ -80,10 +72,7 @@ function UpdateAvailableRow({ status, selfUpdate }) {
 function AutoCheckRow({ auto, onToggle }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.automaticChecks')}</span>
-        <span className="settings-description">{t('settings.automaticChecksDesc')}</span>
-      </div>
+      <SettingsRowLabel hintSlot={false} label={t('settings.automaticChecks')} description={t('settings.automaticChecksDesc')} />
       <SettingsOnOffPills on={auto} onToggle={onToggle} />
     </div>
   );

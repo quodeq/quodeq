@@ -22,9 +22,11 @@ import pytest
 from quodeq.services import accumulated as acc_mod
 from quodeq.services.accumulated import (
     AccumulatedCacheConfig,
+    WalkCache,
     compute_accumulated,
     create_accumulated_cache,
 )
+from quodeq.services.wiring import DEFAULT_WALK_CACHE
 
 
 # ---------------------------------------------------------------------------
@@ -102,10 +104,36 @@ def _clear_process_cache():
 # Cross-call reuse
 # ---------------------------------------------------------------------------
 
+def test_slim_walk_read_failure_logs_and_the_run_is_skipped(tmp_path, recording_log, monkeypatch):
+    """A single run's read_run_data failure during the slim classification
+    walk must not abort the whole accumulated view -- it already degraded
+    to skipping that run's dimensions; the walk must also say so."""
+    from quodeq.data.fs.report_parser.runs import read_run_data as real_read_run_data
+
+    root, runs_desc = _project_with_runs(tmp_path, "proj", 5)
+    flaky_run = runs_desc[2]
+
+    def _flaky(reports_root, project, run_id):
+        if run_id == flaky_run:
+            raise ValueError("corrupt eval file")
+        return real_read_run_data(reports_root, project, run_id)
+
+    monkeypatch.setattr("quodeq.services._accumulated_data.read_run_data", _flaky)
+
+    result = compute_accumulated(str(root), "proj", runs_desc[0], log=recording_log)
+
+    assert result is not None
+    assert recording_log.warning_messages
+    assert any(
+        "read_run_data failed" in msg and flaky_run in msg
+        for msg in recording_log.warning_messages
+    )
+
+
 def test_neighbouring_as_of_selections_reuse_the_run_walk(tmp_path, counting_reader):
     """The second day selected must not re-read every run's findings again.
 
-    This is the regression under test: ``_resolve_cache(None)`` used to build a
+    This is the regression under test: ``resolve_cache(None)`` used to build a
     fresh empty LRU per call, so each as-of selection re-hydrated the entire
     run history from disk.
     """
@@ -209,3 +237,60 @@ def test_explicit_cache_config_still_isolates(tmp_path, counting_reader):
     # Both calls did their own reads -- an explicitly supplied cache is not
     # silently promoted to the shared process cache.
     assert len(counting_reader) >= 8
+
+
+# ---------------------------------------------------------------------------
+# G3 process-scoped owner: one WalkCache instance shared by every request
+# with no explicit cache_config.
+# ---------------------------------------------------------------------------
+
+def test_two_request_paths_share_the_default_walk_cache_instance(tmp_path):
+    """Two independent compute_accumulated calls -- as two different request
+    handlers would make them -- must observe the SAME process-wide WalkCache,
+    not one each."""
+    root, runs_desc = _project_with_runs(tmp_path, "proj", 6)
+    assert len(DEFAULT_WALK_CACHE.cache) == 0, "walk cache must start empty for this test"
+
+    compute_accumulated(str(root), "proj", runs_desc[0])
+    populated_after_first = len(DEFAULT_WALK_CACHE.cache)
+    assert populated_after_first > 0, "the walk must have populated the shared instance"
+
+    # A second, independent call path reuses the same object rather than a
+    # fresh one of its own.
+    compute_accumulated(str(root), "proj", runs_desc[1])
+    assert len(DEFAULT_WALK_CACHE.cache) >= populated_after_first
+
+
+def test_walk_cache_max_size_is_re_read_on_every_call(monkeypatch):
+    """WalkCache.max_size() must call max_fn() live, not snapshot it at
+    construction time -- QUODEQ_ACC_WALK_CACHE_MAX has to take effect on the
+    very next call, matching walk_cache_max()'s own contract."""
+    cache = WalkCache(max_fn=acc_mod.walk_cache_max)
+    monkeypatch.delenv("QUODEQ_ACC_WALK_CACHE_MAX", raising=False)
+    assert cache.max_size() == 2048
+
+    monkeypatch.setenv("QUODEQ_ACC_WALK_CACHE_MAX", "3")
+    assert cache.max_size() == 3
+
+
+def test_walk_cache_evicts_oldest_first_like_the_old_ordereddict(tmp_path):
+    """Pin the walk cache's eviction order/size: FIFO on insert past the cap,
+    and a hit refreshes recency -- identical to the old bare OrderedDict."""
+    root, runs_desc = _project_with_runs(tmp_path, "proj", 3)
+    fetch = acc_mod.make_slim_run_fetcher(root, "proj", DEFAULT_WALK_CACHE.cache, DEFAULT_WALK_CACHE.lock, 2)
+
+    fetch(runs_desc[0])
+    fetch(runs_desc[1])
+    assert len(DEFAULT_WALK_CACHE.cache) == 2
+
+    # A hit on the oldest entry refreshes it to most-recently-used.
+    fetch(runs_desc[0])
+    fetch(runs_desc[2])
+    assert len(DEFAULT_WALK_CACHE.cache) == 2
+
+    keys = list(DEFAULT_WALK_CACHE.cache.keys())
+    surviving_runs = {key[2] for key in keys}
+    assert surviving_runs == {runs_desc[0], runs_desc[2]}, (
+        "the refreshed entry and the newest insert must survive; the untouched "
+        "one must be the one evicted"
+    )

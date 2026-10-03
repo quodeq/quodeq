@@ -72,7 +72,7 @@ def test_cache_writer_key_matches_classify_files_via_cache(tmp_path):
     """LOAD-BEARING TEST: the key the closure computes MUST equal
     build_cache_key_for_file(config, file, dim). Otherwise the parent's
     classify_files_via_cache will MISS what the closure WRITES, and we'd be
-    back to the same divergence Phase 1 was meant to fix.
+    back to the key/hash divergence this test guards against.
 
     Verifies the fingerprint contract: same inputs -> same key -> same finding.
     """

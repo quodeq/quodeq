@@ -2,7 +2,7 @@
   "id": "performance",
   "name": "Performance Efficiency",
   "iso_25010": "Performance Efficiency",
-  "version": "2023",
+  "version": "2023.11",
   "sub_characteristics": [
     {
       "name": "Time Behaviour",

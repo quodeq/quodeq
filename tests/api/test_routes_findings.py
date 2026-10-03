@@ -86,6 +86,36 @@ class TestDismissEndpoint:
         assert "dimensions" in body["scores"]
         assert "summary" in body["scores"]
 
+    def test_dismiss_rescore_carries_recounted_totals(self, client, tmp_path):
+        """The run page's cached overview has counts but no finding lists, so
+        the rescored dimension carries its recounted ``totals`` for the
+        client to patch them from (for every mutation kind, not only a
+        dismiss it can splice)."""
+        from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+        from quodeq.data.events.writer import EventLogWriter
+        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+
+        run_dir = tmp_path / "my-project" / "run-1"
+        run_dir.mkdir(parents=True)
+        writer = EventLogWriter(run_dir / "events.jsonl")
+        for line, severity in ((10, "critical"), (20, "major")):
+            writer.emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+                practice_id="Integrity", verdict="violation", dimension="security",
+                file="a.py", line=line, reason="r", req="R1", severity=severity,
+            )))
+        SqliteFindingsRepository(run_dir).list_by_dimension("security")
+
+        resp = client.post("/api/findings/dismiss", json={
+            "project": "my-project", "req": "R1", "file": "a.py", "line": 10,
+            "dimension": "security", "severity": "critical", "run_id": "run-1",
+        })
+
+        [dim] = resp.get_json()["scores"]["dimensions"]
+        assert dim["totals"]["violationCount"] == 1
+        assert dim["totals"]["severity"]["critical"] == 0
+        assert dim["totals"]["severity"]["major"] == 1
+        assert "violations" not in dim
+
     def test_dismiss_with_run_id_returns_delta_envelope(self, client, tmp_path):
         """The dismiss response carries a ``delta`` envelope so the client can
         patch its dashboard/scores caches synchronously. With a run_id, the

@@ -2,10 +2,14 @@ import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
+import { SharedNoCompletedEvalEmptyState } from '../../../components/ProjectEmptyStates.jsx';
 import { t } from '../../../strings/index.js';
+import { RUN_STATE } from '../../../vocab/runState.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
-  const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
+  const hasRunning = availableRuns.some((r) => r?.status === RUN_STATE.RUNNING);
   if (hasRunning) {
     // First-ever evaluation is still running. There's no prior data to
     // show, but we still avoid claiming the project has "no" evaluations
@@ -15,7 +19,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
         title={t('overview.firstEvalTitle')}
         description={t('overview.firstEvalDesc')}
         actionLabel={t('overview.openHistory')}
-        onAction={() => onNavigate?.('history')}
+        onAction={() => onNavigate?.(NAV_TAB.HISTORY)}
       />
     );
   }
@@ -24,20 +28,15 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
   // evaluation" CTA has nowhere useful to send a shared-project viewer. Show
   // the same empty shell without the button and with copy that doesn't imply
   // there's an action to take here.
-  if (selectedSource === 'shared') {
-    return (
-      <EmptyState
-        title={t('overview.noCompletedEvalTitle')}
-        description={t('overview.noCompletedEvalSharedDesc')}
-      />
-    );
+  if (selectedSource === PROJECT_SOURCE.SHARED) {
+    return <SharedNoCompletedEvalEmptyState />;
   }
   return (
     <EmptyState
       title={t('overview.noCompletedEvalTitle')}
       description={t('overview.noCompletedEvalDesc')}
       actionLabel={t('overview.startEvaluation')}
-      onAction={() => onNavigate?.('evaluate')}
+      onAction={() => onNavigate?.(NAV_TAB.EVALUATE)}
     />
   );
 }
@@ -57,18 +56,19 @@ function DimensionFocusPanel({ focusedDimension, focusedDimensionData, setFocuse
 }
 
 function AccumulatedContent({ data, callbacks }) {
-  const { dashboard, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedRunId, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula } = data;
-  const { onRunSelect, onAccumulatedDimensionClick, onNavigate, onGranularityChange } = callbacks;
+  const { dashboard, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedRunId, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula, refreshing } = data;
+  const { onRunSelect, onRunHover, onRunHoverEnd, onAccumulatedDimensionClick, onNavigate, onGranularityChange } = callbacks;
   return (
     <AccumulatedOverviewPanel
       data={{
         accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
         accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
         trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo, granularity, selectedSource,
-        scoresPending, customFormula,
+        scoresPending, customFormula, refreshing,
+        sinceBaseline: dashboard?.sinceBaseline || {}, selectedRun: dashboard?.selectedRun,
       }}
       callbacks={{
-        onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick, onNavigate, onGranularityChange,
+        onRunClick: onRunSelect, onRunHover, onRunHoverEnd, onDimensionClick: onAccumulatedDimensionClick, onNavigate, onGranularityChange,
       }}
     />
   );
@@ -77,8 +77,7 @@ function AccumulatedContent({ data, callbacks }) {
 // ---------------------------------------------------------------------------
 // DashboardContent — the ready-state body of DashboardPage (run panel,
 // accumulated overview, single-dimension focus, or the no-completed-eval
-// empty state). Split out of DashboardPage.jsx to keep that file's
-// early-return ladder under the file-size cap; behavior is unchanged.
+// empty state).
 // ---------------------------------------------------------------------------
 export default function DashboardContent({ runMode, data, focus, callbacks }) {
   const { accumulatedDimensions, availableRuns, selectedProject, projectInfo, selectedSource } = data;
@@ -92,7 +91,11 @@ export default function DashboardContent({ runMode, data, focus, callbacks }) {
     return (
       <RunOverviewPanel
         dashboard={data.dashboard}
+        refreshing={data.refreshing}
         selectedRunId={data.selectedRunId}
+        selectedProject={selectedProject}
+        selectedSource={selectedSource}
+        availableRuns={data.availableRuns}
         projectName={projectInfo?.displayName || projectInfo?.name || selectedProject}
         onDimensionClick={onDimensionCardClick}
         onFileClick={onFileClick}

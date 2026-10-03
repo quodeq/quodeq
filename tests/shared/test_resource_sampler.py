@@ -16,12 +16,15 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.shared.resource_sampler import (
+    ResourceProbes,
     ResourceSampler,
     _format,
     _ollama_rss_mb,
     _self_rss_mb,
 )
 from tests._timeouts import budget
+
+_NO_PROBES = ResourceProbes()
 
 
 class TestSnapshotFormat:
@@ -108,7 +111,7 @@ class TestErrorTolerance:
     )
     def test_self_rss_returns_int_not_raises(self) -> None:
         # Real ps call against the test process — should always succeed.
-        rss = _self_rss_mb()
+        rss = _self_rss_mb(_NO_PROBES)
         assert isinstance(rss, int)
         assert rss > 0  # we exist; we have memory
 
@@ -117,7 +120,7 @@ class TestErrorTolerance:
             "quodeq.shared.resource_sampler.subprocess.run",
             side_effect=OSError("no ps"),
         ):
-            assert _self_rss_mb() == -1
+            assert _self_rss_mb(_NO_PROBES) == -1
 
     def test_ollama_rss_returns_zero_when_not_running(self) -> None:
         # pgrep returncode != 0 means not found — distinct from "couldn't ask".
@@ -128,11 +131,61 @@ class TestErrorTolerance:
             "quodeq.shared.resource_sampler.subprocess.run",
             return_value=_R(),
         ):
-            assert _ollama_rss_mb() == 0
+            assert _ollama_rss_mb(_NO_PROBES) == 0
 
     def test_ollama_rss_returns_unknown_on_pgrep_error(self) -> None:
         with patch(
             "quodeq.shared.resource_sampler.subprocess.run",
             side_effect=OSError("no pgrep"),
         ):
-            assert _ollama_rss_mb() == -1
+            assert _ollama_rss_mb(_NO_PROBES) == -1
+
+
+class TestResourceProbesSeam:
+    """ResourceProbes injection: a fake run/read_proc pair must back every
+    sample, proving subprocess.run/os.listdir were never called."""
+
+    def test_sample_once_uses_the_injected_probes(self) -> None:
+        run_calls: list[list[str]] = []
+
+        class _R:
+            returncode = 0
+            stdout = "12345"
+
+        def fake_run(cmd, **kwargs):
+            run_calls.append(cmd)
+            return _R()
+
+        def fake_read_proc(path):
+            return ["3", "4", "5"]  # 3 fds
+
+        probes = ResourceProbes(run=fake_run, read_proc=fake_read_proc)
+        sampler = ResourceSampler(probes=probes)
+        sampler.start()
+        try:
+            with patch(
+                "quodeq.shared.resource_sampler.subprocess.run",
+                side_effect=AssertionError("must not call subprocess.run directly"),
+            ), patch(
+                "quodeq.shared.resource_sampler.os.listdir",
+                side_effect=AssertionError("must not call os.listdir directly"),
+            ):
+                line = sampler.sample_once()
+        finally:
+            sampler.stop()
+
+        assert run_calls, "the injected run fake was never called"
+        assert "fds=3" in line
+
+    def test_no_probes_arg_keeps_the_subprocess_and_listdir_fallback(self) -> None:
+        """Existing patch targets keep biting: no probes injected -> falls
+        back to subprocess.run/os.listdir, resolved at call time."""
+        sampler = ResourceSampler()
+        sampler.start()
+        try:
+            with patch("quodeq.shared.resource_sampler.subprocess.run") as mock_run:
+                mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "999"})()
+                sampler.sample_once()
+        finally:
+            sampler.stop()
+        assert mock_run.called

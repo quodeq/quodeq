@@ -9,7 +9,12 @@
  * one place, so the three call sites cannot drift apart again.
  */
 
-/** Normalize a violation object into the dismiss POST payload. */
+/**
+ * Normalize a violation object into the dismiss POST payload: the finding's
+ * identity only. The server reads the snippet it fingerprints from the
+ * run's own rows, so a row whose detail is still deferred dismisses the
+ * same as a hydrated one.
+ */
 export function buildDismissPayload(v, fallbackDimension) {
   const fileParts = (v.file || '').split(':');
   const file = fileParts[0];
@@ -19,14 +24,6 @@ export function buildDismissPayload(v, fallbackDimension) {
     file,
     line,
     dimension: v.dimension || fallbackDimension || '',
-    severity: v.severity,
-    title: v.title || '',
-    reason: v.reason,
-    reqRefs: v.reqRefs || [],
-    context: v.context || '',
-    snippet: v.snippet || '',
-    scope: v.scope || '',
-    endLine: v.endLine || 0,
     principle: v.principle || '',
   };
 }

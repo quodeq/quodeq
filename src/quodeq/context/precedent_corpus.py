@@ -10,28 +10,32 @@ from __future__ import annotations
 
 import logging
 import math
+import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.config.context_env import PrecedentSettings, precedent_settings
 from quodeq.context.precedent_fingerprint import fingerprint, precedent_text
 from quodeq.context.precedent_store import (
     AvailabilityFn,
     EmbedFn,
     Embedder,
     VectorStoreFns,
-    _load_or_backfill_vectors,
-    _resolve_vector_store,
+    load_or_backfill_vectors,
+    openai_errors,
+    resolve_vector_store,
 )
 
 _logger = logging.getLogger(__name__)
 
 MARKER_NAME = ".semantic_precedents_off"
-_EMBED_BUDGET_S = 20.0
+EMBED_BUDGET_S = 20.0
 
 
-def _unit(vec: list[float]) -> list[float] | None:
+def unit(vec: list[float]) -> list[float] | None:
+    """*vec* scaled to length 1, or None for the zero vector."""
     norm = math.sqrt(math.sumprod(vec, vec))
     if norm == 0.0:
         return None
@@ -55,7 +59,7 @@ class PrecedentCorpus:
         threshold: float,
         marker_path: Path,
     ) -> None:
-        self._vectors = [u for v in vectors if (u := _unit(v)) is not None]
+        self._vectors = [u for v in vectors if (u := unit(v)) is not None]
         self._embed = embed
         self.threshold = threshold
         self._marker_path = marker_path
@@ -72,23 +76,23 @@ class PrecedentCorpus:
 
     def match_many(self, texts: list[str]) -> list[float | None]:
         """Best cosine similarity of each text against the corpus, one embedding call."""
+        import httpx  # noqa: PLC0415 -- lazy: see precedent_store.openai_errors()'s docstring
         if self._disabled or not self._vectors or not texts:
             return [None] * len(texts)
         try:
             start = time.monotonic()
             queries = self._embed(list(texts))
             if len(queries) != len(texts):
-                raise RuntimeError(f"embedding returned {len(queries)} vectors "
-                                   f"for {len(texts)} texts")
+                raise RuntimeError(f"embedding returned {len(queries)} vectors for {len(texts)} texts")
             self._elapsed += time.monotonic() - start
             scores: list[float | None] = []
             for query in queries:
-                q = _unit(query)
+                q = unit(query)
                 scores.append(None if q is None else max(math.sumprod(q, v) for v in self._vectors))
-            if self._elapsed > _EMBED_BUDGET_S:
+            if self._elapsed > EMBED_BUDGET_S:
                 self._trip("cumulative embedding time budget exceeded")
             return scores
-        except Exception as exc:  # noqa: BLE001 -- contractually total
+        except (*openai_errors(), httpx.HTTPError, RuntimeError, TypeError, ValueError) as exc:
             self._trip(f"embedding failed: {exc}")
             return [None] * len(texts)
 
@@ -97,7 +101,7 @@ class PrecedentCorpus:
         return self.match_many([text])[0]
 
 
-def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
+def collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
     """Map fingerprint -> canonical text for every dismissed finding.
 
     Mirrors ``_semantic_eligible`` in ``analysis/mcp/precedent_downweight.py``
@@ -125,7 +129,7 @@ def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
     return out
 
 
-def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, AvailabilityFn, object]:
+def resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, AvailabilityFn, object]:
     """Build the production embed/availability callables from llm_bridge.
 
     Split out from load_precedent_corpus because assigning a nested
@@ -149,7 +153,7 @@ def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, Availability
     return _embed, embedding_model_available, BATCH_TIMEOUT
 
 
-def _resolve_embed_and_availability(
+def resolve_embed_and_availability(
     embed_fn: EmbedFn | None,
     availability_fn: AvailabilityFn | None,
     model: str,
@@ -163,7 +167,7 @@ def _resolve_embed_and_availability(
     """
     batch_timeout: object = None
     if embed_fn is None or availability_fn is None:
-        prod_embed_fn, prod_availability_fn, prod_batch_timeout = _resolve_embedding(
+        prod_embed_fn, prod_availability_fn, prod_batch_timeout = resolve_embedding(
             model, base_url
         )
         if embed_fn is None:
@@ -177,19 +181,17 @@ def _resolve_embed_and_availability(
 def _resolve_available_embedder(
     embed_fn: EmbedFn | None,
     availability_fn: AvailabilityFn | None,
+    settings: PrecedentSettings,
 ) -> Embedder | None:
     """Resolve model/embed_fn/batch_timeout, or None when unavailable.
 
-    Wraps :func:`_resolve_embed_and_availability` with the model/base_url
-    lookup and the availability check + degrade-log, so
+    Wraps :func:`resolve_embed_and_availability` with the settings' model/
+    base_url and the availability check + degrade-log, so
     ``load_precedent_corpus`` only has to handle a single
     None-or-proceed branch.
     """
-    from quodeq.shared.env import get_embedding_base_url, get_embedding_model  # noqa: PLC0415
-
-    model = get_embedding_model()
-    base_url = get_embedding_base_url()
-    embed_fn, availability_fn, batch_timeout = _resolve_embed_and_availability(
+    model, base_url = settings.model, settings.base_url
+    embed_fn, availability_fn, batch_timeout = resolve_embed_and_availability(
         embed_fn, availability_fn, model, base_url,
     )
     if not availability_fn(model, base_url):
@@ -202,8 +204,8 @@ def _resolve_available_embedder(
 
 
 def _resolve_store() -> VectorStoreFns:
-    """Production store resolver; tests patch ``precedent_corpus._resolve_vector_store``."""
-    return _resolve_vector_store()
+    """Production store resolver; tests patch ``precedent_corpus.resolve_vector_store``."""
+    return resolve_vector_store()
 
 
 @dataclass(frozen=True)
@@ -223,7 +225,7 @@ def _embed_and_build_corpus(
 ) -> "PrecedentCorpus | None":
     """Backfill/load vectors and assemble the corpus, or None if nothing embedded."""
     start = time.monotonic()
-    result = _load_or_backfill_vectors(store, project_dir, texts, embedder)
+    result = load_or_backfill_vectors(store, project_dir, texts, embedder)
     if result is None:
         return None
     pairs, embedded_new = result
@@ -255,21 +257,20 @@ def load_precedent_corpus(
     embed_fn: EmbedFn | None = None,
     availability_fn: AvailabilityFn | None = None,
     store: VectorStoreFns | None = None,
+    settings: PrecedentSettings | None = None,
 ) -> "PrecedentCorpus | None":
     """Build the semantic corpus, or None. NEVER raises (never breaks a scan).
 
     Test seams: *embed_fn*/*availability_fn* default to llm_bridge's
-    production callables, *store* to ``data.sqlite.precedent_vectors``. The
+    production callables, *store* to ``data.sqlite.precedent_vectors``,
+    *settings* to the process env (callers resolve and pass their own). The
     run-dir marker file is the cross-process circuit breaker: one process's
     failure disables the tier for sibling agents, respawns, and per-call API
     context rebuilds.
     """
-    from quodeq.shared.env import (  # noqa: PLC0415 -- cross-cutting layer
-        get_precedent_similarity_threshold,
-        semantic_precedents_enabled,
-    )
-
-    if not semantic_precedents_enabled():
+    import httpx  # noqa: PLC0415 -- lazy: see precedent_store.openai_errors()'s docstring
+    settings = settings if settings is not None else precedent_settings()
+    if not settings.enabled:
         _logger.debug("Semantic precedents: flag off")
         return None
     marker = run_dir / MARKER_NAME
@@ -278,19 +279,19 @@ def load_precedent_corpus(
             _logger.debug("Semantic precedents: circuit marker present")
             return None
 
-        embedder = _resolve_available_embedder(embed_fn, availability_fn)
+        embedder = _resolve_available_embedder(embed_fn, availability_fn, settings)
         if embedder is None:
             return None
 
-        texts = _collect_dismissed_texts(project_dir)
+        texts = collect_dismissed_texts(project_dir)
         if not texts:
             _logger.debug("Semantic precedents: no dismissed findings")
             return None
         if store is None:
             store = _resolve_store()
 
-        policy = CorpusBuildPolicy(marker=marker, threshold=get_precedent_similarity_threshold())
+        policy = CorpusBuildPolicy(marker=marker, threshold=settings.similarity_threshold)
         return _embed_and_build_corpus(store, project_dir, texts, embedder, policy)
-    except Exception as exc:  # noqa: BLE001 -- never break a scan
+    except (*openai_errors(), httpx.HTTPError, RuntimeError, sqlite3.Error, OSError, ValueError) as exc:
         _logger.warning("Semantic precedent corpus unavailable: %s", exc)
         return None

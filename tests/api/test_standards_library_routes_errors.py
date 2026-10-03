@@ -1,6 +1,6 @@
 """Post-PR review I4: library-backed standards routes keep their 502 contract.
 
-Cluster 14 narrowed both routes from ``except Exception`` to
+Both routes were narrowed from ``except Exception`` to
 ``(OSError, ValueError)``. That left two realistic transport failures falling
 through to Flask's bare 500 instead of the documented ``{"error", "code"}``
 502 body: ``http.client.HTTPException`` (``IncompleteRead``, ``BadStatusLine``,

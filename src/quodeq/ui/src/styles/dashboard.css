@@ -1,7 +1,13 @@
 /* ── Tab fade transition ─────────────────────────────── */
 
+/* The wrapper is a stable node (see TabFade in AppMain.jsx); the two phases
+   name identical keyframes so a phase flip restarts the fade in place. */
 .tab-fade {
   animation: tab-fadein 300ms ease;
+}
+
+.tab-fade[data-fade="b"] {
+  animation-name: tab-fadein-alt;
 }
 
 @keyframes tab-fadein {
@@ -9,40 +15,9 @@
   to { opacity: 1; }
 }
 
-/* ── Navigation pending bar ─────────────────────────────
-   Shown while a route transition's target page is still rendering
-   (useNavStack navPending). Sits at the top of the content column so a
-   heavy detail page (or a slow webview engine) never leaves a click
-   looking ignored. Fades in late: fast navigations never flash it. */
-.nav-pending-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  overflow: hidden;
-  z-index: 30;
-  pointer-events: none;
-  animation: nav-pending-appear 80ms ease-out 120ms both;
-}
-
-.nav-pending-bar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: 40%;
-  background: var(--color-accent);
-  animation: nav-pending-slide 0.9s ease-in-out infinite;
-}
-
-@keyframes nav-pending-appear {
+@keyframes tab-fadein-alt {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-@keyframes nav-pending-slide {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(350%); }
 }
 
 /* ── Dashboard fade transitions ──────────────────────── */
@@ -59,10 +34,12 @@
   animation: dashboard-fadein 400ms ease;
 }
 
-/* Subtle "background refetch in progress" — used while placeholderData
-   shows the previous run's content during a run switch. */
-.dashboard-refreshing {
-  opacity: 0.7;
+/* A section whose data is being refetched while it still shows the previous
+   values: muted text only. The one loading line lives on the top bar
+   (.topbar-pending), so stacked pending sections never pile up indicators
+   and never dim content below the readable floor. */
+.section-pending {
+  --color-text: var(--color-text-muted);
 }
 
 @keyframes dashboard-fadein {
@@ -425,13 +402,8 @@
 }
 
 /* Scores for a newly-picked day are still in flight, so the cards below are
-   still showing the previous selection's grades. Fade them and label the
-   panel rather than letting stale numbers read as the answer. */
-.quality-dimensions--pending .dimensions-panel {
-  opacity: 0.55;
-  transition: opacity 120ms ease;
-}
-
+   still showing the previous selection's grades. The section carries the
+   top bar pending line; this chip says why. */
 .quality-dimensions__pending {
   color: var(--color-text-muted);
   font-size: 0.75rem;
@@ -2436,9 +2408,9 @@
   width: 100%;
 }
 
-/* ── Toolbar: name search, filter pills, sync status ──
-   Sits above the merged card list (ProjectsToolbar/FilterPill/
-   SyncedIndicator in ProjectsPage.jsx). The search field mirrors
+/* ── Toolbar: name search, filter pills ──
+   Sits above the merged card list (ProjectsToolbar/FilterPill in
+   ProjectsToolbar.jsx; the sync status is the strip, .sync-strip). The search field mirrors
    TermInput's terminal-input look (see .term-input in terminal.css); the
    location and sort selectors are dropdown pills that light up with the
    accent whenever a non-default value is active. */
@@ -2554,24 +2526,9 @@
   font-weight: var(--weight-medium);
 }
 
-.projects-toolbar-sync {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-left: auto;
-}
-
-.projects-toolbar-sync-label {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
 @media (max-width: 600px) {
   .projects-toolbar-search {
     flex-basis: 100%;
-  }
-  .projects-toolbar-sync {
-    margin-left: 0;
   }
 }
 
@@ -2944,26 +2901,36 @@
   margin-bottom: var(--space-4);
 }
 
+/* Header actions are compact, the same height as the strip's buttons below
+   them (26 px, small mono), so the title row stays the loudest thing. */
 .projects-page__add-btn {
   flex-shrink: 0;
+  min-height: 26px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+}
+.projects-page__header-actions .projects-page__import-btn {
+  min-height: 26px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
 }
 
-/* Pill-style import button — visually aligned with the topbar provider/model
-   pill (muted text, subtle border, transparent bg) so it reads as a
-   secondary action next to the red filled "add project" CTA. */
+/* Secondary header actions (connect evaluations repository, the strip buttons): the same
+   size and shape as the filled "add project" term-btn beside them (mono 13px,
+   term-btn padding and radius), muted colours so only the primary one
+   carries the accent. */
 .projects-page__import-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  min-height: 28px;
+  padding: var(--term-space-2) var(--term-space-3);
   box-sizing: border-box;
   border: 1px solid var(--color-border);
   border-radius: var(--term-radius);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.4;
+  font-family: var(--term-font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: normal;
   color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;
@@ -3013,42 +2980,324 @@
   }
 }
 
-/* ── Empty-projects centered CTA ── */
+/* ── Empty Repositories page: the welcome's two paths, side by side ── */
 
-.projects-empty--cta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: var(--space-12) var(--space-6);
-  gap: var(--space-3);
+.projects-empty--paths {
+  padding: var(--space-6) 0;
 }
 
-.projects-empty__title {
-  margin: 0;
-  font-size: 1.4rem;
+/* ── Evaluations repository form (url or folder) ──
+   Shared by the welcome's connect step and the failure card below. */
+
+.repo-source-switch {
+  display: inline-flex;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  overflow: hidden;
+}
+
+.repo-source-switch__option {
+  appearance: none;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--term-font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.repo-source-switch__option + .repo-source-switch__option {
+  border-left: 1px solid var(--color-border);
+}
+.repo-source-switch__option:hover {
   color: var(--color-text);
-  font-weight: 600;
+  background: var(--color-surface-alt);
+}
+.repo-source-switch__option--active,
+.repo-source-switch__option--active:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.repo-source-switch__option:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
 }
 
-.projects-empty__hint {
-  margin: 0;
-  max-width: 420px;
+.evals-repo-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.repo-form__field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.repo-form__field > .term-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.repo-form__field .term-input__field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.repo-form__path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--term-font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+}
+.repo-form__path--empty {
   color: var(--color-text-muted);
 }
 
-/* Small layout-only adjustments on top of the term-btn--filled visual. */
-.projects-empty__cta-btn {
+.evals-repo-form__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.evals-repo-form__hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.evals-repo-form__error {
+  margin-bottom: 0;
+}
+
+@media (max-width: 600px) {
+  .evals-repo-form__submit {
+    flex: 1 1 100%;
+  }
+}
+
+/* ── Team results: sync strip and connect card ──
+   The strip sits under the header while a team repository is configured
+   (one state at a time, see SyncStrip.jsx); the connect card is the inline
+   card a failed connect comes back in. Both reuse the
+   header's pill buttons and the card surface tokens. */
+
+.sync-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  font-family: var(--term-font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+}
+
+.sync-strip__cloud {
+  color: var(--color-accent);
+}
+
+.sync-strip__repo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sync-strip__status {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.sync-strip__meta {
+  color: var(--color-text-muted);
+}
+
+.sync-strip__meta--warn {
+  color: var(--color-warning-text);
+}
+
+.sync-strip__retry {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sync-strip__retry:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.sync-strip__grow {
+  flex: 1 1 auto;
+}
+
+.sync-strip__actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.sync-strip__btn {
+  min-height: 26px;
+  font-size: var(--text-xs);
+}
+
+.sync-strip__menu {
+  position: relative;
+}
+
+.sync-strip__menu-list {
+  left: auto;
+  right: 0;
+  min-width: 170px;
+}
+
+.sync-strip__invite-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font: inherit;
+}
+
+/* Shared by the strip and a team card's pull. */
+.sync-strip__bar {
+  position: relative;
+  flex: 0 1 180px;
+  min-width: 120px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-surface-alt);
+}
+
+.sync-strip__bar-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--color-accent);
+  transition: width 0.4s ease;
+}
+
+.sync-strip__bar--indeterminate .sync-strip__bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  animation: sync-bar-slide 1.3s ease-in-out infinite;
+}
+
+@keyframes sync-bar-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(290%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-strip__bar--indeterminate .sync-strip__bar-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.45;
+  }
+}
+
+.project-card-pulling .sync-strip__bar {
+  flex: 1 1 auto;
+  min-width: 60px;
+}
+
+.connect-team-card {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--term-radius);
+}
+
+.connect-team-card__title {
+  margin: 0;
+  font-family: var(--term-font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.connect-team-card__marker {
+  color: var(--color-accent);
+}
+
+.connect-team-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+/* Icon-only dismiss, the same quiet "×" the dialogs use: no border, muted
+   until hovered, sized to the title row so it never towers over it. */
+.connect-team-card__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--term-radius);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.connect-team-card__close:hover {
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+.connect-team-card__close:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.connect-team-card__desc {
+  margin: 0 0 var(--space-3);
+  max-width: 60ch;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.connect-team-card__access {
   margin-top: var(--space-3);
 }
 
-.projects-empty__cta-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+@media (max-width: 600px) {
+  .sync-strip__grow {
+    display: none;
+  }
 }
 
 /* ── Global empty-state CTA (used on overview/violations/map when no projects) ── */
@@ -3090,6 +3339,7 @@
 .project-card:focus-within .project-card-footer,
 .project-card:has(.project-delete-btn--confirm) .project-card-footer,
 .project-card:has(.project-card-footer-error) .project-card-footer,
+.project-card:has(.project-card-footer-note) .project-card-footer,
 .project-card:has(.project-delete-btn--pending) .project-card-footer {
   opacity: 1;
   pointer-events: auto;
@@ -3158,7 +3408,7 @@
    colored. `aria-disabled` (not the native attribute) keeps the click
    firing while a job is running, matching this codebase's is-disabled
    convention -- see connectingRef/refreshingRef/pullingRef in
-   useSharedProjects.js and the EmptyProjectsCTA comment. */
+   useSharedProjects.js and evalBlocked.js. */
 .project-delete-btn--accent {
   color: var(--color-accent);
   border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
@@ -3179,6 +3429,41 @@
   flex-basis: 100%;
   margin: var(--space-1) 0 0;
   text-align: right;
+}
+
+/* Fetch-latest-code outcome, on its own line like the error above. */
+.project-card-footer-note {
+  flex-basis: 100%;
+  margin: var(--space-1) 0 0;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Fetch-latest-code button: the icon buttons' danger hover is for delete. */
+.project-delete-btn--neutral:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
+  border-color: var(--color-border);
+}
+
+.project-delete-btn--neutral[aria-disabled="true"] {
+  cursor: progress;
+}
+
+.project-delete-btn--spinning svg {
+  animation: project-refresh-spin 900ms linear infinite;
+}
+
+@keyframes project-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-delete-btn--spinning svg {
+    animation: none;
+    opacity: 0.5;
+  }
 }
 
 /* Resume-setup badge on project cards with onboardingCompletedAt === null.
@@ -3265,4 +3550,63 @@
   border-radius: 4px;
   background: var(--color-surface-alt);
   opacity: 0.6;
+}
+
+/* ── Detail-page card-list skeleton ─────────────────────
+   DeferredMount fallback for card lists and tables (detail pages,
+   Violations, History). Static
+   dimmed blocks (house idiom, see dashboard.css .overview-skeleton__bar):
+   36px header row + 160px card rows, mirroring the pages'
+   ROW_HEIGHT_PX (rowSizeEstimator) so the fallback commit and the mounted VirtualList
+   occupy the same slot at the same scale. */
+.card-list-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.card-list-skeleton__bar {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+.card-list-skeleton__bar--header { height: 36px; width: 40%; }
+.card-list-skeleton__bar--card { height: 160px; }
+
+/* The ghost tile: a project that is still cloning. Quieter than a real card
+   (dashed edge), same width, so the real tile replaces it without a jump. */
+.project-card--ghost {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border);
+  background: var(--color-surface);
+}
+.project-card--ghost__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.project-card--ghost__name {
+  margin: 0;
+  font-family: var(--term-font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+.project-card--ghost__meta {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.project-card--ghost__error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
 }

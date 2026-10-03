@@ -15,7 +15,7 @@ message writes a non-raising `<name>_error()` checker (see
 ``shared/validation.py``, ``core/utils/io.py``, ``shared/url_validation.py``)
 and the route returns the checker's string or a fixed constant, never the
 exception object itself. A domain exception with a client-facing text keeps
-it in an attribute (``_ImportError.public_message``).
+it in an attribute (``ImportValidationError.public_message``).
 """
 from __future__ import annotations
 

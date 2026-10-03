@@ -222,3 +222,14 @@ class TestEmptyStatusDimensionsRecovery:
         progress = build_scan_progress("j1", run_dir)
         assert progress is not None
         assert progress.dimensions == []
+
+
+class TestNonObjectStatusJson:
+    def test_non_object_status_json_does_not_crash(self, tmp_path: Path) -> None:
+        """A non-object status.json (e.g. a JSON array) must not crash the
+        live-progress reader: ``_gather_progress_context`` calls
+        ``status.get(...)`` unconditionally."""
+        run_dir = _make_run(tmp_path)
+        (run_dir / "status.json").write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+
+        assert build_scan_progress("j1", run_dir) is None

@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { POINTER_EVENT } from '../../../vocab/pointerEvent.js';
 
 /**
  * The pointer-drag lifecycle the side pane's two resizers share: take over
@@ -37,8 +38,8 @@ export function useDragLifecycle({ setResizingFlag, activeDragCleanupRef }) {
       setResizingFlag(false);
       document.body.style.cursor = prevCursor;
       document.body.style.userSelect = prevSelect;
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener(POINTER_EVENT.MOVE, handleMove);
+      window.removeEventListener(POINTER_EVENT.UP, handleUp);
       activeDragCleanupRef.current = null;
     };
     const handleUp = (ev) => {
@@ -46,8 +47,8 @@ export function useDragLifecycle({ setResizingFlag, activeDragCleanupRef }) {
       cleanup();
     };
 
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
+    window.addEventListener(POINTER_EVENT.MOVE, handleMove);
+    window.addEventListener(POINTER_EVENT.UP, handleUp);
     activeDragCleanupRef.current = cleanup;
     return cleanup;
   }, [setResizingFlag, activeDragCleanupRef]);

@@ -111,7 +111,7 @@ def test_legacy_incremental_flag_warns_on_run(mock_model, mock_paths, tmp_path, 
     mock_paths_obj.evaluators_dir = tmp_path / "evaluators"
     mock_paths.return_value = mock_paths_obj
 
-    with patch("quodeq.cli_evaluation._resolve_evaluation_inputs", return_value=None):
+    with patch("quodeq.cli_evaluation.resolve_evaluation_inputs", return_value=None):
         with patch("quodeq.cli_evaluation.check_evaluate_prereqs"):
             run_evaluate(_legacy_incremental_args)
     captured = capsys.readouterr()

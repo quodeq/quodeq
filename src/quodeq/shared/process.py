@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 import sys
 
+from quodeq.shared.constants import PLATFORM_WIN32
+
 
 def is_pid_alive(pid: int) -> bool:
     """Return True if *pid* refers to a live process. POSIX + Windows.
@@ -25,7 +27,7 @@ def is_pid_alive(pid: int) -> bool:
     ``OpenProcess`` + ``GetExitCodeProcess`` instead, which are
     side-effect-free and tolerate dead PIDs cleanly.
     """
-    if sys.platform == "win32":
+    if sys.platform == PLATFORM_WIN32:
         import ctypes
         from ctypes import wintypes
         PROCESS_QUERY_LIMITED_INFORMATION = 0x1000

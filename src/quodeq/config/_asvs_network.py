@@ -8,21 +8,21 @@ import random
 import time
 import urllib.error
 import urllib.request
-import os
 
+from quodeq.shared.constants import RETRY_BASE_DELAY_S, RETRY_JITTER_S
 from quodeq.shared.url_validation import validate_url_safe
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
 
-_DEFAULT_FETCH_TIMEOUT_S = 30
-_RETRY_BASE_DELAY_S = 0.5
-_RETRY_JITTER_S = 0.3
+DEFAULT_FETCH_TIMEOUT_S = 30
 _MAX_FETCH_BYTES = 50 * 1024 * 1024  # ASVS standard docs are well under this; guards against a compromised/misconfigured allowlisted host
+_DEFAULT_MAX_RETRIES = 3  # attempts before fetch_with_retry gives up
 
 
-def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retries: int = 3) -> bytes:
+def fetch_with_retry(url: str, timeout: int = DEFAULT_FETCH_TIMEOUT_S, max_retries: int = _DEFAULT_MAX_RETRIES) -> bytes:
     """Fetch URL content with exponential-backoff retries.
 
     Retries on network errors up to *max_retries* times, raising
@@ -44,7 +44,7 @@ def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retr
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             last_exc = exc
             if attempt < max_retries - 1:
-                time.sleep(_RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, _RETRY_JITTER_S))
+                time.sleep(RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, RETRY_JITTER_S))
             continue
         if len(data) > _MAX_FETCH_BYTES:
             raise ConnectionError(
@@ -70,7 +70,7 @@ def verify_integrity(
     """
     actual_hash = hashlib.sha256(content).hexdigest()
     if expected_hash is None:
-        expected_hash = (os.environ if env is None else env).get("QUODEQ_ASVS_SHA256")
+        expected_hash = resolve_env(env).get("QUODEQ_ASVS_SHA256")
     if skip_integrity is None:
         skip_integrity = False
     if expected_hash and actual_hash != expected_hash:

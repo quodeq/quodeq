@@ -225,17 +225,12 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
   });
 });
 
-// ViolationsPage fires its onRefresh on every mount (see
-// ViolationsPage.jsx's tabKey effect) -- including plain drill-down/back
-// navigation with no mutation involved, since the page remounts on every
-// round trip. Wiring onRefresh to scheduleDashboardReconcile (as a prior
-// revision did) turned every such round trip into an ACTIVE refetch of the
-// 10-20 MB dashboard payload -- the exact freeze refetchType:'none' exists
-// to avoid. onRefresh must stay wired to the lazy refreshDashboard; only the
-// four suppression-mutation handlers in useDismissedFindings.js (restore/
+// The Violations page has no mount-time refresh: mounting it is plain
+// navigation and must leave the dashboard cache alone. Only the four
+// suppression-mutation handlers in useDismissedFindings.js (restore/
 // restore-all/delete/delete-all) get the debounced ACTIVE reconcile, via the
-// separate onReconcile callback threaded down from here.
-describe('ViolationsRoute onRefresh/onReconcile wiring (Dismissed tab reconcile)', () => {
+// onReconcile callback threaded down from here.
+describe('ViolationsRoute onReconcile wiring (Dismissed tab reconcile)', () => {
   function renderViolationsRoute(props) {
     const outer = ROUTE_RENDERERS.violations({}, props);
     // ROUTE_RENDERERS.violations returns <ViolationsRoute params props />;
@@ -254,14 +249,13 @@ describe('ViolationsRoute onRefresh/onReconcile wiring (Dismissed tab reconcile)
     };
   }
 
-  it('wires onRefresh to refreshDashboard (lazy mark-stale) so plain navigation never forces an active refetch', () => {
+  it('passes no onRefresh: nothing marks the dashboard stale on mount', () => {
     const props = violationsProps();
     const inner = renderViolationsRoute(props);
-    expect(inner.props.callbacks.onRefresh).toBe(props.refreshDashboard);
-    expect(inner.props.callbacks.onRefresh).not.toBe(props.scheduleDashboardReconcile);
+    expect(inner.props.callbacks.onRefresh).toBeUndefined();
   });
 
-  it('wires onReconcile to scheduleDashboardReconcile, for the suppression-mutation handlers to call in addition to onRefresh', () => {
+  it('wires onReconcile to scheduleDashboardReconcile, for the suppression-mutation handlers', () => {
     const props = violationsProps();
     const inner = renderViolationsRoute(props);
     expect(inner.props.callbacks.onReconcile).toBe(props.scheduleDashboardReconcile);

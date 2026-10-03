@@ -145,3 +145,43 @@ def test_pre_stamp_db_heals_on_first_contact(tmp_path: Path) -> None:
 
     assert store.get_grades_algo_version() == GRADE_ALGO_VERSION
     assert len(store.read_dimension_scores()) == 1
+
+
+def test_grade_algo_version_is_three() -> None:
+    """v3: the tally groups findings by ``req`` before ``vt`` (issue #1274).
+
+    Grade tables stamped v2 were computed with vt-grouped tallies, so a
+    run untouched since then must re-derive; the staleness test above proves
+    the mechanism, this pins the version that triggers it.
+    """
+    from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
+
+    assert GRADE_ALGO_VERSION == 3
+
+
+def test_a_dismiss_that_touches_no_finding_keeps_the_grades(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """A dismiss grows actions.jsonl for every run of the project; a run none of
+    whose verdicts move must not re-derive its grade tables."""
+    import quodeq.data.projection.grade_projector as grade_projector
+
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "r1"
+    run_dir.mkdir(parents=True)
+    events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+    calls: list[Path] = []
+    real = grade_projector.recompute_grades
+    monkeypatch.setattr(grade_projector, "recompute_grades", lambda d: (calls.append(d), real(d)))
+
+    ActionLogWriter(project_dir).emit(
+        FindingDismissedEvent(payload=FindingDismissed(req="R9", file="other.py", line=3))
+    )
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+    ActionLogWriter(project_dir).emit(
+        FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10))
+    )
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+
+    assert calls == [run_dir]

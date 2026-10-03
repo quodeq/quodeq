@@ -1,11 +1,27 @@
-import { useCallback, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { STANDARDS_CHANGED_REASON, notifyStandardsChanged } from '../../../constants.js';
+import { useStandardsQuery } from './useStandardsQuery.js';
+import { t } from '../../../strings/index.js';
 
-export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
+export const STANDARD_TYPES = { ISO: 'iso', WCAG: 'wcag', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
+
+const FAMILY_LABEL_KEYS = {
+  [STANDARD_TYPES.ISO]: 'standards.baseIso',
+  [STANDARD_TYPES.WCAG]: 'standards.baseWcag',
+  [STANDARD_TYPES.QUODEQ]: 'standards.baseQuodeq',
+  [STANDARD_TYPES.COMMUNITY]: 'standards.baseCommunity',
+  [STANDARD_TYPES.CUSTOM]: 'standards.baseCustom',
+};
+
+/** The standard's family and, when it has one, its edition: "iso-25010", "wcag-2.2", "custom". */
+export function standardBaseLabel(standard) {
+  const key = FAMILY_LABEL_KEYS[standard?.type];
+  if (!key) return null;
+  return standard.subtype ? `${t(key)}-${standard.subtype}` : t(key);
+}
 
 // Fallback bucket for a standard whose `type` doesn't match any known
 // STANDARD_TYPES value. Keeps it visible (StandardsTable folds this bucket
@@ -43,7 +59,8 @@ function makeHandleDuplicate({ duplicateStandard, setMutationError, refresh, onD
 
 function groupStandards(standards) {
   const g = {
-    [STANDARD_TYPES.BUILTIN]: [],
+    [STANDARD_TYPES.ISO]: [],
+    [STANDARD_TYPES.WCAG]: [],
     [STANDARD_TYPES.QUODEQ]: [],
     [STANDARD_TYPES.COMMUNITY]: [],
     [STANDARD_TYPES.CUSTOM]: [],
@@ -71,23 +88,22 @@ function groupStandards(standards) {
  */
 export function useStandards({ onDuplicated } = {}) {
   const { listStandards, deleteStandard, duplicateStandard } = useApi();
-  const queryClient = useQueryClient();
-  const [mutationError, setMutationError] = useState(null);
-
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error, setMutationError, queryClient } = useStandardsQuery({
     queryKey: standardsKeys.list(),
     queryFn: () => listStandards(),
   });
 
   const standards = data || [];
 
+  // invalidateQueries already refetches the mounted list query and its
+  // promise settles when that fetch does; a second refetch() would cancel
+  // it and fetch again.
   const refresh = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: standardsKeys.list() });
     // The Evaluate picker keeps its own merged plugin+standards list outside
     // React Query; tell it the set of standards may have changed.
     notifyStandardsChanged(STANDARDS_CHANGED_REASON.LIST);
-    return refetch();
-  }, [queryClient, refetch]);
+    return queryClient.invalidateQueries({ queryKey: standardsKeys.list() });
+  }, [queryClient]);
 
   const handleDelete = useCallback(
     makeHandleDelete({ deleteStandard, setMutationError, refresh }),
@@ -101,13 +117,11 @@ export function useStandards({ onDuplicated } = {}) {
 
   const grouped = useMemo(() => groupStandards(standards), [standards]);
 
-  const combinedError = mutationError || (error ? error.message : null);
-
   return {
     standards,
     grouped,
     loading: isLoading,
-    error: combinedError,
+    error,
     refresh,
     handleDelete,
     handleDuplicate,

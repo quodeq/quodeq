@@ -12,7 +12,7 @@ from tests.api._standards_overrides_fixtures import (  # noqa: F401 -- pytest fi
 
 
 # ---------------------------------------------------------------------------
-# Task 6: dryRun impact preview and changedDimensions
+# dryRun impact preview and changedDimensions
 # ---------------------------------------------------------------------------
 
 def test_dry_run_reports_changed_dimension_without_writing(client, project_root: Path):

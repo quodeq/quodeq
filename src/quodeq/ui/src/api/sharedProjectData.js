@@ -9,9 +9,20 @@ import { createProject } from '../models/project.js';
 import { createDashboard } from '../models/dashboard.js';
 import { createDimensionEval } from '../models/dimension.js';
 import { epochSecondsToMs } from './sharedStatus.js';
-import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
+import { LATEST_RUN_ID } from '../constants.js';
+import { asOfQuery, findingDetailQuery, parseAccumulated, parseFleetCompare, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
+import { attachEvalFindingDetailRefs, attachRunFindingDetailRefs } from './complianceDetail.js';
+import { createViolations } from '../models/violation.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { fleetQuery, sharedProjectPath } from './paths.js';
 
 // ── Project List & Info ─────────────────────────────────────────────────────
+
+// The first listing of a freshly cloned repository computes every project
+// card inline on the server and can take longer than the default 30s abort.
+// The connect and refresh jobs warm it before reporting done, so this wider
+// window is the safety net for a listing that still lands cold.
+const SHARED_LIST_TIMEOUT_MS = 120000;
 
 /**
  * List projects from the shared repository.
@@ -25,7 +36,7 @@ import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, r
  */
 export async function sharedListProjects({ refresh = false } = {}) {
   const refreshParam = refresh ? '1' : '0';
-  const data = await request(`/shared/projects?refresh=${refreshParam}`);
+  const data = await request(`/shared/projects?refresh=${refreshParam}`, { timeout: SHARED_LIST_TIMEOUT_MS });
   const list = data?.projects ?? data ?? [];
   const projects = Array.isArray(list) ? list.map(createProject) : [];
 
@@ -35,7 +46,7 @@ export async function sharedListProjects({ refresh = false } = {}) {
       if (list[idx]) {
         proj.publishedBy = list[idx].publishedBy ?? null;
         proj.publishedAt = epochSecondsToMs(list[idx].publishedAt);
-        proj.source = list[idx].source ?? 'shared';
+        proj.source = list[idx].source ?? PROJECT_SOURCE.SHARED;
       }
     });
   }
@@ -57,11 +68,11 @@ export async function sharedListProjects({ refresh = false } = {}) {
  *   the backend's epoch seconds to epoch-milliseconds.
  */
 export async function sharedGetProjectInfo(projectId) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/info`);
+  const data = await request(`${sharedProjectPath(projectId)}/info`);
   const project = createProject(data);
   project.publishedBy = data?.publishedBy ?? null;
   project.publishedAt = epochSecondsToMs(data?.publishedAt);
-  project.source = data?.source ?? 'shared';
+  project.source = data?.source ?? PROJECT_SOURCE.SHARED;
   return project;
 }
 
@@ -71,7 +82,7 @@ export async function sharedGetProjectInfo(projectId) {
  * @returns {Promise<{runs: Array}>}
  */
 export function sharedGetRuns(projectId) {
-  return request(`/shared/projects/${encodeURIComponent(projectId)}/runs`);
+  return request(`${sharedProjectPath(projectId)}/runs`);
 }
 
 // ── Dashboard & Scores ──────────────────────────────────────────────────────
@@ -82,8 +93,8 @@ export function sharedGetRuns(projectId) {
  * @param {string} [run='latest']
  * @returns {Promise<import('../models/dashboard.js').Dashboard>}
  */
-export async function sharedGetDashboard(projectId, run = 'latest') {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/dashboard${runQuery(run)}`);
+export async function sharedGetDashboard(projectId, run = LATEST_RUN_ID) {
+  const data = await request(`${sharedProjectPath(projectId)}/dashboard${runQuery(run)}`);
   return createDashboard(data);
 }
 
@@ -95,8 +106,18 @@ export async function sharedGetDashboard(projectId, run = 'latest') {
  * @returns {Promise<{project: string, summary: Object, dimensions: Array, trend: Array, runsCount: number, lastRun: Object|null}>}
  */
 export async function sharedGetCompareSummary(projectId) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/compare-summary`);
+  const data = await request(`${sharedProjectPath(projectId)}/compare-summary`);
   return parseSlimDimensions(data);
+}
+
+/**
+ * The compare summaries of a fleet of shared projects in one request.
+ * @param {string[]} projectIds
+ * @returns {Promise<{summaries: Array<Object>, errors: Object<string, string>}>}
+ */
+export async function sharedGetFleetCompare(projectIds) {
+  const data = await request(`/shared/fleet/compare${fleetQuery(projectIds)}`);
+  return parseFleetCompare(data);
 }
 
 /**
@@ -106,7 +127,7 @@ export async function sharedGetCompareSummary(projectId) {
  * @returns {Promise<Object>}
  */
 export async function sharedGetAccumulated(projectId, asOfRun = null) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/accumulated${asOfQuery(asOfRun)}`);
+  const data = await request(`${sharedProjectPath(projectId)}/accumulated${asOfQuery(asOfRun)}`);
   return parseAccumulated(data);
 }
 
@@ -117,21 +138,33 @@ export async function sharedGetAccumulated(projectId, asOfRun = null) {
  * @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>}
  */
 export async function sharedGetProjectScores(projectId, asOfRun = null) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/scores${asOfQuery(asOfRun)}`);
+  const data = await request(`${sharedProjectPath(projectId)}/scores${asOfQuery(asOfRun)}`);
   return parseUnifiedScores(data);
 }
 
 /**
- * Get slim scores for a specific run.
+ * One run's rescored dimensions with finding detail deferred, from the
+ * shared mirror (`sharedGetFindingDetail` refills it).
  * @param {string} projectId
  * @param {string} runId
  * @returns {Promise<{dimensions: Array, summary: Object}>}
  */
 export async function sharedGetRunScores(projectId, runId) {
   const data = await request(
-    `/shared/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`
+    `${sharedProjectPath(projectId)}/scores/${encodeURIComponent(runId)}`
   );
-  return parseSlimDimensions(data);
+  return attachRunFindingDetailRefs(parseSlimDimensions(data), projectId, runId, PROJECT_SOURCE.SHARED);
+}
+
+/**
+ * `getFindingDetail` against the shared mirror.
+ * @param {string} projectId
+ * @param {{kind: string, dimension: string, run?: string|null, asOf?: string|null, principle?: string, pathPrefix?: string}} scope
+ * @returns {Promise<import('../models/violation.js').Violation[]>}
+ */
+export async function sharedGetFindingDetail(projectId, scope) {
+  const data = await request(`${sharedProjectPath(projectId)}/compliance-detail?${findingDetailQuery(scope)}`);
+  return createViolations(data?.items);
 }
 
 // ── Dimension Eval & Violations ─────────────────────────────────────────────
@@ -145,9 +178,9 @@ export async function sharedGetRunScores(projectId, runId) {
  */
 export async function sharedGetDimensionEval(projectId, runId, dimension) {
   const data = await request(
-    `/shared/projects/${encodeURIComponent(projectId)}/dimensions/${encodeURIComponent(dimension)}/eval?run=${encodeURIComponent(runId)}`
+    `${sharedProjectPath(projectId)}/dimensions/${encodeURIComponent(dimension)}/eval?run=${encodeURIComponent(runId)}`
   );
-  return createDimensionEval(data);
+  return attachEvalFindingDetailRefs(createDimensionEval(data), projectId, runId, PROJECT_SOURCE.SHARED);
 }
 
 /**
@@ -158,7 +191,7 @@ export async function sharedGetDimensionEval(projectId, runId, dimension) {
  */
 export function sharedGetViolations(projectId, runId) {
   return request(
-    `/shared/projects/${encodeURIComponent(projectId)}/violations?run=${encodeURIComponent(runId)}`
+    `${sharedProjectPath(projectId)}/violations?run=${encodeURIComponent(runId)}`
   );
 }
 
@@ -179,7 +212,7 @@ const SHARED_DISMISSED_REQUEST_LIMIT = 5000;
  */
 export function sharedListDismissedFindings(projectId) {
   return request(
-    `/shared/projects/${encodeURIComponent(projectId)}/findings/dismissed`
+    `${sharedProjectPath(projectId)}/findings/dismissed`
     + `?limit=${SHARED_DISMISSED_REQUEST_LIMIT}`
   );
 }
@@ -190,5 +223,5 @@ export function sharedListDismissedFindings(projectId) {
  * @returns {Promise<Array>} Entries: { req, file, line, note, verifiedAt }
  */
 export function sharedListVerifiedFindings(projectId) {
-  return request(`/shared/projects/${encodeURIComponent(projectId)}/findings/verified`);
+  return request(`${sharedProjectPath(projectId)}/findings/verified`);
 }

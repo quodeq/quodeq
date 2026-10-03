@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { projectPath } from '../../../api/paths.js';
 import { projectKeys } from '../../../api/queryKeys.js';
 import { request } from '../../../api/request.js';
 
@@ -15,7 +16,7 @@ import { request } from '../../../api/request.js';
 export function useScanEstimates(projectId, enabled = true) {
   const { data, isLoading } = useQuery({
     queryKey: [...projectKeys.project(projectId || ''), 'estimates'],
-    queryFn: ({ signal }) => request(`/projects/${encodeURIComponent(projectId)}/estimates`, { signal }),
+    queryFn: ({ signal }) => request(`${projectPath(projectId)}/estimates`, { signal }),
     enabled: !!projectId && enabled,
     staleTime: 60_000,
     retry: false,

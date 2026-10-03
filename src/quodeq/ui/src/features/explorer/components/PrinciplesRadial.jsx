@@ -14,6 +14,8 @@
  */
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
+import { SCORE_SCALE_MAX } from '../../../constants.js';
 // Ring levels, as a fraction of the outer radius (fifths).
 const RING_LEVEL_1 = 0.2;
 const RING_LEVEL_2 = 0.4;
@@ -237,7 +239,7 @@ function computeRadialLayout(principles, angles, scaleMax, outerRadius, size) {
 function makeRadialHandlers(onPrincipleClick) {
   const handleClick = (name) => () => onPrincipleClick && onPrincipleClick(name);
   const handleKey = (name) => (e) => {
-    if ((e.key === 'Enter' || e.key === ' ') && onPrincipleClick) {
+    if ((e.key === KEY.ENTER || e.key === ' ') && onPrincipleClick) {
       e.preventDefault();
       onPrincipleClick(name);
     }
@@ -247,7 +249,7 @@ function makeRadialHandlers(onPrincipleClick) {
 
 export default function PrinciplesRadial({
   principles = [],
-  scaleMax = 10,
+  scaleMax = SCORE_SCALE_MAX,
   size = 400,
   outerRadius = 200,
   onPrincipleClick,

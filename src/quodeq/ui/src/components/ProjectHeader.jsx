@@ -1,7 +1,8 @@
-import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
+import RunNavigator from './RunNavigator.jsx';
 import { formatRunId, extDisplayName } from '../utils/formatters.js';
 import { t, LOCALE } from '../strings/index.js';
-import { activateOnKey } from '../utils/a11y.js';
+import { activationHandlers } from '../utils/a11y.js';
+import { PERCENT } from '../constants.js';
 
 const MAX_DISPLAYED_STATS = 5;
 
@@ -29,7 +30,7 @@ function LanguageStats({ stats, totalFiles }) {
 
 function CoverageStat({ totalFiles, analyzedFiles }) {
   if (!totalFiles || totalFiles === 0) return null;
-  const pct = analyzedFiles != null ? Math.round((analyzedFiles / totalFiles) * 100) : null;
+  const pct = analyzedFiles != null ? Math.round((analyzedFiles / totalFiles) * PERCENT) : null;
   if (pct == null) return null;
   return (
     <>
@@ -58,8 +59,7 @@ export default function ProjectHeader({
                 className="content-project-parent content-project-parent--link"
                 role="button"
                 tabIndex={0}
-                onClick={() => parentId && onProjectChange(parentId)}
-                onKeyDown={activateOnKey(() => parentId && onProjectChange(parentId))}
+                {...activationHandlers(() => parentId && onProjectChange(parentId))}
               >{parent}</span>
               <span className="content-project-sep">&rsaquo;</span>
             </>

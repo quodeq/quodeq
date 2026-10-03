@@ -24,14 +24,21 @@ from collections.abc import Mapping
 
 from quodeq.llm_bridge._ollama import (
     DEFAULT_MEMORY_FRACTION,
-    _detect_memory,
+    HEALTH_OK,
+    detect_memory,
     estimate_max_agents,
 )
 from quodeq.config.llm_bridge_env import llamacpp_base_url
+from quodeq.llm_bridge._constants import LOCAL_SERVER_PROBE_TIMEOUT_S
+from quodeq.llm_bridge._local_server import (
+    bare_model_entry,
+    concurrency_result,
+    normalize_base,
+    parse_health_response,
+    server_address,
+)
 
 _log = logging.getLogger(__name__)
-
-_TIMEOUT_S = 3
 #: Everything a probe against a llama-server may raise: the socket/HTTP
 #: layer (OSError, which urllib's URLError and ConnectionRefusedError both
 #: subclass) and a body that is not the JSON we expect (ValueError, which
@@ -47,31 +54,13 @@ def _default_base_url(env: Mapping[str, str] | None = None) -> str:
     return llamacpp_base_url(env)
 
 
-def _normalize_base(base_url: str) -> str:
-    """Strip a trailing /v1 (or /v1/) so /health and /v1/models both work.
-
-    Quodeq stores ``api_base`` as the OpenAI-compatible ``/v1`` URL for use
-    by the analysis runner. The native llama.cpp ``/health`` endpoint sits
-    one level up, so we accept either form here.
-    """
-    stripped = base_url.rstrip("/")
-    if stripped.endswith("/v1"):
-        stripped = stripped[: -len("/v1")]
-    return stripped
-
-
 def get_llamacpp_status(base_url: str | None = None) -> dict:
     """Check if a llama-server process is running and reachable."""
-    root = _normalize_base(base_url or _default_base_url())
+    root = normalize_base(base_url or _default_base_url())
     try:
         req = urllib.request.Request(f"{root}/health")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
-            data = json.loads(resp.read() or b"{}")
-            return {
-                "running": True,
-                "status": data.get("status", "ok"),
-                "address": root.replace("http://", ""),
-            }
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
+            return parse_health_response(resp.read(), server_address(root), ok_status=HEALTH_OK)
     except _TRANSPORT_ERRORS as exc:
         _log.warning("llama.cpp status check failed: %s", exc)
         return {"running": False, "error": "Connection failed"}
@@ -84,21 +73,18 @@ def list_llamacpp_models(base_url: str | None = None) -> list[dict]:
     The model name is whatever llama-server reports for the GGUF passed
     via ``-m``, which is typically the file basename.
     """
-    root = _normalize_base(base_url or _default_base_url())
+    root = normalize_base(base_url or _default_base_url())
     try:
         req = urllib.request.Request(f"{root}/v1/models")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
-            entries = data.get("data", []) or []
+            entries = data.get("data") if isinstance(data, dict) else None
+            if not isinstance(entries, list):
+                entries = []
             return [
-                {
-                    "name": m.get("id", ""),
-                    "size": 0,
-                    "quantization": "",
-                    "family": "",
-                }
+                bare_model_entry(m["id"])
                 for m in entries
-                if m.get("id")
+                if isinstance(m, dict) and isinstance(m.get("id"), str) and m["id"]
             ]
     except _TRANSPORT_ERRORS as exc:
         _log.warning("Could not list llama.cpp models: %s", exc)
@@ -115,15 +101,10 @@ def run_concurrency_test(
     and assume the loaded model occupies it. The estimate is conservative,
     capped by ``estimate_max_agents``.
     """
-    gpu_memory = _detect_memory()
+    gpu_memory = detect_memory()
     models = list_llamacpp_models(base_url)
     if not models:
-        return {
-            "recommended": 1,
-            "vram_per_context": 0,
-            "gpu_memory": gpu_memory,
-            "reason": "llama-server is not running or no model loaded",
-        }
+        return concurrency_result(1, 0, gpu_memory, "llama-server is not running or no model loaded")
 
     # No size data from /v1/models, so use a fraction of host memory as a
     # rough per-context budget. This mirrors Ollama's behavior when VRAM
@@ -131,16 +112,7 @@ def run_concurrency_test(
     vram_per_context = models[0].get("size", 0) or max(int(gpu_memory * DEFAULT_MEMORY_FRACTION), 1)
 
     if gpu_memory <= 0:
-        return {
-            "recommended": 1,
-            "vram_per_context": vram_per_context,
-            "gpu_memory": gpu_memory,
-            "reason": "Could not detect host memory",
-        }
+        return concurrency_result(1, vram_per_context, gpu_memory, "Could not detect host memory")
 
     result = estimate_max_agents(model_size=vram_per_context, gpu_memory=gpu_memory)
-    return {
-        "recommended": result["estimate"],
-        "vram_per_context": vram_per_context,
-        "gpu_memory": gpu_memory,
-    }
+    return concurrency_result(result["estimate"], vram_per_context, gpu_memory)

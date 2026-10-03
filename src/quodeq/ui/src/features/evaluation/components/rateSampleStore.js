@@ -6,8 +6,8 @@
  * `JobStatStrip` unmount/remount. Navigating out of and back into a running
  * evaluation must not restart the window from empty; doing so blanked the rate
  * to "estimating…" for ~30s on every entry (and tempted a biased whole-run
- * average as a stopgap). The buffer persists for the life of the page; a full
- * reload starts fresh, which is acceptable.
+ * average as a stopgap). A job's buffer lives until JobStatStrip sees the job
+ * terminal and calls forgetJob; its rate is never read after that.
  *
  * No React, no DOM — drop-in testable.
  */
@@ -40,12 +40,17 @@ export function createRateSampleStore({ windowMs = RATE_WINDOW_MS } = {}) {
     return byJob.get(jobId) || [];
   }
 
+  /** Drop a job's samples. Called once the job is terminal: nothing reads them again. */
+  function forgetJob(jobId) {
+    byJob.delete(jobId);
+  }
+
   /** Test hygiene: the store is otherwise long-lived and would leak across tests. */
   function reset() {
     byJob.clear();
   }
 
-  return { recordRateSample: appendSample, getRateSamples: readSamples, reset };
+  return { recordRateSample: appendSample, getRateSamples: readSamples, forgetJob, reset };
 }
 
 /** The app-wide throughput store every production import shares. */
@@ -57,6 +62,10 @@ export function recordRateSample(jobId, t, taken) {
 
 export function getRateSamples(jobId) {
   return defaultRateSampleStore.getRateSamples(jobId);
+}
+
+export function forgetJob(jobId) {
+  defaultRateSampleStore.forgetJob(jobId);
 }
 
 /** Test hygiene: the store is module-level and would otherwise leak across tests. */

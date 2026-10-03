@@ -5,10 +5,11 @@ origin + publish_project + sync_shared_index) and points settings at it —
 the recipe every shared-clone integration test in this directory needs.
 Moved here from ``test_routes_shared_read.py`` (its original home) so
 ``test_assistant_shared_sessions.py`` can reuse it without duplicating the
-fixture (Task 6, Step 0).
+fixture.
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import subprocess
 from pathlib import Path
@@ -24,7 +25,13 @@ from quodeq.data.fs.shared_repo import (
     shared_repo_path,
     sync_shared_index,
 )
+from quodeq.data.fs.git_access_probe import ProbeResult
+from quodeq.services import project_clone_job
+from quodeq.services.github_access import clear_access_cache
+from quodeq.services.github_gh_cli import GhStatus
 from quodeq.services.shared_settings import SharedSettings, write_settings
+from quodeq.shared.git_errors import GitFailureKind
+from tests._timeouts import budget
 
 _VIOLATION = dict(
     practice_id="P1", verdict="violation", dimension="Security",
@@ -49,7 +56,7 @@ _EVAL_JSON = {
 
 def _make_origin(tmp_path: Path) -> str:
     origin = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True, timeout=budget(30))
     return f"file://{origin}"
 
 
@@ -81,7 +88,7 @@ def shared_clone_fixture(tmp_path, monkeypatch):
     assert ensure_shared_clone(url) is not None
     subprocess.run(
         ["git", "config", "user.name", "tester"],
-        cwd=shared_repo_path(url), check=True, capture_output=True,
+        cwd=shared_repo_path(url), check=True, capture_output=True, timeout=budget(30),
     )
     local_root = tmp_path / "local-evaluations"
     project_dir = local_root / "proj-a"
@@ -110,3 +117,43 @@ def shared_clone_fixture(tmp_path, monkeypatch):
 
     write_settings(SharedSettings(url=url))
     return url
+
+
+def _literal_is_internal(host: str) -> bool:
+    """The URL guard's DNS check without DNS: only IP literals and localhost count as internal."""
+    try:
+        addr = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return host == "localhost"
+    return addr.is_private or addr.is_loopback or addr.is_link_local
+
+
+@pytest.fixture(autouse=True)
+def _ambient_access(monkeypatch):
+    """Routes that clone or push walk the access ladder first; keep every api test off the network.
+
+    Patched at the probe boundary, not at ``resolve_access``, so the real
+    ladder (URL guard first, then the probe) runs and its call order is
+    observable. ``probe_calls`` records every probe.
+    """
+    probe_calls: list[str] = []
+
+    def probe(url, **_kwargs):
+        probe_calls.append(url)
+        return ProbeResult(GitFailureKind.OK)
+
+    clear_access_cache()
+    monkeypatch.setattr("quodeq.services.github_access.probe_remote", probe)
+    monkeypatch.setattr("quodeq.services.github_access.pinned_git_config", lambda url: [])
+    monkeypatch.setattr("quodeq.services.github_access.gh_status", lambda **_kwargs: GhStatus(False, False))
+    monkeypatch.setattr("quodeq.services.github_access.load_account", lambda: None)
+    monkeypatch.setattr("quodeq.data.fs.repo_validation._resolves_to_private", _literal_is_internal)
+    yield probe_calls
+    clear_access_cache()
+
+
+@pytest.fixture()
+def inline_clone_job(monkeypatch):
+    """Run the add-project job on the calling thread against a fresh slot."""
+    monkeypatch.setattr(project_clone_job, "_default_status", project_clone_job.CloneStatus())
+    monkeypatch.setattr(project_clone_job, "spawn_daemon", lambda target: target())

@@ -30,11 +30,11 @@
  * @property {string|null}   fromRunId
  * @property {string|null}   fromDateLabel
  * @property {string|null}   fromDateISO
- * @property {number|null}   [filesRead]         - files analyzed in this dim (Phase 1+)
- * @property {number|null}   [sourceFileCount]   - total project source-file count (Phase 1+)
- * @property {string|null}   [exitReason]        - per-dim or run-level exit signal.
- *   Values: "done" (success), "time_limit", "failure_streak", "cancelled",
- *   "error", or null/missing (legacy, treated as "done" by the UI).
+ * @property {number|null}   [filesRead]         - files analyzed in this dim (older runs may not have it)
+ * @property {number|null}   [sourceFileCount]   - total project source-file count (older runs may not have it)
+ * @property {string|null}   [exitReason]        - per-dim or run-level exit signal,
+ *   one of EXIT_REASON's values (see vocab/exitReason.js), or null/missing
+ *   (legacy, treated as EXIT_REASON.DONE by the UI).
  * @property {number}        [dismissedCount]    - re-found violations hidden by the
  *   project-level dismissed filter (dashboard run view). Missing when zero.
  *
@@ -52,6 +52,21 @@
 import { createViolations } from './violation.js';
 import { createPrinciple, createPrincipleGrade } from './principle.js';
 
+const OBJECT_TYPE_NAME = 'object'; // typeof sentinel shared by every raw-payload factory's "is this a plain object" guard below
+
+/**
+ * A dimension's violation count for display: the totals count when present,
+ * else the length of the violations list, else 0.
+ *
+ * @param {Dimension|Object} dim
+ * @returns {number}
+ */
+export function dimensionViolationCount(dim) {
+  if (typeof dim.totalViolations === 'number') return dim.totalViolations;
+  if (Array.isArray(dim.violations)) return dim.violations.length;
+  return 0;
+}
+
 /**
  * Create a canonical Dimension from a raw dashboard API object.
  *
@@ -59,7 +74,7 @@ import { createPrinciple, createPrincipleGrade } from './principle.js';
  * @returns {Dimension}
  */
 export function createDimension(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
+  if (!raw || typeof raw !== OBJECT_TYPE_NAME) return raw;
   return { ...raw, ...canonicalFindings(raw) };
 }
 
@@ -88,8 +103,18 @@ function canonicalFindings(raw) {
  * @param {Object} raw
  * @returns {Dimension}
  */
+/**
+ * True when every dimension carries its violation bodies (the full dashboard
+ * shape). The overview shape leaves the key out, and readers that need
+ * bodies (the grade-formula TYPES tab, the map's fallback) test this
+ * instead of treating a missing list as "no findings".
+ */
+export function hasBodies(dimensions) {
+  return (dimensions || []).every((d) => Array.isArray(d?.violations));
+}
+
 export function createSlimDimension(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
+  if (!raw || typeof raw !== OBJECT_TYPE_NAME) return raw;
   return {
     ...raw,
     violations: Array.isArray(raw.violations) ? createViolations(raw.violations) : raw.violations,
@@ -105,7 +130,7 @@ export function createSlimDimension(raw) {
  * @returns {DimensionEval}
  */
 export function createDimensionEval(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
+  if (!raw || typeof raw !== OBJECT_TYPE_NAME) return raw;
   return {
     ...raw,
     ...canonicalFindings(raw),

@@ -105,7 +105,7 @@ def test_busy_wal_switch_does_not_delete_a_healthy_index(tmp_path: Path) -> None
 def test_concurrent_first_open_yields_one_consistent_schema(tmp_path: Path) -> None:
     """Threads racing to create the same fresh index must all get a good DB.
 
-    Mirrors ``_build_project_entries_threaded``: several workers call
+    Mirrors ``build_project_entries_threaded``: several workers call
     ``open_index`` on the one shared index path at the same instant. Every
     thread must come back with the current schema and the index must end up
     with exactly one ``schema_version`` row -- no duplicate inserts from two

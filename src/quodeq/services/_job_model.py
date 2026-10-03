@@ -1,8 +1,7 @@
 """Job data model, store protocol, and in-memory store implementation.
 
 JSON serialization (``_job_to_json``/``_job_from_json``) and the disk-backed
-``FileJobStore``/``create_job_store`` live in ``_job_file_store.py`` -- split
-out to keep this module under the size ratchet's 300-line cap, and
+``FileJobStore``/``create_job_store`` live in ``_job_file_store.py`` and are
 re-exported from here.
 """
 
@@ -16,42 +15,28 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
+from quodeq.shared.clock import utc_now_iso
 from quodeq.shared.constants import CC_MARKER_KEY
 
-_REPORT_PATH_MARKER = "Report path:"
-_EXIT_CODE_TIMEOUT = -9
+REPORT_PATH_MARKER = "Report path:"
+EXIT_CODE_TIMEOUT = -9
 
 # Watchdog polls process state every N seconds and re-checks deadline_at,
 # which only lands in job state after the analyzing_start marker -- so a
 # blocking wait(timeout=full_budget) at spawn time can't see it.
-_WATCHDOG_POLL_INTERVAL_S = 1.0
-
-# status.json exit reasons that mean "the run hit its time budget" -- the
-# user's own setting doing its job, not an error. Jobs ending this way are
-# marked cancelled (already in the salvage-scoring trigger list in
-# api/_evaluation_routes.py) with exit_reason set, so the evaluate header
-# renders "time limit reached" instead of FAILED.
-_DEADLINE_EXIT_REASONS = ("deadline", "time_limit")
-_EXIT_REASON_DEADLINE = "deadline"
+WATCHDOG_POLL_INTERVAL_S = 1.0
 
 if TYPE_CHECKING:
     import subprocess
 
     from quodeq.services._external_jobs import ProcessControl
 
-# Canonical job status strings. They live here, with the Job they describe,
-# so both jobs.py (which re-exports them for its importers) and the mixins
-# it composes can import them without reaching back into jobs.py.
-STATUS_RUNNING = "running"
-STATUS_CANCELLED = "cancelled"
-STATUS_DONE = "done"
-STATUS_FAILED = "failed"
-
-_MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
-_MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
-_CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
+MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
+MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
+CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 
 
@@ -70,15 +55,13 @@ class JobLaunchOptions:
     time_limit_s: int | None = None
 
 
-def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: str) -> "Job":
+def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: JobStatus) -> "Job":
     """A fresh job record for *cmd*, started now, carrying *launch*'s run metadata."""
-    from datetime import datetime, timezone  # noqa: PLC0415
-
     return Job(
         job_id=job_id,
         status=status,
         command=cmd,
-        started_at=datetime.now(timezone.utc).isoformat(),
+        started_at=utc_now_iso(),
         ended_at=None,
         exit_code=None,
         ai_provider=launch.ai_provider,
@@ -87,12 +70,10 @@ def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: st
     )
 
 
-def mark_spawn_failed(job: "Job", exc: BaseException, *, status: str, exit_code: int) -> None:
+def mark_spawn_failed(job: "Job", exc: BaseException, *, status: JobStatus, exit_code: int) -> None:
     """Close *job* as failed-to-start: terminal status, end time, exit code and a log line."""
-    from datetime import datetime, timezone  # noqa: PLC0415
-
     job.status = status
-    job.ended_at = datetime.now(timezone.utc).isoformat()
+    job.ended_at = utc_now_iso()
     job.exit_code = exit_code
     job.logs.append(f"Failed to start process: {exc}")
 
@@ -102,12 +83,14 @@ class JobProcessSeams:
     """Injection points for how ``JobManager`` spawns, probes and caps subprocesses.
 
     Every field defaults to the production collaborator: ``subprocess.Popen``,
-    the signal-based ``ProcessControl``, and the ``QUODEQ_JOB_TIMEOUT_S``
-    env var for the hard duration cap.
+    the signal-based ``ProcessControl``, the ``QUODEQ_JOB_TIMEOUT_S`` env var
+    for the hard duration cap, and the ``QUODEQ_MAX_CONCURRENT_JOBS`` env var
+    for the concurrency cap.
     """
     spawn_impl: Callable[..., subprocess.Popen] | None = None
     process_control: ProcessControl | None = None
     job_timeout_cap_s: float | None = None
+    max_concurrent_jobs: int | None = None
 
 
 @dataclass
@@ -115,18 +98,23 @@ class Job:
     """State of a single evaluation subprocess."""
 
     job_id: str
-    status: str
+    status: JobStatus
     command: list[str]
     started_at: str
     ended_at: str | None
     exit_code: int | None
-    logs: deque[str] = field(default_factory=lambda: deque(maxlen=_MAX_LOG_LINES))
+    logs: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_LOG_LINES))
+    # The live record declares the fields its frozen JobSnapshot
+    # (core/types/job.py) carries; a frozen and a mutable dataclass cannot
+    # share them by inheritance, so this block repeats that one by design.
+    # jscpd:ignore-start
     output_project: str | None = None
     output_run_id: str | None = None
     phase: str | None = None
     deadline_at: str | None = None
     current_dimension: str | None = None
     dimensions: list[str] | None = None
+    # jscpd:ignore-end
     ai_provider: str | None = None
     ai_model: str | None = None
     time_limit_s: int | None = None  # 0 = unlimited, None = unknown
@@ -134,29 +122,6 @@ class Job:
     # completions and plain failures. Lets the UI tell a time-budget kill
     # apart from a real failure.
     exit_reason: str | None = None
-
-    def complete(self, exit_code: int, ended_at: str) -> None:
-        """Transition job to a terminal state based on exit code."""
-        self.exit_code = exit_code
-        self.ended_at = ended_at
-        self.status = "completed" if exit_code == 0 else "failed"
-
-    def cancel(self, ended_at: str) -> None:
-        """Mark job as cancelled."""
-        if self.status in ("completed", "failed"):
-            return
-        self.status = "cancelled"
-        self.ended_at = ended_at
-
-    def add_log(self, line: str) -> None:
-        """Append a log line to the rolling buffer."""
-        self.logs.append(line)
-
-    def set_phase(self, phase: str, dimension: str | None = None) -> None:
-        """Update the current analysis phase."""
-        self.phase = phase
-        if dimension is not None:
-            self.current_dimension = dimension
 
     def to_dict(self) -> JobSnapshot:
         """Return a frozen snapshot of the current job state."""
@@ -244,4 +209,4 @@ class InMemoryJobStore:
             self._jobs.pop(job_id, None)
 
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)

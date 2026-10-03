@@ -4,6 +4,10 @@ import '@testing-library/jest-dom/vitest';
 import TopBar from './TopBar.jsx';
 import { SidePaneContext } from '../features/side-pane/SidePaneContext.jsx';
 import { AssistantDrawerProvider } from '../features/assistant/AssistantDrawerProvider.jsx';
+import { EvaluationLiveStoreProvider } from '../features/evaluation/EvaluationLiveContext.jsx';
+import {
+  createLiveEvaluationStore, LIVE_EVALUATION_INITIAL_STATE,
+} from '../features/evaluation/liveEvaluationStore.js';
 
 const sidePaneStub = {
   getRegisteredSpec: () => null,
@@ -12,11 +16,18 @@ const sidePaneStub = {
   removeWindow: () => {},
 };
 
-function renderTopBar(props) {
+// The run chip and the progress hairline read progress from the live
+// evaluation store, not from a TopBar prop, so a poll tick re-renders those
+// two leaves instead of the whole bar.
+function renderTopBar({ runProgress = null, ...props } = {}) {
+  const store = createLiveEvaluationStore();
+  store.publish({ ...LIVE_EVALUATION_INITIAL_STATE, progress: runProgress });
   return render(
     <AssistantDrawerProvider>
       <SidePaneContext.Provider value={sidePaneStub}>
-        <TopBar {...props} />
+        <EvaluationLiveStoreProvider store={store}>
+          <TopBar {...props} />
+        </EvaluationLiveStoreProvider>
       </SidePaneContext.Provider>
     </AssistantDrawerProvider>
   );

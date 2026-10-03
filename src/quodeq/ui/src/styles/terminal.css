@@ -106,7 +106,7 @@
     padding: var(--term-space-2);
   }
   .term-stat__value { --stat-value-max: 22px; }
-  .term-stat__label { margin-bottom: 0; }
+.term-stat__label { margin-bottom: 0; }
 }
 
 /* `count-abbr` sev badge variant used in the VIOLATIONS stat cell */
@@ -159,6 +159,10 @@
   flex: 0 0 auto;
   white-space: nowrap;
 }
+/* A hint of two lines (RATIO's reading, then the density). */
+.term-stat__hint-line { display: block; }
+.term-stat__hint-line + .term-stat__hint-line { margin-top: 2px; }
+
 .term-stat__hint {
   margin-top: var(--term-space-1);
   font-size: 11px;
@@ -281,7 +285,19 @@
   border-radius: var(--term-radius);
   border: 1px solid transparent;
   text-transform: uppercase;
+  /* A chip is one token: the stat hint allows breaks anywhere, and a narrow
+     tile would otherwise stack "7 9 3 m a j" one character per line. The row
+     wraps whole chips instead (see .acc-eval-sev-row). */
+  white-space: nowrap;
 }
+/* The change since the previous run or period, inside a severity chip: the
+   score tile's trend badge, at the chip's size. The arrow takes the badge's
+   colour (fewer findings reads good) rather than its own direction colour,
+   since here the arrow points the way the number went. */
+.term-sev-badge__delta { margin-left: 4px; }
+.term-sev-badge__delta .trend-badge { padding: 0; font-size: inherit; gap: 2px; }
+.term-sev-badge__delta .trend-badge .trend-arrow { color: inherit; }
+
 .term-sev-badge__count {
   font-weight: 400;
   opacity: 0.9;
@@ -524,6 +540,7 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .acc-eval-sev-row {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: var(--term-space-1);
   align-items: center;
 }
@@ -644,6 +661,7 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .principle-detail-sev-row {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: var(--term-space-1);
   align-items: center;
 }
@@ -797,6 +815,10 @@ button.term-sev-badge--clickable:focus-visible {
   line-height: 1.55;
   margin: 0 0 var(--term-space-2);
   font-family: var(--term-font-mono);
+}
+
+.vlive-detail--terminal .vlive-detail-reason--unavailable {
+  color: var(--color-text-muted);
 }
 
 /* ---------- Code block + "-- see code · N lines" affordance ---------- */
@@ -1220,6 +1242,12 @@ button.term-sev-badge--clickable:focus-visible {
   font-size: 10px;
   letter-spacing: 0.05em;
 }
+/* A row whose delete request is in flight. */
+.history-table .history-row--deleting {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 .history-table .history-row--partial .history-row__col--score strong,
 .history-table .history-row--partial .history-row__col--delta {
   opacity: 0.7;
@@ -1324,6 +1352,8 @@ button.term-sev-badge--clickable:focus-visible {
 .history-row__col--grade  { flex: 0 0 44px; text-align: left; }
 .history-row__col--score  { flex: 0 0 52px; text-align: left; font-variant-numeric: tabular-nums; }
 .history-row__col--delta  { flex: 0 0 56px; text-align: left; font-variant-numeric: tabular-nums; }
+.history-row__col--majors, .history-row__col--types { flex: 0 0 44px; text-align: left; font-variant-numeric: tabular-nums; }
+.history-row__col--majors-delta, .history-row__col--types-delta { flex: 0 0 48px; text-align: left; font-variant-numeric: tabular-nums; }
 .history-row__col--dims   { flex: 1 1 auto; min-width: 0; }
 .history-row__col--chevron {
   flex: 0 0 44px;
@@ -1570,7 +1600,6 @@ button.term-sev-badge--clickable:focus-visible {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  /* Anchors the absolutely-positioned .nav-pending-bar to this column. */
   position: relative;
   /* Isolate the main column's layout + paint from the side-pane subtree
      and topbar so a pane-divider drag doesn't propagate reflow into the
@@ -2352,7 +2381,41 @@ button.term-sev-badge--clickable:focus-visible {
   background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 55%, transparent), var(--color-accent));
   transition: width 0.6s ease;
 }
+/* Indeterminate twin of .topbar-progress for pending page data (refetch, run
+   switch, navigation). Same slot: while it shows, run progress waits. */
+.topbar-pending {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  animation: topbar-pending-appear 80ms ease-out 120ms both;
+}
+.topbar-pending::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  animation: topbar-pending-sweep 1.1s ease-in-out infinite;
+}
+@keyframes topbar-pending-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes topbar-pending-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(350%); }
+}
 @media (prefers-reduced-motion: reduce) {
+  .topbar-pending::before {
+    animation: none;
+    width: 100%;
+    background: var(--color-accent);
+    opacity: 0.7;
+  }
   .topbar-run-chip__dot { animation: none; }
   .topbar-run-chip__bar > span,
   .topbar-progress > span { transition: none; }

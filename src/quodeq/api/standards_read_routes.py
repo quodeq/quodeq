@@ -142,7 +142,8 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
             # JSON decode and a non-object body; HTTPException (IncompleteRead,
             # BadStatusLine, ...) is urllib's own family and NOT an OSError.
             logger.warning("Failed to fetch library index: %s", exc)
-            return error_response("Failed to connect to standards library", 502, "library_error")
+            return error_response(
+                "Failed to connect to standards library", HTTPStatus.BAD_GATEWAY, "library_error")
         return jsonify(index)
 
     @app.get("/api/standards/<standard_id>")

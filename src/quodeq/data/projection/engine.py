@@ -10,10 +10,27 @@ from typing import Optional
 
 from quodeq.core.dismissals import fold_dismissals
 from quodeq.data.events.reader import EventLogReader
+from quodeq.data.projection.admission import Admitter, make_admitter, mapping_stamps
 from quodeq.data.projection.handlers import handle
 from quodeq.data.sqlite.state_store import SQLiteStateStore
+from quodeq.shared.stamp_memo import StampCache, file_stamp, memoized_by_stamp
 
 _logger = logging.getLogger(__name__)
+
+# Every run of a project folds the same actions.jsonl after a dismiss; fold it
+# once per change. DismissedKeys is frozen, so sharing it is safe.
+_FOLDS = StampCache(max_entries=256, name="projection.folds")  # a few entries per project
+
+
+def _save_mapping_stamps(store: SQLiteStateStore) -> None:
+    """Record which standard mappings this run's findings were placed with.
+
+    Stores without the stamp methods (test fakes) are skipped.
+    """
+    dims = getattr(store, "projected_dimensions", None)
+    save = getattr(store, "save_mapping_stamps", None)
+    if dims is not None and save is not None:
+        save(mapping_stamps(dims()))
 
 
 class ProjectionEngine:
@@ -21,8 +38,10 @@ class ProjectionEngine:
 
     def __init__(
         self, store_factory: Callable[[Path], SQLiteStateStore] | None = None,
+        admitter: Admitter | None = None,
     ) -> None:
         self._store_factory = store_factory or SQLiteStateStore
+        self._admitter = admitter if admitter is not None else make_admitter()
 
     def rebuild(self, event_log: Path, run_dir: Path) -> int:
         """Full rebuild: clear all state and replay every event."""
@@ -73,7 +92,10 @@ class ProjectionEngine:
         if not force and current_size == last_size:
             return 0
 
-        dismissed = fold_dismissals(read_action_events(actions_log.parent))
+        stamp = file_stamp(actions_log)
+        fold = lambda: fold_dismissals(read_action_events(actions_log.parent))  # noqa: E731
+        dismissed = fold() if stamp is None else memoized_by_stamp(
+            str(actions_log), stamp, fold, cache=_FOLDS)
         with store.connection():
             changed = store.apply_dismissed_state(dismissed)
             store.save_actions_projected_size(current_size)
@@ -95,7 +117,7 @@ class ProjectionEngine:
         with conn_ctx:
             for event in reader.stream(since_timestamp=since, from_offset=from_offset):
                 try:
-                    handle(event, store)
+                    handle(event, store, self._admitter)
                     last_ts = event.timestamp
                     count += 1
                 except (ValueError, KeyError, TypeError):
@@ -110,5 +132,6 @@ class ProjectionEngine:
             if last_ts is not None:
                 store.save_checkpoint(last_ts)
                 store.save_projected_size(size_before)
+                _save_mapping_stamps(store)
         _logger.info("Projected %d events from %s", count, event_log)
         return count

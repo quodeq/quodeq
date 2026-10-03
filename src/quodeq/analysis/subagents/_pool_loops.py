@@ -10,8 +10,8 @@ from typing import Callable
 from quodeq.analysis.subagents._pool_models import (
     ScaleUpState,
     SubagentResult,
-    _FUTURE_POLL_INTERVAL_S,
-    _SCOUT_TIMEOUT_S,
+    FUTURE_POLL_INTERVAL_S,
+    SCOUT_TIMEOUT_S,
 )
 from quodeq.analysis.subagents._pool_scaling import (
     EvidencePaths,
@@ -23,6 +23,7 @@ from quodeq.analysis.subagents._pool_scaling import (
     should_respawn,
 )
 from quodeq.analysis.subagents.file_queue import WorkQueue
+from quodeq.config.analysis_env import AGENT_FAILURE_STREAK_DEFAULT
 from quodeq.shared import cancellation
 
 _SCOUT_BUDGET_FRACTION = 0.5
@@ -45,6 +46,9 @@ class LoopContext:
     dimension_key: str
     submit_fn: Callable[[], None]
     deadline_at: float | None = None
+    run_deadline_at: float | None = None
+    # The run's consecutive-dead-agent backstop (see check_agent_failure_streak).
+    agent_failure_streak_limit: int = AGENT_FAILURE_STREAK_DEFAULT
     # Injectable cancellation check; the default binds the process-wide
     # signal here (the composition seam) so the loops never touch the
     # singleton themselves and tests can pass an isolated callable.
@@ -60,17 +64,29 @@ def _respawn_for_surplus(ctx: LoopContext, just_done: int) -> None:
     """
     remaining = should_respawn(
         ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
-        deadline_at=ctx.deadline_at,
+        deadline_at=ctx.deadline_at, run_deadline_at=ctx.run_deadline_at,
     )
     for _ in range(compute_scale_up(remaining - len(ctx.futures), just_done)):
         ctx.submit_fn()
+
+
+def _collect_finished(ctx: LoopContext, ev_paths: EvidencePaths) -> set[Future[SubagentResult]]:
+    """Collect the agents that finished since the last poll, then check the failure streak.
+
+    The streak check cancels the run when the finished agents push the
+    consecutive-failure count to the limit.
+    """
+    done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
+    if done:
+        check_agent_failure_streak(ctx.results, ctx.agent_failure_streak_limit)
+    return done
 
 
 def scout_loop(ctx: LoopContext) -> None:
     """Scout-then-scale loop: one agent first, then fill the pool when the
     scout finishes or times out. Each later poll respawns for the pending
     files no in-flight agent will take, capped by the slots just vacated."""
-    scout_timeout = _SCOUT_TIMEOUT_S if ctx.max_duration <= 0 else min(_SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * _SCOUT_BUDGET_FRACTION)
+    scout_timeout = SCOUT_TIMEOUT_S if ctx.max_duration <= 0 else min(SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * _SCOUT_BUDGET_FRACTION)
     state = ScaleUpState(
         pool_start=ctx.pool_start, max_duration=ctx.max_duration, scout_timeout=scout_timeout,
     )
@@ -79,19 +95,17 @@ def scout_loop(ctx: LoopContext) -> None:
         return
     ctx.submit_fn()
     while ctx.futures:
-        done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
-        if done:
-            check_agent_failure_streak(ctx.results)
+        done = _collect_finished(ctx, ev_paths)
         scale_ctx = ScaleUpContext(
             ctx.queue, ctx.queue_path, ctx.submit_fn,
-            deadline_at=ctx.deadline_at,
+            deadline_at=ctx.deadline_at, run_deadline_at=ctx.run_deadline_at,
         )
         gate_was_open = state.scout_done
         state.scout_done = maybe_scale_up(
             done, state, ctx.n_agents, scale_ctx, running=len(ctx.futures),
         )
         if not done:
-            time.sleep(_FUTURE_POLL_INTERVAL_S)
+            time.sleep(FUTURE_POLL_INTERVAL_S)
             continue
         if not gate_was_open:
             # The scout finishing is what opened the gate this iteration, and
@@ -113,10 +127,8 @@ def immediate_loop(ctx: LoopContext) -> None:
         # No deadline-kill here: Future.cancel() is a no-op for running
         # threads. Enforcement is the spawn-gate in should_respawn() plus
         # the per-agent max_duration clamp set in build_agent_config().
-        done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
-        if done:
-            check_agent_failure_streak(ctx.results)
+        done = _collect_finished(ctx, ev_paths)
         if not done:
-            time.sleep(_FUTURE_POLL_INTERVAL_S)
+            time.sleep(FUTURE_POLL_INTERVAL_S)
             continue
         _respawn_for_surplus(ctx, len(done))

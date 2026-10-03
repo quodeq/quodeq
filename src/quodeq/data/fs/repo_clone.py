@@ -13,7 +13,8 @@ import logging
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.context.online_cache import (
@@ -21,20 +22,18 @@ from quodeq.context.online_cache import (
     ensure_clone,
     is_inside_cache,
 )
+from quodeq.data.fs.git_stream import run_git_streaming
+from quodeq.data.git_cli import git_env_floor
 from quodeq.data.fs.repo_validation import validate_remote_url as _validate_remote_url
-from quodeq.shared.env_resolve import resolve_env
+from quodeq.config.clone_env import git_clone_timeout_s
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_CLONE_TIMEOUT_S = 300
 
-
-def _get_clone_timeout(env: Mapping[str, str] | None = None) -> int:
-    """Return the git clone timeout, reading the env var lazily."""
-    try:
-        return int(resolve_env(env).get("QUODEQ_GIT_CLONE_TIMEOUT", str(_DEFAULT_CLONE_TIMEOUT_S)))
-    except ValueError:
-        return _DEFAULT_CLONE_TIMEOUT_S
+def _clone_args(url: str, dest: Path, extra_args: list[str], git_config: Sequence[str]) -> list[str]:
+    """The ``git clone`` argv after the binary; one shape for the buffered and streaming paths."""
+    config_flags = [flag for entry in git_config for flag in ("-c", entry)]
+    return [*config_flags, "clone", "--progress", *extra_args, "--", url, str(dest)]
 
 
 class GitCloneClient:
@@ -56,39 +55,77 @@ class GitCloneClient:
     def __init__(self, env: Mapping[str, str] | None = None) -> None:
         self._env = env
 
-    def clone_progress(self, url: str, dest: Path, extra_args: list[str], *, timeout_s: int) -> None:
+    def clone_progress(
+        self, url: str, dest: Path, extra_args: list[str], *, timeout_s: int,
+        git_config: Sequence[str] = (),
+    ) -> None:
         """Run ``git clone`` for *url* into *dest*.
+
+        *git_config* entries (``key=value``) apply to this git process only,
+        via the global ``-c`` flag; they are not written into the clone.
 
         Raises the raw ``subprocess`` / ``OSError`` failures unchanged — the
         services layer owns retry orchestration and mapping them to
         user-facing clone errors.
         """
-        env = {**resolve_env(self._env), "GIT_LFS_SKIP_SMUDGE": "1", "LC_ALL": "C", "LANG": "C"}
         subprocess.run(
-            ["git", "clone", "--progress", *extra_args, "--", url, str(dest)],
+            ["git", *_clone_args(url, dest, extra_args, git_config)],
             check=True,
-            env=env,
+            env=git_env_floor(self._env),
+            stdin=subprocess.DEVNULL,
             timeout=timeout_s,
             capture_output=True,
         )
 
+    def clone_streaming(
+        self, url: str, dest: Path, extra_args: list[str], *, timeout_s: int,
+        git_config: Sequence[str] = (), on_line: Callable[[str], None],
+    ) -> tuple[bool, str]:
+        """``clone_progress`` with every stderr line handed to *on_line* as it arrives.
+
+        Same argv and guards as ``clone_progress`` (pinned locale via
+        ``git_env_floor``, closed stdin, ``--`` before the URL); returns the
+        runner's ``(ok, tail)`` instead of raising, so the caller classifies.
+        """
+        return run_git_streaming(
+            _clone_args(url, dest, extra_args, git_config),
+            timeout=timeout_s, env=git_env_floor(self._env), on_line=on_line,
+        )
+
     def clone_legacy(self, repo_input: str, dest: Path, *, timeout_s: int) -> None:
         """Run ``git clone`` for *repo_input* into *dest* (mkdtemp fallback path)."""
-        env = {**resolve_env(self._env), "GIT_LFS_SKIP_SMUDGE": "1"}
+        env = git_env_floor(self._env)
         subprocess.run(
             ["git", "clone", "--progress", repo_input, str(dest)],
-            check=True, env=env, timeout=timeout_s,
+            check=True, env=env, stdin=subprocess.DEVNULL, timeout=timeout_s,
         )
 
 
 _default_git_client = GitCloneClient()
 
 
-def clone_repo(url: str, dest: Path, extra_args: list[str], *, timeout_s: int) -> None:
-    """Compat wrapper around :meth:`GitCloneClient.clone_progress` on the
-    module default instance. See that method for the argv-shape rationale.
+@dataclass(frozen=True)
+class OnlineCacheOps:
+    """Online-cache collaborators ``prepare_repository`` drives. None =
+    production default (``context.online_cache.cache_disabled``/
+    ``ensure_clone``). The cache's own clone/fetch internals are not
+    threaded here -- only the two calls this module makes directly."""
+
+    cache_disabled: Callable[[], bool] | None = None
+    ensure_clone: Callable[[str], Path | None] | None = None
+
+
+def clone_repo(
+    url: str, dest: Path, extra_args: list[str], *, timeout_s: int,
+    git_config: Sequence[str] = (), env: Mapping[str, str] | None = None,
+) -> None:
+    """Compat wrapper around :meth:`GitCloneClient.clone_progress`. See that
+    method for the argv-shape rationale. *env* (None = process environment)
+    is the base environment the clone inherits; a non-None value builds a
+    one-off client instead of using the module default.
     """
-    _default_git_client.clone_progress(url, dest, extra_args, timeout_s=timeout_s)
+    client = _default_git_client if env is None else GitCloneClient(env)
+    client.clone_progress(url, dest, extra_args, timeout_s=timeout_s, git_config=git_config)
 
 
 def _legacy_tempdir_clone(repo_input: str, *, client: GitCloneClient | None = None) -> str:
@@ -105,32 +142,40 @@ def _legacy_tempdir_clone(repo_input: str, *, client: GitCloneClient | None = No
     tmp_dir = tempfile.mkdtemp()
     dest = Path(tmp_dir) / repo_name
     try:
-        _logger.info("Cloning %s (timeout: %ds)...", repo_input, _get_clone_timeout())
-        client.clone_legacy(repo_input, dest, timeout_s=_get_clone_timeout())
+        timeout_s = git_clone_timeout_s()
+        _logger.info("Cloning %s (timeout: %ds)...", repo_input, timeout_s)
+        client.clone_legacy(repo_input, dest, timeout_s=timeout_s)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
         shutil.rmtree(tmp_dir, ignore_errors=True)
         raise
     return str(dest.resolve())
 
 
-def prepare_repository(repo_input: str, *, client: GitCloneClient | None = None) -> str:
+def prepare_repository(
+    repo_input: str, *, client: GitCloneClient | None = None,
+    cache_ops: OnlineCacheOps | None = None,
+) -> str:
     """Return a local working copy of *repo_input*, cloning if necessary.
 
     Routes through :func:`quodeq.context.online_cache.ensure_clone` so the
     second-and-onward evaluations of the same URL reuse a shallow cached
     clone (fetched + reset to ``origin/HEAD``). The legacy mkdtemp clone
     path is kept as a fallback and behind ``QUODEQ_DISABLE_ONLINE_CACHE``.
-    *client* is an injection seam for the legacy path only — the online
-    cache's own clone/fetch calls (``context/online_cache.py``) are a
-    separate collaborator, not threaded here.
+    *client* is an injection seam for the legacy path only. *cache_ops* is
+    an :class:`OnlineCacheOps` bundle for the two online-cache calls this
+    function makes directly — the online cache's own clone/fetch internals
+    are a separate collaborator, not threaded here.
 
     Raises ValueError if the URL does not match the expected git
     repository format.
     """
+    ops = cache_ops or OnlineCacheOps()
+    is_cache_disabled = ops.cache_disabled if ops.cache_disabled is not None else cache_disabled
+    do_ensure_clone = ops.ensure_clone if ops.ensure_clone is not None else ensure_clone
     _validate_remote_url(repo_input)
-    if cache_disabled():
+    if is_cache_disabled():
         return _legacy_tempdir_clone(repo_input, client=client)
-    cached = ensure_clone(repo_input)
+    cached = do_ensure_clone(repo_input)
     if cached is not None:
         return str(cached.resolve())
     # Cache-miss + clone failure: try the old path so a corrupt cache

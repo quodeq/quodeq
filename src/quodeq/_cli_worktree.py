@@ -1,15 +1,14 @@
 """Git worktree management for branch-scoped evaluation.
 
-Split from ``_cli_resolution.py`` to keep each module under 300 lines.
 Re-exported by ``_cli_resolution.py`` (which is in turn re-exported by
-``cli_evaluation.py``), so existing ``quodeq._cli_resolution.<name>`` and
-``quodeq.cli_evaluation.<name>`` patch targets keep working unchanged.
+``cli_evaluation.py``), so ``quodeq._cli_resolution.<name>`` and
+``quodeq.cli_evaluation.<name>`` are valid patch targets.
 
-``_create_worktree``'s failure path calls ``_cleanup_worktree`` through a
+``create_worktree``'s failure path calls ``cleanup_worktree`` through a
 deferred lookup on ``quodeq._cli_resolution`` (rather than a bare name)
-because tests patch ``quodeq._cli_resolution._cleanup_worktree`` directly —
+because tests patch ``quodeq._cli_resolution.cleanup_worktree`` directly —
 see ``tests/test_cli_worktree_cleanup.py``. ``_fetch_branch`` looks up its
-timeout the same way: ``_FETCH_TIMEOUT_S`` stays defined in
+timeout the same way: ``FETCH_TIMEOUT_S`` stays defined in
 ``_cli_resolution.py`` because a test reloads that module
 (``importlib.reload``) with ``QUODEQ_GIT_CLONE_TIMEOUT_S`` set and reads the
 import-time constant back off it — see
@@ -19,15 +18,29 @@ import-time constant back off it — see
 from __future__ import annotations
 
 import logging
+import random
 import shutil
 import subprocess
 import sys
 import tempfile as _tempfile
+import time
 from pathlib import Path
+
+from quodeq.data.git_cli import git_env_floor
+from quodeq.shared.constants import GIT_BIN, GIT_FLAG_C, RETRY_JITTER_S
 
 _logger = logging.getLogger(__name__)
 
 _WORKTREE_TIMEOUT_S = 30
+
+
+def _git(repo_dir: Path, *args: str, timeout: float, check: bool = False) -> subprocess.CompletedProcess[str]:
+    """Run ``git -C <repo_dir> <args>`` with captured UTF-8 text output."""
+    return subprocess.run(
+        [GIT_BIN, GIT_FLAG_C, str(repo_dir), *args],
+        capture_output=True, text=True, encoding="utf-8", check=check, timeout=timeout,
+        env=git_env_floor(), stdin=subprocess.DEVNULL,
+    )
 
 
 def _fetch_branch(repo_dir: Path, branch: str) -> bool:
@@ -36,20 +49,19 @@ def _fetch_branch(repo_dir: Path, branch: str) -> bool:
     Single-branch clones (online repos registered via run_git_clone) have no
     refspec for other branches, so a plain ``fetch origin <branch>`` would
     only update FETCH_HEAD; the explicit ``<branch>:<branch>`` refspec makes
-    it usable by ``worktree add``. Returns True when the fetch succeeded.
+    it usable by ``worktree add``. The ``--`` keeps a branch name that starts
+    with a dash a refspec rather than a fetch option, the same way
+    ``worktree add`` is called. Returns True when the fetch succeeded.
     """
     from quodeq import _cli_resolution as _facade
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "fetch", "origin", f"{branch}:{branch}"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_facade._FETCH_TIMEOUT_S,
-        )
+        result = _git(repo_dir, "fetch", "origin", "--", f"{branch}:{branch}", timeout=_facade.FETCH_TIMEOUT_S)
         return result.returncode == 0
     except (subprocess.SubprocessError, OSError):
         return False
 
 
-def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
+def create_worktree(repo_dir: Path, branch: str) -> Path | None:
     """Create a temporary git worktree for the given branch.
 
     Returns the worktree path, or None on failure. When the first attempt
@@ -61,28 +73,26 @@ def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
     from quodeq import _cli_resolution as _facade
     for retried in (False, True):
         try:
-            subprocess.run(
-                ["git", "-C", str(repo_dir), "worktree", "add", str(worktree_dir), "--", branch],
-                capture_output=True, text=True, encoding="utf-8", check=True, timeout=_WORKTREE_TIMEOUT_S,
+            _git(
+                repo_dir, "worktree", "add", str(worktree_dir), "--", branch,
+                timeout=_WORKTREE_TIMEOUT_S, check=True,
             )
             return worktree_dir
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
             if not retried and _fetch_branch(repo_dir, branch):
+                time.sleep(random.uniform(0, RETRY_JITTER_S))
                 continue
             print(f"Failed to create worktree for branch '{branch}': {exc}", file=sys.stderr)
-            _facade._cleanup_worktree(repo_dir, worktree_dir)
+            _facade.cleanup_worktree(repo_dir, worktree_dir)
             shutil.rmtree(worktree_dir, ignore_errors=True)
             return None
     return None
 
 
-def _cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
+def cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
     """Remove a temporary git worktree."""
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "worktree", "remove", str(worktree_dir), "--force"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_WORKTREE_TIMEOUT_S,
-        )
+        result = _git(repo_dir, "worktree", "remove", str(worktree_dir), "--force", timeout=_WORKTREE_TIMEOUT_S)
         if result.returncode != 0:
             _logger.warning(
                 "git worktree remove %s exited %d: %s",

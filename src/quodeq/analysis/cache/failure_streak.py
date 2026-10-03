@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
+from quodeq.analysis.mcp.schemas import JSONL_MARKER_FILE_DONE, FileDoneStatus
 from quodeq.shared import cancellation
 
 _logger = logging.getLogger(__name__)
@@ -22,6 +23,11 @@ _logger = logging.getLogger(__name__)
 # enough that a trip happens within ~poll_interval of the threshold-th
 # error, large enough that we don't spin.
 _POLL_INTERVAL_S = 0.5
+
+# How long stop_and_join waits for the watcher thread to exit. Public: the
+# dim runner (cache/dimension_runner.py) passes it explicitly at its own
+# call site instead of relying on the default.
+STOP_JOIN_TIMEOUT_S = 5.0
 
 
 class CircuitBreakerError(Exception):
@@ -75,7 +81,7 @@ class FailureStreakWatcher:
             )
         self._thread.start()
 
-    def stop_and_join(self, *, timeout: float = 5.0) -> None:
+    def stop_and_join(self, *, timeout: float = STOP_JOIN_TIMEOUT_S) -> None:
         """Signal the watcher to stop and wait up to ``timeout`` for it."""
         self._stop.set()
         if self._thread is not None:
@@ -128,7 +134,9 @@ class FailureStreakWatcher:
                 "failure-streak breaker tripped: %d consecutive errors; recent=%s",
                 streak, [(e.file, e.reason) for e in event.recent],
             )
-            cancellation.request_cancel()
+            # Named, so the dim runner can tell this cancel from a signal or a
+            # provider-fatal one and release it once the dimension drains.
+            cancellation.request_cancel(reason=REASON_CIRCUIT_BREAKER)
         self._tripped.set()
         return True
 
@@ -153,13 +161,13 @@ class FailureStreakWatcher:
                 continue
             if not isinstance(entry, dict):
                 continue
-            if entry.get("_marker") != "file_done":
+            if entry.get("_marker") != JSONL_MARKER_FILE_DONE:
                 continue
             status = entry.get("status")
-            if status == "ok":
+            if status == FileDoneStatus.OK:
                 streak = 0
                 recent = []
-            elif status == "error":
+            elif status == FileDoneStatus.ERROR:
                 streak += 1
                 recent.append(FileError(
                     file=str(entry.get("file", "?")),

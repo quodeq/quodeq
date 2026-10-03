@@ -1,6 +1,8 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { useVisibleInterval } from '../../../hooks/useVisibleInterval.js';
+import { PUBLISH_STATE } from '../dashboardVocab.js';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -9,7 +11,7 @@ const POLL_INTERVAL_MS = 2000;
 // usePublish.js -- publishingRef and mountedRef stay owned by usePublish.js
 // itself (they also guard the publish() trigger and the hook's own mount
 // lifecycle, which are outside this extraction; mountedRef is passed in so
-// checkStatus can still read it), but publishingProjectRef, pollTimerRef,
+// checkStatus can still read it), but publishingProjectRef, the poll flag,
 // stopPolling/startPolling, refreshListAfterCompletion, and checkStatus move
 // here as one unit since they only ever operate on each other.
 // Imperative and cache-key-targeted rather than a plain refetch of usePublish's
@@ -29,10 +31,11 @@ function useRefreshListAfterCompletion(queryClient, sharedListProjects) {
         // network -- silently contradicting the comment above this function.
         staleTime: 0,
       })
-      .catch(() => {
+      .catch((err) => {
         // Best effort -- a failed refresh just leaves the "published <time
         // ago>" meta stale on cards; it is not primary content worth an
         // error banner over.
+        console.debug('[usePublishPolling] list refresh failed:', err);
       });
   }, [queryClient, sharedListProjects]);
 }
@@ -45,7 +48,7 @@ function useRefreshListAfterCompletion(queryClient, sharedListProjects) {
 // forward-compatible the moment the backend starts emitting a discriminating
 // code.
 function applyPublishFailure(publish, finishedProject, setters) {
-  setters.setPublishState('error');
+  setters.setPublishState(PUBLISH_STATE.ERROR);
   setters.setPublishError(apiErrorMessage({ message: publish.error }, 'projects.publishFailed'));
   setters.setPublishErrorProject(finishedProject);
 }
@@ -58,7 +61,7 @@ function applyPublishFailure(publish, finishedProject, setters) {
 // banner under the card, since CardFooter keys showError on
 // publishErrorProject alone, not on publishState.
 async function applyPublishSuccess(finishedProject, setters, { applyOptimisticPublish, refreshListAfterCompletion }) {
-  setters.setPublishState('done');
+  setters.setPublishState(PUBLISH_STATE.DONE);
   setters.setPublishError(null);
   setters.setPublishErrorProject(null);
   // Flip the card BEFORE the network round trip below, then let the
@@ -67,11 +70,9 @@ async function applyPublishSuccess(finishedProject, setters, { applyOptimisticPu
   await refreshListAfterCompletion();
 }
 
-function useCheckStatus({
-  getSharedStatus, mountedRef, stopPolling, applyOptimisticPublish,
-  refreshListAfterCompletion, publishingProjectRef, setPublishState,
-  setPublishError, setPublishErrorProject, setPublishingProjectBoth,
-}) {
+// `controls` is the job-state bundle from usePublishJobState; `completion`
+// holds the two callbacks the done branch runs.
+function useCheckStatus({ getSharedStatus, mountedRef, stopPolling, controls, completion }) {
   return useCallback(async () => {
     let data;
     try {
@@ -82,26 +83,26 @@ function useCheckStatus({
     }
     if (!mountedRef.current) return;
     const publish = data?.publish || {};
-    if (publish.state === 'running') return; // keep polling
+    if (publish.state === PUBLISH_STATE.RUNNING) return; // keep polling
     stopPolling();
-    const finishedProject = publish.project ?? publishingProjectRef.current;
-    const setters = { setPublishState, setPublishError, setPublishErrorProject };
-    if (publish.state === 'error') {
-      applyPublishFailure(publish, finishedProject, setters);
+    const finishedProject = publish.project ?? controls.publishingProjectRef.current;
+    if (publish.state === PUBLISH_STATE.ERROR) {
+      applyPublishFailure(publish, finishedProject, controls);
     } else {
-      await applyPublishSuccess(finishedProject, setters, { applyOptimisticPublish, refreshListAfterCompletion });
+      await applyPublishSuccess(finishedProject, controls, completion);
     }
-    setPublishingProjectBoth(null);
-  }, [getSharedStatus, stopPolling, applyOptimisticPublish, refreshListAfterCompletion, setPublishingProjectBoth]);
+    controls.setPublishingProjectBoth(null);
+  }, [getSharedStatus, mountedRef, stopPolling, controls, completion]);
 }
 
 // idle | running | done | error -- mirrors the backend's global publish job.
 // publishingProjectRef mirrors `publishingProject` state synchronously, so
 // the poll callback (memoized once, reused across ticks) always reads the
 // latest value instead of whatever was captured in its closure at creation
-// time.
+// time. The setters and the ref come back as one stable `controls` bundle,
+// which is what the poll callback and usePublish's trigger both work with.
 function usePublishJobState() {
-  const [publishState, setPublishState] = useState('idle');
+  const [publishState, setPublishState] = useState(PUBLISH_STATE.IDLE);
   const [publishingProject, setPublishingProject] = useState(null);
   const [publishError, setPublishError] = useState(null);
   const [publishErrorProject, setPublishErrorProject] = useState(null);
@@ -112,11 +113,12 @@ function usePublishJobState() {
     setPublishingProject(id);
   }, []);
 
-  return {
-    publishState, publishingProject, publishError, publishErrorProject,
-    setPublishState, setPublishError, setPublishErrorProject,
-    publishingProjectRef, setPublishingProjectBoth,
-  };
+  const controls = useMemo(
+    () => ({ setPublishState, setPublishError, setPublishErrorProject, publishingProjectRef, setPublishingProjectBoth }),
+    [setPublishingProjectBoth],
+  );
+
+  return { publishState, publishingProject, publishError, publishErrorProject, controls };
 }
 
 /**
@@ -127,41 +129,27 @@ function usePublishJobState() {
  * after unmount are dropped (`mountedRef`).
  */
 export function usePublishPolling({ queryClient, sharedListProjects, getSharedStatus, applyOptimisticPublish, mountedRef }) {
-  const {
-    publishState, publishingProject, publishError, publishErrorProject,
-    setPublishState, setPublishError, setPublishErrorProject,
-    publishingProjectRef, setPublishingProjectBoth,
-  } = usePublishJobState();
+  const { publishState, publishingProject, publishError, publishErrorProject, controls } = usePublishJobState();
 
-  const pollTimerRef = useRef(null);
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-  }, []);
+  const [polling, setPolling] = useState(false);
+  const stopPolling = useCallback(() => { setPolling(false); }, []);
 
   const refreshListAfterCompletion = useRefreshListAfterCompletion(queryClient, sharedListProjects);
-  const checkStatus = useCheckStatus({
-    getSharedStatus, mountedRef, stopPolling, applyOptimisticPublish, refreshListAfterCompletion,
-    publishingProjectRef, setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth,
-  });
+  const completion = useMemo(
+    () => ({ applyOptimisticPublish, refreshListAfterCompletion }),
+    [applyOptimisticPublish, refreshListAfterCompletion],
+  );
+  const checkStatus = useCheckStatus({ getSharedStatus, mountedRef, stopPolling, controls, completion });
 
-  const startPolling = useCallback(() => {
-    stopPolling();
-    pollTimerRef.current = setInterval(checkStatus, POLL_INTERVAL_MS);
-  }, [stopPolling, checkStatus]);
+  const startPolling = useCallback(() => { setPolling(true); }, []);
+  useVisibleInterval(checkStatus, polling ? POLL_INTERVAL_MS : 0);
 
   return {
     publishState,
     publishingProject,
     publishError,
     publishErrorProject,
-    setPublishState,
-    setPublishError,
-    setPublishErrorProject,
-    publishingProjectRef,
-    setPublishingProjectBoth,
+    ...controls,
     stopPolling,
     startPolling,
     checkStatus,

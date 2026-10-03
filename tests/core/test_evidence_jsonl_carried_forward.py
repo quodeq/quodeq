@@ -40,7 +40,7 @@ def test_judgment_to_dict_emits_flag_only_when_set():
 
 
 def test_wire_dict_to_judgment_reads_carried_forward():
-    # Used by _emit_cached_findings to mirror cache replays into
+    # Used by emit_cached_findings to mirror cache replays into
     # events.jsonl, which feeds the SSE path.
     assert wire_dict_to_judgment(
         json.loads(_line(carried_forward=True))

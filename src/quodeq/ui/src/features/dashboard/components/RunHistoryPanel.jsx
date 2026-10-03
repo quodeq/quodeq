@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { formatPeriodLabel } from '../../../utils/formatters.js';
+import { runCounts } from '../headlineStats.js';
 import { t } from '../../../strings/index.js';
 import { granularityLabel } from '../../../strings/labels.js';
 import {
@@ -10,9 +11,10 @@ import {
   periodOrDateLabel,
   tooltipScore,
 } from '../../../components/scoreChartPanel.jsx';
+import { PANEL_CHART_HEIGHT_PX, runChartInteraction } from '../../../components/scoreChartHelpers.js';
+import { countsLine } from '../../history/components/chartTooltipCounts.jsx';
 
 const MAX_CHART_RUNS = 20;
-const CHART_HEIGHT = 160;
 const MAX_BAR_SIZE = 28;
 // The chart needs two points before a trend line means anything.
 const MIN_CHART_POINTS = 2;
@@ -29,6 +31,7 @@ function buildTrendData(trend, granularity = 'day') {
     const numericAverage = parseFloat(row.numericAverage);
     return {
       ...row,
+      ...runCounts(row),
       numericAverage,
       periodLabel: formatPeriodLabel(row, granularity),
       delta: i > 0 ? numericAverage - parseFloat(arr[i - 1].numericAverage) : null,
@@ -43,23 +46,27 @@ function buildTrendData(trend, granularity = 'day') {
 // the line comparable across runs. The cost is that a point refreshed by 1 of
 // 7 dimensions looks identical to one backed by a full sweep, so say when the
 // refresh was partial. A complete scan needs no annotation.
+function partialNote(entry) {
+  const refreshed = entry.dimensionsCount;
+  const total = entry.accumulatedDimensionsCount;
+  if (!Number.isFinite(refreshed) || !Number.isFinite(total) || refreshed >= total) return null;
+  return (
+    <span className="rht-coverage">
+      {t('history.partialRefresh', { count: refreshed, total })}
+    </span>
+  );
+}
+
+// The counts line is the bucket's newest run's criticals, majors and open
+// types: the run the tooltip names, not a project-wide figure.
 export const RunHistoryTooltip = makeScoreTooltip({
   label: periodOrDateLabel,
   missingScore: MISSING_SCORE,
-  extra: (entry) => {
-    const refreshed = entry.dimensionsCount;
-    const total = entry.accumulatedDimensionsCount;
-    if (!Number.isFinite(refreshed) || !Number.isFinite(total) || refreshed >= total) return null;
-    return (
-      <span className="rht-coverage">
-        {t('history.partialRefresh', { count: refreshed, total })}
-      </span>
-    );
-  },
+  extra: (entry) => <>{countsLine(entry, { runLabel: entry.dateLabel })}{partialNote(entry)}</>,
 });
 
 const CHART_PRESENTATION = {
-  height: CHART_HEIGHT,
+  height: PANEL_CHART_HEIGHT_PX,
   fillHeight: true,
   maxBarSize: MAX_BAR_SIZE,
   gradientId: 'scoreAreaGrad',
@@ -86,10 +93,21 @@ function buildRunKbdItems(data, onBarClick) {
   }));
 }
 
-export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
-  const [hoveredIndex, setHoveredIndex] = useState(null);
+/** Hover setter that also reports the hovered run to the prefetcher: a bar
+ * warms its run, leaving the chart cancels the pending warm-up. */
+export function hoverWithPrefetch(setHoveredIndex, data, onBarHover, onBarHoverEnd) {
+  return (index) => {
+    setHoveredIndex(index);
+    if (index === null) onBarHoverEnd?.();
+    else if (data[index]?.runId) onBarHover?.(data[index].runId);
+  };
+}
+
+export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick, onBarHover, onBarHoverEnd, granularity = 'day', onGranularityChange }) {
+  const [hoveredIndex, setHoveredIndexState] = useState(null);
   // Hooks must run in the same order every render, so compute before any early return.
   const data = useMemo(() => buildTrendData(trend, granularity), [trend, granularity]);
+  const setHoveredIndex = hoverWithPrefetch(setHoveredIndexState, data, onBarHover, onBarHoverEnd);
 
   // The parent only mounts this panel when there are ≥2 days of data, so an
   // empty trend shouldn't happen — but guard the truly-empty case. A single
@@ -112,12 +130,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
         <ScoreChartWithKeyboard
           data={data}
           chart={CHART_PRESENTATION}
-          interaction={{
-            hoveredIndex,
-            setHoveredIndex,
-            selectedRunId,
-            onActivate: onBarClick ? (point) => onBarClick(point.runId) : undefined,
-          }}
+          interaction={runChartInteraction({ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick })}
           kbdLabel={t('dashboard.runHistoryKbdLabel')}
           kbdItems={buildRunKbdItems(data, onBarClick)}
         />

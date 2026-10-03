@@ -4,7 +4,7 @@ CI's Windows runner has 4 vCPUs and the job runs pytest-xdist with ``-n auto``,
 so four workers saturate the box. A literal ``wait(timeout=5)`` that is
 generous on an idle laptop becomes a coin flip there: a worker thread can miss
 its window purely because it never got scheduled. That is not hypothetical —
-run 30148774491 on develop logged a daemon thread dying on
+a CI run on develop logged a daemon thread dying on
 ``assert cancel.wait(timeout=5)`` in ``test_assistant_routes.py`` while the
 stop route it was waiting for had not been scheduled yet.
 

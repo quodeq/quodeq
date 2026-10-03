@@ -72,7 +72,7 @@ def test_logs_js_caps_the_dom_with_max_lines():
 
 
 def test_logs_page_has_aria_live_log_region():
-    """New lines must be announced to assistive tech (finding 7329)."""
+    """New lines must be announced to assistive tech."""
     app = create_app()
     client = app.test_client()
     resp = client.get("/logs")
@@ -93,8 +93,8 @@ def test_logs_page_has_a_status_region():
 
 
 def test_logs_js_reports_a_stalled_poll():
-    """A failed poll must show a visible status, not just console.warn
-    (finding 7334); the next successful poll clears it."""
+    """A failed poll must show a visible status, not just console.warn;
+    the next successful poll clears it."""
     app = create_app()
     client = app.test_client()
     resp = client.get("/logs.js")

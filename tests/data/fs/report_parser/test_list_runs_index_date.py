@@ -1,5 +1,7 @@
 import json
+import os
 from pathlib import Path
+from unittest.mock import patch
 
 from quodeq.data.fs.report_parser.runs import list_runs
 from quodeq.data.fs.report_parser._date_utils import normalize_date
@@ -53,3 +55,61 @@ def test_dateless_run_gains_started_at_from_index(tmp_path, monkeypatch):
     _make_run(reports, "proj", "run-c", started_at="2026-07-04T05:25:51+00:00", eval_date=None)
     runs = list_runs(reports, "proj")
     assert runs[0].date_iso == normalize_date("2026-07-04T05:25:51+00:00")[0]
+
+
+def test_parsed_fallback_date_is_remembered_in_index(tmp_path, monkeypatch):
+    """Second list_runs serves the fallback date from the index, no report read."""
+    import quodeq.data.fs.report_parser.runs as runs_mod
+
+    monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "idx.db"))
+    reports = tmp_path / "evaluations"
+    _make_run(reports, "proj", "run-d", started_at="x", eval_date="2026-06-01T10:00:00+00:00",
+              write_status=False)
+    first = list_runs(reports, "proj")
+    expected = normalize_date("2026-06-01T10:00:00+00:00")
+    assert (first[0].date_iso, first[0].date_label) == expected
+
+    def _boom(*_a, **_k):
+        raise AssertionError("parse_run_date must not run once the date is indexed")
+
+    monkeypatch.setattr(runs_mod, "parse_run_date", _boom)
+    second = list_runs(reports, "proj")
+    assert (second[0].date_iso, second[0].date_label) == expected
+
+
+def test_undated_finished_run_is_remembered_as_undated(tmp_path, monkeypatch):
+    """A finished run with no date anywhere is read once, then served undated from the index."""
+    import quodeq.data.fs.report_parser.runs as runs_mod
+
+    monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "idx.db"))
+    reports = tmp_path / "evaluations"
+    _make_run(reports, "proj", "run-e", started_at="x", eval_date=None, write_status=False)
+    runs = list_runs(reports, "proj")
+    assert runs[0].date_iso is None
+
+    def _boom(*_a, **_k):
+        raise AssertionError("an undated finished run must not be parsed again")
+
+    monkeypatch.setattr(runs_mod, "parse_run_date", _boom)
+    again = list_runs(reports, "proj")
+    assert (again[0].date_iso, again[0].date_label) == (None, "run-e")
+    # Consumers that order runs by date (run_diff baselines) never see it.
+    from quodeq.data.fs.report_parser.run_dates import project_run_dates
+    assert project_run_dates(reports, "proj") == {}
+
+
+def test_undated_running_run_keeps_being_parsed(tmp_path, monkeypatch):
+    """A run still in flight may gain a date from a later report, so it is not remembered yet."""
+    monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "idx.db"))
+    reports = tmp_path / "evaluations"
+    _make_run(reports, "proj", "run-f", started_at="x", eval_date=None, write_status=False)
+    (reports / "proj" / "run-f" / "status.json").write_text(json.dumps({"state": "running"}), "utf-8")
+    with patch("quodeq.data.fs.report_parser.runs.resolve_external_pid", return_value=os.getpid()):
+        runs = list_runs(reports, "proj")
+    assert runs[0].date_iso is None and str(runs[0].status) == "running"
+    from quodeq.data.sqlite.run_index import open_index, read_run_dates
+    db = open_index(tmp_path / "idx.db")
+    try:
+        assert read_run_dates(db, "proj") == {}
+    finally:
+        db.close()

@@ -61,7 +61,7 @@ def test_force_action_api_host_port(monkeypatch):
         captured["port"] = port
         return f"http://{host}:{port}", FakeProcess()
 
-    monkeypatch.setattr(runner, "_ensure_action_api_forced", fake_ensure)
+    monkeypatch.setattr(runner, "ensure_action_api_forced", fake_ensure)
     monkeypatch.setattr(runner, "validate_paths", lambda *_args, **_kwargs: None)
     hooks = DashboardHooks(
         build_ui=lambda *_args, **_kwargs: Path("ui/web/dist"),
@@ -88,3 +88,53 @@ def test_force_action_api_host_port(monkeypatch):
 
     runner.run_dashboard(config, hooks=hooks)
     assert captured == {"host": "0.0.0.0", "port": 9000}
+
+
+class _StubbornProcess:
+    """A live process whose post-SIGTERM wait can time out."""
+
+    def __init__(self, ignores_sigterm: bool):
+        self.ignores_sigterm = ignores_sigterm
+        self.calls: list[tuple[str, float | None]] = []
+
+    def poll(self):
+        return None
+
+    def terminate(self):
+        self.calls.append(("terminate", None))
+
+    def kill(self):
+        self.calls.append(("kill", None))
+
+    def wait(self, timeout=None):
+        self.calls.append(("wait", timeout))
+        if timeout is not None and self.ignores_sigterm:
+            raise _api_spawn.subprocess.TimeoutExpired("api", timeout)
+        return 0
+
+
+def _spawn_failing_health(monkeypatch, tmp_path, proc):
+    def unhealthy(_base_url):
+        raise TimeoutError("not healthy")
+
+    monkeypatch.setattr(_api_spawn, "spawn_action_api", lambda *_a, **_k: proc)
+    monkeypatch.setattr(_api_spawn, "wait_for_action_api", unhealthy)
+    with pytest.raises(TimeoutError):
+        _api_spawn.spawn_and_wait(_TEST_PORT, "http://x", tmp_path / "p.pid", _TEST_HOST)
+
+
+def test_spawn_and_wait_bounds_the_wait_after_sigterm(monkeypatch, tmp_path):
+    proc = _StubbornProcess(ignores_sigterm=False)
+    _spawn_failing_health(monkeypatch, tmp_path, proc)
+    assert proc.calls == [("terminate", None), ("wait", _api_spawn.TERMINATE_GRACE_SECONDS)]
+
+
+def test_spawn_and_wait_kills_a_child_that_ignores_sigterm(monkeypatch, tmp_path):
+    proc = _StubbornProcess(ignores_sigterm=True)
+    _spawn_failing_health(monkeypatch, tmp_path, proc)
+    assert proc.calls == [
+        ("terminate", None),
+        ("wait", _api_spawn.TERMINATE_GRACE_SECONDS),
+        ("kill", None),
+        ("wait", None),
+    ]

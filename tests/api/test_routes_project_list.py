@@ -68,7 +68,7 @@ def test_export_project_rejects_invalid_project_name(client):
 
 
 class TestUpdateProjectPathValidation:
-    """finding 5926: update_project_path's distinct failure modes (invalid
+    """update_project_path's distinct failure modes (invalid
     URL, non-directory target, missing project) get their own message
     instead of a blanket "Project not found" 404 for all of them."""
 
@@ -89,6 +89,13 @@ class TestUpdateProjectPathValidation:
         assert resp.status_code == 400
         body = resp.get_json()
         assert body["code"] == "INVALID_URL"
+        assert "my-proj" not in provider.updated_paths
+
+    def test_file_url_is_refused_with_invalid_url(self, client, provider, tmp_path):
+        """A project path is a folder, not a URL: file:// is for the results repo only."""
+        resp = client.patch("/api/projects/my-proj/path", json={"path": f"file://{tmp_path}"})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_URL"
         assert "my-proj" not in provider.updated_paths
 
     def test_non_string_path_is_refused(self, client, provider):

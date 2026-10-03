@@ -1,7 +1,6 @@
 """Per-launch shared secret gating the webview's CSP unsafe-eval relaxation."""
 from __future__ import annotations
 
-import contextlib
 import logging
 import secrets
 import subprocess
@@ -11,26 +10,28 @@ import typing
 _logger = logging.getLogger(__name__)
 # Env var read by quodeq.api.security to gate the webview-only CSP
 # relaxation. Must match quodeq.api.security._ENV_WEBVIEW_TOKEN.
-_ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
+ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
+
+_TOKEN_BYTES = 24  # secrets.token_urlsafe's input size for the per-launch webview token
 
 _webview_token: str | None = None
 
 
-def _get_webview_token() -> str:
+def get_webview_token() -> str:
     """Return this process's launch token, generating it on first use.
 
-    Memoized so the API subprocess (started via _ensure_action_api[_forced],
+    Memoized so the API subprocess (started via ensure_action_api[_forced],
     which sets it into this process's environment before spawning) and the
     webview subprocess (started later by _serve_native, which appends it to
     argv) get the same value, however far apart their call sites are.
     """
     global _webview_token
     if _webview_token is None:
-        _webview_token = secrets.token_urlsafe(24)
+        _webview_token = secrets.token_urlsafe(_TOKEN_BYTES)
     return _webview_token
 
 
-def _warn_reused_api_token_mismatch(base_url: str) -> None:
+def warn_reused_api_token_mismatch(base_url: str) -> None:
     """Explain why the desktop shell's CSP relaxation will not be granted.
 
     The token is only handed to an API process we spawn ourselves. A reused
@@ -76,15 +77,17 @@ def _send_token(window_proc: subprocess.Popen | None) -> None:
     if stdin is None:
         return
     try:
-        stdin.write(f"{_get_webview_token()}\n".encode())
+        stdin.write(f"{get_webview_token()}\n".encode())
         stdin.flush()
     except (OSError, ValueError) as exc:
         _logger.debug("webview token handoff failed: %s", exc)
     finally:
         # Must close even when the write failed: the child blocks in
         # readline() until this end is closed.
-        with contextlib.suppress(OSError, ValueError):
+        try:
             stdin.close()
+        except (OSError, ValueError) as exc:
+            _logger.debug("webview token stdin close failed: %s", exc)
 
 
 def spawn_window_with_token(

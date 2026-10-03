@@ -12,12 +12,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from quodeq.core.run.state import TERMINAL_STATES, RunState, parse_run_state
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.types import DimensionResult
 from quodeq.data.mappers import parse_dimension_result
+from quodeq.data.sqlite.dimension_counts import read_dimension_counts
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
 from quodeq.data.fs.report_parser.external_pid import resolve_external_pid
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
+from quodeq.data.fs.report_parser._evidence_sqlite import manifest_metadata
+from quodeq.data.fs.report_parser._run_scalars import scalars_to_dimension_results
+from quodeq.shared.constants import EVIDENCE_DIRNAME, JSON_SUFFIX, MANIFEST_FILENAME
 from quodeq.data.fs.report_parser._repository import (
     build_repository_info as build_repository_info,
 )
@@ -26,7 +31,7 @@ from quodeq.data.fs.report_parser._run_info import (
     parse_run_date,
     safe_read_dir as safe_read_dir,
 )
-from quodeq.data.fs.report_parser.run_dates import project_run_dates
+from quodeq.data.fs.report_parser.run_dates import remember_run_dates, remembered_run_dates
 from quodeq.shared.validation import validate_path_segment
 
 _DEFAULT_RUN_LIMIT = 100
@@ -49,7 +54,7 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
         raise FileNotFoundError(f"Run not found: {project}/{run_id}")
     run_dir = Path(resolved_run)
     evaluations = load_evaluations(run_dir / "evaluation")
-    evidence_map = load_evidence_map(run_dir / "evidence")
+    evidence_map = load_evidence_map(run_dir / EVIDENCE_DIRNAME)
 
     dimensions: list[DimensionResult] = []
     for evaluation in evaluations:
@@ -115,6 +120,7 @@ def _read_run_scalars_from_sql(run_dir: Path) -> "tuple[list[dict], list[dict]] 
         store = SQLiteStateStore(run_dir)
         dim_rows = store.read_dimension_scores()
         principle_rows = store.read_principle_grades()
+        counts = read_dimension_counts(run_dir)
     except sqlite3.DatabaseError:
         return None
 
@@ -126,46 +132,13 @@ def _read_run_scalars_from_sql(run_dir: Path) -> "tuple[list[dict], list[dict]] 
 
     eval_dir = run_dir / "evaluation"
     on_disk = (
-        sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
+        sum(1 for p in eval_dir.iterdir() if p.suffix == JSON_SUFFIX)
         if eval_dir.is_dir() else 0
     )
     if on_disk and len(dim_rows) != on_disk:
         return None
 
-    return dim_rows, principle_rows
-
-
-def _scalars_to_dimension_results(
-    dim_rows: list[dict], principle_rows: list[dict],
-) -> list[DimensionResult]:
-    """Build sorted DimensionResults from validated SQL grade rows.
-
-    No eval-time grade fallback here (unlike overlay_sql_grades): the fast
-    path doesn't read the JSON, and a projected dim past the NULL-score
-    guard always carries a real grade label ("Insufficient" or better),
-    never "".
-    """
-    from quodeq.core.types.report import PrincipleGrade  # noqa: PLC0415
-
-    principles_by_dim: dict[str, list[PrincipleGrade]] = {}
-    for r in principle_rows:
-        principles_by_dim.setdefault(r["dimension"], []).append(PrincipleGrade(
-            principle=r["principle_id"],
-            score=f'{r["score"]}/10' if r.get("score") is not None else None,
-            grade=r.get("grade"),
-        ))
-
-    dimensions = [
-        DimensionResult(
-            dimension=r["dimension"],
-            overall_score=f'{r["score"]}/10',
-            overall_grade=r.get("grade"),
-            principles=principles_by_dim.get(r["dimension"], []),
-        )
-        for r in dim_rows
-    ]
-    dimensions.sort(key=lambda d: d.dimension)
-    return dimensions
+    return dim_rows, principle_rows, counts
 
 
 def read_run_scalars(
@@ -175,15 +148,18 @@ def read_run_scalars(
     *,
     fallback_reader: Callable[[Path, str, str], list[DimensionResult]] = _default_fallback_reader,
 ) -> list[DimensionResult]:
-    """Load a run's per-dimension SCALARS (score/grade/principles) only.
+    """Load a run's per-dimension scalars: everything a full read carries but the findings.
 
-    Fast path for the dashboard trend and accumulated carry-forward, which need
-    only ``overall_score`` / ``overall_grade`` per dimension — not the full
-    findings.  Reads the authoritative SQL grade tables directly instead of
-    parsing the evaluation JSON, then falls back to *fallback_reader*
+    Fast path for the trend, the accumulated walk and the Compare screen,
+    which never list findings. Reads the authoritative SQL grade tables
+    directly instead of parsing the evaluation JSON, plus the run manifest
+    for the run-level metadata, then falls back to *fallback_reader*
     (defaults to :func:`read_run_data`) whenever the SQL tables can't
     faithfully reproduce the overlaid result -- see
     :func:`_read_run_scalars_from_sql` for the full list of guards.
+
+    Not available without the report: ``evidence_date`` (the run's date,
+    which ``RunInfo`` carries) and ``quarantined_count`` (0 here).
     """
     validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
@@ -191,8 +167,8 @@ def read_run_scalars(
     sql_result = _read_run_scalars_from_sql(run_dir)
     if sql_result is None:
         return fallback_reader(reports_root, project, run_id)
-    dim_rows, principle_rows = sql_result
-    return _scalars_to_dimension_results(dim_rows, principle_rows)
+    dim_rows, principle_rows, counts = sql_result
+    return scalars_to_dimension_results(dim_rows, principle_rows, counts, manifest_metadata(run_dir))
 
 
 def _read_run_status(run_dir: Path) -> str | None:
@@ -212,33 +188,25 @@ def _read_run_status(run_dir: Path) -> str | None:
     return state if isinstance(state, str) else None
 
 
-# Terminal status.json states → History status vocabulary. A terminal state is
-# authoritative even when the run's PID is still alive: the cancel path flips
-# status.json to ``cancelled`` immediately, but the subprocess keeps draining
-# its subagents for a few seconds before it exits. Without this, a cancelled
-# run reappears as "running" in History for the length of that drain.
-_TERMINAL_STATE_TO_STATUS = {
-    "done": "complete",
-    "failed": "failed",
-    "cancelled": "cancelled",
-}
-
-
-def _run_status_for_entry(project_dir: Path, run_dir: Path, entry_name: str) -> str:
+def _run_status_for_entry(project_dir: Path, run_dir: Path, entry_name: str) -> RunState:
     """Status precedence for one run dir entry:
 
-    1. status.json state is terminal (done/failed/cancelled) → honor it,
-       even over a still-live PID (a cancelled run keeps draining after
-       its state flips; it must not resurface as "running").
-    2. Live process holding the PID → "in_progress" (dimmed "Running…" in UI)
-    3. Otherwise → "complete" (historical, crashed, pre-.pid-era runs)
+    1. status.json state is terminal -> honor it, even over a still-live
+       PID (a cancelled run keeps draining after its state flips; it must
+       not resurface as running).
+    2. Live process holding the PID -> RUNNING.
+    3. Otherwise -> DONE (historical, crashed, pre-.pid-era runs).
     """
     raw_state = _read_run_status(run_dir)
-    terminal_status = _TERMINAL_STATE_TO_STATUS.get(raw_state or "")
-    if terminal_status is not None:
-        return terminal_status
+    if raw_state:
+        try:
+            state = parse_run_state(raw_state)
+        except ValueError:
+            state = None
+        if state in TERMINAL_STATES:
+            return state
     pid = resolve_external_pid(project_dir, entry_name)
-    return "in_progress" if pid is not None else "complete"
+    return RunState.RUNNING if pid is not None else RunState.DONE
 
 
 def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIMIT) -> list[RunInfo]:
@@ -258,7 +226,8 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
     if resolved is None:
         return []
     project_dir = Path(resolved)
-    index_dates = project_run_dates(reports_root, project)
+    index_dates = remembered_run_dates(reports_root, project)
+    parsed: dict[str, tuple[str | None, str]] = {}
     run_infos: list[RunInfo] = []
     for entry in safe_read_dir(project_dir):
         if not entry.is_dir() or entry.name.startswith("."):
@@ -268,7 +237,7 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         # without a prescan never write evidence/manifest.json, and the SQLite
         # index (History) already accepts any run with a status.json — the two
         # enumerators must agree or the Overview 404s on runs History shows.
-        is_run = (run_dir / "evidence" / "manifest.json").exists() \
+        is_run = (run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME).exists() \
             or (run_dir / "status.json").is_file()
         if not is_run:
             continue
@@ -278,7 +247,13 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
             date_iso, date_label = cached
         else:
             date_iso, date_label = parse_run_date(reports_root, project, entry.name)
+            # Remembered so this read happens once. An undated run is parsed
+            # again while it runs (a report may still bring a date) and
+            # remembered as undated once it has finished.
+            if date_iso is not None or status in TERMINAL_STATES:
+                parsed[entry.name] = (date_iso, date_label)
         run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label, status=status))
+    remember_run_dates(project, parsed)
     run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)
     if limit > 0:
         return run_infos[:limit]

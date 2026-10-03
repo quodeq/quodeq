@@ -7,8 +7,11 @@ by tests/api/test_terminal_routes.py.
 """
 from __future__ import annotations
 
+import logging
+import threading
 from unittest.mock import patch
 
+import pytest
 from flask_sock import ConnectionClosed
 
 from quodeq.api import _terminal_ws_helpers as ws_helpers
@@ -35,10 +38,15 @@ class _OkManager:
 
 
 class _RaisingManager:
-    """Simulates a spawn failure: ensure_session raises before a PTY exists."""
+    """Simulates a spawn failure: ensure_session raises before a PTY exists.
+
+    OSError, not RuntimeError: this is what a real PtyBackend.spawn() raises
+    (os.openpty()/subprocess.Popen() failures are both OSError), and that is
+    the exception type setup_terminal_session's except now narrows to.
+    """
 
     def ensure_session(self, *, cwd, cols, rows):
-        raise RuntimeError("boom: shell spawn failed")
+        raise OSError("boom: shell spawn failed")
 
     def scrollback(self):  # pragma: no cover - must not be reached
         raise AssertionError("scrollback() must not run after a failed ensure_session")
@@ -91,3 +99,80 @@ def test_setup_failure_logs_when_client_closed_before_fallback_frame():
     assert ok is False
     assert debug.called
     assert "client already gone" in debug.call_args.args[0]
+
+
+class _OneShotManager:
+    """One chunk of data available, then idle forever (nothing left to send)."""
+
+    def __init__(self):
+        self.alive = True
+        self._served = False
+
+    def read(self, max_bytes=65536):
+        if self._served:
+            return ""
+        self._served = True
+        return "hi"
+
+
+class TestPumpTerminalOut:
+    """pump_terminal_out runs on its own daemon thread (terminal_routes.py's
+    `_terminal_ws`), so it is the only thing that can signal `stop` for it.
+    Its except was narrowed from bare `Exception` to (ConnectionClosed,
+    OSError); the try/finally around the whole loop makes sure `stop` is
+    still set even if something outside that tuple ends the loop instead."""
+
+    def test_narrowed_exception_from_send_breaks_the_loop_and_signals_stop(self):
+        class _OsErrorWs:
+            def send(self, data):
+                raise OSError("broken pipe")
+
+        stop = threading.Event()
+        ws_helpers.pump_terminal_out(_OneShotManager(), _OsErrorWs(), stop)
+        assert stop.is_set()
+
+    def test_an_exception_outside_the_tuple_still_signals_stop_before_propagating(self):
+        class _WeirdWs:
+            def send(self, data):
+                raise RuntimeError("not a ConnectionClosed/OSError")
+
+        stop = threading.Event()
+        with pytest.raises(RuntimeError):
+            ws_helpers.pump_terminal_out(_OneShotManager(), _WeirdWs(), stop)
+        assert stop.is_set()
+
+
+class _ReceiveRaisesWs:
+    def __init__(self, exc):
+        self._exc = exc
+
+    def receive(self, timeout=None):
+        raise self._exc
+
+
+def _unused_apply_control(manager, payload):
+    raise AssertionError("no control frame is sent")
+
+
+class TestTerminalReadLoop:
+    """A client disconnect is the normal end of a session: it stops the loop
+    without a warning. Any other failure still warns with the traceback."""
+
+    def test_client_disconnect_stops_the_loop_without_a_warning(self, caplog):
+        stop = threading.Event()
+        with caplog.at_level(logging.DEBUG, logger=ws_helpers.__name__):
+            ws_helpers.terminal_read_loop(
+                _ReceiveRaisesWs(ConnectionClosed()), _OkManager(), stop, _unused_apply_control
+            )
+        assert stop.is_set()
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+    def test_os_error_still_warns_with_the_traceback(self, caplog):
+        stop = threading.Event()
+        with caplog.at_level(logging.DEBUG, logger=ws_helpers.__name__):
+            ws_helpers.terminal_read_loop(
+                _ReceiveRaisesWs(OSError("pty gone")), _OkManager(), stop, _unused_apply_control
+            )
+        assert stop.is_set()
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warnings) == 1 and warnings[0].exc_info is not None

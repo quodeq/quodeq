@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import { useTerminalSocket } from './useTerminalSocket.js';
-import { createTerminalInstance, isReservedChord } from './terminalSetup.js';
+import { createTerminalInstance, isReservedChord, TERMINAL_STATUS } from './terminalSetup.js';
 import { themeFromCss } from './xtermTheme.js';
 import { t } from '../../strings/index.js';
 import { DATA_THEME_ATTR } from '../../constants.js';
@@ -24,7 +24,7 @@ function isHidden(el) {
 // reconciles the tab strip against /terminal/sessions; retrying is futile.
 function useGoneNotify(status, sessionId, onGone) {
   useEffect(() => {
-    if (status === 'gone') onGone?.(sessionId);
+    if (status === TERMINAL_STATUS.GONE) onGone?.(sessionId);
   }, [status, sessionId, onGone]);
 }
 
@@ -49,7 +49,7 @@ function useCopyApiRegistration(registerApi, sessionId, termRef) {
     };
     registerApi(sessionId, { getCopyText });
     return () => registerApi(sessionId, null);
-  }, [registerApi, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [registerApi, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps -- the ref (termRef) is read at run time, not tracked
 }
 
 // Fit xterm to its box and push the resulting size to the PTY. A failing fit
@@ -65,17 +65,16 @@ function fitAndResize(fit, term, resize, where) {
   }
 }
 
-// The size must reach the PTY only once the socket is OPEN. The resize sent
-// during mount is dropped (socket still connecting), which would leave the
-// PTY at the backend's default 80x24 while xterm renders the real (smaller)
-// drawer size — so full-screen TUIs like `claude`/`vim` draw off-screen and
-// look clipped. Re-fit and re-sync when the socket opens (and on reconnect).
-function useRefitOnOpen({ status, resize, rootRef, fitRef, termRef }) {
+// Refit xterm and re-sync the PTY size each time `trigger` changes while
+// `ready` holds. Skipped while the view is hidden (where we deliberately skip
+// fitting), so a stray call can't resize to 0. `where` names the caller in
+// the failure log.
+function useRefitOn(trigger, ready, where, { resize, rootRef, fitRef, termRef }) {
   useEffect(() => {
     const el = rootRef.current;
-    if (status !== 'open' || !fitRef.current || !termRef.current || isHidden(el)) return;
-    fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-open');
-  }, [status, resize]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!ready || !fitRef.current || !termRef.current || isHidden(el)) return;
+    fitAndResize(fitRef.current, termRef.current, resize, where);
+  }, [trigger, resize]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked; `ready` and `where` follow `trigger`
 }
 
 function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, box }) {
@@ -142,18 +141,7 @@ function useSessionMount({ live, sessionId, send, resize, rootRef, termRef, fitR
     // to wait for — build immediately.
     setup();
     return makeSessionTeardown({ termRef, fitRef, box });
-  }, [live, sessionId, send, resize]); // eslint-disable-line react-hooks/exhaustive-deps
-}
-
-// Refit + re-sync the PTY when this session becomes visible again (it was
-// hidden, where we deliberately skip fitting). Guard on visibility so a
-// stray call while still hidden can't resize to 0.
-function useRefitOnActivate({ active, resize, rootRef, fitRef, termRef }) {
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!active || !fitRef.current || !termRef.current || isHidden(el)) return;
-    fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-activate');
-  }, [active, resize]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [live, sessionId, send, resize]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
 }
 
 // Give xterm keyboard focus when this session becomes the frontmost one so
@@ -169,7 +157,7 @@ function useFocusOnActivate(active, live, termRef) {
     } catch (err) {
       console.warn('[TerminalSessionView] focus on activate failed:', err);
     }
-  }, [active, live]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [active, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the ref (termRef) is read at run time, not tracked
 }
 
 // While the socket is not open, disable xterm input. send() already no-ops
@@ -181,8 +169,8 @@ function useDisableInputWhenClosed(status, live, termRef) {
   useEffect(() => {
     const term = termRef.current;
     if (!term) return;
-    term.options.disableStdin = status !== 'open';
-  }, [status, live]); // eslint-disable-line react-hooks/exhaustive-deps
+    term.options.disableStdin = status !== TERMINAL_STATUS.OPEN;
+  }, [status, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the ref (termRef) is read at run time, not tracked
 }
 
 // A dead socket swallows keystrokes with no visual cue, so any not-connected
@@ -248,9 +236,15 @@ export default function TerminalSessionView({ sessionId, active, live, onGone, r
 
   useGoneNotify(status, sessionId, onGone);
   useCopyApiRegistration(registerApi, sessionId, termRef);
-  useRefitOnOpen({ status, resize, rootRef, fitRef, termRef });
+  // The size must reach the PTY only once the socket is OPEN. The resize sent
+  // during mount is dropped (socket still connecting), which would leave the
+  // PTY at the backend's default 80x24 while xterm renders the real (smaller)
+  // drawer size, so full-screen TUIs like `claude`/`vim` draw off-screen and
+  // look clipped. Refit when the socket opens (and on reconnect).
+  useRefitOn(status, status === TERMINAL_STATUS.OPEN, 'refit-on-open', { resize, rootRef, fitRef, termRef });
   useSessionMount({ live, sessionId, send, resize, rootRef, termRef, fitRef });
-  useRefitOnActivate({ active, resize, rootRef, fitRef, termRef });
+  // Refit when this session becomes visible again.
+  useRefitOn(active, active, 'refit-on-activate', { resize, rootRef, fitRef, termRef });
   useFocusOnActivate(active, live, termRef);
   useDisableInputWhenClosed(status, live, termRef);
 

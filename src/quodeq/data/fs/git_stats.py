@@ -32,3 +32,21 @@ def count_commits_since(
         return int(proc.stdout.strip())
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
+
+
+def last_fetched_mtime(repo: Path) -> float | None:
+    """Mtime of *repo*'s ``.git/FETCH_HEAD``, or ``.git/HEAD`` as fallback.
+
+    None when neither file exists, or when the one that does is unstatable
+    (permissions, a race with deletion). Callers convert the raw mtime to
+    whatever presentation format (ISO string, relative age) they need.
+    """
+    fetch_head = repo / ".git" / "FETCH_HEAD"
+    head = repo / ".git" / "HEAD"
+    candidate = fetch_head if fetch_head.exists() else head if head.exists() else None
+    if candidate is None:
+        return None
+    try:
+        return candidate.stat().st_mtime
+    except OSError:
+        return None

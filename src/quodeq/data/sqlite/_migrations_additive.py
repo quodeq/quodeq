@@ -1,13 +1,15 @@
 """Additive evaluation.db upgrades after the v3->v4 rebuild: each adds a
-column or an index, guarded to be idempotent. Split out of _migrations.py to
-keep both files under the size ratchet; the version walk itself stays in
+column or an index, guarded to be idempotent. The version walk itself is in
 _migrations.py."""
 from __future__ import annotations
 
 import sqlite3
 
+FINDINGS_TABLE = "findings"  # the table most upgrades extend
 
-def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
+
+def table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    """True when the database has a table called *name*."""
     return conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
     ).fetchone() is not None
@@ -31,14 +33,22 @@ def _add_findings_column(conn: sqlite3.Connection, column: str, decl: str) -> No
     OperationalError the scoring/dashboard read seams don't catch, permanently
     bricking the run. Skip if the column already exists.
     """
-    if not _table_exists(conn, "findings"):
-        return
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    if table_exists(conn, FINDINGS_TABLE):
+        add_missing_column(conn, FINDINGS_TABLE, column, decl)
+
+
+def add_missing_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    """``ALTER TABLE <table> ADD COLUMN <column> <decl>`` unless *table* already has *column*.
+
+    The caller checks that *table* exists where it may not. *table*, *column*
+    and *decl* are migration literals, never input.
+    """
+    columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
     if column not in columns:
-        conn.execute(f"ALTER TABLE findings ADD COLUMN {column} {decl}")
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 
-def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
+def upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
     """Add the provenance_downgrade column to findings (default 0, issue #656).
 
     Marks findings the deterministic provenance gate (#639) de-escalated from
@@ -49,7 +59,7 @@ def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
     _add_findings_column(conn, "provenance_downgrade", "INTEGER NOT NULL DEFAULT 0")
 
 
-def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
+def upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
     """Add the scope_downgrade_json column to findings (default NULL).
 
     Marks findings the deterministic scope gate de-escalated from major to
@@ -63,17 +73,16 @@ def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
     _add_findings_column(conn, "scope_downgrade_json", "TEXT")
 
 
-def _upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
+def upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
     """Add the (requirement, file, line) composite index to findings.
 
-    read_finding_details() (findings_queries.py) used to scan every row and
-    filter matching keys in Python; the index lets its SQL WHERE seek
-    instead. Skip if findings doesn't exist yet (mirrors the
-    provenance_downgrade guard in _upgrade_v5_to_v6). IF NOT EXISTS makes a
+    read_finding_details() (findings_queries.py) filters on those keys in its
+    SQL WHERE; the index lets that seek instead of scanning every row. Skip if findings doesn't exist yet (mirrors the
+    provenance_downgrade guard in upgrade_v5_to_v6). IF NOT EXISTS makes a
     re-run safe if a crash landed the CREATE INDEX but not the later
     user_version bump (same idempotency shape as the other upgrades here).
     """
-    if not _table_exists(conn, "findings"):
+    if not table_exists(conn, FINDINGS_TABLE):
         return
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_findings_req_file_line "
@@ -81,7 +90,7 @@ def _upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
     )
 
 
-def _upgrade_v8_to_v9(conn: sqlite3.Connection) -> None:
+def upgrade_v8_to_v9(conn: sqlite3.Connection) -> None:
     """Add the violation_type_raw column to findings (default '').
 
     Stores the model's violation-type tag as emitted so the taxonomy report
@@ -90,3 +99,33 @@ def _upgrade_v8_to_v9(conn: sqlite3.Connection) -> None:
     Guards and idempotency: see :func:`_add_findings_column`.
     """
     _add_findings_column(conn, "violation_type_raw", "TEXT NOT NULL DEFAULT ''")
+
+
+_MOVE_BLANK_PRINCIPLES_SQL = """
+INSERT OR IGNORE INTO unmapped_findings (
+    dimension, requirement, principle_hint, verdict, severity, file, line,
+    title, reason, snippet, unmapped_reason, dedup_key
+)
+SELECT dimension, requirement, '', verdict, severity, file, line,
+       title, reason, snippet, 'missing_principle', dedup_key
+FROM findings WHERE practice_id = '';
+DELETE FROM findings WHERE practice_id = '';
+"""
+
+
+def upgrade_v9_to_v10(conn: sqlite3.Connection) -> None:
+    """Add ``unmapped_findings`` and the triggers that keep ``findings`` placed.
+
+    Rows already stored with an empty principle move to ``unmapped_findings``
+    rather than being deleted; the run's missing standard stamp then
+    re-projects it from its events, which places them through admission.
+    A DB without a ``findings`` table (very old schemas) only gets the new
+    table. Every statement is idempotent, so a crash before the version bump
+    is safe to re-run.
+    """
+    from quodeq.data.sqlite._schema import PRINCIPLE_TRIGGERS_DDL, UNMAPPED_TABLE_DDL  # noqa: PLC0415
+
+    conn.executescript(UNMAPPED_TABLE_DDL)
+    if table_exists(conn, FINDINGS_TABLE):
+        conn.executescript(_MOVE_BLANK_PRINCIPLES_SQL)
+        conn.executescript(PRINCIPLE_TRIGGERS_DDL)

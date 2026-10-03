@@ -2,7 +2,7 @@
   "id": "security",
   "name": "Security",
   "iso_25010": "Security",
-  "version": "2023",
+  "version": "2023.11",
   "note": "Security requirements are sourced from OWASP ASVS L1 (standards/asvs/level1.json). This file contains structural metadata only.",
   "sub_characteristics": [
     {

@@ -355,3 +355,15 @@
   width: 100%;
   height: 56px;
 }
+
+/* "Why this grade" worked example: pickers over one stage row per line. */
+.gf-explain { font-family: var(--font-mono); font-size: var(--text-xs); }
+.gf-explain__pickers { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-2); }
+.gf-explain__picker { display: inline-flex; gap: var(--space-2); align-items: center; color: var(--color-text-muted); }
+.gf-explain__stages { list-style: decimal inside; margin: 0; padding: 0; }
+.gf-explain__stage { display: grid; grid-template-columns: minmax(10ch, 1fr) minmax(12ch, 2fr) minmax(0, 2fr); gap: var(--space-2); padding: 2px 0; }
+.gf-explain__label { color: var(--color-text-muted); }
+.gf-explain__value { color: var(--color-text); }
+.gf-explain__param { color: var(--color-text-muted); }
+.gf-explain__note { color: var(--color-text-muted); }
+@media (max-width: 640px) { .gf-explain__stage { grid-template-columns: 1fr; } }

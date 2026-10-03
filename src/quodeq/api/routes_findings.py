@@ -15,9 +15,17 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, abort, jsonify, make_response, request
 
-from quodeq.api.helpers import json_error, page_params
+from quodeq.api._constants import (
+    CODE_INVALID_PARAM,
+    CODE_MISSING_PARAM,
+    CODE_NOT_FOUND,
+    MAX_FINDINGS_LIST_LIMIT,
+    MESSAGE_INVALID_PROJECT_NAME,
+    QUERY_FLAG_TRUE,
+)
+from quodeq.api.helpers import json_error, optional_json_object_or_response, page_params, validate_segment
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
@@ -31,10 +39,10 @@ from quodeq.services.mutation_rescore import (
 )
 from quodeq.services.verified import unverify_finding, verified_entries
 from quodeq.shared.utils import get_evaluations_dir
-from quodeq.shared.validation import resolve_child_dir, validate_path_segment
+from quodeq.shared.validation import resolve_child_dir
 
 _logger = logging.getLogger(__name__)
-_MAX_FINDINGS_LIST_LIMIT = 5000
+_PROJECT_FIELDS = ("project",)  # the one body field restore-all and delete-all read
 
 
 def _invalid_body_fields(
@@ -70,10 +78,12 @@ def _project_dir_or_none(evaluations_dir: str, project: str) -> Path | None:
     concatenated onto it, so a traversal or absolute-path value matches nothing
     instead of having to be contained after the fact.
 
-    None means absent, not invalid: validate_path_segment has already rejected
-    syntactically bad names above.
+    None means absent, not invalid: a syntactically bad name aborts the
+    request here with a coded 400, before any route acts on it.
     """
-    validate_path_segment(project)
+    bad_name = validate_segment(project, message=MESSAGE_INVALID_PROJECT_NAME)
+    if bad_name is not None:
+        abort(make_response(bad_name))
     resolved = resolve_child_dir(evaluations_dir, project)
     return Path(resolved) if resolved is not None else None
 
@@ -97,24 +107,25 @@ def _project_dir(evaluations_dir: str, project: str) -> Path:
     return resolved
 
 
-def _finding_target_or_error(
-    body: dict[str, Any],
-) -> tuple[dict[str, Any] | None, tuple[Response, int] | None]:
-    """Parse and validate the project/req/file/line target shared by dismiss,
-    restore, and unverify. Returns the target dict, or None plus the ready
-    error response. ``fingerprint`` (restore names a dismissed entry by it)
-    is optional and only type-checked here.
+def _finding_request() -> tuple[dict[str, Any], dict[str, Any], None] | tuple[None, None, tuple[Response, int]]:
+    """Read the body naming one finding for dismiss, restore and unverify.
+
+    Returns ``(body, target, None)``, or ``(None, None, error)`` for a bad
+    body or target. ``fingerprint`` (restore's key) is only type-checked.
     """
+    body = optional_json_object_or_response(CODE_INVALID_PARAM)
+    if not isinstance(body, dict):
+        return None, None, body
     project = body.get("project", "")
     req = body.get("req", "")
     file = body.get("file", "")
     line = body.get("line")
     if not project or not req or not file or line is None:
-        return None, (jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400)
+        return None, None, json_error("project, req, file, and line are required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     type_err = _invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
     if type_err:
-        return None, (jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400)
-    return {"project": project, "req": req, "file": file, "line": line}, None
+        return None, None, json_error(type_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
+    return body, {"project": project, "req": req, "file": file, "line": line}, None
 
 
 def _eval_dir(app: Flask) -> str:
@@ -140,103 +151,110 @@ def _list_project_entries(
     # No limit param → return everything (capped at the hard maximum).
     # A malformed or out-of-range limit/offset answers 400; an explicit
     # limit above the hard maximum stays clamped (the UI asks for 5000).
-    paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+    paging = page_params(request.args, default_limit=MAX_FINDINGS_LIST_LIMIT)
     if isinstance(paging[0], dict):
         return paging
     limit, offset = paging
-    limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
+    limit = min(limit, MAX_FINDINGS_LIST_LIMIT)
     project_dir = _project_dir_or_none(_eval_dir(app), project)
     if project_dir is None:
         return jsonify([])
     return jsonify(lister(project_dir, offset=offset, limit=limit))
 
 
-def _dismiss(app: Flask) -> tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
-    target, err = _finding_target_or_error(body)
+def _mutate_finding(
+    app: Flask,
+    mutate: Callable[[Path, dict[str, Any], str | None], object],
+    delta_for: Callable[..., Any],
+) -> tuple[Response, int]:
+    """Apply *mutate* to the finding named in the request body, then rescore."""
+    body, target, err = _finding_request()
     if err is not None:
         return err
     run_id = _run_id(body)
-    dismiss_finding(_project_dir(_eval_dir(app), target["project"]), body, run_id=run_id)
+    mutate(_project_dir(_eval_dir(app), target["project"]), body, run_id)
     scores = _scores_with_fallback(app, target["project"], run_id)
-    delta = dismiss_delta(
+    delta = delta_for(
         _eval_dir(app), target["project"], run_id,
         {"req": target["req"], "file": target["file"], "line": target["line"]},
     )
-    return jsonify({"scores": scores, "delta": delta}), 200
+    return jsonify({"scores": scores, "delta": delta}), HTTPStatus.OK
 
 
-def _restore(app: Flask) -> tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
-    target, err = _finding_target_or_error(body)
-    if err is not None:
-        return err
-    run_id = _run_id(body)
-    restore_finding(_project_dir(_eval_dir(app), target["project"]), body)
-    scores = _scores_with_fallback(app, target["project"], run_id)
-    delta = restore_delta(
-        _eval_dir(app), target["project"], run_id,
-        {"req": target["req"], "file": target["file"], "line": target["line"]},
-    )
-    return jsonify({"scores": scores, "delta": delta}), 200
-
-
-def _restore_all(app: Flask) -> tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
+def _mutate_project(
+    app: Flask,
+    mutate: Callable[[Path], int],
+    delta_for: Callable[..., Any],
+    count_key: str,
+) -> tuple[Response, int]:
+    """Apply *mutate* to every entry of the request body's project, then rescore."""
+    body = optional_json_object_or_response(CODE_INVALID_PARAM)
+    if not isinstance(body, dict):
+        return body
     project = body.get("project", "")
     run_id = _run_id(body)
     if not project:
-        return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
-    count = restore_all_findings(_project_dir(_eval_dir(app), project))
+        return json_error("project is required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
+    type_err = _invalid_body_fields(body, _PROJECT_FIELDS)
+    if type_err:
+        return json_error(type_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
+    count = mutate(_project_dir(_eval_dir(app), project))
     scores = _scores_with_fallback(app, project, run_id)
-    delta = restore_all_delta(_eval_dir(app), project, run_id)
-    return jsonify({"ok": True, "restored": count, "scores": scores, "delta": delta}), 200
+    delta = delta_for(_eval_dir(app), project, run_id)
+    return jsonify({"ok": True, count_key: count, "scores": scores, "delta": delta}), HTTPStatus.OK
+
+
+def _dismiss(app: Flask) -> tuple[Response, int]:
+    return _mutate_finding(
+        app, lambda project_dir, body, run_id: dismiss_finding(project_dir, body, run_id=run_id), dismiss_delta,
+    )
+
+
+def _restore(app: Flask) -> tuple[Response, int]:
+    return _mutate_finding(
+        app, lambda project_dir, body, _run_id: restore_finding(project_dir, body), restore_delta,
+    )
+
+
+def _restore_all(app: Flask) -> tuple[Response, int]:
+    return _mutate_project(app, restore_all_findings, restore_all_delta, "restored")
 
 
 def _delete(app: Flask) -> tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_response(CODE_INVALID_PARAM)
+    if not isinstance(body, dict):
+        return body
     project = body.get("project", "")
     dimension = body.get("dimension", "")
     principle = body.get("principle", "")
     file = body.get("file", "")
     run_id = _run_id(body)
     if not project or not dimension or not principle or not file:
-        return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
+        return json_error("project, dimension, principle, and file are required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
     if type_err:
-        return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
+        return json_error(type_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
     swept = delete_finding(_project_dir(_eval_dir(app), project), body)
     scores = _scores_with_fallback(app, project, run_id)
     delta = delete_delta(
         _eval_dir(app), project, run_id,
         {"dimension": dimension, "principle": principle, "file": file},
     )
-    return jsonify({"ok": True, "swept": swept, "scores": scores, "delta": delta}), 200
+    return jsonify({"ok": True, "swept": swept, "scores": scores, "delta": delta}), HTTPStatus.OK
 
 
 def _delete_all(app: Flask) -> tuple[Response, int]:
-    if request.args.get("confirm") != "true":
-        return json_error(
-            "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
-        )
-    body = request.get_json(silent=True) or {}
-    project = body.get("project", "")
-    run_id = _run_id(body)
-    if not project:
-        return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
-    count = delete_all_dismissed(_project_dir(_eval_dir(app), project))
-    scores = _scores_with_fallback(app, project, run_id)
-    delta = delete_all_delta(_eval_dir(app), project, run_id)
-    return jsonify({"ok": True, "deleted": count, "scores": scores, "delta": delta}), 200
+    if request.args.get("confirm") != QUERY_FLAG_TRUE:
+        return json_error("Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED")
+    return _mutate_project(app, delete_all_dismissed, delete_all_delta, "deleted")
 
 
 def _unverify(app: Flask) -> tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
-    target, err = _finding_target_or_error(body)
+    body, target, err = _finding_request()
     if err is not None:
         return err
     unverify_finding(_project_dir(_eval_dir(app), target["project"]), body)
-    return jsonify({"ok": True}), 200
+    return jsonify({"ok": True}), HTTPStatus.OK
 
 
 def register_findings_routes(app: Flask) -> None:
@@ -245,9 +263,8 @@ def register_findings_routes(app: Flask) -> None:
     @app.errorhandler(_ProjectNotFoundError)
     def _handle_project_not_found(_exc: _ProjectNotFoundError) -> tuple[Response, int]:
         # Same {"error", "code"} shape every other error branch in this
-        # file returns, instead of Flask's default 404 HTML page that the
-        # bare abort() _project_dir used to call would give.
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        # file returns, instead of Flask's default 404 HTML page.
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
 
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response | tuple[dict[str, Any], int]:

@@ -16,7 +16,7 @@ export const MANAGED_STANDARD = {
   id: 'iso-25010',
   name: 'ISO 25010',
   description: 'Quality standard',
-  type: 'builtin',
+  type: 'iso',
   managed: true,
   principles: [
     {

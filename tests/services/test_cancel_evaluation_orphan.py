@@ -70,7 +70,7 @@ def test_cancel_orphan_with_run_dir_preserves_findings(tmp_path: Path) -> None:
     preserve evidence and update status.json — not delete anything.
 
     Realistic scenario: process died but heartbeat is still fresh, so the
-    background stale-check (in ``_check_stale_and_promote``) hasn't promoted
+    background stale-check (in ``check_stale_and_promote``) hasn't promoted
     the row yet. The user clicks Cancel; SIGTERM has nothing to signal; the
     fallback must promote the row to ``cancelled(stale_detected)``.
     """

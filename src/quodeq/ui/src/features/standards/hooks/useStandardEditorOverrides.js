@@ -1,15 +1,24 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useStandardsOverrides } from './useStandardsOverrides.js';
-import { applyParamOverride, countCustomizedRequirements, decideSave } from '../overridesModel.js';
+import { applyParamOverride, countCustomizedRequirements, decideSave, SAVE_DECISION_COMMIT } from '../overridesModel.js';
 import { useAppState } from '../../../hooks/useAppState.js';
 import { t } from '../../../strings/index.js';
 
+/**
+ * Persist the standard and any drafted overrides. Returns false when the
+ * standard save was rejected (useStandardDetail already shows that error
+ * inline), so the caller must not treat the edit as landed.
+ */
 async function persistEditorChanges({ editable, save, overridesDirty, overrides, saveOverrides, setDraftOverrides }) {
-  if (editable) await save();
+  if (editable) {
+    const result = await save();
+    if (result?.error) return false;
+  }
   if (overridesDirty) {
     await saveOverrides(overrides);
     setDraftOverrides(null);
   }
+  return true;
 }
 
 function notifySaved({ rescanDims, onRescan, onSaved, standardId }) {
@@ -25,8 +34,8 @@ function makeCommitSave({
     setPendingImpact(null);
     setOverridesSaveError(null);
     try {
-      await persistEditorChanges({ editable, save, overridesDirty, overrides, saveOverrides, setDraftOverrides });
-      notifySaved({ rescanDims, onRescan, onSaved, standardId: standard?.id });
+      const saved = await persistEditorChanges({ editable, save, overridesDirty, overrides, saveOverrides, setDraftOverrides });
+      if (saved) notifySaved({ rescanDims, onRescan, onSaved, standardId: standard?.id });
     } catch (err) {
       // Keep the draft so the user can retry; surface the error inline.
       setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));
@@ -70,7 +79,7 @@ export function useStandardEditorOverrides({ standard, editable, save, onSaved, 
     try {
       const impact = await previewOverrides(overrides);
       const decision = decideSave({ overridesDirty, impact });
-      if (decision === 'commit') { await commitSave(); return; }
+      if (decision === SAVE_DECISION_COMMIT) { await commitSave(); return; }
       setPendingImpact(decision.confirm);
     } catch (err) {
       setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));

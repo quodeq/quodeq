@@ -6,6 +6,11 @@
  * threading these through React state.
  */
 
+// The bottom drawer's two panel ids: BottomDrawer.jsx's tab content, the
+// hotkey target useDrawerHotkeys.js resolves to, and the tab this module's
+// own dropDisabledPanels filters by.
+export const DRAWER_PANEL = Object.freeze({ ASSISTANT: 'assistant', TERMINAL: 'terminal' });
+
 /** openTab: open a panel if not already open (always activates it). */
 export function openTabPanels(openPanels, tab) {
   return openPanels.includes(tab) ? openPanels : [...openPanels, tab];
@@ -50,7 +55,7 @@ export function closeSpecificPanel(openPanels, activeTab, tab) {
 
 /** Drop any panel whose feature was disabled in Settings; keep the rest. */
 export function dropDisabledPanels(openPanels, { assistantEnabled, terminalEnabled }) {
-  const next = openPanels.filter((t) => (t === 'assistant' ? assistantEnabled : terminalEnabled));
+  const next = openPanels.filter((t) => (t === DRAWER_PANEL.ASSISTANT ? assistantEnabled : terminalEnabled));
   return next.length === openPanels.length ? openPanels : next;
 }
 

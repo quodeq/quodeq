@@ -1,14 +1,12 @@
-"""Helper functions for attaching cross-references to compiled standards.
-
-Extracted from compile_standards.py to keep that module under 300 lines.
-"""
+"""Helper functions for attaching cross-references to compiled standards (used by compile_standards.py)."""
 from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
+from itertools import chain
 from pathlib import Path
-from typing import Callable
+from typing import Callable, TypeVar
 
 from quodeq.shared.utils import read_json as _read_json
 
@@ -27,12 +25,23 @@ _CISQ_DIR = "cisq"
 _CERT_DIR = "cert"
 
 _logger = logging.getLogger(__name__)
+_T = TypeVar("_T")
 
 
 def _each_req(index: dict[str, list[dict]]) -> Iterator[dict]:
     """Yield every requirement in *index*, across all practices."""
     for reqs in index.values():
         yield from reqs
+
+
+def _unique_by(items: Iterable[_T], key: Callable[[_T], object]) -> Iterator[_T]:
+    """Yield *items* in order, skipping any whose ``key`` was already yielded."""
+    seen: set[object] = set()
+    for item in items:
+        k = key(item)
+        if k not in seen:
+            seen.add(k)
+            yield item
 
 
 def _load_standards_json(path: Path, label: str) -> dict | None:
@@ -69,32 +78,26 @@ def attach_cisq_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
         return
     cisq_lookup = {c["id"]: c for c in cisq_data.get("cwes", [])}
     for req in _each_req(index):
-        seen: set[int] = set()
-        for cwe_id in req["_cwe_ids"]:
-            if cwe_id in cisq_lookup and cwe_id not in seen:
-                seen.add(cwe_id)
-                req["refs"].append({
-                    "source": "cisq",
-                    "id": None,
-                    "name": cisq_lookup[cwe_id]["requirement"],
-                    "url": _CISQ_MAIN_URL,
-                })
+        matched = (cwe_id for cwe_id in req["_cwe_ids"] if cwe_id in cisq_lookup)
+        for cwe_id in _unique_by(matched, key=lambda c: c):
+            req["refs"].append({
+                "source": "cisq",
+                "id": None,
+                "name": cisq_lookup[cwe_id]["requirement"],
+                "url": _CISQ_MAIN_URL,
+            })
 
 
 def _collect_asvs_refs_for_req(req: dict, asvs_by_cwe: dict[int, list[dict]]) -> None:
     """Append ASVS refs to a single requirement, deduplicating by ID."""
-    seen: set[str] = set()
-    for cwe_id in req["_cwe_ids"]:
-        for asvs_req in asvs_by_cwe.get(cwe_id, []):
-            asvs_id = asvs_req["id"]
-            if asvs_id not in seen:
-                seen.add(asvs_id)
-                req["refs"].append({
-                    "source": "asvs",
-                    "id": asvs_id,
-                    "name": asvs_req["text"],
-                    "url": _ASVS_MAIN_URL,
-                })
+    matched = (a for cwe_id in req["_cwe_ids"] for a in asvs_by_cwe.get(cwe_id, []))
+    for asvs_req in _unique_by(matched, key=lambda a: a["id"]):
+        req["refs"].append({
+            "source": "asvs",
+            "id": asvs_req["id"],
+            "name": asvs_req["text"],
+            "url": _ASVS_MAIN_URL,
+        })
 
 
 def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:
@@ -127,17 +130,10 @@ def _collect_cert_refs_for_req(
     req: dict, cert_by_cwe: dict[int, list[dict]], cert_by_id: dict[str, dict],
 ) -> None:
     """Append CERT refs to a single requirement, deduplicating by ID."""
-    seen: set[str] = set()
-    for cwe_id in req["_cwe_ids"]:
-        for rule in cert_by_cwe.get(cwe_id, []):
-            if rule["id"] not in seen:
-                seen.add(rule["id"])
-                req["refs"].append(_cert_ref(rule))
-    for cert_id in req["_cert_ids"]:
-        if cert_id not in seen and cert_id in cert_by_id:
-            rule = cert_by_id[cert_id]
-            seen.add(cert_id)
-            req["refs"].append(_cert_ref(rule))
+    by_cwe = (rule for cwe_id in req["_cwe_ids"] for rule in cert_by_cwe.get(cwe_id, []))
+    by_id = (cert_by_id[cert_id] for cert_id in req["_cert_ids"] if cert_id in cert_by_id)
+    for rule in _unique_by(chain(by_cwe, by_id), key=lambda r: r["id"]):
+        req["refs"].append(_cert_ref(rule))
 
 
 def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:
@@ -168,14 +164,12 @@ def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
         return
     wcag_lookup = {c["id"]: c for c in wcag_data.get("criteria", [])}
     for req in _each_req(index):
-        seen: set[str] = set()
-        for wcag_id in req["_wcag_ids"]:
-            if wcag_id in wcag_lookup and wcag_id not in seen:
-                seen.add(wcag_id)
-                c = wcag_lookup[wcag_id]
-                req["refs"].append({
-                    "source": "wcag22",
-                    "id": wcag_id,
-                    "name": c["name"],
-                    "url": c.get("url", _WCAG22_MAIN_URL),
-                })
+        matched = (wcag_id for wcag_id in req["_wcag_ids"] if wcag_id in wcag_lookup)
+        for wcag_id in _unique_by(matched, key=lambda w: w):
+            c = wcag_lookup[wcag_id]
+            req["refs"].append({
+                "source": "wcag22",
+                "id": wcag_id,
+                "name": c["name"],
+                "url": c.get("url", _WCAG22_MAIN_URL),
+            })

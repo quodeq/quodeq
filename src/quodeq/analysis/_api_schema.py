@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import json
 import re
-from enum import Enum as _Enum
 
 from pydantic import BaseModel, Field, field_validator
 
-_SYSTEM_PROMPT = (
+from quodeq.core.types.finding_type import FindingType, parse_finding_type
+from quodeq.core.types.severity import Severity, parse_severity
+
+SYSTEM_PROMPT = (
     "You are a code quality evaluator. Quote the offending code into "
     "`snippet` VERBATIM from the source, one or a few contiguous lines, "
     "exact characters, no paraphrase. Set `end_line` to match the last "
@@ -26,28 +28,9 @@ _SYSTEM_PROMPT = (
 )
 
 
-class _FindingType(str, _Enum):
-    violation = "violation"
-    compliance = "compliance"
-
-
-class _Severity(str, _Enum):
-    critical = "critical"
-    major = "major"
-    minor = "minor"
-
-
-_SEVERITY_VALUES = frozenset(s.value for s in _Severity)
-
-
-def _is_known_severity(value: object) -> bool:
-    """True when *value* names a `_Severity` member (case- and space-insensitive)."""
-    return isinstance(value, str) and value.strip().lower() in _SEVERITY_VALUES
-
-
 class _Finding(BaseModel):
     req: str = Field(description="Requirement ID (e.g. P-TIM-1, S-CON-3)")
-    t: _FindingType = Field(description="violation or compliance")
+    t: FindingType = Field(description="violation or compliance")
     file: str = Field(description="File path relative to repo root")
     line: int = Field(description="1-indexed line number of the offending expression. MUST be > 0.", gt=0)
     end_line: int | None = Field(
@@ -62,7 +45,7 @@ class _Finding(BaseModel):
             "makes the highlight readable."
         ),
     )
-    severity: _Severity = Field(default=_Severity.minor)
+    severity: Severity = Field(default=Severity.MINOR)
     vt: str | None = Field(
         default=None,
         description=(
@@ -111,13 +94,20 @@ class _Finding(BaseModel):
 
         Case and surrounding space are normalised on the way through, so
         ``"Major"`` lands as ``major`` rather than silently degrading to the
-        default.
+        default. Non-string input (``null``, a number) is the default too.
         """
-        if isinstance(value, _Severity):
-            return value
-        if _is_known_severity(value):
-            return value.strip().lower()  # type: ignore[union-attr]
-        return _Severity.minor
+        return parse_severity(value) if isinstance(value, str) else Severity.MINOR
+
+    @field_validator("t", mode="before")
+    @classmethod
+    def _normalise_finding_type(cls, value: object) -> object:
+        """Land ``"Violation"`` or ``" compliance "`` on the canonical type.
+
+        Case and surrounding space are model noise, like severity's. Any
+        other value (``"violations"``, a list) passes through unchanged so the
+        enum still rejects it and the finding counts as dropped.
+        """
+        return parse_finding_type(value) or value
 
 
 # A dict that fails `_Finding` validation but carries the required, domain-specific
@@ -218,7 +208,7 @@ def _extract_finding_dicts(
 _JSON_OPENER_RE = re.compile(r"[\[{]")
 
 
-def _parse_findings(
+def parse_findings(
     raw_json: str,
     *,
     drop_reasons: dict[str, int] | None = None,
@@ -242,6 +232,9 @@ def _parse_findings(
     sits inside the SEP-06 no-logging boundary. Pass *dropped_sink* to also
     receive the rejected dicts themselves, so the caller can attempt a repair
     re-ask instead of only counting the loss.
+
+    A response nested deeper than the interpreter's recursion limit stops the
+    walk; findings harvested before it are returned.
     """
     decoder = json.JSONDecoder()
     findings: list[dict] = []
@@ -251,9 +244,13 @@ def _parse_findings(
         start = opener.start()
         try:
             node, end = decoder.raw_decode(raw_json, start)
+            _extract_finding_dicts(node, findings, dropped, drop_reasons)
         except json.JSONDecodeError:
             i = start + 1
             continue
-        _extract_finding_dicts(node, findings, dropped, drop_reasons)
+        except RecursionError:
+            # Pathologically nested output: stop the walk instead of aborting
+            # the caller. What was harvested before it stands; the rest is lost.
+            break
         i = end
     return findings, len(dropped)

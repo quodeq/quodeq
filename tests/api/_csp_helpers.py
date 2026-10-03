@@ -17,7 +17,7 @@ _ALT_PORT_ORIGINS = [
     f"http://localhost:{p}" for p in alt_ports()
 ]
 
-# ws:// alt-port origins for the terminal WebSocket (Task 5). WebKit/pywebview
+# ws:// alt-port origins for the terminal WebSocket. WebKit/pywebview
 # enforces CSP against the WebSocket handshake scheme, so http:// alone does
 # not cover it — each alt port needs an explicit ws:// entry too.
 _WS_ALT_PORT_ORIGINS = [

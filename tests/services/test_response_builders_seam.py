@@ -1,4 +1,4 @@
-"""_build_response_from_grade_tables is driven through injected seams.
+"""build_response_from_grade_tables is driven through injected seams.
 
 The violation this pins ([12]/[49]): the builder used to import and construct
 SQLiteStateStore and run raw SQL inline, so unit-testing it required a real
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from quodeq.services.ports import GradeTablesReader
 from quodeq.services.scoring import _response_builders as rb
-from quodeq.services.scoring._response_builders import _build_response_from_grade_tables
+from quodeq.services.scoring._response_builders import build_response_from_grade_tables
 
 _DIM_ROWS = [
     {"dimension": "security", "score": 8.2, "grade": "B+", "exit_reason": None},
@@ -64,7 +64,7 @@ def test_fake_reader_drives_full_response(tmp_path, monkeypatch):
         seen.append(run_dir)
         return FakeGradeTables()
 
-    out = _build_response_from_grade_tables(tmp_path, store_factory=factory)
+    out = build_response_from_grade_tables(tmp_path, store_factory=factory)
 
     assert seen == [tmp_path]
     (dim,) = out["dimensions"]
@@ -85,7 +85,7 @@ def test_fake_reader_drives_full_response(tmp_path, monkeypatch):
 def test_fake_reader_with_no_findings(tmp_path, monkeypatch):
     monkeypatch.setattr(rb, "read_active_findings", lambda run_dir: [])
 
-    out = _build_response_from_grade_tables(
+    out = build_response_from_grade_tables(
         tmp_path, store_factory=lambda run_dir: FakeGradeTables())
 
     (dim,) = out["dimensions"]
@@ -109,7 +109,7 @@ def test_fake_reader_carries_density_from_dimension_scores_files_read(tmp_path, 
          "files_read": 8},
     ]
 
-    out = _build_response_from_grade_tables(
+    out = build_response_from_grade_tables(
         tmp_path, store_factory=lambda run_dir: FakeGradeTables(dim_rows=dim_rows))
 
     (dim,) = out["dimensions"]

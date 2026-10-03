@@ -11,17 +11,19 @@ from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
 from quodeq.core.scoring.constants import (
-    _BASE_K,
-    _CEIL_SCALE,
-    _GRADE_THRESHOLDS,
-    _LIFT_COMPRESS,
-    _SEVERITY_GRADE_FLOOR,
-    _SEVERITY_WEIGHT,
+    BASE_K,
+    CEIL_SCALE,
+    GRADE_THRESHOLDS,
+    LIFT_COMPRESS,
+    SEVERITY_GRADE_FLOOR,
+    SEVERITY_WEIGHT,
+    Grade,
     MAX_SCORE,
 )
+from quodeq.core.types.severity import SEVERITY_ORDER
 
 # Canonical grade labels: positions are fixed, only the numeric boundaries move.
-GRADE_LABELS: tuple[str, ...] = ("Exemplary", "Good", "Adequate", "Poor")
+GRADE_LABELS: tuple[str, ...] = (Grade.EXEMPLARY, Grade.GOOD, Grade.ADEQUATE, Grade.POOR)
 
 # Mirrors data/config/dimensions.json (pinned by a sync test). Defaults are
 # equal (1.0) so the overall score is a plain mean; users can retune per
@@ -35,6 +37,7 @@ _DEFAULT_DIMENSION_WEIGHTS: dict[str, float] = {
     "flexibility": 1.0,
     "clean-architecture": 1.0,
     "domain-driven-design": 1.0,
+    "accessibility": 1.0,
 }
 
 # Slider ranges shared by validation and (conceptually) the UI.
@@ -77,13 +80,13 @@ class ScoringParams:
 
 
 DEFAULT_PARAMS = ScoringParams(
-    severity_weight=dict(_SEVERITY_WEIGHT),
-    base_k=_BASE_K,
-    lift_compress=_LIFT_COMPRESS,
-    ceil_scale=_CEIL_SCALE,
-    floor_minor=_SEVERITY_GRADE_FLOOR["minor"],
-    floor_major=_SEVERITY_GRADE_FLOOR["major"],
-    grade_thresholds=tuple((float(t), label) for t, label in _GRADE_THRESHOLDS),
+    severity_weight=dict(SEVERITY_WEIGHT),
+    base_k=BASE_K,
+    lift_compress=LIFT_COMPRESS,
+    ceil_scale=CEIL_SCALE,
+    floor_minor=SEVERITY_GRADE_FLOOR["minor"],
+    floor_major=SEVERITY_GRADE_FLOOR["major"],
+    grade_thresholds=tuple((float(t), label) for t, label in GRADE_THRESHOLDS),
 )
 
 
@@ -151,7 +154,7 @@ def validate_params(params: ScoringParams) -> list[str]:
             errors.append(f"{name} must be between {lo} and {hi}, got {value}")
     if params.floor_minor < params.floor_major:
         errors.append("floor_minor must be >= floor_major")
-    for sev in ("critical", "major", "minor"):
+    for sev in SEVERITY_ORDER:
         w = params.severity_weight.get(sev)
         if w is None or not (_SEVERITY_WEIGHT_RANGE[0] <= w <= _SEVERITY_WEIGHT_RANGE[1]):
             errors.append(

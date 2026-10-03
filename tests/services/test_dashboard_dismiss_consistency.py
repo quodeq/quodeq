@@ -9,6 +9,7 @@ from quodeq.services.dashboard import build_dashboard, clear_shared_dimension_ca
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys
 from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
 from quodeq.services.score_cache import score_cache_version
+from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from tests.services._scalar_fixtures import build_projected_run
 
@@ -38,7 +39,13 @@ def test_dismiss_produces_a_new_shared_cache_version(tmp_path):
     """
     reports = tmp_path / "evaluations"
     project = "proj"
-    build_projected_run(reports, project, "20260101T000000", {"security": (7.0, "Fair")})
+    run_dir = build_projected_run(reports, project, "20260101T000000", {"security": (7.0, "Fair")})
+    # The run holds the finding the dismiss targets, so the dismiss touches it
+    # and its trend point is rescored through the shared dimension cache.
+    SqliteFindingsRepository(run_dir).insert_finding({
+        "p": "P1", "d": "security", "t": "violation", "req": "R1", "file": "a.py", "line": 1,
+        "severity": "major", "w": "t", "reason": "r",
+    })
 
     # Warm on a clean project so nothing but a dismiss can introduce a version.
     build_dashboard(reports, project, run="latest")

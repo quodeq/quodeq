@@ -16,7 +16,8 @@
           "name": { "type": "string" },
           "iso_25010": { "type": "string" },
           "source": { "type": "string" },
-          "type": { "type": "string" }
+          "type": { "type": "string" },
+          "subtype": { "type": "string" }
         },
         "additionalProperties": false
       },

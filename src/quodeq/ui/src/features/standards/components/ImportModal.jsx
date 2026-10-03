@@ -1,19 +1,10 @@
-import { useState, useRef } from 'react';
-import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
-import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { useImportFlow, STEP } from '../hooks/useImportFlow.js';
 
-const BYTES_PER_KB = 1024;
-const MAX_FILE_SIZE = BYTES_PER_KB * BYTES_PER_KB; // 1MB
 // File extension is product identity, not translatable prose.
 const QUODEQ_FILE_EXT = '.quodeq';
 const WARNINGS_MAX_HEIGHT = 200;
 const CONFLICT_MAX_HEIGHT = 120;
-const STEP = { PICK: 'pick', REVIEWING: 'reviewing', ERROR: 'error', WARNINGS: 'warnings', CONFLICT: 'conflict' };
-
-function buildImportedCopyId(id) {
-  return `${id}-imported`;
-}
 
 function PickStep({ fileRef, onFile, onClose }) {
   return (
@@ -102,93 +93,11 @@ function ConflictStep({ parsedData, conflict, warnings, actions }) {
   );
 }
 
-async function importEvaluator(data, force, onImported, state, importStandard) {
-  const { setStep, setError, setWarnings, setConflict } = state;
-  setStep(STEP.REVIEWING);
-  try {
-    const result = await importStandard(data, force);
-    if (result._conflict) {
-      setConflict(result.existing);
-      setWarnings(result.warnings || []);
-      setStep(STEP.CONFLICT);
-      return;
-    }
-    if (result.warnings?.length > 0 && !force) {
-      setWarnings(result.warnings);
-      setStep(STEP.WARNINGS);
-      return;
-    }
-    // The server echoes the stored standard; fall back to the file's own id.
-    onImported(result.detail?.id ?? data?.id);
-  } catch (err) {
-    setError(apiErrorMessage(err, 'standards.importFailed'));
-    setStep(STEP.ERROR);
-  }
-}
-
-async function handleFileInput(e, onImported, state, importStandard) {
-  const { setStep, setError, setParsedData } = state;
-  const file = e.target.files?.[0];
-  if (!file) return;
-  if (file.size > MAX_FILE_SIZE) {
-    setError(t('standards.fileTooLarge', { size: (file.size / BYTES_PER_KB).toFixed(0) }));
-    setStep(STEP.ERROR);
-    return;
-  }
-  let data;
-  try {
-    const text = await file.text();
-    data = JSON.parse(text);
-  } catch (err) {
-    console.warn('[ImportModal] could not parse imported file:', err);
-    setError(t('standards.invalidJson'));
-    setStep(STEP.ERROR);
-    return;
-  }
-  if (typeof data !== 'object' || Array.isArray(data)) {
-    setError(t('standards.invalidJsonObject'));
-    setStep(STEP.ERROR);
-    return;
-  }
-  setParsedData(data);
-  await importEvaluator(data, false, onImported, state, importStandard);
-}
-
-function useImportActions(onImported, state, importStandard) {
-  const { parsedData, setParsedData } = state;
-
-  const handleFile = async (e) => handleFileInput(e, onImported, state, importStandard);
-  // One action, offered from two steps: "overwrite the conflicting standard"
-  // on the conflict step and "import anyway" on the warnings step.
-  const handleImportAnyway = async () => {
-    await importEvaluator(parsedData, true, onImported, state, importStandard);
-  };
-  const handleImportAsCopy = async () => {
-    const copied = { ...parsedData, id: buildImportedCopyId(parsedData.id) };
-    setParsedData(copied);
-    await importEvaluator(copied, false, onImported, state, importStandard);
-  };
-  return { handleFile, handleImportAnyway, handleImportAsCopy };
-}
-
-function useImportModal(onImported) {
-  const { importStandard } = useApi();
-  const [step, setStep] = useState(STEP.PICK);
-  const [error, setError] = useState(null);
-  const [warnings, setWarnings] = useState([]);
-  const [conflict, setConflict] = useState(null);
-  const [parsedData, setParsedData] = useState(null);
-  const fileRef = useRef(null);
-  const actions = useImportActions(onImported, { setStep, setError, setWarnings, setConflict, parsedData, setParsedData }, importStandard);
-
-  return { step, error, warnings, conflict, parsedData, fileRef, ...actions };
-}
-
 export default function ImportModal({ onClose, onImported }) {
   const {
     step, error, warnings, conflict, parsedData,
     fileRef, handleFile, handleImportAnyway, handleImportAsCopy,
-  } = useImportModal(onImported);
+  } = useImportFlow(onImported);
 
   return (
     <div className="modal-overlay" onClick={onClose}>

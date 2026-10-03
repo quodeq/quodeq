@@ -1,7 +1,13 @@
-import { render, fireEvent } from '@testing-library/react';
+import { render as rtlRender, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import DashboardPage from './DashboardPage.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
+import { withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
+
+// The run panel reads the run's findings through the query client; the
+// page tests only care about the loader and fade gates, so the findings
+// never resolve here.
+const render = (ui) => rtlRender(ui, { wrapper: withStableQueryApi({ getRunScores: () => new Promise(() => {}) }) });
 
 // Split from DashboardPage.test.jsx: runMode's own loading gate, the
 // shared-selection/zero-local-projects teammate persona, and frame
@@ -22,7 +28,7 @@ describe('DashboardPage runMode loading gate', () => {
     loading: true,
     isFetching: false,
     error: null,
-    availableRuns: [{ runId: 'r1', status: 'complete' }],
+    availableRuns: [{ runId: 'r1', status: 'done' }],
   };
 
   it('renders exactly one LoadingScreen before the run payload has resolved', () => {
@@ -127,7 +133,7 @@ describe('DashboardPage, teammate persona: shared selection + zero local project
   });
 });
 
-// P4: the Overview's frame must stay mounted across every state, including
+// The Overview's frame must stay mounted across every state, including
 // the "no projects"/"no project selected" empty branches -- otherwise the
 // page jumps (no .dashboard-page wrapper, then one appears) the moment real
 // content shows up. The error and no-completed-evaluation branches already

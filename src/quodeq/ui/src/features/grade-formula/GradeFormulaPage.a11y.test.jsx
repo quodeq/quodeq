@@ -1,5 +1,5 @@
 /**
- * #6033 - the SEVERITY/CURVE/BOUNDARIES/DIMENSIONS tab strip had no ARIA
+ * #6033 - the FORMULA/TYPES/DIMENSIONS tab strip had no ARIA
  * tab semantics: no role="tablist"/"tab", no aria-selected, no
  * role="tabpanel" on the body it controls.
  */
@@ -7,6 +7,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ApiProvider } from '../../api/ApiContext.jsx';
 import useGradeFormula from './useGradeFormula.js';
 import GradeFormulaPage from './GradeFormulaPage.jsx';
 
@@ -47,31 +49,41 @@ function mockHook(over = {}) {
   return hookState;
 }
 
+function Providers({ children }) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={client}><ApiProvider value={{}}>{children}</ApiProvider></QueryClientProvider>;
+}
+
+function mount(ui) {
+  return render(ui, { wrapper: Providers });
+}
+
 describe('GradeFormulaPage tab widget a11y', () => {
   beforeEach(() => { mockHook(); });
   afterEach(() => { vi.clearAllMocks(); });
 
   it('exposes the tab strip as a labelled tablist', () => {
-    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    mount(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
     expect(screen.getByRole('tablist', { name: 'Grade formula view' })).toBeInTheDocument();
   });
 
   it('marks the active tab as selected and switches selection on click', () => {
-    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
-    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('SEVERITY');
+    mount(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    expect(screen.getAllByRole('tab').map((el) => el.textContent)).toEqual(['FORMULA', 'TYPES', 'DIMENSIONS']);
+    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('FORMULA');
     fireEvent.click(screen.getByRole('tab', { name: 'DIMENSIONS' }));
     expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('DIMENSIONS');
   });
 
   it('renders the active tab body as a tabpanel', () => {
-    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    mount(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
     expect(screen.getByRole('tabpanel')).toBeInTheDocument();
   });
 
-  // #6033 fix round 1 - complete the tab pattern: each tab points at the
+  // #6033 - complete the tab pattern: each tab points at the
   // panel it controls, and the panel is labelled by whichever tab is active.
   it('wires aria-controls from the active tab to the panel, and aria-labelledby back', () => {
-    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    mount(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
     const tab = screen.getByRole('tab', { selected: true });
     const panel = screen.getByRole('tabpanel');
     expect(tab).toHaveAttribute('aria-controls', panel.id);
@@ -79,7 +91,7 @@ describe('GradeFormulaPage tab widget a11y', () => {
   });
 
   it('updates aria-controls/aria-labelledby when the active tab changes', () => {
-    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    mount(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
     fireEvent.click(screen.getByRole('tab', { name: 'DIMENSIONS' }));
     const tab = screen.getByRole('tab', { selected: true });
     const panel = screen.getByRole('tabpanel');

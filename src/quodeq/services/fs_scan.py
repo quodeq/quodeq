@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.types.scan import ScanData
 from quodeq.data.fs.project_files import write_scan_json
 from quodeq.data.git_cli import list_branches, list_tracked_files
@@ -62,7 +62,7 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
 
     branches = _list_branches(project_dir)
     modules = _list_modules(project_dir)
-    scanned_at = datetime.now(timezone.utc).isoformat()
+    scanned_at = utc_now_iso()
 
     result = ScanData(
         file_tree=sorted(file_tree),
@@ -81,6 +81,11 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
     return result
 
 
+def _is_scanned_dir_name(name: str) -> bool:
+    """False for tooling/vendor dirs in ``_SKIP_DIRS`` and hidden (dot) dirs."""
+    return name not in _SKIP_DIRS and not name.startswith(".")
+
+
 def _walk_files(root: Path):
     """Walk directory tree iteratively, yielding file paths lazily.
 
@@ -97,7 +102,7 @@ def _walk_files(root: Path):
         dirs: list[Path] = []
         for item in entries:
             if item.is_dir():
-                if item.name not in _SKIP_DIRS and not item.name.startswith("."):
+                if _is_scanned_dir_name(item.name):
                     dirs.append(item)
             elif item.is_file():
                 yield item
@@ -114,7 +119,7 @@ def _list_modules(project_dir: Path) -> list[str]:
     """Return top-level subdirectory names as module identifiers."""
     return sorted(
         d.name for d in project_dir.iterdir()
-        if d.is_dir() and d.name not in _SKIP_DIRS and not d.name.startswith(".")
+        if d.is_dir() and _is_scanned_dir_name(d.name)
     )
 
 

@@ -6,12 +6,9 @@ from pathlib import Path
 
 from quodeq.analysis.stream.counters import extract_files_from_blocks
 from quodeq.analysis.stream.event_text import TEXT_EXTRACTORS
+from quodeq.core.types.finding_type import FINDING_TYPES
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import open_text
-
-FINDING_TYPE_VIOLATION = "violation"
-FINDING_TYPE_COMPLIANCE = "compliance"
-_FINDING_TYPES = frozenset({FINDING_TYPE_VIOLATION, FINDING_TYPE_COMPLIANCE})
 
 
 def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
@@ -31,7 +28,7 @@ def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
         if line.startswith("{"):
             try:
                 obj = json.loads(line)
-                if obj.get("p") and obj.get("t") in _FINDING_TYPES:
+                if obj.get("p") and obj.get("t") in FINDING_TYPES:
                     out.write(line + "\n")
                     count += 1
             except json.JSONDecodeError as exc:

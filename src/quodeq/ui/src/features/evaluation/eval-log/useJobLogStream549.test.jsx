@@ -87,6 +87,23 @@ describe('#549 useJobLogStream inactivity timer', () => {
     expect(screen.getByTestId('status')).toHaveTextContent('streaming');
   });
 
+  it('treats a heartbeat event as activity without appending a log line', async () => {
+    // A quiet run sends `event: heartbeat` frames; those must keep the
+    // stream alive but never show up in the log.
+    render(<Probe jobId="job-hb" />);
+    const es = MockEventSource.instances[0];
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45000);
+      es.emit('heartbeat', { data: '{}' });
+      await vi.advanceTimersByTimeAsync(45000);
+    });
+
+    expect(es.closed).toBe(false);
+    expect(screen.getByTestId('status')).toHaveTextContent('streaming');
+    expect(screen.getByTestId('logs')).toHaveTextContent('');
+  });
+
   it('clears the inactivity timer on unmount to avoid state updates after unmount', async () => {
     const { unmount } = render(<Probe jobId="job-3" />);
     const es = MockEventSource.instances[0];

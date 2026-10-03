@@ -19,6 +19,13 @@ from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.filesystem import FilesystemActionProvider
 
 
+def _cancel_then_exit(*_args, on_exit=None, **_kwargs):
+    """A cancel_job stand-in that, like the real one, runs on_exit once the process is gone."""
+    if on_exit is not None:
+        on_exit()
+    return True
+
+
 class TestDiscardSkipsScoring:
     def test_discard_does_not_score_completed_evidence(self):
         """With discard_partial=True, cancel must NOT write eval reports.
@@ -35,8 +42,8 @@ class TestDiscardSkipsScoring:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
+             patch("quodeq.services.evaluation_mixin.discard_run_state") as mock_discard, \
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"):
             result = m.cancel_evaluation(
                 "j1", reports_dir="/reports", discard_partial=True,
             )
@@ -48,13 +55,13 @@ class TestDiscardSkipsScoring:
         """Without discard, the cancel path keeps scoring completed dims."""
         m = FsEvaluationMixin()
         m._jobs = MagicMock()
-        m._jobs.cancel_job.return_value = True
+        m._jobs.cancel_job.side_effect = _cancel_then_exit
         m._jobs.get_job.return_value = JobSnapshot(
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"):
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
         mock_score.assert_called_once()
@@ -85,14 +92,11 @@ class TestRouteDiscardBlocksScoringResurrection:
         return app, provider
 
     @pytest.fixture(autouse=True)
-    def _reset_claim_registry(self, monkeypatch):
-        from quodeq.api._evaluation_routes import _scored_jobs, _scored_jobs_lock
+    def _no_api_key(self, monkeypatch):
+        # Each test builds its own app (self._make_app()), which gets its
+        # own fresh ScoringClaims instance, so there's no shared registry
+        # left over from another test to reset.
         monkeypatch.delenv("QUODEQ_API_KEY", raising=False)
-        with _scored_jobs_lock:
-            _scored_jobs.clear()
-        yield
-        with _scored_jobs_lock:
-            _scored_jobs.clear()
 
     def test_get_after_discard_cancel_does_not_score(self, tmp_path, monkeypatch):
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path))
@@ -113,7 +117,7 @@ class TestRouteDiscardBlocksScoringResurrection:
         )
         scored = threading.Event()
         with patch(
-            "quodeq.api._evaluation_routes.score_completed_evidence",
+            "quodeq.services.score_run.score_completed_evidence",
             side_effect=lambda *a, **k: scored.set(),
         ):
             get_resp = client.get("/api/evaluations/j-disc")

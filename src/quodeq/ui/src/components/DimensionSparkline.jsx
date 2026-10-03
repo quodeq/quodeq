@@ -9,8 +9,8 @@
  * backend call is required.
  */
 import { scoreGradeColorVar } from '../utils/formatters.js';
+import { SCORE_SCALE_MAX } from '../constants.js';
 
-const MAX_SCORE = 10;
 // Visible scores typically hover in the 6–10 range, so mapping 0–10 onto the
 // bar height compresses all bars near the top. Clipping the visible range
 // restores height contrast without distorting the colour (which still maps
@@ -47,7 +47,7 @@ export default function DimensionSparkline({
   const vbWidth = n * barUnits + (n - 1) * barGapUnits;
   const vbHeight = height;
   const minH = Math.max(1, minHeightRatio * vbHeight);
-  const visibleSpan = MAX_SCORE - VISIBLE_MIN_SCORE;
+  const visibleSpan = SCORE_SCALE_MAX - VISIBLE_MIN_SCORE;
   return (
     <svg
       className="dim-sparkline"
@@ -61,7 +61,7 @@ export default function DimensionSparkline({
         // Height uses a clipped 4–10 range so trends are visible; colour
         // still uses the raw score so a 9.8 reads "grade-top" even when the
         // bar is near max height.
-        const clipped = Math.max(VISIBLE_MIN_SCORE, Math.min(MAX_SCORE, score));
+        const clipped = Math.max(VISIBLE_MIN_SCORE, Math.min(SCORE_SCALE_MAX, score));
         const ratio = (clipped - VISIBLE_MIN_SCORE) / visibleSpan;
         const h = Math.max(minH, ratio * vbHeight);
         const x = i * (barUnits + barGapUnits);

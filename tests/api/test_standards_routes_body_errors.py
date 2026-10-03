@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from quodeq.api.app import create_app
 
 from tests.api.test_standards_routes import (  # noqa: F401 -- `dirs` is a fixture
@@ -167,3 +169,50 @@ def test_import_standard_still_imports_a_valid_payload(dirs):
     assert resp.get_json()["status"] == "imported"
     stored = json.loads(dirs["evaluators"].joinpath("ok-std.json").read_text())
     assert stored["id"] == "ok-std"
+
+
+# --- update/delete reject a traversal-shaped id with a coded 400 -----------
+
+def test_update_standard_with_traversal_id_returns_400(dirs):
+    app = _app(dirs)
+    with app.test_client() as c:
+        resp = c.put(
+            "/api/standards/a..b", json={"name": "x"}, headers=_ORIGIN,
+        )
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "bad_request"
+
+
+def test_delete_standard_with_traversal_id_returns_400(dirs):
+    app = _app(dirs)
+    with app.test_client() as c:
+        resp = c.delete("/api/standards/a..b", headers=_ORIGIN)
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "bad_request"
+
+
+def test_update_standard_malformed_json_returns_json_400(dirs):
+    app = _app(dirs)
+    with app.test_client() as c:
+        resp = c.put(
+            "/api/standards/security", data="{bad",
+            content_type="application/json", headers=_ORIGIN,
+        )
+    assert resp.status_code == 400
+    assert resp.is_json
+
+
+# --- duplicate rejects a non-string newId before touching the filesystem ---
+
+@pytest.mark.parametrize("field", ["newId", "new_id"])
+def test_duplicate_standard_with_non_string_new_id_returns_400(dirs, field):
+    app = _app(dirs)
+    with app.test_client() as c:
+        resp = c.post(
+            "/api/standards/security/duplicate", json={field: ["a"]}, headers=_ORIGIN,
+        )
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "bad_request"
+    # The bad newId must never reach the filesystem, e.g. as "['a'].json".
+    assert list(dirs["evaluators"].iterdir()) == []

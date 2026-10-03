@@ -3,6 +3,7 @@
  * payload builder and the applied-action window-event handler. Both are pure
  * builders exported so their contracts stay testable without mounting App.
  */
+import { ACTION_TYPE } from '../../vocab/actionType.js';
 
 // Exported for tests: the session-start payload must carry the selected
 // source so remote projects get read-only sessions server-side.
@@ -34,7 +35,7 @@ export function buildAssistantActionAppliedHandler({
   selectedProject,
 }) {
   return (event) => {
-    if (event.detail?.actionType !== 'dismiss_finding') return;
+    if (event.detail?.actionType !== ACTION_TYPE.DISMISS_FINDING) return;
     // Apply the delta first so the currently-visible screen patches in place
     // immediately; the refresh/reconcile below are the eventual-correctness
     // path (e.g. for views the delta doesn't cover).

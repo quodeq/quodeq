@@ -7,6 +7,7 @@ from pathlib import Path
 
 from quodeq.core.types.standard import StandardDetail, StandardMeta
 from quodeq.services._standards_crud import (
+    IMPORT_STATUS_CONFLICT,
     create, delete, duplicate, import_from_file, update,
 )
 from quodeq.services._standards_io import default_read_json, default_write_json
@@ -20,6 +21,8 @@ from quodeq.services.wiring import (
     standard_exists as _standard_exists,
     standard_path as _standard_path,
 )
+
+__all__ = ["StandardsService", "IMPORT_STATUS_CONFLICT"]
 
 
 @dataclass

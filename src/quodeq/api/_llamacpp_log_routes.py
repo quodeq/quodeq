@@ -22,15 +22,17 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Mapping
-from http import HTTPStatus
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask
 
-from quodeq.api._sse_log_helpers import sse_tail_generator
+from quodeq.api.provider_log_routes import ProviderLog, register_provider_log_routes
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
+
+_LLAMA_LOG_FILENAME = "llama-server.log"  # the filename probed at every candidate log directory
 
 
 def _default_log_paths(env: Mapping[str, str] | None = None) -> list[Path]:
@@ -62,17 +64,17 @@ def _default_log_paths(env: Mapping[str, str] | None = None) -> list[Path]:
         # Permission denied or read-only home — fall through to other
         # candidates rather than failing the whole probe.
         _logger.debug("could not create %s, trying the next log location: %s", quodeq_logs, exc)
-    candidates: list[Path] = [quodeq_logs / "llama-server.log"]
-    if sys.platform == "darwin":
-        candidates.append(home / "Library" / "Logs" / "llama-server.log")
-    elif sys.platform == "win32":
+    candidates: list[Path] = [quodeq_logs / _LLAMA_LOG_FILENAME]
+    if sys.platform == PLATFORM_DARWIN:
+        candidates.append(home / "Library" / "Logs" / _LLAMA_LOG_FILENAME)
+    elif sys.platform == PLATFORM_WIN32:
         local_app = environ.get("LOCALAPPDATA")
         if local_app:
             candidates.append(Path(local_app) / "llama.cpp" / "server.log")
     else:
         xdg_state = environ.get("XDG_STATE_HOME") or str(home / ".local" / "state")
-        candidates.append(Path(xdg_state) / "llama-server.log")
-    candidates.append(Path("/tmp/llama-server.log"))
+        candidates.append(Path(xdg_state) / _LLAMA_LOG_FILENAME)
+    candidates.append(Path("/tmp") / _LLAMA_LOG_FILENAME)
     return candidates
 
 
@@ -99,54 +101,22 @@ def _llamacpp_log_path(
     return None
 
 
+_LLAMACPP_LOG = ProviderLog(
+    name="llamacpp",
+    log_path=_llamacpp_log_path,
+    help=(
+        "Could not locate a llama-server log file. Either redirect "
+        "llama-server's output to a standard path (e.g. on macOS: "
+        "`llama-server -m model.gguf --port 8080 > ~/Library/Logs/llama-server.log 2>&1`) "
+        "or set the LLAMACPP_LOG_FILE env var to its location."
+    ),
+    availability_route=True,
+)
+
+
 def register_llamacpp_log_routes(app: Flask, env: Mapping[str, str] | None = None) -> None:
     """Register the /api/llamacpp/logs/{available,stream} endpoints.
 
-    Auth: inherits protection from the global before_request hook.
-
-    *env* is captured once here, at app-creation time, rather than read per
-    request; ``None`` keeps the per-request lookup against ``os.environ``.
+    Auth and *env* capture work as in ``configure_security``.
     """
-
-    @app.get("/api/llamacpp/logs/available")
-    def llamacpp_logs_available() -> Response:
-        """Tell the UI whether log streaming is configured.
-
-        The console toggle in the llama.cpp settings tab is only shown
-        when this returns ``{"available": true}``, since opening an SSE
-        connection that immediately 404s would just produce a confusing
-        red error pill.
-        """
-        log_path = _llamacpp_log_path(env=env)
-        return jsonify({"available": bool(log_path and log_path.exists())})
-
-    @app.get("/api/llamacpp/logs/stream")
-    def stream_llamacpp_logs() -> Response | tuple[Response, int]:
-        log_path = _llamacpp_log_path(env=env)
-        if log_path is None or not log_path.exists():
-            return (
-                jsonify({
-                    "error": "llamacpp log unavailable",
-                    "code": "NOT_FOUND",
-                    "help": (
-                        "Could not locate a llama-server log file. Either redirect "
-                        "llama-server's output to a standard path (e.g. on macOS: "
-                        "`llama-server -m model.gguf --port 8080 > ~/Library/Logs/llama-server.log 2>&1`) "
-                        "or set the LLAMACPP_LOG_FILE env var to its location."
-                    ),
-                }),
-                HTTPStatus.NOT_FOUND,
-            )
-        last_event_id = request.headers.get("Last-Event-ID", "")
-        try:
-            initial_offset = int(last_event_id) if last_event_id else 0
-        except ValueError:
-            initial_offset = 0
-
-        resp = Response(
-            sse_tail_generator(log_path, initial_offset),
-            mimetype="text/event-stream",
-        )
-        resp.headers["Cache-Control"] = "no-cache"
-        resp.headers["X-Accel-Buffering"] = "no"
-        return resp
+    register_provider_log_routes(app, _LLAMACPP_LOG, env)

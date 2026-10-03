@@ -82,7 +82,7 @@ class TestCommitAndPush:
 
         with _prepare_workspace("proj-uuid-1", url, root, None) as (_project_dir, repo):
             monkeypatch.setattr(
-                shared_publish, "run_git", lambda *a, **kw: (False, "fatal: pathspec"),
+                shared_publish, "stage_publish_paths", lambda repo, pid: (False, "fatal: pathspec"),
             )
             with pytest.raises(PublishError, match="git add failed"):
                 _commit_and_push(repo, "proj-uuid-1", 0)

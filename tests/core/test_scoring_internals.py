@@ -15,7 +15,7 @@ from quodeq.core.scoring.internals import (
     weight_as_multiplier,
 )
 from quodeq.core.scoring.constants import (
-    _MAX_PENALTY_MULTIPLIER,
+    MAX_PENALTY_MULTIPLIER,
 )
 import dataclasses
 from quodeq.core.scoring.params import DEFAULT_PARAMS
@@ -134,7 +134,7 @@ class TestComplianceDampening:
         assert compliance_dampening({"minor": 5}, {}) == 1.0
 
     def test_no_compliance_returns_max_penalty(self):
-        assert compliance_dampening({}, {"minor": 5}) == _MAX_PENALTY_MULTIPLIER
+        assert compliance_dampening({}, {"minor": 5}) == MAX_PENALTY_MULTIPLIER
 
     def test_high_ratio_reduces_multiplier(self):
         mult = compliance_dampening({"minor": 30}, {"minor": 5})

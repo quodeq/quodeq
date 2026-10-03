@@ -15,6 +15,14 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.services._fs_clone import CloneError, run_git_clone
+from quodeq.shared.git_errors import GitFailureKind
+
+
+@pytest.fixture(autouse=True)
+def _public_remote(monkeypatch):
+    """The fake remote resolves to one public address, so the pin step
+    never touches DNS and never refuses the clone."""
+    monkeypatch.setattr("quodeq.services._fs_clone.resolve_addresses", lambda hostname: ("140.82.121.3",))
 
 
 def _stderr(text: str) -> subprocess.CalledProcessError:
@@ -95,8 +103,8 @@ def test_fallback_removes_partial_clone_with_readonly_objects(
 @pytest.mark.parametrize(
     "stderr_text,expected_kind",
     [
-        ("Permission denied (publickey).", "auth"),
-        ("Repository not found.", "repo_not_found"),
+        ("Permission denied (publickey).", GitFailureKind.AUTH_REQUIRED),
+        ("Repository not found.", GitFailureKind.NOT_FOUND),
         ("destination path 'foo' already exists and is not an empty directory.", "dest_exists"),
         ("No space left on device", "disk"),
     ],
@@ -118,7 +126,7 @@ def test_timeout_does_not_retry(tmp_path):
     with patch("quodeq.services._fs_clone._subprocess.run", side_effect=timeout) as run_mock:
         with pytest.raises(CloneError) as exc:
             run_git_clone("https://x/y.git", tmp_path / "dest")
-    assert exc.value.kind == "network"
+    assert exc.value.kind == GitFailureKind.TIMEOUT
     assert run_mock.call_count == 1
 
 
@@ -138,3 +146,55 @@ def test_env_overrides_shallow_window(tmp_path, monkeypatch):
         run_git_clone("https://x/y.git", tmp_path / "dest")
     cmd = run_mock.call_args[0][0]
     assert "--shallow-since=12 months ago" in cmd
+
+
+# --- address pinning: git connects to the addresses the URL check saw ---
+
+
+def _argv_with(resolved, url: str, tmp_path) -> list[str]:
+    with patch("quodeq.services._fs_clone.resolve_addresses", return_value=resolved), \
+         patch("quodeq.data.fs.repo_clone.subprocess.run") as run_mock:
+        run_git_clone(url, tmp_path / "dest", shallow_months=0)
+    run_mock.assert_called_once()
+    return run_mock.call_args[0][0]
+
+
+def test_https_clone_pins_every_resolved_address_before_the_subcommand(tmp_path) -> None:
+    argv = _argv_with(("140.82.121.3", "2606:50c0:8000::153"), "https://github.com/acme/repo.git", tmp_path)
+
+    assert argv[:3] == ["git", "-c", "http.curloptResolve=github.com:443:140.82.121.3,2606:50c0:8000::153"]
+    assert argv[3] == "clone"
+
+
+def test_pin_uses_the_port_in_the_url(tmp_path) -> None:
+    argv = _argv_with(("140.82.121.3",), "http://git.example:8080/acme/repo.git", tmp_path)
+
+    assert argv[2] == "http.curloptResolve=git.example:8080:140.82.121.3"
+
+
+def test_scp_form_remote_is_not_pinned(tmp_path) -> None:
+    with patch("quodeq.services._fs_clone.resolve_addresses") as resolve, \
+         patch("quodeq.data.fs.repo_clone.subprocess.run") as run_mock:
+        run_git_clone("git@github.com:acme/repo.git", tmp_path / "dest", shallow_months=0)
+
+    resolve.assert_not_called()
+    assert run_mock.call_args[0][0][:2] == ["git", "clone"]
+
+
+@pytest.mark.parametrize("resolved", [("10.0.0.7",), ("140.82.121.3", "127.0.0.1"), ("169.254.169.254",)])
+def test_a_rebinding_answer_refuses_the_clone_before_git_runs(tmp_path, resolved) -> None:
+    with patch("quodeq.services._fs_clone.resolve_addresses", return_value=resolved), \
+         patch("quodeq.data.fs.repo_clone.subprocess.run") as run_mock, \
+         pytest.raises(CloneError, match="private/internal"):
+        run_git_clone("https://github.com/acme/repo.git", tmp_path / "dest", shallow_months=0)
+
+    run_mock.assert_not_called()
+
+
+def test_an_unresolvable_host_refuses_the_clone(tmp_path) -> None:
+    with patch("quodeq.services._fs_clone.resolve_addresses", return_value=()), \
+         patch("quodeq.data.fs.repo_clone.subprocess.run") as run_mock, \
+         pytest.raises(CloneError, match="could not resolve"):
+        run_git_clone("https://github.com/acme/repo.git", tmp_path / "dest", shallow_months=0)
+
+    run_mock.assert_not_called()

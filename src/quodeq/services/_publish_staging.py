@@ -1,8 +1,8 @@
 """Staging logic for publishing a project into the shared results repo.
 
 Split out of shared_publish.py: pure file-copy/merge operations
-plus stage_project's one exception, a `git config user.name` read (see
-audit finding C1). Invariants (spec):
+plus stage_project's one exception, a `git config user.name` read.
+Invariants (spec):
 - only completed runs (state == "done") are published
 - explicit allowlist of source-of-truth files, never derived artifacts
 - actions.jsonl is union-merged with the remote copy, never overwritten
@@ -15,10 +15,10 @@ _publish_git.py, whose push/commit run_git calls tests DO monkeypatch via
 """
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 
+from quodeq.core.run.state import RunState
 from quodeq.services.wiring import (
     ACTIONS_LOG_FILENAME,
     DIMENSIONS_FILENAME,
@@ -28,13 +28,14 @@ from quodeq.services.wiring import (
     copy_file_if_exists,
     copy_matching_files,
     ensure_dir,
+    merge_action_log_files,
     read_status,
     replace_json_file,
     run_git,
 )
+from quodeq.shared.constants import EVIDENCE_DIRNAME, MANIFEST_FILENAME
 
 _RUN_FILES = (STATUS_FILENAME, DIMENSIONS_FILENAME, "events.jsonl")
-_EVIDENCE_DIR = "evidence"
 _EVALUATION_DIR = "evaluation"
 _SCAN_FILENAME = "scan.json"
 
@@ -49,7 +50,7 @@ def list_completed_runs(project_dir: Path) -> list[Path]:
         except UnsupportedSchemaError:
             # Skip runs with unsupported schema versions
             continue
-        if status and status.get("state") == "done":
+        if status and status.get("state") == RunState.DONE:
             runs.append(entry)
     return runs
 
@@ -58,11 +59,11 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> None:
     ensure_dir(dest_run_dir)
     for name in _RUN_FILES:
         copy_file_if_exists(run_dir / name, dest_run_dir / name)
-    evidence = run_dir / _EVIDENCE_DIR
+    evidence = run_dir / EVIDENCE_DIRNAME
     if evidence.is_dir():
-        dest_evidence = dest_run_dir / _EVIDENCE_DIR
+        dest_evidence = dest_run_dir / EVIDENCE_DIRNAME
         ensure_dir(dest_evidence)
-        copy_file_if_exists(evidence / "manifest.json", dest_evidence / "manifest.json")
+        copy_file_if_exists(evidence / MANIFEST_FILENAME, dest_evidence / MANIFEST_FILENAME)
         copy_matching_files(evidence, dest_evidence, "*_evidence.jsonl")
     evaluation = run_dir / _EVALUATION_DIR
     if evaluation.is_dir():
@@ -74,32 +75,14 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> None:
         copy_matching_files(evaluation, dest_run_dir / _EVALUATION_DIR, "*.json")
 
 
-def _timestamp_key(line: str) -> tuple[int, str]:
-    try:
-        ts = json.loads(line).get("timestamp")
-    except (json.JSONDecodeError, AttributeError, TypeError):
-        return (1, "")
-    if not ts:
-        return (1, "")
-    return (0, str(ts))
-
-
 def merge_actions_log(ours: Path, theirs: Path, dest: Path) -> None:
-    seen: set[str] = set()
-    lines: list[str] = []
-    for source in (ours, theirs):
-        if not source.exists():
-            continue
-        for raw in source.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if line and line not in seen:
-                seen.add(line)
-                lines.append(line)
-    if not lines:
-        return
-    lines.sort(key=_timestamp_key)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    """Union-merge *ours* and *theirs* into *dest*, deduped and timestamp-sorted.
+
+    Thin delegate to ``data.actions_log.merge_action_log_files``: a non-UTF8
+    source raises ``ValueError`` here too, which ``stage_project``'s caller
+    (``publish_project``) already catches and turns into ``PublishError``.
+    """
+    merge_action_log_files(dest, (ours, theirs))
 
 
 def _publish_attribution(clone_root: Path) -> str:
@@ -108,8 +91,8 @@ def _publish_attribution(clone_root: Path) -> str:
     Reads git config rather than GIT_AUTHOR_NAME/GIT_COMMITTER_NAME: those
     env vars only affect a new commit's recorded author/committer identity,
     not `git config` lookups. Falls back to "unknown" (never raises) so a
-    missing git identity never blocks a publish -- audit finding C1 is about
-    truthful attribution when it IS known, not about requiring one.
+    missing git identity never blocks a publish -- attribution is about
+    truthfulness when it IS known, not about requiring one.
     """
     ok, out = run_git(["config", "user.name"], cwd=clone_root)
     author = out.strip() if ok else ""
@@ -137,7 +120,7 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
     for run_dir in runs:
         copy_run(run_dir, dest_project_dir / run_dir.name)
 
-    # Record who published and when at publish time (audit finding C1),
+    # Record who published and when at publish time,
     # rather than relying solely on git-log against the shared clone, which
     # published_meta() still falls back to for dirs published before this
     # file existed. dest_project_dir is <clone>/evaluations/<project_id>, so

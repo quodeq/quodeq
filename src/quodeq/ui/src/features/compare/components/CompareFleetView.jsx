@@ -16,6 +16,8 @@ import CompareAttentionStrip from './CompareAttentionStrip.jsx';
 import CompareDimensionsBoard from './CompareDimensionsBoard.jsx';
 import CompareProjectsTable from './CompareProjectsTable.jsx';
 import { nf, score1 } from '../compareFormatters.js';
+import { REASON_TYPE } from '../compareBoard.js';
+import { CONSEQUENCE_LEVEL } from '../compareFleet.js';
 
 // Top-N by consequence always shown in the attention strip; beyond that
 // only rows that actually flag ('watch'+) qualify (see partitionFleetRows).
@@ -29,14 +31,14 @@ function buildAttentionItems(attnAll, onOpenProject, openDimension) {
     name: row.name,
     onNameClick: () => onOpenProject(row.id),
     why: reasons.map((r) => {
-      if (r.type === 'worstDim') return t('compare.reasonWorstDim', { dim: r.dim, score: score1(r.score) });
-      if (r.type === 'declining') return t('compare.reasonDeclining', { delta: r.delta });
-      if (r.type === 'stale') {
+      if (r.type === REASON_TYPE.WORST_DIM) return t('compare.reasonWorstDim', { dim: r.dim, score: score1(r.score) });
+      if (r.type === REASON_TYPE.DECLINING) return t('compare.reasonDeclining', { delta: r.delta });
+      if (r.type === REASON_TYPE.STALE) {
         return r.commits != null
           ? t('compare.reasonStaleCommits', { count: nf(r.commits) })
           : t('compare.reasonStale');
       }
-      if (r.type === 'coverage') return t('compare.reasonCoverage', { pct: r.pct });
+      if (r.type === REASON_TYPE.COVERAGE) return t('compare.reasonCoverage', { pct: r.pct });
       return null;
     }).filter(Boolean).join(' · '),
     extra: worstDim && (
@@ -83,7 +85,7 @@ function partitionFleetRows(orderedRows, attention, errorsById) {
   const scoredRows = orderedRows.filter((r) => r.hasData);
   const attnAll = [
     ...attention.slice(0, ATTENTION_LEAD_COUNT),
-    ...attention.slice(ATTENTION_LEAD_COUNT).filter((a) => a.level !== 'clear'),
+    ...attention.slice(ATTENTION_LEAD_COUNT).filter((a) => a.level !== CONSEQUENCE_LEVEL.CLEAR),
   ];
   const isUnevaluated = (row) => row.loaded && !row.hasData && !errorsById[row.id];
   const mainRows = orderedRows.filter((row) => !isUnevaluated(row));
@@ -116,7 +118,7 @@ export default function CompareFleetView({
         noteText={t('compare.attentionNote')}
         items={buildAttentionItems(attnAll, onOpenProject, openDimension)}
       />
-      {/* v4a: every score at a glance — column headers SORT, a cell opens
+      {/* Every score at a glance — column headers SORT, a cell opens
           that project's own dimension (remote rows open the shared project). */}
       <CompareMatrix
         ariaLabel={t('compare.matrixAria')}

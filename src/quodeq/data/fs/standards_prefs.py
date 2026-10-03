@@ -25,6 +25,7 @@ from quodeq.core.standards.visibility import (
     VISIBILITY_RELPATH,
     normalize_ids,
 )
+from quodeq.shared.advisory_json import read_advisory_json
 
 _logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def load_visible_standard_ids(project_root: str | Path | None) -> tuple[str, ...
         return DEFAULT_VISIBLE_STANDARDS
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 - config must never fail a scan; see module docstring
+    except (OSError, ValueError, RecursionError) as exc:
         _logger.warning(
             "Ignoring unreadable or malformed standards visibility %s: %s", path, exc)
         return DEFAULT_VISIBLE_STANDARDS
@@ -79,13 +80,12 @@ def load_project_overrides(project_root: str | Path | None) -> dict[str, dict]:
     if not project_root:
         return {}
     path = Path(project_root) / OVERRIDES_RELPATH
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 - config must never fail a scan; see module docstring
+    data, err = read_advisory_json(path)
+    if err is not None:
         _logger.warning(
-            "Ignoring unreadable or malformed standards overrides %s: %s", path, exc)
+            "Ignoring unreadable or malformed standards overrides %s: %s", path, err)
+        return {}
+    if data is None:
         return {}
     overrides = data.get("overrides") if isinstance(data, dict) else None
     if not isinstance(overrides, dict):
@@ -113,7 +113,7 @@ def collect_declared_params(compiled_dir: Path) -> dict[str, dict]:
     for path in sorted(Path(compiled_dir).glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001 - one bad standard must not sink the rest
+        except (OSError, ValueError, RecursionError) as exc:
             _logger.warning("Skipping unreadable declared params in %s: %s", path, exc)
             continue
         for principle in data.get("principles", []):

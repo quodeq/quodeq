@@ -1,12 +1,17 @@
 import { MS_PER_DAY } from './time.js';
+import { RUN_STATE } from '../vocab/runState.js';
+import { GRANULARITY } from './granularity.js';
 
 const DAYS_PER_WEEK = 7;
+const PAD_CHAR = '0'; // padStart fill for two-digit month/day/week segments
 // ISO weeks are anchored on Thursday: shifting any date in the week to its
 // Thursday and reading that Thursday's year/week gives the correct ISO week
 // even when the week spans a year boundary.
 const ISO_WEEK_ANCHOR_DAY = 4;
 // "YYYY-MM".length
 export const YEAR_MONTH_KEY_LENGTH = 7;
+// "YYYY-MM-DD".length: slices a UTC instant string down to its date part.
+export const ISO_DATE_LENGTH = 10;
 
 /**
  * Local calendar-day key (YYYY-MM-DD) for a trend entry's dateISO.
@@ -23,13 +28,13 @@ export const YEAR_MONTH_KEY_LENGTH = 7;
  */
 export function localDayKey(dateISO) {
   const s = dateISO || '';
-  if (s.length <= 10) return s.slice(0, 10);
+  if (s.length <= ISO_DATE_LENGTH) return s.slice(0, ISO_DATE_LENGTH);
   const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s.slice(0, 10);
+  if (Number.isNaN(d.getTime())) return s.slice(0, ISO_DATE_LENGTH);
   return [
     d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
+    String(d.getMonth() + 1).padStart(2, PAD_CHAR),
+    String(d.getDate()).padStart(2, PAD_CHAR),
   ].join('-');
 }
 
@@ -54,7 +59,7 @@ export function isoWeekKey(dateISO) {
   const isoYear = date.getUTCFullYear();
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
   const weekNo = Math.ceil(((date - yearStart) / MS_PER_DAY + 1) / DAYS_PER_WEEK);
-  return `${isoYear}-W${String(weekNo).padStart(2, '0')}`;
+  return `${isoYear}-W${String(weekNo).padStart(2, PAD_CHAR)}`;
 }
 
 /**
@@ -66,9 +71,9 @@ export function isoWeekKey(dateISO) {
  * @param {'day'|'week'|'month'} [granularity='day']
  * @returns {string}
  */
-export function bucketKey(dateISO, granularity = 'day') {
-  if (granularity === 'month') return localDayKey(dateISO).slice(0, YEAR_MONTH_KEY_LENGTH);
-  if (granularity === 'week') return isoWeekKey(dateISO);
+export function bucketKey(dateISO, granularity = GRANULARITY.DAY) {
+  if (granularity === GRANULARITY.MONTH) return localDayKey(dateISO).slice(0, YEAR_MONTH_KEY_LENGTH);
+  if (granularity === GRANULARITY.WEEK) return isoWeekKey(dateISO);
   return localDayKey(dateISO);
 }
 
@@ -89,7 +94,7 @@ export function bucketKey(dateISO, granularity = 'day') {
  * @returns {boolean}
  */
 export function isBucketEligible(entry) {
-  return (entry?.status || '') !== 'in_progress';
+  return (entry?.status || '') !== RUN_STATE.RUNNING;
 }
 
 /**
@@ -103,7 +108,7 @@ export function isBucketEligible(entry) {
  * @param {'day'|'week'|'month'} [granularity='day']
  * @returns {Array} Collapsed entries, one per bucket
  */
-export function collapseByPeriod(trend, granularity = 'day') {
+export function collapseByPeriod(trend, granularity = GRANULARITY.DAY) {
   if (!trend || trend.length === 0) return trend;
   const collapsed = [];
   let currentKey = null;
@@ -130,7 +135,7 @@ export function collapseByPeriod(trend, granularity = 'day') {
  * @param {'day'|'week'|'month'} [granularity='day']
  * @returns {Set<string>} Lowercase dimension names evaluated that period
  */
-export function collectPeriodDimensions(trend, selectedRunId, granularity = 'day') {
+export function collectPeriodDimensions(trend, selectedRunId, granularity = GRANULARITY.DAY) {
   if (!trend || !trend.length || !selectedRunId) return new Set();
   const entry = trend.find((t) => t.runId === selectedRunId);
   if (!entry) return new Set();
@@ -154,7 +159,7 @@ export function collectPeriodDimensions(trend, selectedRunId, granularity = 'day
  * @param {'day'|'week'|'month'} [granularity='day']
  * @returns {Array} One run per bucket
  */
-export function buildPeriodRuns(availableRuns, trend, granularity = 'day') {
+export function buildPeriodRuns(availableRuns, trend, granularity = GRANULARITY.DAY) {
   if (!availableRuns || !availableRuns.length) return [];
   if (!Array.isArray(trend)) return [];
   const trendMap = new Map(trend.map((r) => [r.runId, r]));
@@ -187,7 +192,7 @@ export function buildPeriodRuns(availableRuns, trend, granularity = 'day') {
  * @param {number} [limit=Infinity] Max buckets to keep (newest buckets win).
  * @returns {Array<{runId:string, dateISO:string, dateLabel:string, score:number, grade:*, overallGrade:*}>}
  */
-export function extractDimensionPeriodSeries(trend, dimensionName, granularity = 'day', limit = Infinity) {
+export function extractDimensionPeriodSeries(trend, dimensionName, granularity = GRANULARITY.DAY, limit = Infinity) {
   if (!Array.isArray(trend) || !dimensionName) return [];
   const want = String(dimensionName).toLowerCase();
   const seen = new Set();
@@ -245,7 +250,7 @@ export function sliceTrendAtRun(trend, runId) {
  * @returns {Array} Collapsed entries, one per day
  */
 export function collapseByDay(trend) {
-  return collapseByPeriod(trend, 'day');
+  return collapseByPeriod(trend, GRANULARITY.DAY);
 }
 
 /**
@@ -257,7 +262,7 @@ export function collapseByDay(trend) {
  * @returns {Set<string>} Lowercase dimension names evaluated that day
  */
 export function collectDayDimensions(trend, selectedRunId) {
-  return collectPeriodDimensions(trend, selectedRunId, 'day');
+  return collectPeriodDimensions(trend, selectedRunId, GRANULARITY.DAY);
 }
 
 /**
@@ -269,5 +274,5 @@ export function collectDayDimensions(trend, selectedRunId) {
  * @returns {Array} One entry per day
  */
 export function buildDailyRuns(availableRuns, trend) {
-  return buildPeriodRuns(availableRuns, trend, 'day');
+  return buildPeriodRuns(availableRuns, trend, GRANULARITY.DAY);
 }

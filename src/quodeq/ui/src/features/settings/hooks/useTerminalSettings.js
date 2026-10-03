@@ -1,12 +1,15 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
+import { broadcastSettingsChange, useSettingsChangeSync } from './settingsSync.js';
+import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
 
 export const TERMINAL_ENABLED_KEY = 'cc-terminal-enabled';
 const CHANGE_EVENT = 'terminal-settings-changed';
+const SYNC_EVENTS = [CHANGE_EVENT];
 
 function loadEnabled(storage) {
   // Enabled by default: only an explicit opt-out ('false') disables it.
   try {
-    return storage.getItem(TERMINAL_ENABLED_KEY) !== 'false';
+    return storage.getItem(TERMINAL_ENABLED_KEY) !== STORED_FALSE;
   } catch (err) {
     console.warn('[useTerminalSettings] could not read:', err);
     return true;
@@ -27,24 +30,15 @@ export default function useTerminalSettings({ storage = localStorage } = {}) {
 
   const setEnabled = useCallback((value) => {
     try {
-      storage.setItem(TERMINAL_ENABLED_KEY, value ? 'true' : 'false');
+      storage.setItem(TERMINAL_ENABLED_KEY, value ? STORED_TRUE : STORED_FALSE);
     } catch (err) {
       console.warn('[useTerminalSettings] could not persist:', err);
     }
     setEnabledState(value);
-    if (typeof window !== 'undefined') window.dispatchEvent(new Event(CHANGE_EVENT));
+    broadcastSettingsChange(CHANGE_EVENT);
   }, [storage]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const onChange = () => setEnabledState(loadEnabled(storage));
-    window.addEventListener(CHANGE_EVENT, onChange);
-    window.addEventListener('storage', onChange);
-    return () => {
-      window.removeEventListener(CHANGE_EVENT, onChange);
-      window.removeEventListener('storage', onChange);
-    };
-  }, [storage]);
+  useSettingsChangeSync(SYNC_EVENTS, { load: loadEnabled, setState: setEnabledState, storage });
 
   return { enabled, setEnabled };
 }

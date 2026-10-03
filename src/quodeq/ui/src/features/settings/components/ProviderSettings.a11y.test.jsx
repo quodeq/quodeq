@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
+import { AdvancedAnalysisSettings, TimeLimitSetting } from './ProviderSettings.jsx';
+import { PROVIDER_SETTING_KEY } from '../../../constants.js';
 
 // #6394 / #6395 - the per-dimension/grouped and verify on/off pill pairs are
 // mutually-exclusive choices marked only by a CSS class; they need
@@ -32,5 +33,16 @@ describe('AdvancedAnalysisSettings toggle a11y', () => {
     setup({ verify: 'false' });
     expect(screen.getByRole('radio', { name: 'Off' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'On' })).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
+// The minutes input is named by the row's visible time-limit label.
+describe('TimeLimitSetting a11y', () => {
+  it.each([
+    ['limited', { [PROVIDER_SETTING_KEY.TIME_LIMIT]: '600' }],
+    ['unlimited', {}],
+  ])('gives the minutes spinbutton the time-limit label as its name when %s', (_mode, state) => {
+    render(<TimeLimitSetting state={state} update={vi.fn()} />);
+    expect(screen.getByRole('spinbutton')).toHaveAccessibleName('Evaluation time limit');
   });
 });

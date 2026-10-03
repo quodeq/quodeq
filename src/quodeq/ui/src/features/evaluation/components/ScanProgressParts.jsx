@@ -2,7 +2,7 @@
  * ScanProgress's smaller subcomponents/helpers: the failed/lost banner, the
  * coverage bar + legend, the summary line, and the footer.
  *
- * Split out of ScanProgress.jsx verbatim — moved into named
+ * Presentational parts of ScanProgress.jsx — moved into named
  * functions/components so ScanProgress itself clears the
  * max-lines-per-function gate. Logic is unchanged from the pre-split
  * version.
@@ -16,12 +16,10 @@ import { SectionLabel } from '../../../components/terminal/index.js';
 import { formatDuration, formatDurationCoarse } from '../../../utils/formatters.js';
 import { exitReasonInfo, exitReasonWarn } from '../../../models/exitReason.js';
 import { t } from '../../../strings/index.js';
+import { JOB_STATUS } from '../../../vocab/jobStatus.js';
+import { PERCENT } from '../../../constants.js';
 
 const STATUS_MARKERS = { arrow: '→', check: '✓', error: 'Error:', failed: 'failed' };
-// Job status that still produced results, so a recorded exit reason reads as
-// a partial-coverage warning rather than a failure.
-const STATUS_DONE = 'done';
-
 function isStatusLine(line) {
   const prefixes = [STATUS_MARKERS.arrow, STATUS_MARKERS.check, STATUS_MARKERS.error];
   return prefixes.some((p) => line.startsWith(p)) || line.includes(STATUS_MARKERS.failed);
@@ -62,7 +60,7 @@ export function ScanProgressBanner({ isFailed, isLost, status, progress, logs, e
   // Done-with-errors: the provider died mid-run but files had already been
   // analysed, so the run kept its partial results. Warn that the numbers
   // below cover only part of the project.
-  if (status === STATUS_DONE && failInfo && exitReasonWarn(reason)) {
+  if (status === JOB_STATUS.DONE && failInfo && exitReasonWarn(reason)) {
     return (
       <div className="scan-progress__warning" role="alert">
         <strong>{failInfo.label}</strong> · {t('evaluate.runStoppedEarly')}
@@ -81,7 +79,7 @@ export function ScanProgressBar({ showCoverage, cachedFiles, cachedPctWidth, run
         role="progressbar"
         aria-label={t('evaluate.scanProgressAria')}
         aria-valuemin={0}
-        aria-valuemax={100}
+        aria-valuemax={PERCENT}
         aria-valuenow={Math.round(showCoverage ? coveredPct : overallPct)}
         title={showCoverage ? t('evaluate.cachedBarTitle', { count: cachedFiles }) : undefined}
       >

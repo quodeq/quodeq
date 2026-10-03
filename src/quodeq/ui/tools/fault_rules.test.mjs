@@ -20,6 +20,9 @@ js.run('swallowed-catch', plugin.rules['swallowed-catch'], {
     // Not every logger is `console`. A warn/error/debug call on anything
     // counts as reaching somebody.
     "try { f(); } catch { log.warn('[m] failed'); }",
+    // A promise `.catch` handler that logs or surfaces the error.
+    "p.catch((err) => console.warn('[m] failed:', err));",
+    'p.catch(() => setError(true));',
   ],
   invalid: [
     // Empty body, optional catch binding: the error is gone.
@@ -34,6 +37,12 @@ js.run('swallowed-catch', plugin.rules['swallowed-catch'], {
       code: 'try { f(); } catch (o) { try { j(); } catch (n) { console.warn(n); } }',
       errors: 1,
     },
+    // A promise `.catch` handler that does nothing drops the rejection.
+    { code: 'p.catch(() => {});', errors: 1 },
+    { code: 'p.catch(function () {});', errors: 1 },
+    { code: 'p.catch(() => undefined);', errors: 1 },
+    { code: 'p.catch(() => null);', errors: 1 },
+    { code: 'p.catch(() => void 0);', errors: 1 },
   ],
 });
 
@@ -61,11 +70,17 @@ js.run('raw-storage-access', plugin.rules['raw-storage-access'], {
   valid: [
     // The approved wrapper, which handles private mode and quota errors.
     "import { readString } from '../adapters/storage.js'; readString('k');",
+    'function f(storage) {}',
+    // A default parameter is the documented injection convention.
+    'function f(storage = localStorage) {}',
   ],
   invalid: [
     { code: "localStorage.getItem('k');", errors: 1 },
     { code: "sessionStorage.setItem('k','1');", errors: 1 },
     { code: "window.localStorage.removeItem('k');", errors: 1 },
+    // A bare storage object aliased to a variable skips the adapter just the
+    // same: its methods are then called unguarded.
+    { code: 'const s = sessionStorage;', errors: 1 },
   ],
 });
 

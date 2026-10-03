@@ -4,7 +4,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from quodeq.analysis._config import AnalysisConfig, _SpawnPaths
+from quodeq.analysis._config import AnalysisConfig, SpawnPaths
 from quodeq.analysis.errors import FatalProviderError, ProviderError, classify_fatal_provider_message
 from quodeq.analysis.stream.progress_reader import IncrementalProgressReader
 from quodeq.shared import cancellation
@@ -56,7 +56,7 @@ def _run_with_heartbeat(
     return timed_out
 
 
-def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
+def check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
     """Raise AnalysisError if the process exited with a non-zero code.
 
     Raises FatalProviderError instead when stderr matches a known
@@ -80,9 +80,9 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
         raise AnalysisError(message)
 
 
-def _spawn_and_monitor(
+def spawn_and_monitor(
     args: list[str], work_dir: Path, env: dict,
-    paths: _SpawnPaths, cfg: AnalysisConfig,
+    paths: SpawnPaths, cfg: AnalysisConfig,
 ) -> tuple[subprocess.Popen, bool]:
     """Spawn the AI CLI process, monitor with heartbeat, return (process, timed_out)."""
     with open(paths.stream_file, "w", encoding="utf-8") as out, open(paths.stream_err, "w", encoding="utf-8") as err:

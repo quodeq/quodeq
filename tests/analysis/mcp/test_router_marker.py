@@ -53,6 +53,14 @@ class TestMarkFileDone:
         with pytest.raises(ValueError):
             router.mark_file_done(file="src/foo.py", status="bogus")
 
+    def test_invalid_status_message_names_the_plain_values(self):
+        router = _make_router(io.StringIO())
+        with pytest.raises(ValueError) as exc:
+            router.mark_file_done(file="src/foo.py", status="bogus")
+        assert str(exc.value) == (
+            "mark_file_done: status must be one of 'ok', 'error', 'skipped', got 'bogus'"
+        )
+
 
 def test_router_accumulates_findings_per_file_then_drains_on_ok():
     """Receive 3 findings for Foo.kt and 2 for Bar.kt. Call mark_file_done(Foo.kt, ok).
@@ -134,7 +142,10 @@ def test_router_callback_exception_does_not_break_marker_write_or_accumulation()
     from quodeq.analysis.mcp.enricher import CompiledContext
 
     def boom(_file: str, _findings: list[dict]) -> None:
-        raise RuntimeError("simulated cache write failure")
+        # OSError, not an arbitrary Exception: mark_file_done's on_file_done
+        # catch narrows to (OSError, ValueError, TypeError), the shapes a
+        # real cache write can raise.
+        raise OSError("simulated cache write failure")
 
     fh = io.StringIO()
     router = FindingsRouter(fh, context=CompiledContext(), on_file_done=boom)

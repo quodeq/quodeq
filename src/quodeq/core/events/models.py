@@ -14,16 +14,11 @@ from typing import Dict, Generic, List, Optional, TypeVar
 from uuid import uuid4, UUID
 
 from quodeq.core.constants import FULL_CONFIDENCE
+from quodeq.core.types.finding_type import FINDING_TYPES, FindingType
 from quodeq.core.types.req_ref import ReqRef
 
 
 T = TypeVar("T")
-
-# Judgment.verdict vocabulary. "dismissed" is NOT a valid Judgment verdict --
-# that's a derived view-only state on Finding (see Judgment's docstring).
-VERDICT_VIOLATION = "violation"
-VERDICT_COMPLIANCE = "compliance"
-VALID_VERDICTS = frozenset({VERDICT_VIOLATION, VERDICT_COMPLIANCE})
 
 # Judgment.severity's default when the model doesn't set one explicitly.
 DEFAULT_SEVERITY = "medium"
@@ -108,11 +103,11 @@ class Judgment:
 
     def is_violation(self) -> bool:
         """True when this judgment counts against the score."""
-        return self.verdict == VERDICT_VIOLATION
+        return self.verdict == FindingType.VIOLATION
 
     def is_compliance(self) -> bool:
         """True when this judgment is evidence the practice was followed."""
-        return self.verdict == VERDICT_COMPLIANCE
+        return self.verdict == FindingType.COMPLIANCE
 
     def has_valid_verdict(self) -> bool:
         """True when verdict is one of the known values.
@@ -123,7 +118,7 @@ class Judgment:
         a raising validator here would make historical ``events.jsonl``
         entries with an unexpected verdict permanently unreplayable.
         """
-        return self.verdict in VALID_VERDICTS
+        return self.verdict in FINDING_TYPES
 
 
 # Deprecation alias -- remove in a follow-up PR once all callers migrate.

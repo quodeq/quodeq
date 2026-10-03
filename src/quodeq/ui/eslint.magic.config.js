@@ -12,10 +12,14 @@
 // events, queries and breakpoints: src/constants.js. Unit conversions:
 // src/utils/time.js. See CONTRIBUTING.md, Code Style.
 //
-// Ignored values are self-describing: -1/0/1/2 (sentinels, unit steps), 10
-// and 100 (the 0-10 score scale and percent), 24/60/1000 (time unit
-// conversions). Tests and fixtures are excluded: there the literal is the
-// expected value, which is the contract under test.
+// Ignored values are self-describing: -1/0/1/2 (sentinels, unit steps) —
+// the floor. The score scale, percent and time unit factors (10, 24, 60,
+// 100, 1000) are named constants, not ignored: every other literal in
+// production UI code names a home rather than being grandfathered here.
+// Tests and fixtures are excluded: there the literal is the expected value,
+// which is the contract under test.
+import { JSX_MODULE_LANGUAGE_OPTIONS } from './tools/eslint_shared_config.mjs';
+
 export default [
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],
@@ -25,16 +29,12 @@ export default [
       'src/**/*.fixtures.js',
       'src/**/*.fixtures.jsx',
     ],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
     rules: {
       'no-magic-numbers': [
         'error',
         {
-          ignore: [-1, 0, 1, 2, 10, 24, 60, 100, 1000],
+          ignore: [-1, 0, 1, 2],
           ignoreArrayIndexes: true,
           ignoreDefaultValues: true,
           ignoreClassFieldInitialValues: true,

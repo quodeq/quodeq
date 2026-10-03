@@ -1,11 +1,10 @@
 """Project scan and estimate routes.
 
-Split from routes_project_list.py to keep that file under the size ratchet's
-300-line cap. ``reports_dir`` is looked up dynamically through the
-routes_project_list facade (rather than imported directly) so that
-``patch("quodeq.api.routes_project_list.reports_dir", ...)`` in existing
-tests still takes effect for these routes, which are registered from inside
-``register_project_list_routes``.
+``reports_dir`` is looked up dynamically through its real
+owner, ``routes_common`` (rather than through the routes_project_list
+facade that just re-exports it), so this module never imports back a
+sibling that imports it. Tests patch
+"quodeq.api.routes_common.reports_dir".
 
 Handlers are module-level functions attached to *app* via
 ``app.get(rule)(handler)`` in ``register_project_scan_routes`` rather than
@@ -18,7 +17,6 @@ decorator form and the direct-call form both end up calling
 from __future__ import annotations
 
 import dataclasses
-import json
 import logging
 import os
 from http import HTTPStatus
@@ -26,20 +24,31 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import _path_from_body, json_error, scan_target_error as _scan_target_error
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, MESSAGE_INVALID_PROJECT_NAME, QUERY_FLAG_TRUE
+from quodeq.api.helpers import (
+    json_error,
+    jsonify_error,
+    optional_json_object_or_response,
+    path_from_body,
+    scan_target_error as _scan_target_error,
+    validate_segment,
+)
 from quodeq.services.fs_project_helpers import (
     project_record_exists,
+    read_cached_scan,
     read_project_record,
+    scan_json_exists,
 )
 from quodeq.services.fs_scan import scan_project
-from quodeq.shared.validation import validate_path_segment
+from quodeq.core.types.project_source import ProjectLocation
+from quodeq.shared.csv_values import split_csv
 
 _logger = logging.getLogger(__name__)
 
 
 def _reports_dir() -> str:
-    from quodeq.api import routes_project_list as _facade
-    return _facade.reports_dir()
+    from quodeq.api.routes_common import reports_dir as _owner_reports_dir
+    return _owner_reports_dir()
 
 
 def _contained_project_dir(project: str) -> Path | None:
@@ -62,26 +71,24 @@ def _contained_project_dir(project: str) -> Path | None:
 
 def _scan_inputs(project: str) -> tuple[Path | None, tuple[Response, int] | None]:
     """Resolve *project* to its directory under the reports root, or an error."""
-    try:
-        validate_path_segment(project)
-    except ValueError:
-        return None, json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+    err = validate_segment(project, message=MESSAGE_INVALID_PROJECT_NAME)
+    if err is not None:
+        return None, err
     project_dir = _contained_project_dir(project)
     if project_dir is None:
-        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return project_dir, None
 
 
 def _cached_scan_response(project_dir: Path) -> Response | None:
     """The project's existing scan.json as a response, or None to rescan."""
-    scan_path = project_dir / "scan.json"
-    if not scan_path.exists():
+    if not scan_json_exists(project_dir):
         return None
-    try:
-        return jsonify(json.loads(scan_path.read_text(encoding="utf-8")))
-    except (json.JSONDecodeError, OSError) as exc:
-        _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project_dir.name, exc)
+    scan = read_cached_scan(project_dir)
+    if scan is None:
+        _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project_dir.name, "invalid JSON")
         return None
+    return jsonify(scan)
 
 
 def _local_scan_root(project_dir: Path) -> tuple[Path | None, tuple[Response, int] | None]:
@@ -89,12 +96,12 @@ def _local_scan_root(project_dir: Path) -> tuple[Path | None, tuple[Response, in
     # Check if local — read the project's repository record (via the
     # service layer; the route keeps no repository_info.json knowledge).
     if not project_record_exists(project_dir):
-        return None, json_error("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return None, json_error("No scan available", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     info = read_project_record(project_dir)
     if info is None:
         return None, json_error(
             "Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
-    if info.get("location") != "local" or not info.get("path"):
+    if info.get("location") != ProjectLocation.LOCAL or not info.get("path"):
         return None, json_error(
             "Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
     project_path = Path(info["path"])
@@ -142,18 +149,19 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
     from quodeq.analysis.estimates import project_estimates_payload
 
     raw_dims = request.args.get("dimensions", "")
-    requested = [d.strip() for d in raw_dims.split(",") if d.strip()] or None
-    clean_scan = request.args.get("cleanScan", "false").strip().lower() == "true"
+    requested = split_csv(raw_dims) or None
+    clean_scan = request.args.get("cleanScan", "false").strip().lower() == QUERY_FLAG_TRUE
     return jsonify(project_estimates_payload(project_dir, requested, clean_scan))
 
 
 def scan_path() -> Response | tuple[Response, int]:
     """Scan a local directory path directly (no registered project required)."""
-    data = request.get_json(silent=True) or {}
-    target = _path_from_body(data)
+    data = optional_json_object_or_response(CODE_INVALID_INPUT)
+    if not isinstance(data, dict):
+        return data
+    target = path_from_body(data)
     if isinstance(target, tuple):
-        body, status = target
-        return jsonify(body), status
+        return jsonify_error(target)
     if not target:
         return json_error("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
 
@@ -161,8 +169,7 @@ def scan_path() -> Response | tuple[Response, int]:
     # Allowlist: only permit paths under user home or the evaluations directory
     err = _scan_target_error(target_path, _reports_dir())
     if err is not None:
-        body, status = err
-        return jsonify(body), status
+        return jsonify_error(err)
     if not target_path.is_dir():
         return json_error("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
 

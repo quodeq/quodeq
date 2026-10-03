@@ -88,7 +88,7 @@ def test_resolve_run_location_rejects_path_traversal(monkeypatch, tmp_path):
     outside = tmp_path / "outside" / "run-1"
     outside.mkdir(parents=True)
     monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+        "quodeq.api._assistant_location.get_evaluations_dir", lambda: str(evals)
     )
     from quodeq.api._assistant_helpers import resolve_run_location
     # A traversal project id that would escape the root must NOT resolve, even
@@ -109,7 +109,7 @@ def test_resolve_repo_root_returns_local_working_copy(monkeypatch, tmp_path):
         json.dumps({"path": str(repo_dir)}), encoding="utf-8"
     )
     monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+        "quodeq.api._assistant_location.get_evaluations_dir", lambda: str(evals)
     )
     from quodeq.api._assistant_helpers import resolve_repo_root
     assert resolve_repo_root("proj") == str(repo_dir)
@@ -130,7 +130,7 @@ def test_resolve_repo_root_rejects_urls_and_missing_dirs(monkeypatch, tmp_path):
             json.dumps({"path": path}), encoding="utf-8"
         )
     monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+        "quodeq.api._assistant_location.get_evaluations_dir", lambda: str(evals)
     )
     from quodeq.api._assistant_helpers import resolve_repo_root
     assert resolve_repo_root("online") is None
@@ -148,7 +148,7 @@ def test_resolve_run_location_detaches_unreadable_repo_root(monkeypatch, tmp_pat
         json.dumps({"path": "https://github.com/acme/app"}), encoding="utf-8"
     )
     monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.get_evaluations_dir", lambda: str(evals)
+        "quodeq.api._assistant_location.get_evaluations_dir", lambda: str(evals)
     )
     from quodeq.api._assistant_helpers import resolve_run_location
     run_dir, repo_root = resolve_run_location("proj", "run-1")

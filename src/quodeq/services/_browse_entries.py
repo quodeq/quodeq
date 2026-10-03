@@ -27,7 +27,11 @@ def readable_entries(
     for entry in (safe_read_dir(target) if entries is None else entries):
         if entry.name.startswith("."):
             continue
-        if not (entry.is_dir() if want_dirs else entry.is_file()):
+        try:
+            keep = entry.is_dir() if want_dirs else entry.is_file()
+        except OSError:
+            continue
+        if not keep:
             continue
         entry_path = target / entry.name
         if not os.access(entry_path, os.R_OK):

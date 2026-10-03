@@ -4,11 +4,9 @@
  * Polls every 5s and reports { status: 'online' | 'offline', address }.
  * A fetch rejection is treated as offline.
  */
-import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { systemKeys } from '../../../api/queryKeys.js';
-
-const POLL_MS = 5000;
+import { useServerStatusPoll } from './useServerStatusPoll.js';
 
 /**
  * The Ollama daemon status, or null before the first poll resolves.
@@ -17,24 +15,5 @@ const POLL_MS = 5000;
  */
 export function useOllamaServerStatus() {
   const { getOllamaStatus } = useApi();
-
-  const { data } = useQuery({
-    queryKey: systemKeys.ollama(),
-    queryFn: async () => {
-      try {
-        const result = await getOllamaStatus();
-        if (result?.running) {
-          return { status: 'online', address: result.address ?? null };
-        }
-        return { status: 'offline', address: null };
-      } catch (err) {
-        console.warn('[useOllamaServerStatus] status poll failed:', err);
-        return { status: 'offline', address: null };
-      }
-    },
-    refetchInterval: POLL_MS,
-    refetchOnWindowFocus: false,
-  });
-
-  return data ?? null;
+  return useServerStatusPoll(systemKeys.ollama(), getOllamaStatus, 'useOllamaServerStatus');
 }

@@ -5,6 +5,7 @@
  */
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 import { consequenceOf, consequenceLevel } from './compareFleet.js';
+import { roundOneDecimal } from '../../utils/rounding.js';
 
 // Score drop over the delta window (0-10 scale) that earns a row the
 // "declining" reason. Deliberately not trendUtils.DECLINING_THRESHOLD:
@@ -14,6 +15,12 @@ const DECLINING_DELTA = -0.3;
 // Analyzed-files share (percent) below which a row gets the coverage-gap
 // reason.
 const COVERAGE_GAP_PCT = 80;
+
+// buildAttention's machine-readable reason kinds; CompareFleetView turns
+// each into its own copy line.
+export const REASON_TYPE = Object.freeze({
+  WORST_DIM: 'worstDim', DECLINING: 'declining', STALE: 'stale', COVERAGE: 'coverage',
+});
 
 /** Union of dimensions across scope, each with fleet stats + per-project scores. */
 export function buildDimensionsBoard(rows, now, summariesById) {
@@ -43,7 +50,7 @@ export function buildDimensionsBoard(rows, now, summariesById) {
       label: entry.label,
       avg: mean(entry.perProject.map((p) => p.score)),
       delta: entry.deltas.length
-        ? Math.round(mean(entry.deltas) * 10) / 10
+        ? roundOneDecimal(mean(entry.deltas))
         : null,
       violations: entry.violations,
       perProject: entry.perProject
@@ -68,11 +75,11 @@ export function buildAttention(rows) {
         .filter((d) => d.score != null)
         .reduce((acc, d) => (acc == null || d.score < acc.score ? d : acc), null);
       const reasons = [];
-      if (worst) reasons.push({ type: 'worstDim', dim: worst.label, score: worst.score });
-      if (row.delta != null && row.delta <= DECLINING_DELTA) reasons.push({ type: 'declining', delta: row.delta });
-      if (row.stale) reasons.push({ type: 'stale', commits: row.commitsSince });
+      if (worst) reasons.push({ type: REASON_TYPE.WORST_DIM, dim: worst.label, score: worst.score });
+      if (row.delta != null && row.delta <= DECLINING_DELTA) reasons.push({ type: REASON_TYPE.DECLINING, delta: row.delta });
+      if (row.stale) reasons.push({ type: REASON_TYPE.STALE, commits: row.commitsSince });
       if (row.coveragePct != null && row.coveragePct < COVERAGE_GAP_PCT) {
-        reasons.push({ type: 'coverage', pct: row.coveragePct });
+        reasons.push({ type: REASON_TYPE.COVERAGE, pct: row.coveragePct });
       }
       return { row, value, level: consequenceLevel(value), worstDim: worst?.key ?? null, reasons };
     })

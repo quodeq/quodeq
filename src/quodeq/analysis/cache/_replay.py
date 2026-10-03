@@ -1,6 +1,6 @@
 """Cache-replay path: writing cached findings back into a run's evidence.
 
-Split out of ``dimension_runner.py`` (B4/B5e/B6): everything here is about
+Split out of ``dimension_runner.py``: everything here is about
 turning cache entries (hits, consolidated or not) back into JSONL rows and
 ``events.jsonl`` entries, plus the small path helpers that path needs. The
 dispatch/orchestration side (classify, watchers, breaker) stays in
@@ -17,20 +17,40 @@ from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult, group_findings_by_file
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel
+from quodeq.data.fs.stream_files import append_jsonl_strict
+from quodeq.analysis.cache._replay_principle import ReplayPolicy, readmit
+from quodeq.analysis.mcp.finding_admission import ADMISSION_KEY, ADMISSION_UNMAPPED
+from quodeq.data.projection.standards_defaults import warn_unmapped
 from quodeq.data.ports.events import EventEmitter
 
 _logger = logging.getLogger(__name__)
 
 
-def _evidence_dir(config: RunConfig) -> Path:
+def evidence_dir(config: RunConfig) -> Path:
     return config.work_dir or config.src
 
 
-def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
-    return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
+def dim_jsonl_path(config: RunConfig, dim_id: str) -> Path:
+    return evidence_dir(config) / f"{dim_id}_evidence.jsonl"
 
 
-def _write_replayed_keys_sidecar(
+def write_dispatch_keys_sidecar(
+    config: RunConfig, dim_id: str, keys: dict[str, str],
+) -> None:
+    """Record the cache keys this dim is about to dispatch (miss path).
+
+    ``consolidation.mark_run_consolidated`` reads this sidecar alongside
+    ``<dim>_replayed_unconsolidated_keys.json`` to know which entries a
+    completed run consolidates. Unlike that sidecar, this one is always
+    written when the miss path runs at all -- the caller only reaches this
+    point once there is at least one miss to dispatch.
+    """
+    sidecar = evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(json.dumps(keys, indent=2), encoding="utf-8")
+
+
+def write_replayed_keys_sidecar(
     config: RunConfig, dim_id: str, keys: dict[str, str],
 ) -> None:
     """Record which unconsolidated cache entries this dim replayed.
@@ -45,12 +65,12 @@ def _write_replayed_keys_sidecar(
     """
     if not keys:
         return
-    sidecar = _evidence_dir(config) / f"{dim_id}_replayed_unconsolidated_keys.json"
+    sidecar = evidence_dir(config) / f"{dim_id}_replayed_unconsolidated_keys.json"
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(keys, indent=2), encoding="utf-8")
 
 
-def _compute_files_read(
+def compute_files_read(
     classify: ClassifyResult, jsonl_path: Path, all_files: list[str],
 ) -> int:
     """Return the count of source files reproducible from the cache after
@@ -93,7 +113,7 @@ def _events_log_path(jsonl: Path) -> Path:
     return jsonl.parent.parent / "events.jsonl"
 
 
-def _emit_cached_findings(
+def emit_cached_findings(
     events_log: Path, findings: list[dict], *,
     writer_factory: Callable[[Path], EventEmitter] | None = None,
 ) -> None:
@@ -109,7 +129,8 @@ def _emit_cached_findings(
 
     Exceptions are caught per finding and logged — the JSONL write
     already succeeded above, so an event-emit failure should not propagate
-    and roll back the cache restore.
+    and roll back the cache restore. An unmapped finding (see ``readmit``)
+    never becomes an event: it has no principle to be graded under.
     """
     if not findings:
         return
@@ -122,16 +143,22 @@ def _emit_cached_findings(
         from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
         writer_factory = EventLogWriter
     writer = writer_factory(events_log)
+    unplaced: dict[str, int] = {}
     for finding in findings:
+        if finding.get(ADMISSION_KEY) == ADMISSION_UNMAPPED:
+            dimension = finding.get("d") or ""
+            unplaced[dimension] = unplaced.get(dimension, 0) + 1
+            continue
         try:
             payload = wire_dict_to_judgment(finding)
             writer.emit(JudgmentCreatedEvent(payload=payload))
-        except Exception:  # noqa: BLE001 — event-log emit must never break a cache replay
+        except (OSError, TypeError, ValueError):
             _logger.warning(
                 "cache replay: event emit failed for finding p=%r file=%r line=%r",
                 finding.get("p"), finding.get("file"), finding.get("line"),
                 exc_info=True,
             )
+    warn_unmapped(unplaced)
 
 
 def _regate_replayed_findings(
@@ -194,22 +221,21 @@ def _stamp_and_write_findings(
     cache, making a later fresh scan of the same file look carried.
 
     Consolidated first, then unconsolidated, so the JSONL keeps reading
-    foundation-then-new. Returns the stamped list for event mirroring.
+    foundation-then-new. Returns the stamped list for event mirroring. The
+    actual file write is the data layer's ``append_jsonl_strict``; this
+    function owns only the stamping rule.
     """
     stamped = [{**finding, "carried_forward": True} for finding in findings]
-    stamped += [dict(finding) for finding in pending]
-    jsonl.parent.mkdir(parents=True, exist_ok=True)
-    mode = "a" if append else "w"
-    with jsonl.open(mode, encoding="utf-8") as out:
-        for finding in stamped:
-            out.write(json.dumps(finding) + "\n")
+    stamped += list(pending)
+    append_jsonl_strict(jsonl, stamped, append=append)
     return stamped
 
 
-def _write_findings(
+def write_findings(
     jsonl: Path, classify: ClassifyResult, *, append: bool,
     emit_events: bool = True,
-    trust_model: TrustModel | None = None,
+    policy: ReplayPolicy = ReplayPolicy(),
+    writer_factory: Callable[[Path], EventEmitter] | None = None,
 ) -> None:
     """Replay cached findings into this run's evidence JSONL.
 
@@ -226,11 +252,17 @@ def _write_findings(
 
     Both groups are re-gated and both are mirrored to events.jsonl. Skipping
     the unconsolidated group in the event log would resurrect the UI-vs-CLI
-    score disagreement that _emit_cached_findings exists to prevent.
+    score disagreement that emit_cached_findings exists to prevent.
+    Both groups are re-admitted first (``readmit``) with the policy's
+    standards, so the JSONL row and the event carry the same derived fields.
     """
-    findings = classify.cached_findings
-    pending = list(classify.unconsolidated_findings)
-    _regate_replayed_findings(findings, pending, trust_model)
+    groups = (classify.cached_findings, classify.unconsolidated_findings)
+    catalog = None
+    if policy.catalog_loader is not None:
+        catalog = policy.catalog_loader(f.get("d") for group in groups for f in group)
+    findings = readmit(classify.cached_findings, catalog)
+    pending = readmit(classify.unconsolidated_findings, catalog)
+    _regate_replayed_findings(findings, pending, policy.trust_model)
     stamped = _stamp_and_write_findings(jsonl, findings, pending, append=append)
     if emit_events:
-        _emit_cached_findings(_events_log_path(jsonl), stamped)
+        emit_cached_findings(_events_log_path(jsonl), stamped, writer_factory=writer_factory)

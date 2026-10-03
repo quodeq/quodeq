@@ -1,4 +1,4 @@
-"""Cluster 38: RunLogHandler contains writer failures via handleError."""
+"""RunLogHandler contains writer failures via handleError."""
 from __future__ import annotations
 
 import logging

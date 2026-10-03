@@ -27,6 +27,8 @@ class _MockOptions:
     time_limit: int | None = None
     max_subagents: int = 3
     deadline_at: float | None = None
+    ai_cmd_path: str | None = None
+    cache_root: Path | None = None
 
 
 @dataclass
@@ -44,7 +46,12 @@ class _MockRunConfig:
     manifest: object = None
     target: _MockTarget | None = None
     source_file_count: int = 100
+    ai_cmd: str = "claude"
     options: _MockOptions = field(default_factory=_MockOptions)
+    # Plain sentinels (not the real owner types) -- this test only checks
+    # that the builder forwards whatever the RunConfig carries, by identity.
+    drop_counter: object = field(default_factory=object)
+    mcp_registry: object = field(default_factory=object)
 
 
 @dataclass
@@ -60,7 +67,7 @@ class _MockCtx:
 class TestBuildConsolidatedConfig:
     def test_basic_config(self):
         config = _MockRunConfig()
-        with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security", "reliability"], 10)
         assert ac.dimension == "security,reliability"
         assert ac.max_files_per_agent == 10
@@ -68,42 +75,55 @@ class TestBuildConsolidatedConfig:
 
     def test_uses_subagent_model_when_set(self):
         config = _MockRunConfig(options=_MockOptions(subagent_model="haiku-3"))
-        with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security"], 5)
         assert ac.ai_model == "haiku-3"
 
     def test_uses_default_subagent_model(self):
         config = _MockRunConfig(options=_MockOptions(subagent_model=None))
-        with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value="opus-3"):
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value="opus-3"):
             ac = _build_consolidated_config(config, ["security"], 5)
         assert ac.ai_model == "opus-3"
 
     def test_time_limit_default(self):
         config = _MockRunConfig(options=_MockOptions(time_limit=None))
-        with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security"], 5)
         # Should use DEFAULT_TIME_LIMIT
         assert ac.time_limit > 0
 
     def test_time_limit_custom(self):
         config = _MockRunConfig(options=_MockOptions(time_limit=1200))
-        with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security"], 5)
         assert ac.time_limit == 1200
 
     def test_includes_compiled_dir(self, tmp_path):
         config = _MockRunConfig()
-        with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security"], 5, compiled_dir=tmp_path)
         assert ac.compiled_dir == tmp_path
 
     def test_forwards_budget_and_turns(self):
         config = _MockRunConfig(options=_MockOptions(analysis_budget="5.00", max_turns=50, max_duration=900))
-        with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security"], 5)
         assert ac.analysis_budget == "5.00"
         assert ac.max_turns == 50
         assert ac.max_duration == 900
+
+    def test_carries_the_runs_drop_counter_and_mcp_registry_without_run_config(self):
+        """I1: the consolidated builder deliberately never sets run_config
+        (that would turn on the per-file API cache writer for this mode),
+        so drop_counter/mcp_registry must be forwarded directly from the
+        RunConfig instead, for the consumers that check the AnalysisConfig
+        field first."""
+        config = _MockRunConfig()
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value=None):
+            ac = _build_consolidated_config(config, ["security"], 5)
+        assert ac.drop_counter is config.drop_counter
+        assert ac.mcp_registry is config.mcp_registry
+        assert ac.run_config is None
 
 
 # ---------------------------------------------------------------------------

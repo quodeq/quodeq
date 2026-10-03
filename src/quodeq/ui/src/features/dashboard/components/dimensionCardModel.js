@@ -1,7 +1,5 @@
 /** Pure filter/selection logic for DimensionCard's severity/principle/file filters. */
 
-export const SEVERITY_OPTIONS = ['critical', 'major', 'minor', 'unknown'];
-
 export function toggleInList(list, value) {
   return list.includes(value)
     ? list.filter((item) => item !== value)

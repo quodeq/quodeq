@@ -16,7 +16,7 @@ import json
 
 import pytest
 
-from quodeq.analysis._api_schema import _Finding, _parse_findings
+from quodeq.analysis._api_schema import _Finding, parse_findings
 
 # The exact shape gemma4:26b-mlx emitted, captured from a live run.
 _COMPLIANCE_FINDING = {
@@ -76,7 +76,26 @@ class TestSeverityCoercion:
         violation = {**_COMPLIANCE_FINDING, "t": "violation", "severity": "major"}
         raw = json.dumps({"findings": [violation, _COMPLIANCE_FINDING]})
 
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
 
         assert dropped == 0
         assert [f["severity"] for f in findings] == ["major", "minor"]
+
+
+class TestFindingTypeNormalisation:
+    """Model output: case and space noise on "t" lands on the canonical type;
+    any other spelling is a dropped finding, never a guess."""
+
+    @pytest.mark.parametrize("raw", ["Violation", " VIOLATION ", "violation"])
+    def test_case_and_space_land_on_the_canonical_type(self, raw):
+        node = {**_COMPLIANCE_FINDING, "t": raw, "severity": "major"}
+        findings, dropped = parse_findings(json.dumps(node))
+        assert dropped == 0
+        assert findings[0]["t"] == "violation"
+        assert json.dumps(findings[0]["t"]) == '"violation"'
+
+    @pytest.mark.parametrize("raw", ["violations", "dismissed"])
+    def test_other_spellings_are_dropped_not_guessed(self, raw):
+        findings, dropped = parse_findings(json.dumps({**_COMPLIANCE_FINDING, "t": raw}))
+        assert findings == []
+        assert dropped == 1

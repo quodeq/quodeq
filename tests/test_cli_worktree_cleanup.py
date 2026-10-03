@@ -1,24 +1,24 @@
 """Tests for worktree cleanup on failure path (finding #376).
 
-The except block in _create_worktree previously called worktree_dir.rmdir()
+The except block in create_worktree previously called worktree_dir.rmdir()
 which only removes an empty dir and leaves a registered/populated worktree
-behind. Fix: call _cleanup_worktree + shutil.rmtree on the failure path.
+behind. Fix: call cleanup_worktree + shutil.rmtree on the failure path.
 """
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 class TestCreateWorktreeCleanupOnFailure:
-    """Ensure _create_worktree fully cleans up on the failure path."""
+    """Ensure create_worktree fully cleans up on the failure path."""
 
     def test_cleanup_worktree_called_on_subprocess_failure(self, tmp_path: Path) -> None:
         """When subprocess.run raises CalledProcessError after the dir is created,
-        _cleanup_worktree must be called (not just rmdir) so the git worktree
+        cleanup_worktree must be called (not just rmdir) so the git worktree
         registration is also removed."""
-        from quodeq._cli_resolution import _create_worktree
+        from quodeq._cli_resolution import create_worktree
 
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
@@ -35,20 +35,20 @@ class TestCreateWorktreeCleanupOnFailure:
             "quodeq._cli_resolution.subprocess.run",
             side_effect=subprocess.CalledProcessError(1, "git"),
         ), patch(
-            "quodeq._cli_resolution._cleanup_worktree",
+            "quodeq._cli_resolution.cleanup_worktree",
             side_effect=_fake_cleanup,
         ) as mock_cleanup:
-            result = _create_worktree(repo_dir, "some-branch")
+            result = create_worktree(repo_dir, "some-branch")
 
         assert result is None, "Expected None when subprocess raises"
-        # _cleanup_worktree must have been called once with the correct repo_dir
+        # cleanup_worktree must have been called once with the correct repo_dir
         mock_cleanup.assert_called_once()
         called_repo, called_wt = mock_cleanup.call_args.args
         assert called_repo == repo_dir
 
     def test_no_leftover_dir_on_failure(self, tmp_path: Path) -> None:
         """The worktree dir itself must not survive the failure path."""
-        from quodeq._cli_resolution import _create_worktree
+        from quodeq._cli_resolution import create_worktree
 
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
@@ -64,10 +64,10 @@ class TestCreateWorktreeCleanupOnFailure:
             "quodeq._cli_resolution.subprocess.run",
             side_effect=subprocess.CalledProcessError(1, "git"),
         ), patch(
-            "quodeq._cli_resolution._cleanup_worktree",
+            "quodeq._cli_resolution.cleanup_worktree",
             side_effect=_spy_cleanup,
         ):
-            result = _create_worktree(repo_dir, "some-branch")
+            result = create_worktree(repo_dir, "some-branch")
 
         assert result is None
         if created_dir:
@@ -77,7 +77,7 @@ class TestCreateWorktreeCleanupOnFailure:
 
     def test_cleanup_called_on_timeout(self, tmp_path: Path) -> None:
         """TimeoutExpired on the failure path also triggers proper cleanup."""
-        from quodeq._cli_resolution import _create_worktree
+        from quodeq._cli_resolution import create_worktree
 
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
@@ -86,23 +86,23 @@ class TestCreateWorktreeCleanupOnFailure:
             "quodeq._cli_resolution.subprocess.run",
             side_effect=subprocess.TimeoutExpired("git", 30),
         ), patch(
-            "quodeq._cli_resolution._cleanup_worktree",
+            "quodeq._cli_resolution.cleanup_worktree",
         ) as mock_cleanup:
-            result = _create_worktree(repo_dir, "some-branch")
+            result = create_worktree(repo_dir, "some-branch")
 
         assert result is None
         mock_cleanup.assert_called_once()
 
     def test_branch_argument_injection_guard(self, tmp_path: Path) -> None:
         """The -- separator before branch prevents argument injection."""
-        from quodeq._cli_resolution import _create_worktree
+        from quodeq._cli_resolution import create_worktree
 
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
 
         with patch("quodeq._cli_resolution.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
-            result = _create_worktree(repo_dir, "--upload-pack=evil")
+            result = create_worktree(repo_dir, "--upload-pack=evil")
 
         assert result is not None
         mock_run.assert_called_once()
@@ -115,3 +115,47 @@ class TestCreateWorktreeCleanupOnFailure:
         assert argv[dash_dash_index + 1] == "--upload-pack=evil", (
             f"Branch argument should immediately follow --: {argv}"
         )
+
+
+class TestFetchBranchArgv:
+    def test_fetch_refspec_follows_an_option_terminator(self, tmp_path: Path) -> None:
+        """A dash-prefixed branch reaches ``git fetch`` as a refspec, never
+        as an option: the first ``worktree add`` fails, the fetch runs with
+        ``--`` before ``<branch>:<branch>``, and the retry succeeds."""
+        from quodeq.cli_evaluation import create_worktree
+
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        ok = MagicMock(returncode=0)
+
+        with patch(
+            "quodeq._cli_resolution.subprocess.run",
+            side_effect=[subprocess.CalledProcessError(1, "git"), ok, ok],
+        ) as mock_run:
+            result = create_worktree(repo_dir, "--upload-pack=evil")
+
+        assert result is not None
+        fetch_argv = mock_run.call_args_list[1][0][0]
+        assert fetch_argv[fetch_argv.index("fetch"):] == [
+            "fetch", "origin", "--", "--upload-pack=evil:--upload-pack=evil",
+        ]
+
+    def test_retry_after_the_fetch_waits_a_short_jittered_pause(self, tmp_path: Path) -> None:
+        """The single retry after fetching the branch pauses once for a
+        jittered sub-second delay before the second ``worktree add``."""
+        from quodeq.cli_evaluation import create_worktree
+        from quodeq.shared.constants import RETRY_JITTER_S
+
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        ok = MagicMock(returncode=0)
+
+        with patch(
+            "quodeq._cli_resolution.subprocess.run",
+            side_effect=[subprocess.CalledProcessError(1, "git"), ok, ok],
+        ), patch("time.sleep") as mock_sleep:
+            result = create_worktree(repo_dir, "feature")
+
+        assert result is not None
+        mock_sleep.assert_called_once()
+        assert 0 <= mock_sleep.call_args.args[0] <= RETRY_JITTER_S

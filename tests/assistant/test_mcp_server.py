@@ -8,6 +8,16 @@ from quodeq.assistant.mcp import server
 from quodeq.assistant.tools.registry import ToolRegistry, ToolSpec
 
 
+def _registry_arg_parser() -> argparse.ArgumentParser:
+    """An ArgumentParser with the flags _build_registry_from_args reads, all optional."""
+    parser = server.argparse.ArgumentParser()
+    for a in ("--db-path", "--session-id", "--run-dir", "--repo-root",
+              "--evaluators-dir", "--compiled-dir", "--dimensions-file",
+              "--project-id", "--reports-dir"):
+        parser.add_argument(a, default="")
+    return parser
+
+
 def test_build_registry_from_args_parses_project_scope(tmp_path):
     args = [
         "--db-path", str(tmp_path / "a.db"), "--session-id", "s1",
@@ -16,12 +26,7 @@ def test_build_registry_from_args_parses_project_scope(tmp_path):
         "--dimensions-file", str(tmp_path / "d.json"),
         "--project-id", "selectives", "--reports-dir", str(tmp_path / "reports"),
     ]
-    parser = server.argparse.ArgumentParser()
-    for a in ("--db-path", "--session-id", "--run-dir", "--repo-root",
-              "--evaluators-dir", "--compiled-dir", "--dimensions-file",
-              "--project-id", "--reports-dir"):
-        parser.add_argument(a, default="")
-    ns = parser.parse_args(args)
+    ns = _registry_arg_parser().parse_args(args)
     registry = server._build_registry_from_args(ns)
     assert "get_overview" in registry.names()
 
@@ -29,12 +34,7 @@ def test_build_registry_from_args_parses_project_scope(tmp_path):
 def test_build_registry_defaults_reports_dir(monkeypatch, tmp_path):
     monkeypatch.setattr("quodeq.shared.env.get_evaluations_dir",
                         lambda: str(tmp_path / "evals"))
-    parser = server.argparse.ArgumentParser()
-    for a in ("--db-path", "--session-id", "--run-dir", "--repo-root",
-              "--evaluators-dir", "--compiled-dir", "--dimensions-file",
-              "--project-id", "--reports-dir"):
-        parser.add_argument(a, default="")
-    ns = parser.parse_args([
+    ns = _registry_arg_parser().parse_args([
         "--db-path", str(tmp_path / "a.db"), "--session-id", "s1",
         "--evaluators-dir", str(tmp_path / "e"),
         "--compiled-dir", str(tmp_path / "c"),
@@ -121,6 +121,28 @@ def test_dispatch_exception_answers_with_error_frame():
     # must not leak to MCP callers, but is still written to stderr for ops.
     assert "kaboom" not in frames[0]["error"]["message"]
     assert "kaboom" in stderr.getvalue()
+
+
+def test_dispatch_failure_is_isolated_and_logs_traceback_to_stderr():
+    reg = _registry()
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    reg.dispatch = _boom
+    stdin = io.StringIO(
+        json.dumps({"jsonrpc": "2.0", "id": 9, "method": "tools/call",
+                     "params": {"name": "get_scores", "arguments": {}}}) + "\n"
+        + json.dumps({"jsonrpc": "2.0", "id": 10, "method": "ping", "params": {}}) + "\n",
+    )
+    stdout, stderr = io.StringIO(), io.StringIO()
+    server.serve(reg, stdin=stdin, stdout=stdout, stderr=stderr)
+    frames = [json.loads(l) for l in stdout.getvalue().splitlines() if l.strip()]
+    assert len(frames) == 2
+    assert frames[0]["error"]["code"] == -32603
+    assert frames[1]["result"] == {}  # ping still answered: the failure didn't kill the loop
+    assert "Traceback (most recent call last)" in stderr.getvalue()
+    assert "RuntimeError: boom" in stderr.getvalue()
 
 
 def test_all_cli_arguments_have_help_text():

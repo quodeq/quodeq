@@ -24,6 +24,7 @@ from quodeq.services.dismissed import dismiss_finding
 from quodeq.services.shared_publish import publish_project
 from quodeq.data.fs.shared_repo import sync_shared_index
 from quodeq.services.shared_settings import SharedSettings, write_settings
+from quodeq.services.scoring.compliance_detail import DETAIL_FIELDS
 
 _PROJECT = "proj-a"
 _RUN = "run-1"
@@ -185,10 +186,32 @@ def test_dashboard_parity_local_vs_shared(client, real_project_fixture, shared_c
     assert "R2" in security_reqs
 
 
+def _without_deferred_detail(payload: dict) -> dict:
+    """*payload* with the fields /scores defers (and its marker) removed from
+    both accumulated lists, so a local body can be compared with the shared
+    mirror's, which ships them whole."""
+    dims = []
+    for dim in payload["accumulated"]["dimensions"]:
+        slim = dict(dim)
+        for key in ("violations", "compliance"):
+            slim[key] = [
+                {k: v for k, v in item.items() if k not in DETAIL_FIELDS and k != "detailDeferred"}
+                for item in dim.get(key) or []
+            ]
+        dims.append(slim)
+    return {**payload, "accumulated": {**payload["accumulated"], "dimensions": dims}}
+
+
 def test_scores_parity_local_vs_shared(client, real_project_fixture, shared_clone_fixture):
+    """Same numbers and findings on both sides. The local route defers each
+    finding's detail (refilled by /compliance-detail); the shared mirror has
+    no detail route and ships the bodies whole, so the comparison strips
+    what the deferral touches."""
     local_scores = client.get(f"/api/projects/{_PROJECT}/scores").get_json()
     shared_scores = client.get(f"/api/shared/projects/{_PROJECT}/scores").get_json()
-    assert shared_scores == local_scores
+    assert _without_deferred_detail(shared_scores) == _without_deferred_detail(local_scores)
+    local_items = [v for d in local_scores["accumulated"]["dimensions"] for v in d["violations"]]
+    assert local_items and all(v["detailDeferred"] for v in local_items)
 
 
 def test_violations_parity_local_vs_shared(client, real_project_fixture, shared_clone_fixture):

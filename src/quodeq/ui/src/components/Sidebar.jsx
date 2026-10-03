@@ -4,6 +4,7 @@ import { BRAND_NAME } from '../strings/brand.js';
 import { t, LOCALE } from '../strings/index.js';
 import { isEvaluatableSource } from '../appGating.js';
 import { useSidebarPin } from '../hooks/useSidebarPin.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 import {
   LOGO_VIEWBOX,
   LOGO_PATH_TRANSFORM,
@@ -14,6 +15,8 @@ import {
   LOGO_NEEDLE_DARK_D,
   LogoNeedleMask,
 } from './brandLogoArt.jsx';
+import { NAV_TAB } from '../vocab/navTab.js';
+import { pluralKey } from '../utils/plural.js';
 
 // Unique per component: the onboarding carousel draws the same mark with its
 // own mask, and two elements sharing a DOM id would collide when both are
@@ -24,6 +27,9 @@ const NEEDLE_MASK_ID = 'needle-hole-mask';
 // table on FileDetailPage, just sized up for the sidebar rail.
 const ICON_FOLDER = cloneElement(BASE_ICON_FOLDER, { width: 18, height: 18 });
 
+// Both logo chevrons: clickable, and they ease into their hover colour and glow.
+const LOGO_CHEVRON_STYLE = { fill: 'var(--logo-chevron)', cursor: 'pointer', transition: 'fill 180ms ease, filter 180ms ease' };
+
 function Logo() {
   return (
     <svg viewBox={LOGO_VIEWBOX} role="img" aria-label={BRAND_NAME} width="32" height="32" style={{overflow:'visible'}}>
@@ -33,8 +39,8 @@ function Logo() {
         </filter>
         <LogoNeedleMask id={NEEDLE_MASK_ID} />
       </defs>
-      <path id="left-chevron" d={LOGO_LEFT_CHEVRON_D} transform={LOGO_PATH_TRANSFORM} style={{fill:'var(--logo-chevron)',cursor:'pointer',transition:'fill 180ms ease, filter 180ms ease'}} />
-      <path id="right-chevron" d={LOGO_RIGHT_CHEVRON_D} transform={LOGO_PATH_TRANSFORM} style={{fill:'var(--logo-chevron)',cursor:'pointer',transition:'fill 180ms ease, filter 180ms ease'}} />
+      <path id="left-chevron" d={LOGO_LEFT_CHEVRON_D} transform={LOGO_PATH_TRANSFORM} style={LOGO_CHEVRON_STYLE} />
+      <path id="right-chevron" d={LOGO_RIGHT_CHEVRON_D} transform={LOGO_PATH_TRANSFORM} style={LOGO_CHEVRON_STYLE} />
       <path d={LOGO_Q_D} transform={LOGO_PATH_TRANSFORM} fillRule="evenodd" style={{fill:'var(--logo-q)'}} />
       <g mask={`url(#${NEEDLE_MASK_ID})`}>
         <path d={LOGO_NEEDLE_LIGHT_D} style={{fill:'var(--logo-needle)'}} />
@@ -54,19 +60,23 @@ function formatNavCount(count) {
   return String(count);
 }
 
-function NavButton({ id, label, icon, activeTab, onNavTab, count }) {
+// `countTitle` names what the badge counts; without it the badge's title is
+// the full number once the chip abbreviates it.
+function NavButton({ id, label, icon, activeTab, onNavTab, count, countTitle }) {
   const countLabel = formatNavCount(count);
+  const badgeTitle = countTitle ?? (count >= COUNT_K_THRESHOLD ? String(count) : undefined);
   return (
     <button
       type="button"
       className={`sidebar-nav-item${activeTab === id ? ' active' : ''}`}
+      aria-current={activeTab === id ? 'page' : undefined}
       onClick={() => onNavTab(id)}
       title={label}
     >
       {icon}
       <span className="sidebar-nav-label">{label}</span>
       {countLabel != null && (
-        <span className="sidebar-nav-count" title={count >= COUNT_K_THRESHOLD ? String(count) : undefined}>
+        <span className="sidebar-nav-count" title={badgeTitle}>
           {countLabel}
         </span>
       )}
@@ -110,21 +120,29 @@ function SidebarHeader({ isPinned, handleTogglePin, version }) {
   );
 }
 
+function majorsTitle(count) {
+  if (count == null) return undefined;
+  return t(pluralKey(count, 'sidebar.majorsTitleOne', 'sidebar.majorsTitleMany'), { count });
+}
+
 function ProjectTabsNav({ showProjectTabs, showCompareTab, activeTab, handleNav, violationsCount, historyCount }) {
   if (!showProjectTabs && !showCompareTab) return null;
   return (
     <nav className="sidebar-nav sidebar-block">
       {showProjectTabs && (
-        <NavButton id="overview" label="overview" icon={ICON_OVERVIEW} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id={NAV_TAB.OVERVIEW} label="overview" icon={ICON_OVERVIEW} activeTab={activeTab} onNavTab={handleNav} />
       )}
       {showCompareTab && (
-        <NavButton id="compare" label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id={NAV_TAB.COMPARE} label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
       )}
       {showProjectTabs && (
         <>
-          <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
-          <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
-          <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
+          <NavButton
+            id={NAV_TAB.VIOLATIONS} label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav}
+            count={violationsCount} countTitle={majorsTitle(violationsCount)}
+          />
+          <NavButton id={NAV_TAB.MAP}        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
+          <NavButton id={NAV_TAB.HISTORY}    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
         </>
       )}
     </nav>
@@ -143,9 +161,9 @@ function SidebarFooter({ lastEvalStr, activeTab, handleNav, standardsCount }) {
         )}
       </div>
       <div className="sidebar-nav sidebar-block sidebar-block--flush">
-        <NavButton id="settings" label="settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={handleNav} />
-        <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
-        <NavButton id="help" label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id={NAV_TAB.SETTINGS} label="settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id={NAV_TAB.STANDARDS} label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
+        <NavButton id={NAV_TAB.HELP} label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
       </div>
     </div>
   );
@@ -168,7 +186,7 @@ function EvaluateNav({ selectedSource, activeTab, handleNav }) {
   if (!isEvaluatableSource(selectedSource)) return null;
   return (
     <nav className="sidebar-nav sidebar-block">
-      <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
+      <NavButton id={NAV_TAB.EVALUATE} label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
     </nav>
   );
 }
@@ -181,7 +199,7 @@ function repoNameOf(projectInfo) {
 function ProjectsNav({ repoName, activeTab, handleNav }) {
   return (
     <nav className="sidebar-nav sidebar-block">
-      <NavButton id="projects" label={repoName || 'project'} icon={ICON_FOLDER} activeTab={activeTab} onNavTab={handleNav} />
+      <NavButton id={NAV_TAB.PROJECTS} label={repoName || 'project'} icon={ICON_FOLDER} activeTab={activeTab} onNavTab={handleNav} />
     </nav>
   );
 }
@@ -217,7 +235,7 @@ export default function Sidebar({
   lastEvalAt = null,
   isPinned: controlledPinned,
   onPinChange,
-  selectedSource = 'local',
+  selectedSource = PROJECT_SOURCE.LOCAL,
   showCompareTab = false,
   inert = undefined,
 }) {

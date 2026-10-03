@@ -51,10 +51,9 @@ def run_started_at(run_dir: Path, cache: _RecencyCache | None = None) -> str | N
     started = memo.get(run_dir)
     if started is not None:
         return started
-    status = read_run_status_json(run_dir)
-    # status.json is parsed unchecked; a valid-JSON non-dict must not turn
-    # the listing into a 500, the run just loses its started_at ordering.
-    started = status.get("started_at") if isinstance(status, dict) else None
+    # read_run_status_json returns {} for a missing or non-object file, so
+    # such a run just loses its started_at ordering.
+    started = read_run_status_json(run_dir).get("started_at")
     if not started:
         return None
     started = str(started)

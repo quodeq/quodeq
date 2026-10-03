@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 
-def _normalize_snippet(snippet: str) -> str:
+def normalize_snippet(snippet: str) -> str:
     """Normalize whitespace for robust snippet comparison."""
     return " ".join((snippet or "").split())
 
@@ -22,7 +22,7 @@ def classify_violations(
     baseline_index: dict[str, set[str]] = {}
     for v in baseline:
         file = v.get("file", "")
-        snippet = _normalize_snippet(v.get("snippet", ""))
+        snippet = normalize_snippet(v.get("snippet", ""))
         if file:
             baseline_index.setdefault(file, set()).add(snippet)
 
@@ -30,7 +30,7 @@ def classify_violations(
     existing_list: list[dict] = []
     for v in current:
         file = v.get("file", "")
-        snippet = _normalize_snippet(v.get("snippet", ""))
+        snippet = normalize_snippet(v.get("snippet", ""))
         if snippet and snippet in baseline_index.get(file, set()):
             existing_list.append(v)
         else:

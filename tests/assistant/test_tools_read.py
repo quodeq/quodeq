@@ -104,6 +104,18 @@ def test_get_scores_and_report(ctx):
     assert missing["ok"] is False
 
 
+def test_get_scores_with_run_but_no_eval_dir_raises(ctx):
+    # A selected run whose evaluation/ dir doesn't exist yet (or was never
+    # created) must raise, not silently report empty scores.
+    import shutil
+
+    shutil.rmtree(ctx.run_dir / "evaluation")
+    reg = build_registry(ctx)
+    out = reg.dispatch("get_scores", {})
+    assert out["ok"] is False
+    assert out["error"] == "no evaluation reports in this run"
+
+
 def test_get_report_includes_trimmed_violations(ctx):
     reg = build_registry(ctx)
     report = reg.dispatch("get_report", {"dimension": "security"})["result"]
@@ -159,7 +171,7 @@ def test_get_violations_page_keeps_severity_order_and_stable_ties(ctx, monkeypat
     raw.append({"principle": "P", "file": "src/crit.py", "line": 99, "severity": "critical",
                 "title": "t", "reason": "r"})
     monkeypatch.setattr(rv, "_violations_from_run", lambda c, d: (raw, "security", []))
-    out = rv._get_violations(ctx, "security", limit=5)
+    out = rv.get_violations(ctx, "security", limit=5)
     assert [v["file"] for v in out["violations"]] == [
         "src/crit.py", "src/f0.py", "src/f1.py", "src/f2.py", "src/f3.py"]
     assert out["count"] == 11
@@ -205,3 +217,13 @@ def test_get_violations_without_run(ctx):
     out = build_registry(no_run).dispatch("get_violations", {"dimension": "security"})
     assert out["ok"] is False
     assert "get_context" in out["error"]
+
+
+def test_get_violations_surfaces_a_tool_error_for_corrupt_report(ctx):
+    (ctx.run_dir / "evaluation" / "security.json").write_text("{not json", encoding="utf-8")
+    out = build_registry(ctx).dispatch("get_violations", {"dimension": "security"})
+    assert out["ok"] is False
+    assert "security" in out["error"]
+    # The raw parse exception text never reaches the model/user-facing error.
+    assert "not json" not in out["error"]
+    assert "Expecting" not in out["error"]

@@ -1,10 +1,14 @@
 /**
  * Prefetch a single run's dashboard + scores payloads into the query cache.
  *
- * Pairs with the run-detail views: warming the cache on hover means that by
- * the time the user clicks, the data is often already there and the loading
- * state is skipped entirely. Shared by the overview run navigator
+ * Pairs with the run views: warming the cache on hover means that by the time
+ * the user clicks, the data is often already there and the loading state is
+ * skipped entirely. Shared by the overview run navigator
  * (usePrefetchAdjacentRuns) and the History table rows.
+ *
+ * Only the overview shape is warmed. The full shape a run page needs is 10 to
+ * 34 MB, which is too much to fetch on a guess; the run page asks for it on
+ * arrival.
  *
  * The prefetch fires only after the pointer dwells PREFETCH_DWELL_MS on the
  * same run. Both payloads are expensive to build server-side (seconds of CPU
@@ -19,6 +23,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { projectKeys } from "../../../api/queryKeys.js";
 import { STALE_TIME_MS } from "../../../hooks/queryDefaults.js";
+import { PROJECT_SOURCE } from "../../../vocab/projectSource.js";
+import { LATEST_RUN_ID } from "../../../constants.js";
 
 export const PREFETCH_DWELL_MS = 150;
 
@@ -29,11 +35,11 @@ export const PREFETCH_DWELL_MS = 150;
  *   the local ones, and is folded into the cache keys so a source flip
  *   never warms/reads the other source's cache slot.
  */
-export function usePrefetchRun(selectedProject, selectedSource = "local") {
+export function usePrefetchRun(selectedProject, selectedSource = PROJECT_SOURCE.LOCAL) {
   const queryClient = useQueryClient();
   const { getDashboard, sharedGetDashboard, getProjectScores, sharedGetProjectScores } = useApi();
-  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
-  const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
+  const fetchDashboard = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetDashboard : getDashboard;
+  const fetchScores = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetProjectScores : getProjectScores;
   const timerRef = useRef(null);
 
   const cancelPrefetch = useCallback(() => {
@@ -54,15 +60,16 @@ export function usePrefetchRun(selectedProject, selectedSource = "local") {
         // Historical runs are immutable (see useDashboard), so a cached entry
         // is good until a mutation invalidates it — and prefetchQuery refetches
         // invalidated entries regardless of staleTime.
-        const staleTime = runId !== "latest" ? Infinity : STALE_TIME_MS;
-        // Dashboard payload (the main render).
+        const staleTime = runId !== LATEST_RUN_ID ? Infinity : STALE_TIME_MS;
+        // Dashboard payload (overview shape, ~0.1 MB), the entry the run
+        // page reads on arrival.
         queryClient.prefetchQuery({
           queryKey: projectKeys.dashboard(selectedProject, runId, selectedSource),
           queryFn: () => fetchDashboard(selectedProject, runId),
           staleTime,
         });
         // Scores payload (drives accumulated + trend).
-        const asOf = runId !== "latest" ? runId : null;
+        const asOf = runId !== LATEST_RUN_ID ? runId : null;
         queryClient.prefetchQuery({
           queryKey: projectKeys.scores(selectedProject, asOf, selectedSource),
           queryFn: () => fetchScores(selectedProject, asOf),

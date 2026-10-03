@@ -9,17 +9,19 @@ from __future__ import annotations
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 import httpx
 import openai
 
-from quodeq.analysis._api_schema import _parse_findings
+from quodeq.analysis._api_schema import parse_findings
+from quodeq.analysis._drop_stats import DropStatsCounter
 from quodeq.analysis._drop_stats import format_reasons as _format_drop_reasons
 from quodeq.analysis._drop_stats import record as _record_drop_stats
-from quodeq.config.analysis_env import finding_repair_disabled
 
 _log = logging.getLogger(__name__)
+
+_FINISH_REASON_LENGTH = "length"  # the OpenAI-SDK finish_reason for output truncated by the token budget
 
 # Instruction for the repair re-ask: the model already holds the source (the
 # original user message) and its own snippetless findings (replayed as the
@@ -71,7 +73,7 @@ def _finding_identity(finding: dict) -> tuple:
     )
 
 
-def _repair_snippetless(
+def repair_snippetless(
     client: openai.OpenAI,
     create_kwargs: dict,
     model: str,
@@ -110,7 +112,7 @@ def _repair_snippetless(
         return []
     choice = response.choices[0] if response.choices else None
     text = (choice.message.content or "") if choice else ""
-    findings, _ = _parse_findings(text)
+    findings, _ = parse_findings(text)
     return findings
 
 
@@ -176,45 +178,57 @@ def _apply_repair(
     return max(0, dropped - recovered)
 
 
-def _finish_call(
+def _record_drop_stats_for(
+    counter: DropStatsCounter | None, *, dropped: int, kept: int, reasons: Mapping[str, int],
+) -> None:
+    """Record onto *counter*, or the module-wide default when None."""
+    if counter is not None:
+        counter.record(dropped=dropped, kept=kept, reasons=reasons)
+    else:
+        _record_drop_stats(dropped=dropped, kept=kept, reasons=reasons)
+
+
+def finish_call(
     model: str,
     finish_reason: str | None,
     text: str,
     start: float,
     *,
     reask: Callable[[list[dict]], list[dict]] | None = None,
+    counter: DropStatsCounter | None = None,
 ) -> tuple[list[dict], bool]:
     """Parse *text*, attempt a snippet repair re-ask, record drop stats and
     log the call's outcome.
 
     Returns ``(findings, was_lossy)``. ``was_lossy`` is True when the
     response was truncated by the output budget (``finish_reason ==
-    "length"``), so findings past the cut are lost. See ``_call_api`` for
+    "length"``), so findings past the cut are lost. See ``call_api`` for
     the full lossy-vs-dropped contract.
 
     *reask*, when supplied, takes the snippetless dropped nodes and returns
-    whatever validated findings a single repair call recovers.
-    QUODEQ_DISABLE_FINDING_REPAIR is the operator kill switch.
+    whatever validated findings a single repair call recovers. The operator
+    kill switch (QUODEQ_DISABLE_FINDING_REPAIR) is applied by the caller,
+    which passes ``reask=None`` when repair is off.
     """
     drop_reasons: dict[str, int] = {}
     dropped_nodes: list[dict] = []
-    findings, dropped = _parse_findings(
+    findings, dropped = parse_findings(
         text, drop_reasons=drop_reasons, dropped_sink=dropped_nodes,
     )
-    if dropped and reask is not None and not finding_repair_disabled():
+    if dropped and reask is not None:
         dropped = _apply_repair(
             findings, dropped, dropped_nodes, drop_reasons, reask, model,
         )
     elapsed = time.monotonic() - start
     # Feed the per-run aggregate so the dimension loops can report ONE
     # drop-ratio signal at end of run instead of N scattered per-call lines.
-    _record_drop_stats(dropped=dropped, kept=len(findings), reasons=drop_reasons)
+    _record_drop_stats_for(counter, dropped=dropped, kept=len(findings), reasons=drop_reasons)
 
     # A length-truncated response is an incomplete analysis: the model ran out of
     # output budget mid-stream, so findings after the cut are simply gone. Treat
     # it as lossy so run_api_analysis writes an 'error' marker and the file(s)
     # re-dispatch next run, rather than caching a partial result as 'ok'.
-    truncated = finish_reason == "length"
+    truncated = finish_reason == _FINISH_REASON_LENGTH
     if truncated:
         _log.warning(
             "Model %s response was truncated (finish_reason=length) after %.0fs; "

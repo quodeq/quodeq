@@ -7,13 +7,18 @@ unreadable file degrades to "no signal" or a logged skip, never a raise.
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
+import pytest
 
 from quodeq.data.fs.run_files import (
     dimension_queue_file,
+    has_fingerprint_files,
     list_dimension_evidence,
     queue_file_exists,
     read_dispatched_cache_keys,
     read_queue_files_count,
+    read_run_manifest,
     remove_matching_files,
 )
 
@@ -93,6 +98,58 @@ class TestReadDispatchedCacheKeys:
             json.dumps({"a.py": "theirs"}),
         )
         assert read_dispatched_cache_keys(tmp_path) == []
+
+
+class TestReadRunManifest:
+    def test_none_when_manifest_absent(self, tmp_path):
+        assert read_run_manifest(tmp_path / "run1") is None
+
+    def test_none_when_manifest_corrupt(self, tmp_path):
+        run_dir = _seed_run(tmp_path)
+        (run_dir / "evidence" / "manifest.json").write_text("{not valid json")
+        assert read_run_manifest(run_dir) is None
+
+    def test_none_when_manifest_not_an_object(self, tmp_path):
+        run_dir = _seed_run(tmp_path)
+        (run_dir / "evidence" / "manifest.json").write_text("[1, 2]")
+        assert read_run_manifest(run_dir) is None
+
+    def test_none_when_manifest_not_utf8(self, tmp_path):
+        run_dir = _seed_run(tmp_path)
+        (run_dir / "evidence" / "manifest.json").write_bytes(b"\xff\xfe\x00\x01")
+        assert read_run_manifest(run_dir) is None
+
+    def test_parses_valid_manifest(self, tmp_path):
+        run_dir = _seed_run(tmp_path)
+        (run_dir / "evidence" / "manifest.json").write_text(
+            json.dumps({"language_stats": {".py": 3}}),
+        )
+        assert read_run_manifest(run_dir) == {"language_stats": {".py": 3}}
+
+
+class TestHasFingerprintFiles:
+    def test_false_when_no_fingerprint_files(self, tmp_path):
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "security_evidence.jsonl").write_text("")
+        assert has_fingerprint_files(evidence_dir) is False
+
+    def test_true_when_a_fingerprint_file_exists(self, tmp_path):
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "security_fingerprint.json").write_text("{}")
+        assert has_fingerprint_files(evidence_dir) is True
+
+    def test_raises_on_permission_error(self, tmp_path, monkeypatch):
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+
+        def _denied(self):
+            raise OSError(13, "Permission denied")
+
+        monkeypatch.setattr(Path, "iterdir", _denied)
+        with pytest.raises(OSError):
+            has_fingerprint_files(evidence_dir)
 
 
 class TestRemoveMatchingFiles:

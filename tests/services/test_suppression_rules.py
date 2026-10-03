@@ -2,7 +2,7 @@
 
 Dismissals are keyed ``(req, file, line)``. Every refactor that shifts a line
 re-surfaces a finding the team already decided is acceptable — this session
-alone paid ~13 re-dismissals for patterns covered by the WS1 lean-architecture
+alone paid ~13 re-dismissals for patterns covered by the lean-architecture
 ADR. A rule matches by requirement + file glob, so the decision survives the
 code moving.
 """

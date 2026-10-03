@@ -2,7 +2,7 @@
   "id": "flexibility",
   "name": "Flexibility",
   "iso_25010": "Flexibility",
-  "version": "2023",
+  "version": "2023.11",
   "sub_characteristics": [
     {
       "name": "Adaptability",

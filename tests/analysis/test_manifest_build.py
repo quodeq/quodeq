@@ -96,6 +96,37 @@ def test_with_disciplines_conf(tmp_path: Path, detection: dict) -> None:
     assert "Django" in manifest.frameworks
 
 
+def test_recursive_discovery_failure_falls_back_to_single_scope(
+    tmp_path: Path, detection: dict, monkeypatch,
+) -> None:
+    """A recursive-discovery call that raises must not crash build_manifest --
+    it falls back to the legacy single-scope path, same as an unreadable
+    disciplines.conf."""
+    from quodeq.config.discipline_registry import DisciplineRegistry
+
+    conf = tmp_path / "disciplines.conf"
+    conf.write_text(
+        "[python_fullstack]\n"
+        "language=python\n"
+        "category=backend\n"
+        "detect_file=pyproject.toml\n"
+        "detect_priority=6\n"
+    )
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+    for i in range(3):
+        (tmp_path / f"app{i}.py").write_text(f"x = {i}\n")
+
+    def _boom(self, repo, max_depth=None):
+        raise ValueError("broken recursive discovery")
+
+    monkeypatch.setattr(DisciplineRegistry, "detect_matches_recursive", _boom)
+
+    manifest = build_manifest(tmp_path, detection, disciplines_conf=conf)
+    assert manifest.language == "python"
+    assert manifest.category == "backend"
+    assert all(t.scope_path == "" for t in manifest.targets)
+
+
 def test_analysis_target_name_with_category() -> None:
     from quodeq.analysis.manifest import target_name
     assert target_name("rust", "backend") == "rust_backend"

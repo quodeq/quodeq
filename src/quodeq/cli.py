@@ -2,14 +2,14 @@
 
 Heavy evaluation logic lives in ``quodeq.cli_evaluation`` and its siblings;
 this module re-exports their entry points under public spellings, so
-``from quodeq.cli import …`` never has to name an underscore. The underscore
-originals are still importable from the module that defines them.
+``from quodeq.cli import …`` never has to name an underscore.
 """
 
 from __future__ import annotations
 
 import logging
 import sys
+from enum import StrEnum
 from typing import Callable
 
 from quodeq.cli_parser import build_parser  # re-export
@@ -17,13 +17,11 @@ from quodeq.update.checker import check_async, get_status, set_settings
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 
-# Re-export the evaluation entry points under their public spellings. The
-# underscore originals stay importable from the module that owns them.
+# Re-export the evaluation entry points under their public spellings.
 from quodeq._cli_env import (  # noqa: F401 — public re-exports
     ENV_MAX_DURATION,
     ENV_MAX_TURNS,
     ENV_POOL_BUDGET,
-    _environ,
     cli_env_int,
     cli_environ,
     no_verify,
@@ -54,6 +52,15 @@ from quodeq.cli_evaluation import (  # noqa: F401 — public re-exports
 _logger = logging.getLogger(__name__)
 
 
+class Command(StrEnum):
+    """Top-level CLI subcommand names, as argparse's ``command`` dest reports them."""
+
+    EVALUATE = "evaluate"
+    CI = "ci"
+    REVIEW = "review"
+    EXPORT = "export"
+
+
 _COMMAND_HANDLERS: dict[str, Callable] = {
     "dashboard": lambda argv: dashboard_main(argv[1:] if argv is not None else sys.argv[2:]),
 }
@@ -67,7 +74,7 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
     NEXT invocation has fresh data.
     """
     out = stream if stream is not None else sys.stdout
-    environ = _environ(env)
+    environ = cli_environ(env)
     try:
         if not getattr(out, "isatty", lambda: False)():
             return
@@ -91,7 +98,12 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
                 f"{tag}: {status['current']} → {status['latest']}. Run: {action}",
                 file=out,
             )
-    except Exception:  # pragma: no cover - defensive
+    except (OSError, ValueError):  # pragma: no cover - defensive
+        # check_async/get_status/set_settings already fail-soft internally
+        # (json_state.py swallows OSError/ValueError). The realistic sources
+        # here are both on print(..., file=out): OSError from a closed/broken
+        # stdout pipe, and UnicodeEncodeError (a ValueError subclass) when
+        # out's encoding can't render the "→" glyph.
         _logger.debug("update notice failed", exc_info=True)
 
 
@@ -141,15 +153,15 @@ def main(argv: list[str] | None = None) -> int:
     if command is None:
         return dashboard_main(argv[1:] if argv is not None else sys.argv[1:])
 
-    if command == "evaluate":
+    if command == Command.EVALUATE:
         code = run_evaluate(args)
-    elif command == "ci":
+    elif command == Command.CI:
         from quodeq.ci.cli import handle_ci
         code = handle_ci(args)
-    elif command == "review":
+    elif command == Command.REVIEW:
         from quodeq.ci.review import handle_review
         code = handle_review(args)
-    elif command == "export":
+    elif command == Command.EXPORT:
         from quodeq.ci.export_cli import handle_export
         code = handle_export(args)
     else:

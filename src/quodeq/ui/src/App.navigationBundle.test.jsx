@@ -94,10 +94,10 @@ describe('buildNavigationBundle', () => {
 // map's viz path and the violations sub-tab are route params, so the browser
 // back button and the breadcrumb see them. Drilling pushes, navigating up to
 // a path already in the trailing run of map entries unwinds history via
-// navGoTo, and view toggles replace in place so flipping never grows
-// history. Params must be spread forward on every hop or _tabKey (the
-// fresh-tab-click reset signal) silently drops and the page resets its
-// cached state mid-drill.
+// navSwapAt (the target entry re-stamped with the toggles on screen now),
+// and view toggles replace in place so flipping never grows history. Params
+// must be spread forward on every hop or _tabKey (the fresh-tab-click reset
+// signal) silently drops and the page resets its cached state mid-drill.
 describe('map/violations view state lives in the nav stack', () => {
   function mapProps(navOverrides = {}) {
     return {
@@ -107,7 +107,7 @@ describe('map/violations view state lives in the nav stack', () => {
       },
       navigation: {
         selectedProject: 'p1', selectedSource: 'local', projects: [], projectsLoaded: true,
-        handleNavigate: vi.fn(), handleNavigateReplace: vi.fn(), navGoTo: vi.fn(),
+        handleNavigate: vi.fn(), handleNavigateReplace: vi.fn(), navSwapAt: vi.fn(),
         navStack: [{ page: 'map', _tabKey: 3 }], navStackLength: 1,
         ...navOverrides,
       },
@@ -120,23 +120,43 @@ describe('map/violations view state lives in the nav stack', () => {
     const el = ROUTE_RENDERERS.map({ _tabKey: 3, vizStyle: 'riskmatrix' }, props);
     el.props.nav.onPathChange('src');
     expect(props.navigation.handleNavigate).toHaveBeenCalledWith('map', { _tabKey: 3, vizStyle: 'riskmatrix', path: 'src' });
-    expect(props.navigation.navGoTo).not.toHaveBeenCalled();
+    expect(props.navigation.navSwapAt).not.toHaveBeenCalled();
     expect(props.navigation.handleNavigateReplace).not.toHaveBeenCalled();
   });
 
-  it('map: navigating up to a path already in the trailing map trail unwinds via navGoTo, never pushes a duplicate', () => {
+  // The toggles are a display preference, not a fact about the level: an
+  // entry pushed while on circle pack must not flip the view back to circle
+  // pack when the user, now on galaxy, climbs up into it. Unwinding through
+  // navGoTo restored the entry as pushed (stale toggles); navSwapAt lets the
+  // route re-stamp it with what is on screen.
+  it('map: navigating up to a path already in the trailing map trail unwinds in place, carrying the current toggles', () => {
     const props = mapProps({
       navStack: [
         { page: 'map', _tabKey: 3 },
-        { page: 'map', _tabKey: 3, path: 'src' },
-        { page: 'map', _tabKey: 3, path: 'src/app' },
+        { page: 'map', _tabKey: 3, path: 'src', viewMode: 'violations' },
+        { page: 'map', _tabKey: 3, path: 'src/app', vizStyle: 'galaxy', galaxyMode: 'standards' },
       ],
       navStackLength: 3,
     });
-    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src/app' }, props);
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src/app', vizStyle: 'galaxy', galaxyMode: 'standards' }, props);
     el.props.nav.onPathChange('');
-    expect(props.navigation.navGoTo).toHaveBeenCalledWith(0);
+    expect(props.navigation.navSwapAt).toHaveBeenCalledWith(0, { page: 'map', _tabKey: 3, vizStyle: 'galaxy', galaxyMode: 'standards' });
     expect(props.navigation.handleNavigate).not.toHaveBeenCalled();
+  });
+
+  it('map: unwinding to an entry pushed under another style drops that style when the current view is the default', () => {
+    const props = mapProps({
+      navStack: [
+        { page: 'map', _tabKey: 3, vizStyle: 'galaxy', galaxyMode: 'standards' },
+        { page: 'map', _tabKey: 3, path: 'src' },
+      ],
+      navStackLength: 2,
+    });
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src' }, props);
+    el.props.nav.onPathChange('');
+    expect(props.navigation.navSwapAt).toHaveBeenCalledWith(0, { page: 'map', _tabKey: 3 });
+    const [, entry] = props.navigation.navSwapAt.mock.calls[0];
+    expect(Object.keys(entry).sort()).toEqual(['_tabKey', 'page']);
   });
 
   it('map: the trail scan stops at the first non-map entry, so an older unrelated map entry is not a goTo target', () => {
@@ -150,7 +170,7 @@ describe('map/violations view state lives in the nav stack', () => {
     });
     const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src/app' }, props);
     el.props.nav.onPathChange('src');
-    expect(props.navigation.navGoTo).not.toHaveBeenCalled();
+    expect(props.navigation.navSwapAt).not.toHaveBeenCalled();
     expect(props.navigation.handleNavigate).toHaveBeenCalledWith('map', { _tabKey: 3, path: 'src' });
   });
 
@@ -183,15 +203,15 @@ describe('map/violations view state lives in the nav stack', () => {
     expect(props.navigation.handleNavigate).not.toHaveBeenCalled();
   });
 
-  it('buildNavigationBundle forwards navStack and navGoTo (the map drill-up dies without them)', () => {
+  it('buildNavigationBundle forwards navStack and navSwapAt (the map drill-up dies without them)', () => {
     const navStack = [{ page: 'map' }];
-    const navGoTo = vi.fn();
+    const navSwapAt = vi.fn();
     const bundle = buildNavigationBundle({
-      state: { navStack, navGoTo },
+      state: { navStack, navSwapAt },
       navTab: vi.fn(), navStackLength: 1,
       isEvaluating: false, showToast: vi.fn(), setWizardEntry: vi.fn(),
     });
     expect(bundle.navStack).toBe(navStack);
-    expect(bundle.navGoTo).toBe(navGoTo);
+    expect(bundle.navSwapAt).toBe(navSwapAt);
   });
 });

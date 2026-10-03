@@ -1,19 +1,22 @@
 """Copy/replace mechanics for staging run artifacts (shared-repo publish).
 
 services/shared_publish decides WHAT gets published (the source-of-truth
-allowlist, the glob patterns) and used to perform the shutil/os mechanics
-inline too; the mechanics live here. Errors propagate: the publish flow
+allowlist, the glob patterns); the shutil/os mechanics live here. Errors propagate: the publish flow
 converts OSError into a user-facing PublishError at its own boundary, so
 nothing here may swallow one.
 """
 from __future__ import annotations
 
-import contextlib
 import json
+import logging
 import os
 import shutil
 import tempfile
 from pathlib import Path
+
+from quodeq.shared.json_state import dump_json_and_replace
+
+_logger = logging.getLogger(__name__)
 
 
 def ensure_dir(path: Path) -> None:
@@ -42,8 +45,23 @@ def copy_matching_files(src_dir: Path, dest_dir: Path, pattern: str) -> None:
         shutil.copy2(src, dest_dir / src.name)
 
 
-def replace_json_file(path: Path, data: dict) -> None:
+def read_json_object(path: Path) -> dict | None:
+    """Parsed JSON object at *path*.
+
+    None when the file is absent, not valid JSON, not a JSON object, or not
+    UTF-8 text.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def replace_json_file(path: Path, data: dict, *, indent: int | None = None) -> None:
     """Write *data* as JSON via a same-directory temp file + atomic replace.
+
+    *indent* is passed to ``json.dump`` (None writes compact JSON).
 
     Uses ``tempfile.mkstemp`` (not a fixed ``.tmp`` suffix) so concurrent
     writers to the same *path* never collide on the same temp name.
@@ -51,11 +69,11 @@ def replace_json_file(path: Path, data: dict) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
     cleanup_tmp: str | None = tmp_path
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(data))
-        os.replace(tmp_path, str(path))
+        dump_json_and_replace(fd, tmp_path, path, data, indent=indent)
         cleanup_tmp = None  # ownership transferred to final path
     finally:
         if cleanup_tmp is not None:
-            with contextlib.suppress(OSError):
+            try:
                 os.unlink(cleanup_tmp)
+            except OSError as exc:
+                _logger.warning("leftover temp file %s not removed: %s", cleanup_tmp, exc)

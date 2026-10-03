@@ -6,12 +6,12 @@ import { t } from '../../../strings/index.js';
 
 const WINDOW_ID = 'server-log';
 
-function buildSpec({ logs }) {
+function buildSpec({ logs, firstSeq }) {
   return {
     id: WINDOW_ID,
     type: WINDOW_ID,
     title: t('settings.serverLogTitle'),
-    render: () => <ConsoleLogViewer logs={logs} />,
+    render: () => <ConsoleLogViewer logs={logs} firstSeq={firstSeq} />,
   };
 }
 

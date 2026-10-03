@@ -1,4 +1,4 @@
-"""Host header validation before CSP interpolation (Task 9).
+"""Host header validation before CSP interpolation.
 
 Split out of test_csp_header.py when that file crossed the 300-line cap.
 """
@@ -48,7 +48,7 @@ def test_csp_same_origin_ws_uses_bracketed_ipv6_host_with_port():
     still gets an explicit same-origin ws/wss entry.
 
     ::1 is a first-class local address elsewhere in this app
-    (_LOCALHOST_ADDRS, dashboard/_networking.py's _DEFAULT_LOCAL_HOSTS,
+    (routes_common.LOCALHOST_ADDRS, dashboard/_networking.py's _DEFAULT_LOCAL_HOSTS,
     dashboard/_webview_window_native_ops.py's reload allowlist), so a
     client reaching the dashboard over IPv6 loopback is a real access
     path — the same-origin entry must not be silently dropped for it.

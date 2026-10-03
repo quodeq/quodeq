@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { settingsKeys } from '../../../api/queryKeys.js';
-import { classifyProvider } from './providerUtils.js';
+import { classifyProvider, PROVIDER_CLASSIFICATION } from './providerUtils.js';
 import { CliModelInput } from './CliAdvancedPanel.jsx';
 import { t } from '../../../strings/index.js';
 
@@ -44,7 +44,7 @@ function LocalApiModelSelect({ providerId, value, onChange }) {
 // models for local-api and Copilot providers, a model id for other providers.
 export default function AssistantModelPicker({ provider, providerConfig, value, onChange }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);
-  if (classification === 'local-api') {
+  if (classification === PROVIDER_CLASSIFICATION.LOCAL_API) {
     return <LocalApiModelSelect providerId={provider.id} value={value} onChange={onChange} />;
   }
   return <CliModelInput providerId={provider.id} value={value} onChange={onChange} ariaLabel={t('settings.assistantModelAria')} />;

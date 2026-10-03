@@ -25,7 +25,7 @@ vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
 const trend = [
   {
     runId: 'r1',
-    status: 'complete',
+    status: 'done',
     dateISO: '2026-07-01T10:00:00Z',
     dateLabel: '1 Jul 2026',
     numericAverage: 8.2,
@@ -34,7 +34,7 @@ const trend = [
   },
 ];
 const availableRuns = [
-  { runId: 'r1', status: 'complete', dateISO: '2026-07-01T10:00:00Z', dateLabel: '1 Jul 2026' },
+  { runId: 'r1', status: 'done', dateISO: '2026-07-01T10:00:00Z', dateLabel: '1 Jul 2026' },
 ];
 
 function makeFakeApi(overrides = {}) {
@@ -48,37 +48,47 @@ function makeFakeApi(overrides = {}) {
   };
 }
 
-function renderHistoryPage(selectedSource, overrides = {}) {
+function makeCallbacks() {
+  return {
+    onRunClick: vi.fn(),
+    onDimensionClick: vi.fn(),
+    onNavigate: vi.fn(),
+    onRunChange: vi.fn(),
+    onRunDeleted: vi.fn(),
+  };
+}
+
+function renderWithProps(props) {
   const QC = withQueryClient();
   const fakeApi = makeFakeApi();
   render(
     <QC>
       <ApiProvider value={fakeApi}>
         <HistoryPage
-          trend={trend}
-          selection={{ selectedRunId: 'r1' }}
-          availableRuns={availableRuns}
           dimensions={{}}
-          callbacks={{
-            onRunClick: vi.fn(),
-            onDimensionClick: vi.fn(),
-            onNavigate: vi.fn(),
-            onRunChange: vi.fn(),
-            onRunDeleted: vi.fn(),
-          }}
-          projectInfo={{ displayName: 'Test Project' }}
-          projects={[{ id: 'proj1', name: 'proj1' }]}
+          callbacks={makeCallbacks()}
           projectsLoaded
-          selectedProject="proj1"
-          selectedSource={selectedSource}
           loading={false}
           isFetching={false}
-          {...overrides}
+          {...props}
         />
       </ApiProvider>
     </QC>,
   );
   return fakeApi;
+}
+
+function renderHistoryPage(selectedSource, overrides = {}) {
+  return renderWithProps({
+    trend,
+    selection: { selectedRunId: 'r1' },
+    availableRuns,
+    projectInfo: { displayName: 'Test Project' },
+    projects: [{ id: 'proj1', name: 'proj1' }],
+    selectedProject: 'proj1',
+    selectedSource,
+    ...overrides,
+  });
 }
 
 describe('HistoryPage — delete-run source gating', () => {
@@ -104,40 +114,19 @@ describe('HistoryPage — delete-run source gating', () => {
   });
 });
 
-// Final whole-branch review: Critical 1 (evaluate CTA gating), Finding 3
-// (teammate persona -- shared selection + zero local projects), Finding 6
-// (shared read-only chip).
+// Covers evaluate CTA gating, teammate persona (shared selection + zero
+// local projects), and the shared read-only chip.
 function renderHistoryPageWithData(overrides = {}) {
-  const QC = withQueryClient();
-  const fakeApi = makeFakeApi();
-  render(
-    <QC>
-      <ApiProvider value={fakeApi}>
-        <HistoryPage
-          trend={[]}
-          selection={{ selectedRunId: null }}
-          availableRuns={[]}
-          dimensions={{}}
-          callbacks={{
-            onRunClick: vi.fn(),
-            onDimensionClick: vi.fn(),
-            onNavigate: vi.fn(),
-            onRunChange: vi.fn(),
-            onRunDeleted: vi.fn(),
-          }}
-          projectInfo={null}
-          projects={[]}
-          projectsLoaded
-          selectedProject="shared-1"
-          selectedSource="shared"
-          loading={false}
-          isFetching={false}
-          {...overrides}
-        />
-      </ApiProvider>
-    </QC>,
-  );
-  return fakeApi;
+  return renderWithProps({
+    trend: [],
+    selection: { selectedRunId: null },
+    availableRuns: [],
+    projectInfo: null,
+    projects: [],
+    selectedProject: 'shared-1',
+    selectedSource: 'shared',
+    ...overrides,
+  });
 }
 
 describe('HistoryPage — evaluate CTA gating for shared (Critical 1)', () => {
@@ -188,7 +177,7 @@ describe('HistoryPage — scenario 9: loader gate, containment, refresh dim', ()
 
   it('applies the refresh dim class to the empty state during a background refetch', () => {
     renderHistoryPageWithData({ loading: false, isFetching: true });
-    expect(document.querySelector('.history-page--terminal').className).toContain('dashboard-refreshing');
+    expect(document.querySelector('.history-page--terminal').className).toContain('section-pending');
   });
 
   it('applies the refresh dim class to real content during a background refetch', () => {
@@ -196,7 +185,7 @@ describe('HistoryPage — scenario 9: loader gate, containment, refresh dim', ()
       trend, availableRuns, selection: { selectedRunId: 'r1' },
       loading: false, isFetching: true,
     });
-    expect(document.querySelector('.history-page--terminal').className).toContain('dashboard-refreshing');
+    expect(document.querySelector('.history-page--terminal').className).toContain('section-pending');
   });
 });
 

@@ -137,7 +137,7 @@ def test_list_completed_runs_skips_unsupported_schema_version(tmp_path):
 
 
 def test_stage_project_writes_published_json(tmp_path):
-    """Task 2 (audit C1): stage_project records who published and when at
+    """stage_project records who published and when at
     publish time, instead of relying solely on git log against the shared
     clone (which used to be permanently shallow, misattributing every
     project to whoever pushed last)."""

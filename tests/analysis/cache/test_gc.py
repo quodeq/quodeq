@@ -74,6 +74,27 @@ def test_collect_handles_missing_root(tmp_path: Path):
     assert collect_legacy_entries(tmp_path / "does-not-exist", min_schema=4) == 0
 
 
+def test_ensure_cache_ready_degrades_when_default_paths_raises(tmp_path: Path, monkeypatch):
+    """_default_standards_dir's except narrows to OSError: resolving the
+    bundled standards dir must never break cache maintenance, it just runs
+    without a standards_dir (params_hash keying falls back)."""
+    from quodeq.data.cache_store import migrate as mig
+    import quodeq.analysis.cache.gc as gc_module
+
+    mig._ready_memo.clear()
+
+    def boom():
+        raise OSError("cannot resolve bundled data dir")
+
+    monkeypatch.setattr(gc_module, "default_paths", boom)
+    root = tmp_path / "cache"
+    _write_entry(root, "aa" + "0" * 62, schema=2)
+
+    ensure_cache_ready(root)  # must not raise
+
+    assert not (root / "aa" / ("0" * 62) / "entry.json").exists()
+
+
 def test_ensure_cache_ready_migrates_v3_instead_of_deleting(tmp_path: Path):
     from quodeq.data.cache_store import migrate as mig
     mig._ready_memo.clear()

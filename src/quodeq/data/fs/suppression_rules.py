@@ -24,7 +24,7 @@ from pathlib import Path
 
 from quodeq.core.types.suppression_rule import SuppressionRule
 
-_FILENAME = "suppression_rules.json"
+SUPPRESSION_RULES_FILENAME = "suppression_rules.json"
 _logger = logging.getLogger(__name__)
 
 
@@ -34,12 +34,12 @@ def _is_nonempty_str(x: object) -> bool:
 
 def load_suppression_rules(project_dir: Path) -> tuple[SuppressionRule, ...]:
     """Return the project's suppression rules, or ``()`` when there are none."""
-    path = project_dir / _FILENAME
+    path = project_dir / SUPPRESSION_RULES_FILENAME
     if not path.is_file():
         return ()
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 - a bad rules file must never fail a rescore
+    except (OSError, ValueError, RecursionError) as exc:
         _logger.warning(
             "Ignoring unreadable or malformed suppression rules %s: %s", path, exc)
         return ()

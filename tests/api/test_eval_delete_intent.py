@@ -49,6 +49,14 @@ class TestCancelIntent:
         provider.cancel_evaluation.assert_called_once()
         provider.delete_evaluation.assert_not_called()
 
+    @pytest.mark.parametrize(("query", "waits"), [("", False), ("&wait=true", True), ("&wait=1", False)])
+    def test_wait_flag_asks_the_provider_to_block_until_the_run_is_gone(self, query, waits):
+        """The window close sends ?wait=true: the server is killed right after."""
+        client, provider = _make_client("running")
+        resp = client.delete(f"/api/evaluations/j1?intent=cancel{query}", headers=ORIGIN)
+        assert resp.status_code == 200
+        assert provider.cancel_evaluation.call_args.kwargs["wait_for_exit"] is waits
+
     def test_cancel_intent_never_purges_a_finished_run(self):
         """The dialog-open race: run finished before the DELETE arrived."""
         client, provider = _make_client("done")

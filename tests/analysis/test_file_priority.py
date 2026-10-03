@@ -1,9 +1,11 @@
 """Tests for file priority scoring."""
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.analysis.subagents.priority import (
+    PriorityContext,
     compute_base_score,
     compute_dimension_boost,
     compute_fan_in,
@@ -236,3 +238,24 @@ class TestPrioritizationIntegration:
         files, _, _ = list_source_files(config, "security")
         # src/auth.py should come before tests/test_stuff.py
         assert files.index("src/auth.py") < files.index("tests/test_stuff.py")
+
+
+class TestPrioritizeFilesInjectedConfig:
+    def test_uses_injected_priority_config_instead_of_the_loaded_default(self):
+        """PriorityContext.priority_config is a call-time seam: when set,
+        prioritize_files must use it instead of calling load_priority_config."""
+        custom_config = {"fan_in_divisor": 99, "fan_in_max": 1, "previous_violations_max": 1}
+        with patch(
+            "quodeq.analysis.subagents.priority.load_priority_config",
+            side_effect=AssertionError("the concrete loader must not be called"),
+        ), patch(
+            "quodeq.analysis.subagents.priority.compute_git_scores",
+            return_value={},
+        ) as mock_git_scores:
+            result = prioritize_files(
+                ["a.py"], Path("/tmp"), "security",
+                context=PriorityContext(priority_config=custom_config),
+            )
+        mock_git_scores.assert_called_once()
+        assert mock_git_scores.call_args.kwargs["config"] is custom_config
+        assert result == ["a.py"]

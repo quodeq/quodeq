@@ -20,25 +20,30 @@ from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services.wiring import ActionLogWriter, read_action_events
 
 
+def _finding_identity(finding: dict) -> dict:
+    """The ``req``/``file``/``line`` a verified badge is keyed by, read off a request dict."""
+    return {
+        "req": str(finding.get("req", "")),
+        "file": str(finding.get("file", "")),
+        "line": int(finding.get("line", 0)),
+    }
+
+
+def _payload_key(payload: FindingVerified | FindingUnverified) -> tuple[str, str, int]:
+    """The ``(req, file, line)`` badge key of a replayed event payload."""
+    return (str(payload.req or ""), str(payload.file or ""), int(payload.line or 0))
+
+
 def verify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
     """Append a FindingVerified event to project_dir/actions.jsonl."""
-    payload = FindingVerified(
-        req=str(finding.get("req", "")),
-        file=str(finding.get("file", "")),
-        line=int(finding.get("line", 0)),
-        note=finding.get("note"),
-    )
+    payload = FindingVerified(**_finding_identity(finding), note=finding.get("note"))
     log = writer or ActionLogWriter(project_dir)
     log.emit(FindingVerifiedEvent(payload=payload))
 
 
 def unverify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
     """Append a FindingUnverified event to project_dir/actions.jsonl."""
-    payload = FindingUnverified(
-        req=str(finding.get("req", "")),
-        file=str(finding.get("file", "")),
-        line=int(finding.get("line", 0)),
-    )
+    payload = FindingUnverified(**_finding_identity(finding))
     log = writer or ActionLogWriter(project_dir)
     log.emit(FindingUnverifiedEvent(payload=payload))
 
@@ -68,7 +73,7 @@ def verified_entries(
     for event in read_action_events(project_dir):
         if event.event_type == EventType.FINDING_VERIFIED:
             p = event.payload
-            key = (str(p.req or ""), str(p.file or ""), int(p.line or 0))
+            key = _payload_key(p)
             entries[key] = {
                 "req": key[0], "file": key[1], "line": key[2],
                 # note is always a string in entries; absent notes normalize
@@ -77,8 +82,7 @@ def verified_entries(
                 "verifiedAt": event.timestamp.isoformat(),
             }
         elif event.event_type == EventType.FINDING_UNVERIFIED:
-            p = event.payload
-            entries.pop((str(p.req or ""), str(p.file or ""), int(p.line or 0)), None)
+            entries.pop(_payload_key(event.payload), None)
     items = list(entries.values())
 
     if offset <= 0 and limit is None:

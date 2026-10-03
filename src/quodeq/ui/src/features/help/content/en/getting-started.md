@@ -1,23 +1,26 @@
 ## Getting Started
 
-The first time you launch Quodeq, the onboarding wizard opens automatically. Four short steps and you have your first evaluation running.
+The first time you launch Quodeq, the onboarding wizard opens automatically. Two screens and you have your first evaluation running.
 
 ### The onboarding wizard
 
-1. **Welcome** a quick orientation.
-2. **Repo Scan** paste a local path, GitHub URL, or SSH path. Quodeq scans and shows file counts and detected languages.
-3. **Provider** pick where the AI runs. Skipped automatically if you already have one configured.
-4. **Standard Launch** choose dimensions, scope, branch, and a time budget, then start the evaluation.
+1. **Welcome** how quodeq works, and the two ways in: a repository to score, or an evaluations repository to connect.
+2. **Analyze** one screen: your repository (a git url or a local folder; for a url, quodeq keeps a working copy in `~/quodeq/repos` unless you change it), the model that reviews it (the one configured in Settings, else the best one found on this machine once you choose its model) and the standard (the quodeq default standard unless you change it). Press **scan and run**.
+
+For a url, a progress bar shows the clone as it happens, with the percentage and size so far, and the evaluation starts when the clone lands. A local folder needs no clone and starts at once. You can close the panel while a clone runs: it keeps going in the background and a tile on the **Repositories** tab shows the same bar. The project appears there when the clone finishes, and no evaluation starts for a clone you closed early. Open **add project** again during a clone and the running clone is shown.
 
 > **Drafts are saved**
 >
 > The wizard remembers what you typed. If you close it midway, your draft comes back next time. You can also resume an interrupted setup from the **Projects** tab.
+
+Want to see the welcome again later, even after skipping it? Open **Settings**, find the *onboarding* section and press **show welcome**.
 
 ### What happens next
 
 - The **Evaluate** tab streams the run live, including findings as they appear.
 - When it finishes, the **Overview** tab opens with grades and top findings.
 - **Violations**, **Map**, and **History** let you drill in from different angles.
+- To reach your results from another machine or share them with your team, connect an evaluations repository from the **Projects** tab. **import evaluations** restores a previously exported archive.
 
 ### Requirements
 

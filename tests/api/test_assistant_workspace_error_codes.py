@@ -1,8 +1,7 @@
 """Machine-readable error-code coverage for assistant_workspace_routes.py's
-remaining bare sites (usability cycle 1, task 6 sweep): tools/check_error_codes.py
-(the zero-tolerance gate added in task 6) found the "no worktree" 404s on
-apply/pr/discard, discard's "gone" race, and the "worktree already <status>"
-409 on pr/discard.
+remaining bare sites: tools/check_error_codes.py's zero-tolerance gate found
+the "no worktree" 404s on apply/pr/discard, discard's "gone" race, and the
+"worktree already <status>" 409 on pr/discard.
 
 Sibling of test_assistant_workspace_routes.py, which is already over the
 300-line file cap (grandfathered) -- new coverage goes in a new file

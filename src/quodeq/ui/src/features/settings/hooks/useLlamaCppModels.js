@@ -3,6 +3,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { useLlamacppServerStatus } from './useLlamacppServerStatus.js';
 import { settingsKeys } from '../../../api/queryKeys.js';
 import { useProviderModels } from './useProviderModels.js';
+import { PROVIDER_SETTING_KEY } from '../../../constants.js';
 
 const MODELS_KEY = settingsKeys.llamacppModels();
 
@@ -26,7 +27,7 @@ export function useLlamaCppModels({ state, update }) {
   // state so the analysis runner has a model to send.
   useEffect(() => {
     if (models.length && models[0].name && state.model !== models[0].name) {
-      update('model', models[0].name);
+      update(PROVIDER_SETTING_KEY.MODEL, models[0].name);
     }
   }, [models, state.model, update]);
 

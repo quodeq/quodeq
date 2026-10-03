@@ -1,14 +1,15 @@
-import { readString, removeKey, writeString } from '../../adapters/storage.js';
+import { readString, removeKey, STORAGE_FLAG_ON, writeString } from '../../adapters/storage.js';
+import { PROVIDER_SETTING_KEY } from '../../constants.js';
 
 export const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
 export const LEGACY_AI_CMD_KEY = 'cc-ai-cmd';
 export const LEGACY_SETTING_MIGRATIONS = {
-  'cc-max-subagents': 'subagents',
+  'cc-max-subagents': PROVIDER_SETTING_KEY.SUBAGENTS,
   // Legacy global key — migrate to provider-scoped 'time-limit' suffix.
-  'cc-pool-budget': 'time-limit',
-  'cc-time-limit': 'time-limit',
-  'cc-per-dimension': 'per-dimension',
-  'cc-ai-model': 'model',
+  'cc-pool-budget': PROVIDER_SETTING_KEY.TIME_LIMIT,
+  'cc-time-limit': PROVIDER_SETTING_KEY.TIME_LIMIT,
+  'cc-per-dimension': PROVIDER_SETTING_KEY.PER_DIMENSION,
+  'cc-ai-model': PROVIDER_SETTING_KEY.MODEL,
 };
 
 /**
@@ -43,6 +44,6 @@ export function migrateLegacyProviderSettings(clients, storage) {
   // Only mark the migration complete when every key that needed to move did.
   // A single quota failure must not strand the un-migrated key(s) forever --
   // leaving MIGRATION_DONE_KEY unset lets the whole migration retry next run.
-  if (allWrote) writeString(MIGRATION_DONE_KEY, '1', storage);
+  if (allWrote) writeString(MIGRATION_DONE_KEY, STORAGE_FLAG_ON, storage);
   return { migrated: true, movedKeys };
 }

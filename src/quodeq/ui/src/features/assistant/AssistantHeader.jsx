@@ -7,6 +7,7 @@ import { DrawerWindowControls } from '../../components/DrawerWindowControls.jsx'
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 import { providerSupportsWebTools } from '../../models/provider.js';
 import { t } from '../../strings/index.js';
+import { pluralKey } from '../../utils/plural.js';
 
 // Session-state chips: read-only, no-repo-access, and pending-changes.
 function StatusBadges({ readOnly, repoInfo, workspace, sessionId, refreshWorkspace, addWindow }) {
@@ -31,9 +32,7 @@ function StatusBadges({ readOnly, repoInfo, workspace, sessionId, refreshWorkspa
         <button type="button" className="badge badge--tag badge--danger drawer-changes-chip"
           onClick={() => addWindow(workspaceDiffSpec({ sessionId, key: workspace.createdAt, onChanged: refreshWorkspace }))}
           title={t('assistant.reviewPendingChanges')}>
-          {workspace.filesChanged === 1
-            ? t('assistant.filesChangedOne', { count: workspace.filesChanged })
-            : t('assistant.filesChangedMany', { count: workspace.filesChanged })}
+          {t(pluralKey(workspace.filesChanged, 'assistant.filesChangedOne', 'assistant.filesChangedMany'), { count: workspace.filesChanged })}
         </button>
       )}
     </>
@@ -101,8 +100,7 @@ function DrawerControls({ session, toggles, actions }) {
 /**
  * The assistant panel's own header: panel switcher, animated compass
  * identity, the live model chip (click opens Settings), the session-state
- * chips, and the window controls that used to live in the shared drawer
- * header.
+ * chips, and the window controls.
  */
 export default function AssistantHeader({ selectedProject, onOpenSettings }) {
   const { closeActiveTab, maximized, toggleMaximized, provider, model,

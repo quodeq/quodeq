@@ -12,15 +12,17 @@ import { SidePaneProvider } from '../../side-pane/index.js';
 // (cached-first, see that hook's own tests), so every render touches the API
 // -- an ApiProvider is required from here on regardless of project count.
 function makeFakeApi(overrides = {}) {
-  return {
+  const api = {
     getSharedStatus: vi.fn(async () => ({ configured: true, url: null, publish: { state: 'idle' } })),
     sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
-    refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
-    pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
+    startRefresh: vi.fn(async () => ({ started: true })),
+    startPull: vi.fn(async (id) => ({ started: true, project: id })),
     publishProject: vi.fn(async () => ({ started: true })),
     ...overrides,
   };
+  // The status poll reads getSyncStatus; these tests drive it through getSharedStatus.
+  return { getSyncStatus: (...a) => api.getSharedStatus(...a), ...api };
 }
 
 function renderWithApi(ui, fakeApi) {
@@ -36,11 +38,12 @@ function renderWithApi(ui, fakeApi) {
 
 
 // Split from ProjectsPage.test.jsx: group-aware filtering (parent/
-// subproject), published-age on originUrl-matched cards, the
-// SyncedIndicator states, and the pending grade chip.
+// subproject), published-age on originUrl-matched cards, the sync strip
+// states as the page renders them, and the pending grade chip. The header
+// actions, connect card and pull state live in ProjectsPage.teamResults.test.jsx.
 
-// Review findings 3 & 4 (final whole-branch review): group-aware query
-// filtering for parent/subproject entries, and the empty-CTA filter trap.
+// Group-aware query filtering for parent/subproject entries, and the
+// empty-CTA filter trap.
 describe('ProjectsPage — group-aware filtering and the empty-filter trap', () => {
   const subprojectLocals = [
     { id: 'root-1', name: 'monorepo', latestDate: '2026-07-19T00:00:00Z' },
@@ -110,14 +113,14 @@ describe('ProjectsPage — group-aware filtering and the empty-filter trap', () 
     );
 
     await waitFor(() => expect(screen.getByText('no projects match your filters.')).toBeInTheDocument());
-    expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    expect(screen.queryByText('An evaluations repository')).not.toBeInTheDocument();
     // The toolbar (search input included) must stay mounted so the filter
     // that caused this can actually be cleared.
     expect(screen.getByLabelText('filter projects by name')).toBeInTheDocument();
   });
 });
 
-// Review finding 7 (final whole-branch review): the "published <age>"
+// The "published <age>"
 // decoration must also work for shared matches found by originUrl, not just
 // by id (usePublish's own publishedAtByProject is keyed by the SHARED
 // entry's id, which an originUrl match never shares with the local id).
@@ -153,53 +156,53 @@ describe('ProjectsPage — published-age on originUrl-matched cards', () => {
   });
 });
 
-// Review finding 8 (final whole-branch review): SyncedIndicator wording and
-// visibility.
-describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hiding', () => {
-  it('shows "not synced yet" (never "just now") when nothing has synced', async () => {
+// The sync strip under the header replaced the toolbar's SyncedIndicator:
+// its wording and visibility from the page's point of view.
+describe('ProjectsPage — sync strip: "not synced yet", load failure and unconfigured hiding', () => {
+  it('shows "not synced yet" (never "just now") when nothing has synced, and no toolbar refresh button', async () => {
     const fakeApi = makeFakeApi({
       getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
       sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
     });
     renderWithApi(<ProjectsPage projects={[{ id: 'a', name: 'app' }]} actions={{}} />, fakeApi);
 
-    await waitFor(() => expect(screen.getByText('not synced yet')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('0 projects · not synced yet')).toBeInTheDocument());
     expect(screen.queryByText(/just now/)).not.toBeInTheDocument();
+    expect(screen.getByText('github.com/team/results')).toBeInTheDocument();
+    // The strip replaced the toolbar indicator: no ⟳ "refresh" button is left in the toolbar.
+    expect(screen.queryByRole('button', { name: 'refresh' })).not.toBeInTheDocument();
   });
 
-  // Audit A2: a list that never loads used to render "not synced yet" with
-  // no error and no working recovery control. It now renders a distinct
-  // error state, and the same button that used to just say "refresh" is
-  // the retry affordance -- clicking it calls the refresh endpoint (which
-  // useSharedProjects' refresh() also uses to re-check status, see that
-  // hook's own tests).
-  it('shows "sync failed · retry" (no em-dash) when the shared list fails to load, and the button retries via refreshShared()', async () => {
-    const refreshShared = vi.fn(async () => ({ stale: false, lastSynced: '2026-07-19T00:00:00Z' }));
+  // A list that never loads renders a distinct failure, never "not synced
+  // yet", and its retry starts a refresh (useSharedProjects' refresh() also
+  // re-checks the status, see that hook's own tests).
+  it('shows a load failure with a retry (no em-dash) when the shared list fails to load, and retry calls startRefresh()', async () => {
+    const startRefresh = vi.fn(async () => ({ started: true }));
     const fakeApi = makeFakeApi({
       getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
       sharedListProjects: vi.fn(async () => { throw new Error('list failed'); }),
-      refreshShared,
+      startRefresh,
     });
     const user = userEvent.setup();
     renderWithApi(<ProjectsPage projects={[{ id: 'a', name: 'app' }]} actions={{}} />, fakeApi);
 
-    await waitFor(() => expect(screen.getByText('sync failed · retry')).toBeInTheDocument());
-    expect(screen.getByText('sync failed · retry').textContent).not.toMatch(/—/);
-    expect(screen.queryByText('not synced yet')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/could not read the evaluations repository/)).toBeInTheDocument());
+    expect(screen.getByText(/could not read the evaluations repository/).textContent).not.toMatch(/—/);
+    expect(screen.queryByText(/not synced yet/)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'refresh' }));
+    await user.click(screen.getByRole('button', { name: 'retry' }));
 
-    await waitFor(() => expect(refreshShared).toHaveBeenCalled());
+    await waitFor(() => expect(startRefresh).toHaveBeenCalled());
   });
 
-  it('hides the sync indicator and its refresh button entirely when no shared repo is configured', async () => {
+  it('hides the strip entirely when no shared repo is configured', async () => {
     const fakeApi = makeFakeApi({
       getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
     });
     renderWithApi(<ProjectsPage projects={[{ id: 'a', name: 'app' }]} actions={{}} />, fakeApi);
 
     await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
-    expect(screen.queryByRole('button', { name: 'refresh' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /update|refresh/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/synced|not synced yet|syncing/)).not.toBeInTheDocument();
   });
 });

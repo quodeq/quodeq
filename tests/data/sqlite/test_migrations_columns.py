@@ -1,13 +1,14 @@
-"""Evaluation DB v5..v9 upgrades: added columns/index and their self-healing idempotence."""
+"""Evaluation DB v5..v10 upgrades: added columns/index and their self-healing idempotence."""
 import sqlite3
 from quodeq.data.sqlite._migrations import apply_evaluation_schema
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
 
 def test_schema_version_is_pinned():
-    # The v5 baseline DDL and the per-version upgrade cases below target v9;
+    # The v5 baseline DDL and the per-version upgrade cases below (and v10 in
+    # test_migrations_unmapped.py) target v10;
     # bumping SCHEMA_VERSION without extending them leaves the new path untested.
-    assert SCHEMA_VERSION == 9
+    assert SCHEMA_VERSION == 10
 
 
 # The findings table at SCHEMA_VERSION=5, before issue #656 added
@@ -242,8 +243,8 @@ def test_additive_upgrades_skip_a_db_without_findings():
 
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE runs (id INTEGER PRIMARY KEY)")
-    for upgrade in (additive._upgrade_v5_to_v6, additive._upgrade_v6_to_v7,
-                    additive._upgrade_v7_to_v8, additive._upgrade_v8_to_v9):
+    for upgrade in (additive.upgrade_v5_to_v6, additive.upgrade_v6_to_v7,
+                    additive.upgrade_v7_to_v8, additive.upgrade_v8_to_v9):
         upgrade(conn)  # must not raise
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert tables == {"runs"}
@@ -251,10 +252,10 @@ def test_additive_upgrades_skip_a_db_without_findings():
 
 
 def test_table_exists_reports_presence():
-    from quodeq.data.sqlite._migrations_additive import _table_exists
+    from quodeq.data.sqlite._migrations_additive import table_exists
 
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE findings (id INTEGER PRIMARY KEY)")
-    assert _table_exists(conn, "findings") is True
-    assert _table_exists(conn, "absent") is False
+    assert table_exists(conn, "findings") is True
+    assert table_exists(conn, "absent") is False
     conn.close()

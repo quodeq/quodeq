@@ -99,3 +99,22 @@ class TestRequiresPlatformFiltering:
                 result = mixin.get_ai_clients()
         client_ids = [c["id"] for c in result["clients"]]
         assert "ollama" in client_ids
+
+
+class TestUnknownProviderIdsSurviveTheProviderMove:
+    """Provider ids with no Provider member ("omlx", a user-named endpoint)
+    are listed like any API provider; only the reserved "custom" id is hidden."""
+
+    def test_only_the_custom_id_is_excluded(self):
+        mixin = FsToolingMixin()
+        with patch("quodeq.services.tooling_mixin.get_provider_configs") as mock_cfg:
+            mock_cfg.return_value = {
+                "custom": {"type": "api", "model": "m", "api_base": "https://example.test/v1"},
+                "omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"},
+                "my-endpoint": {"type": "api", "model": "m", "api_base": "https://example.test/v1"},
+            }
+            with patch("shutil.which", return_value=None):
+                result = mixin.get_ai_clients(env={"QUODEQ_AI_CLIENTS": ""})
+        ids = {c["id"] for c in result["clients"]}
+        assert "custom" not in ids
+        assert {"omlx", "my-endpoint"} <= ids

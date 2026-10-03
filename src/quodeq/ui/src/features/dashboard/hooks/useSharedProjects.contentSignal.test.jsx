@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useSharedContentSignal } from './useSharedProjects.js';
+import { useSharedContentSignal, useSharedConnection } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 
 function makeFakeApi(overrides = {}) {
-  return {
+  const api = {
     getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
     sharedListProjects: vi.fn(async () => ({
       projects: [{ id: 'p1', name: 'demo' }],
@@ -13,10 +13,12 @@ function makeFakeApi(overrides = {}) {
       stale: false,
     })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
-    refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
-    pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
+    startRefresh: vi.fn(async () => ({ started: true })),
+    startPull: vi.fn(async (id) => ({ started: true, project: id })),
     ...overrides,
   };
+  // The status poll reads getSyncStatus; these tests drive it through getSharedStatus.
+  return { getSyncStatus: (...a) => api.getSharedStatus(...a), ...api };
 }
 
 // A promise the test controls the settlement of, so we can assert on
@@ -56,6 +58,7 @@ describe('useSharedContentSignal', () => {
     });
     await waitFor(() => expect(result.current.settled).toBe(true));
     expect(result.current.hasContent).toBe(false);
+    expect(result.current.publishedCount).toBe(0);
     expect(fakeApi.sharedListProjects).not.toHaveBeenCalled();
   });
 
@@ -66,6 +69,8 @@ describe('useSharedContentSignal', () => {
     });
     await waitFor(() => expect(result.current.settled).toBe(true));
     expect(result.current.hasContent).toBe(true);
+    // The Compare gate counts published projects, so the signal carries the number.
+    expect(result.current.publishedCount).toBeGreaterThan(0);
   });
 
   it('reports hasContent=false when configured but the list is empty', async () => {
@@ -109,6 +114,29 @@ describe('useSharedContentSignal', () => {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
     await waitFor(() => expect(result.current.settled).toBe(true));
-    expect(fakeApi.refreshShared).not.toHaveBeenCalled();
+    expect(fakeApi.startRefresh).not.toHaveBeenCalled();
+  });
+});
+
+// The welcome panel's passive "is an evaluations repository connected, and
+// where?" read: the host reads like the sync strip's, without the scheme.
+describe('useSharedConnection', () => {
+  it('reports the connected repository as host/path', async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(() => useSharedConnection(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.configured).toBe(true));
+    expect(result.current.host).toBe('github.com/team/results');
+    expect(fakeApi.startRefresh).not.toHaveBeenCalled();
+  });
+
+  it('reports nothing connected, with no host, when sharing is not configured', async () => {
+    const fakeApi = makeFakeApi({ getSharedStatus: vi.fn(async () => ({ configured: false, url: null })) });
+    const { result } = renderHook(() => useSharedConnection(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(result.current).toEqual({ configured: false, host: null });
   });
 });

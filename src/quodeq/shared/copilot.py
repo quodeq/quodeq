@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 import threading
 from pathlib import Path
+
+from quodeq.shared.json_state import dump_json_and_replace
 
 _PROFILE_LOCK = threading.Lock()
 _ALLOWED_ENV_KEYS = frozenset({
@@ -46,10 +47,7 @@ def _prepare_profile(profile: Path) -> None:
     config["ide"] = {**(ide if isinstance(ide, dict) else {}), "autoConnect": False}
     fd, name = tempfile.mkstemp(dir=profile, suffix=".json")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(config, handle)
-        os.chmod(name, _OWNER_RW)
-        os.replace(name, config_path)
+        dump_json_and_replace(fd, name, config_path, config, mode=_OWNER_RW)
     finally:
         Path(name).unlink(missing_ok=True)
 

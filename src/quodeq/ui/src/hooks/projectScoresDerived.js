@@ -3,6 +3,7 @@
  * logic, extracted verbatim. Both are still called from inside a useMemo in
  * that hook, so the memoization behavior (and its deps) is unchanged.
  */
+import { RUN_STATE } from '../vocab/runState.js';
 
 /**
  * Overview is anchored on completed runs. If selectedRun points at an
@@ -17,7 +18,7 @@ export function resolveAsOf({ isLatestSelection, selectedRun, latestQueryData })
   if (!runs) return null;
   const match = runs.find((r) => r.runId === selectedRun);
   if (!match) return null;
-  if (match.status === "in_progress") return null;
+  if (match.status === RUN_STATE.RUNNING) return null;
   return selectedRun;
 }
 
@@ -34,6 +35,6 @@ export function deriveAvailableRuns({ scoresQueryData, latestQueryData }) {
   return trend.map((row) => ({
     runId: row.runId,
     dateLabel: row.dateLabel || row.runId,
-    status: "complete",
+    status: RUN_STATE.DONE,
   }));
 }

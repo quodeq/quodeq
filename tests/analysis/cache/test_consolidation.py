@@ -174,7 +174,7 @@ def test_a_raising_backend_never_propagates(tmp_path: Path, caplog):
         mark_run_consolidated(run_dir, backend)
 
     assert backend.touched == 1, "the backend was never consulted"
-    assert "Could not consolidate cache entry" in caplog.text
+    assert "consolidate cache entry key1 failed" in caplog.text
 
 
 def test_missing_evidence_dir_is_a_no_op(tmp_path: Path):
@@ -191,6 +191,36 @@ def test_missing_evidence_dir_is_a_no_op(tmp_path: Path):
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
 
     mark_run_consolidated(run_dir, _Forbidden())
+
+
+def test_a_raising_entry_is_isolated_and_the_next_key_still_flips(tmp_path: Path, cache, caplog):
+    """One bad cache.get() must not stop later keys from flipping."""
+    cache.put("key2", _entry("key2"))
+    run_dir = _run_dir(tmp_path, "done", {
+        "security_dispatch_keys.json": {"a.py": "key1", "b.py": "key2"},
+    })
+
+    class _FlakyOnce:
+        def __init__(self, inner) -> None:
+            self._inner = inner
+            self._raised = False
+
+        def get(self, key):
+            if key == "key1" and not self._raised:
+                self._raised = True
+                raise RuntimeError("boom")
+            return self._inner.get(key)
+
+        def put(self, key, entry) -> None:
+            self._inner.put(key, entry)
+
+    with caplog.at_level(logging.WARNING):
+        mark_run_consolidated(run_dir, _FlakyOnce(cache))
+
+    assert cache.get("key2").consolidated is True
+    matching = [r for r in caplog.records if "failed" in r.getMessage()]
+    assert matching, [r.getMessage() for r in caplog.records]
+    assert any(r.exc_info for r in matching)
 
 
 def test_already_consolidated_entries_are_not_rewritten(tmp_path: Path, cache):
@@ -216,3 +246,24 @@ def test_already_consolidated_entries_are_not_rewritten(tmp_path: Path, cache):
     mark_run_consolidated(run_dir, recording)
 
     assert recording.puts == []
+
+
+def test_whole_body_catch_is_narrowed_to_os_and_value_errors(tmp_path: Path, cache, caplog, monkeypatch):
+    """mark_run_consolidated's own except (wrapping the whole function body,
+    below the already-isolated per-key loop) narrows to (OSError, ValueError).
+    A failure upstream of the loop (e.g. _collect_keys) must still degrade
+    silently instead of turning a completed run into a failed one."""
+    import quodeq.analysis.cache.consolidation as consolidation_module
+
+    def boom(_evidence_dir):
+        raise OSError("evidence dir listing failed")
+
+    monkeypatch.setattr(consolidation_module, "_collect_keys", boom)
+    run_dir = _run_dir(
+        tmp_path, "done", {"security_dispatch_keys.json": {"a.py": "key1"}},
+    )
+
+    with caplog.at_level(logging.WARNING):
+        mark_run_consolidated(run_dir, cache)
+
+    assert any("Consolidation pass failed" in r.getMessage() for r in caplog.records)

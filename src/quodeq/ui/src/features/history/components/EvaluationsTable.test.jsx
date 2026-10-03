@@ -12,7 +12,7 @@ vi.mock('../hooks/useHistoryRunLive.js', () => ({
   useHistoryRunLive: vi.fn(() => ({ liveDims: {}, plannedDimensions: [], hasScoredDimension: false })),
 }));
 
-const inProgressEntry = { runId: 'run-1', status: 'in_progress', hasScoredDims: false };
+const inProgressEntry = { runId: 'run-1', status: 'running', hasScoredDims: false };
 
 function renderTable(props = {}) {
   return render(
@@ -77,5 +77,76 @@ describe('EvaluationsTable in-progress row readiness', () => {
     fireEvent.click(row);
 
     expect(onRunClick).toHaveBeenCalledWith('run-1');
+  });
+});
+
+describe('EvaluationsTable partial row', () => {
+  it('shows a cancelled run with its own grade and score, marked partial', () => {
+    const entry = {
+      runId: 'c1', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z', dateLabel: '2 May 2026',
+      runNumericAverage: 6.5, runOverallGrade: 'Adequate', numericAverage: null,
+      dimensions: ['security'], dimensionsCount: 1,
+      dimensionDetails: [{ dimension: 'security', score: 6.5, grade: 'Adequate', delta: null }],
+    };
+    renderTable({ visible: [entry], deltas: [null], statusByRunId: new Map([['c1', 'cancelled']]) });
+
+    expect(screen.getByText('6.5')).toBeInTheDocument();
+    expect(screen.getByText('partial')).toBeInTheDocument();
+  });
+});
+
+describe('EvaluationsTable majors and types columns', () => {
+  const done = (runId, majors, openTypes) => ({ runId, dateISO: '2026-09-02T10:00:00Z', dateLabel: '2 Sep', runNumericAverage: '8.5', runOverallGrade: 'Good', dimensionDetails: [{ majors, openTypes }] });
+
+  it('shows the counts with their deltas, down reading as good for majors', () => {
+    useHistoryRunLive.mockReturnValue({ liveDims: {}, plannedDimensions: [], hasScoredDimension: false });
+    renderTable({
+      visible: [done('r2', 3, 30), done('r1', 5, 33)],
+      deltas: [0.5, null],
+      countDeltas: [{ majors: -2, openTypes: -3 }, { majors: null, openTypes: null }],
+    });
+    expect(screen.getByText('MAJORS')).toBeInTheDocument();
+    expect(screen.getByText('TYPES')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('30')).toBeInTheDocument();
+    const majorsDelta = screen.getByText('-2');
+    expect(majorsDelta.className).toContain('history-delta--up');
+  });
+
+  it('an in-progress row shows placeholders in the count cells', () => {
+    useHistoryRunLive.mockReturnValue({ liveDims: {}, plannedDimensions: [], hasScoredDimension: false });
+    renderTable({ countDeltas: [{ majors: null, openTypes: null }] });
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe('EvaluationsTable pending delete', () => {
+  const doneEntry = { runId: 'run-9', status: 'done', dateISO: '2026-09-16T10:00:00Z', dateLabel: '2026-09-16', overallGrade: 'B' };
+
+  it('disables the delete button and dims the row whose delete is pending', () => {
+    renderTable({ visible: [doneEntry], deletingRunIds: new Set(['run-9']) });
+    const button = screen.getByRole('button', { name: 'Delete run' });
+    expect(button).toBeDisabled();
+    expect(button.closest('.history-row').className).toContain('history-row--deleting');
+  });
+
+  it('leaves other rows untouched', () => {
+    renderTable({ visible: [doneEntry], deletingRunIds: new Set(['run-other']) });
+    const button = screen.getByRole('button', { name: 'Delete run' });
+    expect(button).not.toBeDisabled();
+    expect(button.closest('.history-row').className).not.toContain('history-row--deleting');
+  });
+
+  it('does not open or prefetch the pending row from the keyboard or the mouse', () => {
+    const onRunClick = vi.fn();
+    const onRunHover = vi.fn();
+    renderTable({ visible: [doneEntry], deletingRunIds: new Set(['run-9']), onRunClick, onRunHover });
+    const row = screen.getByRole('button', { name: 'Delete run' }).closest('.history-row');
+    fireEvent.click(row);
+    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.focus(row);
+    fireEvent.mouseEnter(row);
+    expect(onRunClick).not.toHaveBeenCalled();
+    expect(onRunHover).not.toHaveBeenCalled();
   });
 });

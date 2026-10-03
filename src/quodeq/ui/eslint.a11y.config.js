@@ -11,17 +11,14 @@
 // the WAI-ARIA dialog pattern, and the rule cannot tell that apart from a
 // stray autoFocus on a page field.
 import jsxA11y from 'eslint-plugin-jsx-a11y';
+import { JSX_MODULE_LANGUAGE_OPTIONS } from './tools/eslint_shared_config.mjs';
 
 export default [
   {
     files: ['src/**/*.jsx'],
     ignores: ['src/**/*.test.jsx', 'src/**/*.fixtures.jsx'],
     plugins: { 'jsx-a11y': jsxA11y },
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
     rules: {
       ...jsxA11y.flatConfigs.recommended.rules,
       'jsx-a11y/no-autofocus': 'off',

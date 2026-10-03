@@ -28,7 +28,7 @@ describe('ThresholdImpactDialog keyboard accessibility', () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
-  // #6580 fix round 1 - the mount/unmount effect must fire once per open, not
+  // #6580 - the mount/unmount effect must fire once per open, not
   // once per onCancel identity: StandardEditor.jsx passes a fresh inline
   // arrow on every render, so a stale [onCancel] dependency tore the effect
   // down and back up on every parent re-render while the dialog stayed open,

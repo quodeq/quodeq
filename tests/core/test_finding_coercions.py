@@ -1,6 +1,7 @@
 """Shared coercions for optional per-finding wire fields."""
 from __future__ import annotations
 
+from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
 
 
@@ -21,3 +22,8 @@ def test_scope_downgrade_accepts_only_string_dicts():
     assert coerce_scope_downgrade("major") is None
     assert coerce_scope_downgrade(None) is None
     assert coerce_scope_downgrade({}) == {}
+
+
+def test_coerce_confidence_infinite_float_falls_back():
+    assert coerce_confidence(float("inf")) == FULL_CONFIDENCE
+    assert coerce_confidence(float("-inf"), default=7) == 7

@@ -1,6 +1,7 @@
 """API runner call options: timeouts, thinking knobs, output caps, truncation."""
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -8,7 +9,7 @@ import pytest
 pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis._api_call import _LOCAL_TIMEOUT
-from quodeq.analysis._api_runner import ApiRunnerConfig, _call_api
+from quodeq.analysis._api_runner import ApiRunnerConfig, call_api
 
 from ._api_runner_helpers import (
     _make_findings_json,
@@ -49,17 +50,17 @@ class TestResolveTimeout:
         )
         assert _resolve_timeout(cfg, is_openai=True) == _CLOUD_TIMEOUT
 
-    def test_env_override_wins(self, monkeypatch):
+    def test_read_timeout_override_wins(self):
         from quodeq.analysis._api_call import _resolve_timeout
-        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "900")
+        # QUODEQ_API_READ_TIMEOUT arrives resolved, as read_timeout_s.
         cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:11434/v1", n_subagents=2,
+            model="m", api_base="http://localhost:11434/v1", n_subagents=2, read_timeout_s=900,
         )
         assert _resolve_timeout(cfg, is_openai=False).read == 900.0
 
-    def test_env_override_garbage_is_ignored(self, monkeypatch):
+    def test_exported_env_is_not_read_per_call(self, monkeypatch):
         from quodeq.analysis._api_call import _resolve_timeout
-        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "soon")
+        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "900")
         cfg = ApiRunnerConfig(
             model="m", api_base="http://localhost:11434/v1", n_subagents=2,
         )
@@ -73,7 +74,7 @@ class TestResolveTimeout:
         raw_client = _mock_raw_client('{"findings":[]}')
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            _call_api("prompt", cfg)
+            call_api("prompt", cfg)
         timeout = mock_oa.call_args.kwargs["timeout"]
         assert timeout.read == _LOCAL_TIMEOUT.read * 2
 
@@ -82,7 +83,7 @@ def _create_kwargs(cfg):
     raw_client = _mock_raw_client('{"findings":[]}')
     with patch("openai.OpenAI") as mock_oa:
         mock_oa.return_value.__enter__.return_value = raw_client
-        _call_api("prompt", cfg)
+        call_api("prompt", cfg)
     return raw_client.chat.completions.create.call_args.kwargs
 
 
@@ -113,11 +114,11 @@ class TestLocalOutputCap:
         kwargs = _create_kwargs(api_config)
         assert kwargs["max_tokens"] == 8192
 
-    def test_env_override_and_zero_disables(self, api_config, monkeypatch):
-        monkeypatch.setenv("QUODEQ_MAX_OUTPUT_TOKENS", "4096")
-        assert _create_kwargs(api_config)["max_tokens"] == 4096
-        monkeypatch.setenv("QUODEQ_MAX_OUTPUT_TOKENS", "0")
-        assert "max_tokens" not in _create_kwargs(api_config)
+    def test_override_and_zero_disables(self):
+        cfg = ApiRunnerConfig(model="m", api_base="http://localhost:8000/v1", max_tokens_override=4096)
+        assert _create_kwargs(cfg)["max_tokens"] == 4096
+        cfg = ApiRunnerConfig(model="m", api_base="http://localhost:8000/v1", max_tokens_override=0)
+        assert "max_tokens" not in _create_kwargs(cfg)
 
     def test_explicit_config_wins(self):
         cfg = ApiRunnerConfig(
@@ -183,7 +184,7 @@ class TestTruncationDetection:
         client = _mock_raw_client_finish(content, "length")
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
-            _findings, was_lossy = _call_api("prompt", api_config)
+            _findings, was_lossy = call_api("prompt", api_config)
         assert was_lossy is True
 
     def test_complete_response_is_not_lossy(self, api_config):
@@ -193,6 +194,43 @@ class TestTruncationDetection:
         client = _mock_raw_client_finish(content, "stop")
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
-            findings, was_lossy = _call_api("prompt", api_config)
+            findings, was_lossy = call_api("prompt", api_config)
         assert was_lossy is False
         assert len(findings) == 1
+
+
+class _FactoryFakeClient:
+    """Fake OpenAI-compatible client for asserting ``call_api`` builds its
+    client through ``client_factory`` instead of calling ``openai.OpenAI``
+    directly."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def _create(self, **kwargs):
+        msg = SimpleNamespace(content='{"findings": []}')
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason="stop", message=msg)])
+
+
+class TestClientFactory:
+    """``call_api`` builds its OpenAI-compatible client through an injectable
+    ``client_factory`` so callers/tests can substitute a fake."""
+
+    def test_call_api_builds_client_through_factory(self, api_config):
+        built = []
+
+        def factory(**kwargs):
+            built.append(kwargs)
+            return _FactoryFakeClient(**kwargs)
+
+        findings, lossy = call_api("prompt", api_config, client_factory=factory)
+        assert built and built[0]["max_retries"] == 0
+        assert lossy is False
+        assert findings == []

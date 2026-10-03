@@ -6,7 +6,7 @@ import { ROUTE_RENDERERS, isSharedSource, buildAssistantActionAppliedHandler } f
 // History, buildAssistantActionAppliedHandler, the assistant drawer's
 // shared-project close gate, and the evaluate route's shared fallback.
 
-// P4-T2: Violations/Map/History previously never received the dashboard
+// Violations/Map/History previously never received the dashboard
 // bundle's error/onRetry (see App.jsx's buildDashboardDataBundle) -- a fetch
 // failure on those routes had no way to surface an error state or a working
 // Retry. These pin the threading only; the pages' own render decisions are
@@ -159,7 +159,7 @@ describe('Assistant drawer close on shared project switch', () => {
   });
 });
 
-// Final whole-branch review, Critical 1 (belt-and-braces): there is no
+// Belt-and-braces: there is no
 // Evaluate flow for shared projects. shouldShowEvaluateButton already keeps
 // the TopBar from linking here, but a stale nav-stack entry could still land
 // the router on the 'evaluate' route with a shared selection -- it must fall

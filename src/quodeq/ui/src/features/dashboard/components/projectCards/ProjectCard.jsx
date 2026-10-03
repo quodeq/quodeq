@@ -3,12 +3,17 @@ import { t } from '../../../../strings/index.js';
 import Badge from '../../../../components/Badge.jsx';
 import { disciplineLabel, formatDate } from './projectDisplayHelpers.js';
 import { GradeChip, LanguageNumbers, ProjectCardChips, PublishedMeta, LocalPublishedMeta } from './ProjectCardParts.jsx';
+import { PROJECT_SOURCE } from '../../../../vocab/projectSource.js';
+import { KEY } from '../../../../vocab/keyboard.js';
+import { PROJECT_LOCATION } from '../../../../models/project.js';
+import { projectIdOrSelf } from '../../../../utils/projectIdentity.js';
+import { pluralKey } from '../../../../utils/plural.js';
 
 function ProjectCardTopLeft({ project, id, name, grade, score, onResumeSetup }) {
   return (
     <div className="project-card-top-left">
       <span className="project-card-name">{project.displayName || name}</span>
-      {project.location === 'online' && (
+      {project.location === PROJECT_LOCATION.ONLINE && (
         <Badge
           variant="tag"
           tone="warning"
@@ -40,7 +45,7 @@ function ProjectCardTopRight({ project, chips, discipline, date }) {
     <div className="project-card-top-right">
       <ProjectCardChips chips={chips} />
       {discipline && <span className="project-meta-tag">{discipline}</span>}
-      <span className="project-meta-item">{project.runsCount === 1 ? t('projects.runsOne', { count: project.runsCount }) : t('projects.runsMany', { count: project.runsCount })}</span>
+      <span className="project-meta-item">{t(pluralKey(project.runsCount, 'projects.runsOne', 'projects.runsMany'), { count: project.runsCount })}</span>
       {date && <span className="project-meta-date">{date}</span>}
     </div>
   );
@@ -50,7 +55,7 @@ function ProjectCardBottom({ project, chips, resolvedPublishedAt, cardChildren }
   return (
     <div className="project-card-bottom">
       <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
-      {chips === 'shared' ? (
+      {chips === PROJECT_SOURCE.SHARED ? (
         <PublishedMeta publishedBy={project.publishedBy} publishedAt={resolvedPublishedAt} />
       ) : (
         <LocalPublishedMeta publishedAt={resolvedPublishedAt} />
@@ -62,7 +67,7 @@ function ProjectCardBottom({ project, chips, resolvedPublishedAt, cardChildren }
 
 export function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, chips, publishedAt }) {
   const { onSelect, footer, isChild = false, onResumeSetup } = cardProps;
-  const id = project.id || project.name || project;
+  const id = projectIdOrSelf(project);
   const name = project.name || project;
   const grade = gradeLabel(project.overallGrade ?? project.latestGrade);
   const score = project.latestScore != null ? parseFloat(project.latestScore).toFixed(1) : null;
@@ -81,7 +86,11 @@ export function ProjectCard({ project, isSelected, cardProps = {}, children: car
         role="button"
         tabIndex={0}
         onClick={() => onSelect?.(id)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
+        onKeyDown={(e) => {
+          // Keys from a nested control (the resume-setup button) belong to it.
+          if (e.target !== e.currentTarget) return;
+          if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onSelect?.(id); }
+        }}
       >
         <div className="project-card-top">
           <ProjectCardTopLeft project={project} id={id} name={name} grade={grade} score={score} onResumeSetup={onResumeSetup} />

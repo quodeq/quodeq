@@ -13,6 +13,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from tests._timeouts import budget
+
 
 def _run(cmd: list[str], cwd: Path) -> None:
     subprocess.run(cmd, cwd=str(cwd), check=True, capture_output=True)
@@ -45,7 +47,7 @@ def test_diff_mode_dry_run_produces_evidence_no_evaluation(tmp_path: Path) -> No
             "--dry-run",
             "--output", str(output),
         ],
-        cwd=str(repo), capture_output=True, text=True,
+        cwd=str(repo), capture_output=True, text=True, timeout=budget(45),
     )
     assert result.returncode == 0, f"stderr:\n{result.stderr}\nstdout:\n{result.stdout}"
 
@@ -63,7 +65,7 @@ def test_diff_mode_dry_run_produces_evidence_no_evaluation(tmp_path: Path) -> No
     assert jsonl_files, "no evidence JSONL files produced"
 
     # Most importantly: no scored reports. The evaluation/ subdir may exist
-    # (created by _setup_run_dirs) but must contain no <dim>.json reports.
+    # (created by setup_run_dirs) but must contain no <dim>.json reports.
     eval_dir = run_dir / "evaluation"
     if eval_dir.exists():
         eval_jsons = list(eval_dir.glob("*.json"))
@@ -83,7 +85,7 @@ def test_diff_mode_clean_scan_mutex_is_enforced(tmp_path: Path) -> None:
             "--diff-from", "main", "--clean-scan",
             "--output", str(tmp_path / "out"),
         ],
-        cwd=str(repo), capture_output=True, text=True,
+        cwd=str(repo), capture_output=True, text=True, timeout=budget(45),
     )
     assert result.returncode == 1
     combined = result.stdout + result.stderr

@@ -1,31 +1,32 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
 import ViolationCard from './ViolationCard.jsx';
 import FileDetailHeader from './FileDetailHeader.jsx';
-import { GroupHeader, LowConfidenceToggle, estimateItemSize, itemKey } from './fileDetailWidgets.jsx';
+import { GroupHeader, LowConfidenceToggle, ROW_HEIGHT_PX, fileFindingKey } from './fileDetailWidgets.jsx';
 import { useFileDetailFiltering } from './useFileDetailFiltering.js';
 import { useFileDetailWindowSpecs } from './useFileDetailWindowSpecs.jsx';
-import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
-import DeferredMount from './DeferredMount.jsx';
-import CardListSkeleton from './CardListSkeleton.jsx';
+import { useDashboardScrollElement } from './VirtualList.jsx';
+import DeferredViolationList from './DeferredViolationList.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
+import { ROW_KIND } from './findingListRows.js';
 
 function renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpanded }) {
   switch (item.kind) {
-    case 'sev-header': {
+    case ROW_KIND.SEV_HEADER: {
       const label = severityLabel(item.sev);
       return <GroupHeader title={label.charAt(0).toUpperCase() + label.slice(1)} count={item.count} />;
     }
-    case 'compliance-header':
+    case ROW_KIND.COMPLIANCE_HEADER:
       return <GroupHeader title={t('explorer.complianceHeader')} count={item.count} />;
-    case 'low-conf-toggle':
+    case ROW_KIND.LOW_CONF_TOGGLE:
       return <LowConfidenceToggle count={item.count} expanded={item.expanded} onToggle={() => setLowConfExpanded((v) => !v)} />;
-    case 'violation':
-    case 'low-conf-row':
+    case FINDING_TYPE.VIOLATION:
+    case ROW_KIND.LOW_CONF_ROW:
       return <ViolationCard v={item.v} onDismiss={onDismiss ? handleDismiss : undefined} />;
-    case 'compliance':
+    case FINDING_TYPE.COMPLIANCE:
       return <ComplianceCard c={item.c} principle={item.c.principle} index={0} />;
     default:
       return null;
@@ -58,20 +59,14 @@ function FileDetailBody({
         />
       )}
 
-      {/* Same two-commit split as PrincipleDetailPage: this page is param-fed
-          (no fetch), so the first paint would otherwise wait for the visible
-          cards' pretext layout effects. */}
-      <DeferredMount fallback={<CardListSkeleton />}>
-        <VirtualList
-          key={virtualKey}
-          items={items}
-          scrollElement={scrollElement}
-          estimateSize={estimateItemSize(items)}
-          getItemKey={itemKey(items)}
-          label={t('explorer.violationsListAria')}
-          renderItem={(item) => renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpanded })}
-        />
-      </DeferredMount>
+      <DeferredViolationList
+        resetKey={virtualKey}
+        items={items}
+        scrollElement={scrollElement}
+        rowHeights={ROW_HEIGHT_PX}
+        findingKey={fileFindingKey}
+        renderItem={(item) => renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpanded })}
+      />
     </>
   );
 }
@@ -82,10 +77,13 @@ export default memo(function FileDetailPage({ file, runId, dateLabel, onDismiss,
   const [lowConfExpanded, setLowConfExpanded] = useState(false);
 
   const {
-    dismissedSet, handleDismiss, liveSevCounts, liveTotal, totalCompliance, showFilters, items,
+    dismissedSet, handleDismiss, liveSevCounts, liveTotal, totalCompliance, showFilters, items, violationsBySeverity,
   } = useFileDetailFiltering({ file, onDismiss, activeFilter, lowConfExpanded });
 
-  useFileDetailWindowSpecs({ file, activeFilter });
+  // The panes print reason, snippet and references: give them the hydrated
+  // rows, not the deferred ones the route handed in.
+  const hydratedFile = useMemo(() => ({ ...file, violationsBySeverity }), [file, violationsBySeverity]);
+  useFileDetailWindowSpecs({ file: hydratedFile, activeFilter });
 
   const scrollElement = useDashboardScrollElement();
 

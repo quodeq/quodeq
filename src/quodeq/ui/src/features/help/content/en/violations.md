@@ -29,11 +29,12 @@ COMPLIANT   src/api.py:88       Parameterized query prevents injection     CWE-8
             cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
 ```
 
-### Three sub-tabs, one dataset
+### Four sub-tabs, one dataset
 
 Use the pills at the top of the tab:
 
 - **by-dimension** a table of dimensions with their principles indented below, showing critical, major, and minor counts, total violations, and health per row. Click a column header to sort.
+- **by-type** one row per requirement code, grouped by dimension and principle, with the count in the baseline run, the count now, the change, and a *closed* badge when a type that had findings has none. Click a row to open its findings. The row menu can dismiss every finding of the type in the project or in one principle.
 - **by-file** the same findings arranged as your directory tree, with a breadcrumb you can drill into. Useful for tracking down a single hot spot.
 - **dismissed** everything you dismissed, with its reason, ready to restore or delete for good.
 
@@ -64,6 +65,10 @@ If a finding is a false positive or an accepted trade-off, dismiss it from the v
 - are **excluded from scoring** (the dimension score updates immediately),
 - are **excluded from future evaluations** for the same principle and file,
 - can be **restored** individually or in bulk via *Restore all*, or removed for good with *Delete* and *Delete all*.
+
+### Dismissing a whole type
+
+The by-type row menu offers **Dismiss all N in this project** and **Dismiss all N in <principle>**. Each finding gets its own dismissal, written the same way as a single dismiss, so they all appear under *dismissed* and can be restored one by one or all at once. A dismissed type stops counting against the grade; the type is not closed, it is dismissed, and the Overview's open-type count no longer includes it.
 
 ### Trust model and suppression rules
 

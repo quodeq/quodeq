@@ -77,15 +77,32 @@ def test_update_standard(client):
     assert resp.get_json()["name"] == "Updated"
 
 
+def test_update_standard_not_found(client):
+    """A missing standard on PUT answers 404, same code the GET route uses."""
+    resp = client.put("/api/standards/nonexistent", json={"id": "nonexistent", "name": "X", "description": "", "weight": 1.0, "source": "", "principles": []}, headers={"Origin": "http://localhost"})
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["code"] == "not_found"
+
+
 def test_delete_standard(client):
     client.post("/api/standards", json={"id": "del-std", "name": "Delete Me", "description": "", "weight": 1.0, "source": "", "principles": []}, headers={"Origin": "http://localhost"})
     resp = client.delete("/api/standards/del-std", headers={"Origin": "http://localhost"})
     assert resp.status_code == 204
 
 
+def test_delete_standard_not_found(client):
+    resp = client.delete("/api/standards/nonexistent", headers={"Origin": "http://localhost"})
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["code"] == "not_found"
+
+
 def test_delete_builtin_forbidden(client):
     resp = client.delete("/api/standards/security", headers={"Origin": "http://localhost"})
     assert resp.status_code == 403
+    body = resp.get_json()
+    assert body["code"] == "forbidden"
 
 
 def test_duplicate_standard(client):

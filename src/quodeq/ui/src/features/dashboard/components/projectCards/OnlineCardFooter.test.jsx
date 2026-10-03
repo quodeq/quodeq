@@ -17,3 +17,23 @@ describe('OnlineCardFooter — onPull guard', () => {
     expect(onPull).toHaveBeenCalledWith('p1');
   });
 });
+
+describe('OnlineCardFooter — pulling', () => {
+  it('shows "downloading…" with an indeterminate bar and a disabled button while the pull runs', () => {
+    const onPull = vi.fn();
+    render(<OnlineCardFooter projectId="p1" onPull={onPull} pulling />);
+    const btn = screen.getByRole('button', { name: 'downloading…' });
+    expect(btn).toBeDisabled();
+    fireEvent.click(btn);
+    expect(onPull).not.toHaveBeenCalled();
+    const bar = screen.getByRole('progressbar', { name: 'downloading a local copy' });
+    expect(bar).toHaveAttribute('aria-busy', 'true');
+    expect(bar).not.toHaveAttribute('aria-valuenow');
+  });
+
+  it('shows "pulled to local" once the pull is done', () => {
+    render(<OnlineCardFooter projectId="p1" pulled />);
+    expect(screen.getByText('pulled to local')).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+});

@@ -25,6 +25,10 @@ import { readStoredScope } from '../compareScopeStorage.js';
 import CompareFleetView from './CompareFleetView.jsx';
 import CompareDimensionView from './CompareDimensionView.jsx';
 import CompareDuelView from './CompareDuelView.jsx';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
+import { COMPARE_VIEW_FLEET } from '../compareModel.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 function buildSharedProps({
   rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir, setSortDir,
@@ -33,7 +37,7 @@ function buildSharedProps({
 }) {
   return {
     rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir,
-    toggleSortDir: () => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc')),
+    toggleSortDir: () => setSortDir((d) => (d === SORT_DIR.DESC ? SORT_DIR.ASC : SORT_DIR.DESC)),
     hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount, toggleProject,
     selectAll, selectFlagged, openDimension,
     // Expanded-row dimension chips jump to that project's own dimension
@@ -64,7 +68,7 @@ function buildSharedProps({
  */
 function useFleetProjects(projects) {
   const localProjects = useMemo(
-    () => (projects || []).filter((p) => p && (p.id || p.name)),
+    () => (projects || []).filter((p) => p && projectId(p)),
     [projects],
   );
   const sharedProjects = useSharedCompareProjects();
@@ -72,8 +76,8 @@ function useFleetProjects(projects) {
     const entries = mergeProjects(localProjects, sharedProjects);
     return entries.map((e) => {
       if (e.local) return e.local;
-      const raw = e.shared.id || e.shared.name;
-      return { ...e.shared, id: `shared:${raw}`, sourceId: raw, source: 'shared' };
+      const raw = projectId(e.shared);
+      return { ...e.shared, id: `shared:${raw}`, sourceId: raw, source: PROJECT_SOURCE.SHARED };
     });
   }, [localProjects, sharedProjects]);
   return { localProjects, fleetProjects };
@@ -90,10 +94,10 @@ function useComparePageState({
   fleetProjects, summariesById, dimension, duel, onOpenProject, onOpenDimension,
   onSwitchDimension, onOpenEvalPrincipal,
 }) {
-  const view = dimension || 'fleet';
+  const view = dimension || COMPARE_VIEW_FLEET;
   // Score is the only table ordering (consequence ranked near-inverse of it
   // on real fleets); the toggle flips best-first / worst-first.
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortDir, setSortDir] = useState(SORT_DIR.DESC);
   const [pickerOpen, setPickerOpen] = useState(false);
   // null scope = everything (including projects added later); an array is an
   // explicit selection.
@@ -125,11 +129,14 @@ function useComparePageState({
  * pushed from the fleet's "compare these two" action (back pops to the
  * fleet).
  */
-function comparePageStatus(projectsLoaded, localProjects, rootRef) {
+// Published projects from the evaluations repository are rows like any
+// other, so the fleet (local plus remote) decides whether there is
+// anything to compare, not the local list alone.
+function comparePageStatus(projectsLoaded, fleetProjects, rootRef) {
   if (!projectsLoaded) {
     return <div className="compare-page" ref={rootRef}><CompareSkeleton /></div>;
   }
-  if (!localProjects.length) {
+  if (!fleetProjects.length) {
     return (
       <div className="compare-page" ref={rootRef}>
         <EmptyState title={t('compare.emptyTitle')} description={t('compare.emptyBody')} />
@@ -168,7 +175,7 @@ export default function ComparePage({
   duel = null,
   onOpenDuel,
 }) {
-  const { localProjects, fleetProjects } = useFleetProjects(projects);
+  const { fleetProjects } = useFleetProjects(projects);
   const { summariesById, errorsById } = useCompareData(fleetProjects);
   const {
     view, sortDir, setSortDir, pickerOpen, setPickerOpen, scopeIds, now,
@@ -187,7 +194,7 @@ export default function ComparePage({
     rootRef.current?.closest('main')?.scrollTo?.(0, 0);
   }, [view, duel]);
 
-  const status = comparePageStatus(projectsLoaded, localProjects, rootRef);
+  const status = comparePageStatus(projectsLoaded, fleetProjects, rootRef);
   if (status) return status;
 
   const scopeCount = scopeSet && scopeSet.size ? scopeRows.length : rows.length;

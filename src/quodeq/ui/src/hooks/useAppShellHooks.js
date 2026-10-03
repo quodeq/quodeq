@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSharedContentSignal } from '../features/dashboard/hooks/useSharedProjects.js';
-import { useEvaluationProgress } from '../features/evaluation/hooks/useEvaluationProgress.js';
-import { computeOverallProgress } from '../features/evaluation/components/scanProgressTotals.js';
 import { readActiveProviderSelection, readActiveProviderModel } from '../utils/effectiveProviderSettings.js';
 import { formatDayLabel } from './useAppState.js';
+import { useCloneTransitions } from './useCloneTransitions.js';
 import { useNativeNavBridge } from './useNativeNavBridge.js';
 import { useStartupTheme, useStartupLoader } from './useStartupTheme.js';
 import { useWizardLifecycle } from '../features/onboarding/useWizardLifecycle.js';
@@ -12,6 +11,7 @@ import { readVisibleStandardIds } from '../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from '../utils/scoreFiltering.js';
 import { useSidePane } from '../features/side-pane/index.js';
 import { useAssistantDrawer } from '../features/assistant/AssistantDrawerProvider.jsx';
+import { DRAWER_PANEL } from '../features/assistant/drawerPanelsModel.js';
 import { useAssistantProvider } from '../features/settings/hooks/useAssistantProvider.js';
 import { deriveAssistantContext } from '../features/assistant/useAssistantContext.js';
 import { buildAssistantSessionPayload } from '../features/assistant/assistantAppBridge.js';
@@ -21,20 +21,15 @@ import {
 } from './useAppEffects.js';
 import { buildBreadcrumbSiblingsFor } from '../features/side-pane/breadcrumbSiblings.js';
 
-// App.jsx's hook groups, extracted verbatim to keep App() itself under the
-// function-length cap without touching hook call order: each group below is
-// called unconditionally, once, in the same relative position App() used to
-// call its member hooks inline -- React only cares about that sequence, not
-// how many function frames it's nested inside.
-
 /**
  * Whether a run is in flight, which gates the wizard and any second start.
  */
 export function computeIsEvaluating(state) {
   // While an evaluation is running we block any path that would open the
   // onboarding wizard or start a second evaluation — only one job may be in
-  // flight at a time.
-  return state.evalLifecycle?.job?.status === 'running';
+  // flight at a time. The flag comes from the live-evaluation store, which
+  // updates it once per run rather than once per poll tick.
+  return !!state.isEvaluating;
 }
 
 /**
@@ -49,6 +44,7 @@ export function computeIsEvaluating(state) {
 export function useAppBootExtras() {
   useEffect(() => { warmOverviewChunks(); }, []);
   const sharedSignal = useSharedContentSignal();
+  useCloneTransitions();
   const [sidebarPinned, setSidebarPinned] = useState(false);
   // Incremented after every successful dismiss POST so the violations
   // page's dismissed sub-tab knows to refetch its list. Without this, a
@@ -82,7 +78,7 @@ export function useAppAssistant(state) {
   const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession } = useAssistantDrawer();
   const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource } = assistantCtx;
   useEffect(() => {
-    if (!assistantOpen || drawerTab !== 'assistant') return;
+    if (!assistantOpen || drawerTab !== DRAWER_PANEL.ASSISTANT) return;
     startAssistantSession(buildAssistantSessionPayload({
       provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource,
     }));
@@ -105,16 +101,17 @@ export function useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, s
   return { wizardEntry, setWizardEntry, wizardHandlers, hasCurrentProjectRuns };
 }
 
-/**
- * Startup-loader gating, the one-shot initial-landing redirect, the native
- * macOS Help-menu nav bridge, and the two selected-project-keyed sync
- * effects (scroll reset, visible-standards hydration).
- */
-export function useAppNavBoot({ state, activeTab, navTab, sharedSignal }) {
+/** The sidebar's active provider/model, read fresh on every render. */
+export function useSidebarProviderSelection() {
   // NOT memoized on purpose: a per-render read is what makes this pick up a
   // Settings change (active provider/model) without its own change listener.
   const sidebarProvider = readActiveProviderSelection();
   const sidebarModel = readActiveProviderModel(sidebarProvider);
+  return { sidebarProvider, sidebarModel };
+}
+
+/** Whether the startup loader should still cover the app shell. */
+export function useAppStartupGate({ state, activeTab }) {
   const showStartupLoader = useStartupLoader({
     projectsLoaded: state.projectsLoaded,
     projectsLoadFailed: state.projectsLoadFailed,
@@ -127,28 +124,26 @@ export function useAppNavBoot({ state, activeTab, navTab, sharedSignal }) {
     error: state.error,
     loading: state.loading,
   });
+  return { showStartupLoader };
+}
+
+/** The derived no-projects landing redirect and the native macOS Help-menu nav bridge. */
+export function useAppNavigationEffects({ state, activeTab, navTab, sharedSignal }) {
   useInitialLandingEffect({ state, sharedSignal, activeTab, navTab });
   useNativeNavBridge(navTab);
-  useProjectScrollResetEffect(state.selectedProject);
-  useVisibleStandardsHydrationEffect(state.selectedProject);
-  return { sidebarProvider, sidebarModel, showStartupLoader };
+}
+
+/** Selected-project-keyed sync effects: scroll reset and visible-standards hydration. */
+export function useSelectedProjectSyncEffects(selectedProject) {
+  useProjectScrollResetEffect(selectedProject);
+  useVisibleStandardsHydrationEffect(selectedProject);
 }
 
 /**
- * Day-label memo, dark/light theme sync, visible-standards-filtered
- * trend/accumulated data, and the breadcrumb jump-bar's sibling lookup.
+ * Sidebar counts should respect the user's currently-visible standards so
+ * they match the numbers shown on the Violations and History pages.
  */
-export function useAppDerived({ state, navTab, navSwapAt, activePage }) {
-  const currentDayLabel = useMemo(
-    () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
-    [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
-  );
-  // Resolve whether the UI is currently rendering dark and keep the native
-  // titlebar in sync; the toggle is used by the topbar's moon/sun button so
-  // the icon reflects what's on-screen, not just the saved mode preference.
-  const { effectiveDark, toggleTheme } = useStartupTheme(state.settings);
-  // Sidebar counts should respect the user's currently-visible standards so
-  // they match the numbers shown on the Violations and History pages.
+export function useVisibleStandardsFiltered(state) {
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const filteredTrend = useMemo(
     () => filterTrendByVisibleStandards(state.dashboard?.trend || [], visibleSet),
@@ -158,6 +153,24 @@ export function useAppDerived({ state, navTab, navSwapAt, activePage }) {
     () => filterAccumulatedByVisibleStandards(state.accumulated, visibleSet, filteredTrend, null),
     [state.accumulated, visibleSet, filteredTrend]
   );
+  return { filteredTrend, filteredAccumulated };
+}
+
+/**
+ * Day-label memo, dark/light theme sync, and the breadcrumb jump-bar's
+ * sibling lookup. `filteredTrend`/`filteredAccumulated` come from
+ * useVisibleStandardsFiltered (called by the caller, unconditionally, ahead
+ * of this hook) and are passed through unchanged.
+ */
+export function useAppDerived({ state, navTab, navSwapAt, activePage, filteredTrend, filteredAccumulated }) {
+  const currentDayLabel = useMemo(
+    () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
+    [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
+  );
+  // Resolve whether the UI is currently rendering dark and keep the native
+  // titlebar in sync; the toggle is used by the topbar's moon/sun button so
+  // the icon reflects what's on-screen, not just the saved mode preference.
+  const { effectiveDark, toggleTheme } = useStartupTheme(state.settings);
   const breadcrumbSiblingsFor = useCallback(
     buildBreadcrumbSiblingsFor({
       selectedProject: state.selectedProject, navTab, navSwapAt, activePage, filteredAccumulated,
@@ -165,23 +178,4 @@ export function useAppDerived({ state, navTab, navSwapAt, activePage }) {
     [state.selectedProject, navTab, navSwapAt, activePage, filteredAccumulated]
   );
   return { currentDayLabel, effectiveDark, toggleTheme, filteredTrend, filteredAccumulated, breadcrumbSiblingsFor };
-}
-
-/**
- * Live run progress for the topbar chrome (run chip + bottom hairline).
- * Shares the JobStatStrip/ScanProgress query cache entry, so this adds no
- * extra polling.
- */
-export function useAppEvalProgress({ state, isEvaluating }) {
-  const evalJob = state.evalLifecycle?.job;
-  const { data: evalProgress } = useEvaluationProgress(isEvaluating ? evalJob?.jobId : undefined, !isEvaluating);
-  return useMemo(() => {
-    if (!isEvaluating) return null;
-    const overall = computeOverallProgress(evalProgress);
-    const runningDim = (evalProgress?.dimensions || []).find((d) => d?.state === 'running');
-    return {
-      dimension: runningDim?.id ? String(runningDim.id).toLowerCase() : null,
-      percent: overall.totalFiles > 0 ? overall.overallPct : null,
-    };
-  }, [isEvaluating, evalProgress]);
 }

@@ -1,4 +1,4 @@
-"""Cluster 17 site 1 regression: the projection fallback's failure logging.
+"""The projection fallback's failure logging.
 
 ``rescore_with_fallback`` used to hand the background projection sweep to a
 bare ``ThreadBackgroundRunner()``, which defaults to ``log=NULL_LOG``
@@ -17,16 +17,16 @@ occur outside ``_bg_project``'s own try/except, e.g. ``lock.acquire()``
 itself), but is NOT what makes this failure observable in production.
 
 The actual production-visible fix is that ``_bg_project`` now catches a
-failure escaping ``_project_all_runs`` itself and logs it via
+failure escaping ``project_all_runs`` itself and logs it via
 ``_logger.warning(...)`` -- WARNING is above the default INFO threshold, so
 this reaches stderr/the log buffer without any operator opt-in. This matches
-the level ``_project_all_runs`` itself already uses for per-run projection
+the level ``project_all_runs`` itself already uses for per-run projection
 failures (``services/_mutation_projection.py:108``).
 
-These tests exercise the real fallback path (run_id=None -> _rescore_run
+These tests exercise the real fallback path (run_id=None -> rescore_run
 short-circuits -> the background projection sweep, via the REAL, un-injected
-``ThreadBackgroundRunner``) and assert the failure is observable WITHOUT
-lowering the logger below its production default level.
+module-level ``_SHARED_RUNNER``) and assert the failure is observable
+WITHOUT lowering the logger below its production default level.
 """
 from __future__ import annotations
 
@@ -37,43 +37,25 @@ import time
 from quodeq.services import mutation_rescore
 
 
-def test_rescore_with_fallback_wires_module_logger_into_background_runner(monkeypatch, caplog):
-    """Deterministic check of the wiring itself: production code (no
-    ``runner=`` injected) must construct its ThreadBackgroundRunner with a
-    sink over the module's own _logger, not the silent default. This is
-    defense in depth (see module docstring) -- it does not by itself make the
-    common failure path production-visible; the ``_bg_project`` warning-level
-    catch below does that.
+def test_rescore_with_fallback_wires_module_logger_into_background_runner(caplog):
+    """Deterministic check of the wiring itself: the shared runner the
+    production path uses (no ``runner=`` injected) logs through a sink over
+    the module's own _logger, not the silent default. Defense in depth (see
+    module docstring); the ``_bg_project`` warning-level catch below is what
+    makes the common failure production-visible.
 
-    Post-PR review M6: the runner is typed ``log: LogSink`` and a bare
-    ``logging.Logger`` has no ``success``, so the module hands it a
-    ``LoggerSink`` wrapper. What matters is that lines written through that
-    sink still land on ``quodeq.services.mutation_rescore``.
+    The runner is typed ``log: LogSink`` and a bare ``logging.Logger`` has
+    no ``success``, so the module hands it a ``LoggerSink`` wrapper. What
+    matters is that lines written through that sink still land on
+    ``quodeq.services.mutation_rescore``.
     """
-    captured = {}
-    real_runner_cls = mutation_rescore.ThreadBackgroundRunner
-
-    class _SpyRunner(real_runner_cls):
-        def __init__(self, *, log=None):
-            captured["log"] = log
-            super().__init__(log=log)
-
-        def submit(self, fn, *, name=""):
-            # Don't actually spawn a thread for this test -- only the
-            # constructor wiring is under test here.
-            pass
-
-    monkeypatch.setattr(mutation_rescore, "ThreadBackgroundRunner", _SpyRunner)
-
-    mutation_rescore.rescore_with_fallback("evaluations", "cluster17-wiring-proj", None)
-
-    sink = captured["log"]
+    sink = mutation_rescore._SHARED_RUNNER._log
     assert sink is mutation_rescore._log_sink
     assert callable(getattr(sink, "success"))  # the LogSink surface a Logger lacks
-    with caplog.at_level(logging.DEBUG, logger=mutation_rescore._logger.name):
+    with caplog.at_level(logging.DEBUG, logger=mutation_rescore.logger.name):
         sink.debug("wiring probe")
     assert any(
-        r.name == mutation_rescore._logger.name and r.getMessage() == "wiring probe"
+        r.name == mutation_rescore.logger.name and r.getMessage() == "wiring probe"
         for r in caplog.records
     ), [r.getMessage() for r in caplog.records]
 
@@ -99,10 +81,10 @@ def test_rescore_with_fallback_logs_background_projection_failure_at_warning(
         finally:
             ran.set()
 
-    monkeypatch.setattr(mutation_rescore, "_project_all_runs", _boom)
-    monkeypatch.setattr(mutation_rescore, "_resolve_project_dir", lambda *_a, **_k: tmp_path)
+    monkeypatch.setattr(mutation_rescore, "project_all_runs", _boom)
+    monkeypatch.setattr(mutation_rescore, "resolve_project_dir", lambda *_a, **_k: tmp_path)
 
-    # run_id=None -> _rescore_run short-circuits to None -> fallback path,
+    # run_id=None -> rescore_run short-circuits to None -> fallback path,
     # using the REAL (un-injected) ThreadBackgroundRunner default.
     result = mutation_rescore.rescore_with_fallback(
         str(tmp_path), "cluster17-fallback-proj", None,
@@ -113,16 +95,20 @@ def test_rescore_with_fallback_logs_background_projection_failure_at_warning(
 
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
-        if any("projection blew up" in r.message for r in caplog.records):
+        if any("failed" in r.getMessage() for r in caplog.records):
             break
         time.sleep(0.02)
 
-    matching = [r for r in caplog.records if "projection blew up" in r.message]
+    matching = [r for r in caplog.records if "failed" in r.getMessage()]
     assert matching, (
         "background projection failure was not logged at WARNING (fell "
         f"back to debug-only visibility?); records seen: "
-        f"{[(r.levelname, r.message) for r in caplog.records]}"
+        f"{[(r.levelname, r.getMessage()) for r in caplog.records]}"
     )
     assert matching[0].name == "quodeq.services.mutation_rescore"
     assert matching[0].levelno == logging.WARNING
-    assert "cluster17-fallback-proj" in matching[0].message
+    assert "cluster17-fallback-proj" in matching[0].getMessage()
+    # The traceback (not just the exception's str()) now reaches the log,
+    # via the run_isolated fault-isolation boundary.
+    assert "projection blew up" in caplog.text
+    assert "Traceback (most recent call last)" in caplog.text

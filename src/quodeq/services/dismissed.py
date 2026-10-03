@@ -20,9 +20,12 @@ from quodeq.core.dismissals import (
     DismissedKeys,
     fold_dismissals,
 )
+from quodeq.core.types.severity import Severity
 from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services._dismiss_fingerprints import backfill_if_needed, resolve_fingerprint
+from quodeq.shared.stamp_memo import StampCache, file_stamp, memoized_by_stamp
 from quodeq.services.wiring import (
+    ACTIONS_LOG_FILENAME,
     ActionLogWriter,
     load_suppression_rules,
     migrate_if_needed,
@@ -39,12 +42,17 @@ from quodeq.core.evidence.model import violations_per_100_files
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 
 
+# One fold per actions.jsonl change: a scores or dashboard request asks for
+# the dismissed state 7-8 times. DismissedKeys is frozen, so sharing is safe.
+_FOLDS = StampCache(max_entries=256, name="dismissed.folds")  # a few entries per project
+
+
 def _target_of(finding: dict) -> DismissedEntry:
     """The ``(req, file, line)`` a client names, as an unfingerprinted entry."""
     raw_line = finding.get("line", 0)
     try:
         line = int(raw_line)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"finding.line must be an integer, got {raw_line!r}") from exc
     return DismissedEntry(str(finding.get("req", "")), str(finding.get("file", "")), line)
 
@@ -147,7 +155,13 @@ def dismissed_keys(project_dir: Path) -> DismissedKeys:
     # entries to fingerprints, once, so they survive the next refactor.
     migrate_if_needed(project_dir)
     backfill_if_needed(project_dir)
-    return fold_dismissals(read_action_events(project_dir))
+    stamp = file_stamp(project_dir / ACTIONS_LOG_FILENAME)
+    if stamp is None:
+        return fold_dismissals(read_action_events(project_dir))
+    return memoized_by_stamp(
+        str(project_dir), stamp, lambda: fold_dismissals(read_action_events(project_dir)),
+        cache=_FOLDS,
+    )
 
 
 def load_dismissed(
@@ -185,16 +199,21 @@ def recount_totals(
     old_totals: Totals | None = None,
     files_read: int | None = None,
 ) -> Totals:
-    """Recompute totals from a filtered violations list."""
+    """Recompute totals from a filtered violations list.
+
+    Only ``critical``, ``major`` and ``minor`` have buckets; any other
+    severity (the findings DB's ``high``, ``medium``, ``low`` among them)
+    counts as ``unknown``.
+    """
     cc = compliance_count if compliance_count is not None else (old_totals.compliance_count if old_totals else 0)
     critical = major = minor = unknown = 0
     for v in violations:
         sev = (v.severity or "").lower()
-        if sev == "critical":
+        if sev == Severity.CRITICAL:
             critical += 1
-        elif sev == "major":
+        elif sev == Severity.MAJOR:
             major += 1
-        elif sev == "minor":
+        elif sev == Severity.MINOR:
             minor += 1
         else:
             unknown += 1

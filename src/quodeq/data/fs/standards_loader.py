@@ -66,8 +66,7 @@ def is_known_dimension(
     """
     if not dimension:
         return False
-    known_lower = {d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)}
-    return dimension.lower() in known_lower
+    return dimension.lower() in (_known_ids_lower(compiled_dir, evaluators_dir) or frozenset())
 
 
 def _load_compiled_data(
@@ -94,22 +93,26 @@ def _load_compiled_data(
         if not is_known:
             _logger.warning("Rejected unknown dimension for compiled standards lookup: %r", dimension)
             return None
-    if compiled_dir:
-        path = Path(compiled_dir) / f"{dimension}.json"
-        if path.is_file():
-            try:
-                return read_json(path)
-            except (OSError, ValueError, UnicodeDecodeError) as exc:
+    # The first existing file wins even if corrupt; only a compiled file's failure warns.
+    for directory, warn_on_failure in ((compiled_dir, True), (evaluators_dir, False)):
+        if not directory or not (path := Path(directory) / f"{dimension}.json").is_file():
+            continue
+        try:
+            return read_json(path)
+        except (OSError, ValueError, UnicodeDecodeError) as exc:
+            if warn_on_failure:
                 _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
-                return None
-    if evaluators_dir:
-        evaluators_path = evaluators_dir / f"{dimension}.json"
-        if evaluators_path.is_file():
-            try:
-                return read_json(evaluators_path)
-            except (OSError, ValueError, UnicodeDecodeError):
-                return None
+            return None
     return None
+
+
+def _known_ids_lower(
+    compiled_dir: str | Path | None, evaluators_dir: str | Path | None,
+) -> frozenset[str] | None:
+    """``known_dimension_ids`` lower-cased (case-insensitive lookups); None with neither dir."""
+    if not (compiled_dir or evaluators_dir):
+        return None
+    return frozenset(d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir))
 
 
 def load_compiled_refs(
@@ -128,7 +131,7 @@ def load_compiled_refs_multi(
     evaluators_dir: Path | None = None,
 ) -> dict[str, list[dict]]:
     """Load refs for multiple dimensions, merging into a single lookup."""
-    known = frozenset(d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)) if (compiled_dir or evaluators_dir) else None
+    known = _known_ids_lower(compiled_dir, evaluators_dir)
     merged: dict[str, list[dict]] = {}
     for dim in dimensions:
         merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir, known=known))
@@ -141,7 +144,7 @@ def load_compiled_requirements_multi(
     overrides: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """Load requirements for multiple dimensions, merging into a single lookup."""
-    known = frozenset(d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)) if (compiled_dir or evaluators_dir) else None
+    known = _known_ids_lower(compiled_dir, evaluators_dir)
     merged: dict[str, dict] = {}
     for dim in dimensions:
         merged.update(load_compiled_requirements(

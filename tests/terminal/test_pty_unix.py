@@ -63,25 +63,46 @@ def test_read_returns_empty_quickly_when_idle():
         pty.kill()
 
 
+_HIGH_FD_FLOOR = 1100  # past select.select()'s FD_SETSIZE of 1024
+_HIGH_FD_LIMIT = 2048  # room above the floor when the worker already holds many fds
+
+
 @pytest.fixture()
 def _raised_nofile_limit():
-    """Raise RLIMIT_NOFILE enough to reach fd 1100 if it isn't already, and
-    restore the original soft limit afterwards regardless of test outcome."""
+    """Raise RLIMIT_NOFILE to reach fds above _HIGH_FD_FLOOR if it isn't
+    already, and restore the original soft limit afterwards."""
     import resource
 
     soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-    if soft < 1200:
+    if soft < _HIGH_FD_LIMIT:
         try:
             resource.setrlimit(
                 resource.RLIMIT_NOFILE,
-                (min(1200, hard) if hard != resource.RLIM_INFINITY else 1200, hard),
+                (_HIGH_FD_LIMIT if hard == resource.RLIM_INFINITY else min(_HIGH_FD_LIMIT, hard), hard),
             )
         except (ValueError, OSError):
-            pytest.skip("cannot raise RLIMIT_NOFILE to reach fd 1100")
+            pytest.skip("cannot raise RLIMIT_NOFILE past the select() limit")
     try:
         yield
     finally:
         resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
+
+
+def _free_high_fd() -> int:
+    """The first unused fd at or above _HIGH_FD_FLOOR. A long-lived test
+    worker can already hold a fixed number such as 1100 (even the pty's own
+    selector), and dup2 onto it would silently close that fd."""
+    import fcntl
+    import resource
+
+    limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+    for fd in range(_HIGH_FD_FLOOR, limit):
+        try:
+            fcntl.fcntl(fd, fcntl.F_GETFD)
+        except OSError:
+            return fd
+    pytest.skip("no free fd above the select() limit")
+    return -1  # unreachable: pytest.skip raises
 
 
 def test_read_works_when_the_master_fd_is_above_select_limit(_raised_nofile_limit):
@@ -92,7 +113,7 @@ def test_read_works_when_the_master_fd_is_above_select_limit(_raised_nofile_limi
     pty = UnixPty(argv=["/bin/sh"])
     pty.spawn(cwd="/", cols=80, rows=24)
     try:
-        high = 1100
+        high = _free_high_fd()
         os.dup2(pty._master_fd, high)
         os.close(pty._master_fd)
         pty._master_fd = high  # the reader must cope with any fd number

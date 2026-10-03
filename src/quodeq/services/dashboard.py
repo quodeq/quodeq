@@ -1,4 +1,4 @@
-"""Dashboard and accumulated-view logic, split from action_provider_fs.
+"""Dashboard and accumulated-view logic.
 
 This module owns the *selected run*: resolving which run the request means,
 rescoring its dimensions against project-wide suppressions, and driving the
@@ -15,81 +15,51 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import ScoringParams
+from quodeq.core.scoring.report_grades import summarize_dimensions
 from quodeq.core.types import DimensionResult
+from quodeq.core.types.dashboard_view import DashboardView
 
-from quodeq.services.deleted import deleted_keys
 from quodeq.services.scoring_view import is_eligible_for_default_view
-from quodeq.services.dismissed import dismissed_keys, filter_dismissed_from_dimensions
 from quodeq.services.wiring import (
     RunInfo,
     list_runs,
-    load_suppression_rules,
     read_run_data,
-    summarize_dimensions,
+    row_dimension,
 )
-from quodeq.services.rescore import rescore_dimension
-from quodeq.services.suppression_keys import SuppressionKeys
-from quodeq.shared.validation import validate_path_segment
+from quodeq.services.run_metadata import read_run_metadata
+from quodeq.services.score_cache import run_rows
+from quodeq.services.trend_fetcher import make_rescoring_fetcher
 
 from quodeq.services._dashboard_cache import (  # noqa: F401
     DashboardCacheConfig,
-    _DEFAULT_RUN_DIM_CACHE_MAX,
+    DEFAULT_RUN_DIM_CACHE_MAX,
     make_run_dimension_fetcher,
-    _run_dim_cache_max,
+    run_dim_cache_max,
     clear_shared_dimension_cache,
     create_dimension_cache,
 )
 from quodeq.services._dashboard_history import (  # noqa: F401
-    _DashboardPayload,
-    _DEFAULT_MAX_HISTORY_RUNS,
-    _SKIP_GRADES,
-    _SelectedRunContext,
-    _collect_previous_scores,
-    _compute_dashboard_payload,
-    _enrich_dimensions_with_trend,
-    _max_history_runs,
-    _read_run_exit_reason,
+    DashboardPayload,
+    DEFAULT_MAX_HISTORY_RUNS,
+    SKIP_GRADES,
+    RunHistory,
+    SelectedRunContext,
+    collect_previous_scores,
+    compute_dashboard_payload,
+    enrich_dimensions_with_trend,
+    max_history_runs,
+    open_run_history,
+    read_run_exit_reason,
 )
 from quodeq.services._dashboard_response import (  # noqa: F401
-    _DimensionAnnotations,
-    _attach_dismissed_count_to_dim,
-    _attach_exit_reason_to_dim,
-    _build_dashboard_result,
-    _slim_history_dim,
+    DimensionAnnotations,
+    attach_exit_reason_to_dim,
+    build_dashboard_result,
+    slim_history_dim,
 )
-
-_LATEST_RUN = "latest"
-
-
-def _rescore_run_dimensions(
-    dims: list[DimensionResult],
-    reports_root: Path,
-    project: str,
-    run_id: str,
-    params: ScoringParams,
-) -> list[DimensionResult]:
-    """Apply the project-wide dismiss/delete rescore to a run's dimensions.
-
-    Identity when the project has no active dismissals/deletions. Otherwise each
-    dimension passes through the same ``rescore_dimension`` transform the
-    accumulated view and the per-run explorer use, so every read path reports
-    the identical dismiss-adjusted score/grade. *run_id* is the run the *dims*
-    were read from: its directory is passed as the evidence basis so a touched
-    dimension is re-scored from that run's own evidence, not the legacy formula.
-    """
-    validate_path_segment(project)
-    project_dir = reports_root / project
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-    rules = load_suppression_rules(project_dir)
-    # Rules count as suppression state; see scored_run_dimensions.
-    if not dismissed and not deleted and not rules:
-        return dims
-    validate_path_segment(run_id)
-    run_dir = project_dir / run_id
-    keys = SuppressionKeys(dismissed, deleted, rules)
-    return [rescore_dimension(d, keys, params=params, run_dir=run_dir) for d in dims]
+from quodeq.services.run_constants import LATEST_RUN
 
 
 def _make_status_aware_fetcher(
@@ -110,29 +80,29 @@ def _make_status_aware_fetcher(
     status_by_id = {r.run_id: r.status for r in runs}
 
     def fetch(run_id: str) -> list[DimensionResult]:
-        if status_by_id.get(run_id) == "in_progress":
+        if status_by_id.get(run_id) is RunState.RUNNING:
             return read_run_data(reports_root, project, run_id)
         return cached(run_id)
 
     return fetch
 
 
-# Fallback order for the "latest" default run when none is complete. Each
+# Fallback order for the "latest" default run when none is done. Each
 # tier is tried newest-first; a failed run is only headlined when nothing
-# else remains (handled after this list). Complete mirrors the Overview's
+# else remains (handled after this list). Done mirrors the Overview's
 # is_eligible_for_default_view; cancelled matches its cancelled fallback.
 _LATEST_FALLBACK_ORDER = (
-    is_eligible_for_default_view,               # complete
-    lambda status: status == "cancelled",
-    lambda status: status == "in_progress",
+    is_eligible_for_default_view,               # done
+    lambda status: status is RunState.CANCELLED,
+    lambda status: status is RunState.RUNNING,
 )
 
 
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
 
-    For ``run == _LATEST_RUN``, prefer the most recent ``complete`` run.
-    in_progress and cancelled runs are skipped: the overview waits for a
+    For ``run == LATEST_RUN``, prefer the most recent ``done`` run.
+    Running and cancelled runs are skipped: the overview waits for a
     run to terminate cleanly before promoting it to the default
     landing-page view. The eligibility predicate is the shared
     ``scoring_view.is_eligible_for_default_view`` rule, used by both
@@ -141,9 +111,9 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     cards say another" inconsistency users hit when the two filters
     drift.
 
-    If no run is complete (fresh project, only run still in progress,
+    If no run is done (fresh project, only run still running,
     every attempt cancelled), fall back by trust order — cancelled, then
-    in_progress — and only headline a ``failed`` run when there is nothing
+    running — and only headline a ``failed`` run when there is nothing
     else. A failed run must not headline the dashboard while a cancelled
     run with real kept-findings data exists, or the headline would show
     untrustworthy data the Overview cards (which never fall back to
@@ -153,7 +123,7 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     Note: run IDs are opaque UUIDs (no sensitive data), safe to include in
     error messages.
     """
-    if run == _LATEST_RUN:
+    if run == LATEST_RUN:
         selected_run = None
         for accept in _LATEST_FALLBACK_ORDER:
             selected_run = next((r for r in runs if accept(r.status)), None)
@@ -172,42 +142,33 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
 
 
 def _resolve_selected_dims(
-    reports_root: Path, project: str, project_dir: Path,
-    selected_run: RunInfo, params: ScoringParams,
-) -> tuple[list[DimensionResult], dict[str, int], dict[str, int]]:
-    """Read the selected run's raw dims, rescore them, and compute the
-    dismissed/suppressed violation counts. ``read_run_data`` overlays the
-    run's SQL grade tables, but those grades only reflect dismissals
-    projected into THIS run and NOT project-wide dismissals/deletions that
-    accrued later -- so the raw selected-run score can disagree with the
-    accumulated overview. Rescore the selected run's dimensions with the
-    SAME project-wide ``rescore_dimension`` transform the accumulated view
-    and the per-run explorer use, so every path reports the identical
-    dismiss-adjusted score/grade AND drops the dismissed + deleted
-    violations from the counts. ``read_run_data`` stays the dimension source
-    here (a stable seam other callers and tests inject through).
-
-    Returns (selected_dims, dismissed_counts, suppressed_counts).
+    reports_root: Path, project: str, selected_run: RunInfo, params: ScoringParams,
+) -> list[DimensionResult]:
+    """Read the selected run's raw dims and rescore them with the project-wide
+    ``rescore_dimension`` (the SQL grade overlay only knows dismissals projected
+    into THIS run, so the accumulated view and this one would otherwise
+    disagree). Each dimension carries what the dismissed and deleted filters
+    hid (``dismissed_count`` / ``suppressed_count``), measured against the
+    same dimensions the response ships, so shown + suppressed == what the
+    scan found.
     """
-    raw_dims = read_run_data(reports_root, project, selected_run.run_id)
-    # ``dismissedCount`` reports how many of the scan's re-found violations were
-    # hidden by the *dismissed* filter specifically (deletions are a separate,
-    # permanent suppression), so measure it against the dismissed-only filter.
-    pre_filter_counts = {d.dimension: len(d.violations) for d in raw_dims}
-    dismissed_only = filter_dismissed_from_dimensions(raw_dims, project_dir)
-    dismissed_counts = {
-        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
-        for d in dismissed_only
-    }
-    selected_dims = _rescore_run_dimensions(
-        raw_dims, reports_root, project, selected_run.run_id, params)
-    # Measured against the SAME dimensions the response ships, so the number
-    # the UI shows always reconciles: shown + suppressed == what the scan found.
-    suppressed_counts = {
-        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
-        for d in selected_dims
-    }
-    return selected_dims, dismissed_counts, suppressed_counts
+    rescoring = make_rescoring_fetcher(
+        reports_root, project, params,
+        base_fetcher=lambda run_id: read_run_data(reports_root, project, run_id),
+    )
+    return rescoring(selected_run.run_id)
+
+
+def _selected_dims_from_rows(history: RunHistory, selected_run: RunInfo) -> list[DimensionResult]:
+    """The selected run's dimensions as the Overview shows them: its score-cache rows.
+
+    The same rows the history walk serves (score, grade, counts, principles,
+    hidden counts), with the findings never read: a hit is one bulk read the
+    fetcher already made, a miss computes the run once and persists it. A run
+    the cache cannot hold (in progress, or the cache disabled) is read fresh
+    and slimmed here.
+    """
+    return [row_dimension(d) for d in run_rows(history.get_run_dimensions)(selected_run.run_id)]
 
 
 def _resolve_params(params: ScoringParams | None) -> ScoringParams:
@@ -218,32 +179,15 @@ def _resolve_params(params: ScoringParams | None) -> ScoringParams:
     return grade_formula.load_params()
 
 
-def _select_run(
-    reports_root: Path, project: str, runs: list[RunInfo], run: str, params: ScoringParams,
-) -> tuple[_SelectedRunContext, _DimensionAnnotations]:
-    """Resolve the requested run and rescore its dimensions.
-
-    Returns the selected-run context alongside the per-dimension annotations
-    (exit reason, dismissed and suppressed counts) measured on those same
-    dimensions.
-    """
-    selected_run, selected_index = _resolve_selected_run(runs, run)
-    selected_dims, dismissed_counts, suppressed_counts = _resolve_selected_dims(
-        reports_root, project, reports_root / project, selected_run, params,
-    )
-    ctx = _SelectedRunContext(
-        run=selected_run,
-        index=selected_index,
-        dimensions=selected_dims,
-        summary=summarize_dimensions(selected_dims, params),
-        runs=runs,
-    )
-    annotations = _DimensionAnnotations(
-        exit_reason=_read_run_exit_reason(reports_root, project, selected_run.run_id),
-        dismissed_counts=dismissed_counts,
-        suppressed_counts=suppressed_counts,
-    )
-    return ctx, annotations
+def _selected_dims(
+    reports_root: Path, project: str, history: RunHistory, selected_run: RunInfo,
+    params: ScoringParams, view: DashboardView,
+) -> list[DimensionResult]:
+    """The selected run's dimensions: the full view reads and rescores its
+    findings, the overview serves it from its rows."""
+    if view is DashboardView.OVERVIEW:
+        return _selected_dims_from_rows(history, selected_run)
+    return _resolve_selected_dims(reports_root, project, selected_run, params)
 
 
 def build_dashboard(
@@ -253,6 +197,7 @@ def build_dashboard(
     *,
     cache_config: DashboardCacheConfig | None = None,
     params: ScoringParams | None = None,
+    view: DashboardView = DashboardView.FULL,
 ) -> dict[str, Any]:
     """Build a full dashboard response for *project* at *run*.
 
@@ -275,9 +220,22 @@ def build_dashboard(
             "trend": [],
         }
 
-    ctx, annotations = _select_run(reports_root, project, runs, run, params)
-    payload = _compute_dashboard_payload(reports_root, project, ctx, cc, params)
-    return _build_dashboard_result(project, runs, ctx.run, payload, annotations)
+    selected_run, selected_index = _resolve_selected_run(runs, run)
+    history = open_run_history(reports_root, project, runs, selected_run.run_id, cc, params)
+    dims = _selected_dims(reports_root, project, history, selected_run, params, view)
+    ctx = SelectedRunContext(
+        run=selected_run,
+        index=selected_index,
+        dimensions=dims,
+        summary=summarize_dimensions(dims, params),
+        runs=runs,
+    )
+    annotations = DimensionAnnotations(
+        exit_reason=read_run_exit_reason(reports_root, project, selected_run.run_id), view=view,
+    )
+    payload = compute_dashboard_payload(reports_root, project, ctx, history, params)
+    metadata = read_run_metadata(reports_root / project / ctx.run.run_id)
+    return build_dashboard_result(project, runs, ctx.run, payload, annotations, run_metadata=metadata)
 
 
 __all__ = [

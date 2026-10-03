@@ -1,11 +1,11 @@
-"""Differential + correctness for the accumulated cache: identical to direct,
-run-set invalidation, and parent-project cache bypass."""
+"""Differential + correctness for the rows-backed accumulated payload: identical
+to direct, run-set invalidation, and parent projects never memoized."""
 
 import pytest
 
 from quodeq.services.dashboard import clear_shared_dimension_cache
 from quodeq.services.dismissed import dismiss_finding
-from quodeq.services.scoring import get_project_scores
+from quodeq.services.scoring import get_project_scores, get_project_scores_stamped
 from tests.services._scalar_fixtures import build_projected_run
 
 
@@ -44,20 +44,15 @@ def test_new_run_invalidates_accumulated(tmp_path, monkeypatch):
     assert second["accumulated"] == get_project_scores(reports, "proj")["accumulated"]
 
 
-def test_parent_project_bypasses_cache(tmp_path, monkeypatch):
-    """A project WITH children must NOT use the accumulated cache (child dismissals
-    escape the version). Verified by making the cache helper raise if consulted."""
+def test_parent_project_is_not_memoized(tmp_path):
+    """A project WITH children folds in child dismissals the stamp cannot see,
+    so its payload is built on every request (stamp None) and never memoized."""
     reports = tmp_path / "evaluations"
     build_projected_run(reports, "parent", "20260101T000000", {"security": (7.0, "Fair")})
     child = reports / "child"
     child.mkdir(parents=True)
     (child / "repository_info.json").write_text('{"parent": "parent"}', encoding="utf-8")
 
-    import quodeq.services.scoring as scoring
-
-    def boom(*a, **k):
-        raise AssertionError("accumulated cache used for a parent project")
-    deps = scoring.ScoringDeps(cached_accumulated=boom)
-
-    result = get_project_scores(reports, "parent", deps=deps)   # must NOT raise (bypasses cache)
-    assert result is not None
+    first, stamp = get_project_scores_stamped(reports, "parent")
+    second, _ = get_project_scores_stamped(reports, "parent")
+    assert stamp is None and first is not None and first is not second

@@ -22,10 +22,9 @@ import remarkGfm from 'remark-gfm';
 import HelpFigure from '../../../components/HelpFigure.jsx';
 import GradeFormulaCurveFigure from './figures/GradeFormulaCurveFigure.jsx';
 import ScoreGroupingFigure from './figures/ScoreGroupingFigure.jsx';
-import gradeFormulaDark from '../../../assets/help/grade-formula.dark.webp';
-import gradeFormulaLight from '../../../assets/help/grade-formula.light.webp';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
 // `informative: true` means the figure's own svg already carries an
 // accessible name (role="img"/aria-label) that must reach the accessibility
@@ -35,7 +34,9 @@ const FIGURES = {
   GradeFormulaCurveFigure: { Component: GradeFormulaCurveFigure, informative: true },
   ScoreGroupingFigure: { Component: ScoreGroupingFigure },
 };
-const IMAGES = { gradeFormulaDark, gradeFormulaLight };
+// Screenshots a markdown figure may name with `@key`; none ship today (the
+// editor's shot was retired when the editor changed, see assets/help/CAPTURE.md).
+const IMAGES = {};
 
 // Registry lookups must consider OWN keys only. A plain object inherits from
 // Object.prototype, so `FIGURES['toString']` is a truthy function -- which
@@ -58,9 +59,18 @@ const ICONS = {
 
 const ICON_PREFIX = 'icon:';
 const TAG_PREFIX = 'tag:';
+// ```figure `component:` value meaning "plain image, no registered
+// component" -- the default when the markdown source omits it too.
+const FIGURE_COMPONENT_IMAGE = 'image';
+// mdast node type for a bold run (react-markdown's parsed tree), used to
+// find a Tip callout's leading bold title.
+const MDAST_STRONG = 'strong';
+// rehype/remark code-fence className convention: ```figure / ```text.
+const LANG_CLASS_FIGURE = 'language-figure';
+const LANG_CLASS_TEXT = 'language-text';
 
 function badgeLabel(kind) {
-  return kind === 'compliance'
+  return kind === FINDING_TYPE.COMPLIANCE
     ? t('explorer.compliantBadge')
     : severityLabel(kind).toUpperCase();
 }
@@ -81,7 +91,7 @@ function parseFigure(body) {
 
 function Figure({ body }) {
   const { component, caption, alt, srcDark, srcLight } = parseFigure(body);
-  if (component && component !== 'image') {
+  if (component && component !== FIGURE_COMPONENT_IMAGE) {
     const entry = pick(FIGURES, component);
     if (!entry) return null;
     const { Component: Inner, informative } = entry;
@@ -97,7 +107,7 @@ function Figure({ body }) {
  */
 function tipTitle(head) {
   const inner = head?.props?.children;
-  const strong = inner?.props?.type === 'strong'
+  const strong = inner?.props?.type === MDAST_STRONG
     ? inner
     : (Array.isArray(inner) ? inner[0] : inner);
   return strong?.props?.children ?? null;
@@ -143,8 +153,8 @@ const COMPONENTS = {
       }
       return <code>{children}</code>;
     }
-    if (className === 'language-figure') return <Figure body={text} />;
-    if (className === 'language-text') return <pre className="help-pre">{text}</pre>;
+    if (className === LANG_CLASS_FIGURE) return <Figure body={text} />;
+    if (className === LANG_CLASS_TEXT) return <pre className="help-pre">{text}</pre>;
     return <code className={className}>{children}</code>;
   },
   pre({ children }) { return children; },        // the code renderer emits its own wrapper

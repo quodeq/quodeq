@@ -11,8 +11,12 @@ from __future__ import annotations
 import json
 from typing import Callable
 
-_TOOL_USE_TYPE = "tool_use"
+BLOCK_TYPE_TOOL_USE = "tool_use"  # Claude assistant-message content block type (also read by assistant/adapters/_stream.py)
 _FILE_READ_TOOLS = frozenset({"Read", "Grep"})
+BLOCK_TYPE_TEXT = "text"  # Claude assistant-message content block type
+BLOCK_TYPE_OUTPUT_TEXT = "output_text"  # codex item.completed content block type
+ITEM_TYPE_AGENT_MESSAGE = "agent_message"  # codex item.completed: a complete assistant message
+_WARNING_TYPE_MCP = "mcp"  # copilot session.warning's warningType for an MCP-related warning
 
 # Stream event "type" values, compared more than once in this module (and by
 # assistant/adapters/_stream.py, which reads the same wire formats).
@@ -23,6 +27,8 @@ EVENT_TYPE_ITEM_COMPLETED = "item.completed"
 EVENT_TYPE_SESSION_WARNING = "session.warning"
 EVENT_TYPE_SESSION_ERROR = "session.error"
 EVENT_TYPE_TOOL_EXECUTION_START = "tool.execution_start"
+EVENT_TYPE_ERROR = "error"
+EVENT_TYPE_TURN_FAILED = "turn.failed"
 # Copilot's tool-name equivalents of Claude's _FILE_READ_TOOLS.
 _COPILOT_FILE_READ_TOOLS = frozenset({"view", "grep"})
 # Non-retryable reason code for a Copilot MCP-policy block. Read back by
@@ -33,8 +39,10 @@ COPILOT_MCP_POLICY_REASON = "copilot_mcp_policy"
 def texts_from_assistant(event: dict) -> list[str]:
     """Extract text blocks from an ``assistant`` stream event."""
     texts: list[str] = []
-    for block in (event.get("message") or {}).get("content") or []:
-        if block.get("type") == "text" and block.get("text"):
+    message = event.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    for block in content if isinstance(content, list) else []:
+        if isinstance(block, dict) and block.get("type") == BLOCK_TYPE_TEXT and block.get("text"):
             texts.append(block["text"])
     return texts
 
@@ -49,11 +57,11 @@ def texts_from_item_completed(event: dict) -> list[str]:
     """Extract text blocks from an ``item.completed`` stream event."""
     texts: list[str] = []
     item = event.get("item") or {}
-    if item.get("type") == "agent_message":
+    if item.get("type") == ITEM_TYPE_AGENT_MESSAGE:
         if item.get("text"):
             texts.append(item["text"])
         for block in item.get("content") or []:
-            if block.get("type") in ("text", "output_text") and block.get("text"):
+            if block.get("type") in (BLOCK_TYPE_TEXT, BLOCK_TYPE_OUTPUT_TEXT) and block.get("text"):
                 texts.append(block["text"])
     return texts
 
@@ -73,7 +81,7 @@ def texts_from_copilot(event: dict) -> list[str]:
 def _copilot_mcp_policy_error(data: dict) -> tuple[str, str] | None:
     """A blocked required server makes the run unusable, even if the CLI continues."""
     message = data.get("message")
-    if (data.get("warningType") != "mcp" or not isinstance(message, str)
+    if (data.get("warningType") != _WARNING_TYPE_MCP or not isinstance(message, str)
             or "blocked by policy" not in message.lower()):
         return None
     for server in ("findings", "quodeq-assistant"):
@@ -115,7 +123,7 @@ def extract_files_from_blocks(blocks: list) -> set[str]:
     """Extract file paths from Read/Grep tool_use blocks."""
     files: set[str] = set()
     for block in blocks:
-        if isinstance(block, dict) and block.get("type") == _TOOL_USE_TYPE and block.get("name") in _FILE_READ_TOOLS:
+        if isinstance(block, dict) and block.get("type") == BLOCK_TYPE_TOOL_USE and block.get("name") in _FILE_READ_TOOLS:
             fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
             if fp:
                 files.add(fp)

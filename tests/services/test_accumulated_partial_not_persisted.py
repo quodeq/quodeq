@@ -1,25 +1,26 @@
-"""The persist gate: a partial accumulated rescore must never enter the cache.
+"""The memo gate: a partial accumulated rescore must never enter ``_PAYLOADS``.
 
-End-to-end mutation cover for the ``cacheable=lambda: rescore_complete[0]``
-gate in ``get_project_scores`` (added with PR #924's guards but previously
-untested — neutralizing it left the whole suite green). The scenario is the
-2026-07-29 production incident: a rescore that covers only a subset of a
-run's dimensions may be SERVED once, but persisting it makes the partial
-payload a permanent cache hit that survives run completion.
+End-to-end mutation cover for the ``if complete:`` gate in
+``get_project_scores_stamped``. The scenario is the 2026-07-29 production
+incident: a winning run whose full read covers only a subset of the
+dimensions its rows graded may be SERVED once, but memoizing it makes the
+partial payload a hit that survives run completion.
 
-The assertion is on the persist call itself (``write_cached_accumulated``),
-not on score values: the shared fixtures bake no findings, so a poisoned and
-a correct payload can be score-identical — the write is the only reliable
-observable.
+The assertion is on the memo write itself, not on score values: the shared
+fixtures bake no findings, so a poisoned and a correct payload can be
+score-identical, and the write is the only reliable observable.
 """
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
-from quodeq.services import _score_cache_fetch, scoring
-from quodeq.services.dashboard import clear_shared_dimension_cache
+from quodeq.services import scoring
+from quodeq.services.dashboard import clear_shared_dimension_cache, make_run_dimension_fetcher
 from quodeq.services.dismissed import dismiss_finding
 from quodeq.services.scoring import get_project_scores
+from quodeq.shared.stamp_memo import StampCache
 from tests.services._scalar_fixtures import build_projected_run
 
 
@@ -42,36 +43,36 @@ def project(tmp_path):
     return reports
 
 
+class _SpyingMemo(StampCache):
+    def __init__(self):
+        super().__init__()
+        self.puts: list = []
+
+    def put(self, key, stamp, payload):
+        self.puts.append(stamp)
+        super().put(key, stamp, payload)
+
+
 @pytest.fixture()
-def persist_spy(monkeypatch):
-    calls: list = []
-    real_write = _score_cache_fetch.write_cached_accumulated
-
-    def spying_write(conn, project_name, version, payload):
-        calls.append(version)
-        return real_write(conn, project_name, version, payload)
-
-    # Patch where cached_accumulated resolves the write, not the facade:
-    # score_cache only re-exports the name.
-    monkeypatch.setattr(_score_cache_fetch, "write_cached_accumulated", spying_write)
-    return calls
+def persist_spy():
+    memo = _SpyingMemo()
+    with patch("quodeq.services.scoring._project_scores._PAYLOADS", memo):
+        yield memo.puts
 
 
 def test_partial_rescore_is_served_but_not_persisted(project, persist_spy):
-    real = scoring._rescore_runs_by_dimension
-
-    def partial(dims, reports_root, project_name, keys, *, params=None):
-        full = real(dims, reports_root, project_name, keys, params=params)
+    def partial_reads(reports_root, project_name):
+        full = make_run_dimension_fetcher(reports_root, project_name)
         # Simulate the incident: only the first-finished dimension came back.
-        return {k: v for k, v in full.items() if k == "security"}
+        return lambda run_id: [d for d in full(run_id) if d.dimension == "security"]
 
-    deps = scoring.ScoringDeps(rescore_runs_by_dimension=partial)
+    deps = scoring.ScoringDeps(base_fetcher_factory=partial_reads)
     payload = get_project_scores(project, "proj", deps=deps)
 
     assert payload is not None, "partial coverage must degrade to serving, not erroring"
     assert persist_spy == [], (
         "a rescore that covered 1 of 2 dimensions was persisted to the "
-        "accumulated cache — it will be served forever (the 2026-07-29 bug)"
+        "payload memo, it will be served forever (the 2026-07-29 bug)"
     )
 
 
@@ -81,6 +82,6 @@ def test_complete_rescore_is_persisted(project, persist_spy):
 
     assert payload is not None
     assert len(persist_spy) == 1, (
-        "a fully-covered rescore should be written to the accumulated cache "
+        "a fully-covered rescore should enter the payload memo "
         "exactly once — if this stopped happening the gate is over-blocking"
     )

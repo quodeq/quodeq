@@ -59,3 +59,25 @@ def test_respawn_unlimited_when_no_constraints(tmp_path):
         max_duration=0,        # 0 = unlimited pool budget
         deadline_at=None,
     ) == 5
+
+
+def _respawn_warnings(monkeypatch, tmp_path, **deadlines) -> list[str]:
+    warnings: list[str] = []
+    monkeypatch.setattr("quodeq.analysis.subagents._pool_scaling.log_warning", warnings.append)
+    queue = _queue(tmp_path, files=3)
+    assert should_respawn(
+        queue, queue._path, pool_start=time.monotonic(), max_duration=600, **deadlines,
+    ) == 0
+    return warnings
+
+
+def test_cut_by_a_dimension_slice_says_so(monkeypatch, tmp_path):
+    now = time.monotonic()
+    warnings = _respawn_warnings(
+        monkeypatch, tmp_path, deadline_at=now - 1, run_deadline_at=now + budget(60))
+    assert warnings == ["  Time budget reached (dimension slice) -- 3 files left, not spawning new agents"]
+
+
+def test_cut_by_the_run_deadline_says_so(monkeypatch, tmp_path):
+    warnings = _respawn_warnings(monkeypatch, tmp_path, deadline_at=time.monotonic() - 1)
+    assert warnings == ["  Time budget reached (run deadline) -- 3 files left, not spawning new agents"]

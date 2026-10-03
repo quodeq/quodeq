@@ -1,7 +1,7 @@
 """Tests for MCP server argument parsing."""
 from quodeq.analysis.mcp.args import parse_args
 
-# When --dimension is set, parse_args (Task 3.5) requires --cache-root and
+# When --dimension is set, parse_args requires --cache-root and
 # --model-id too. These tests focus on the `dimensions` split logic, so we
 # pass placeholder cache args to satisfy the enforcement.
 _CACHE_ARGS = ["--cache-root", "/tmp/cache", "--model-id", "sonnet"]

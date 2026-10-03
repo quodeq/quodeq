@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluationKeys, projectKeys, systemKeys, standardsKeys, settingsKeys } from "./queryKeys";
+import { evaluationKeys, projectKeys, systemKeys, standardsKeys, settingsKeys, projectsKeys } from "./queryKeys";
 
 describe("query key factories", () => {
   it("evaluationKeys.evaluation returns the run-scope prefix", () => {
@@ -50,6 +50,7 @@ describe("query key factories", () => {
     expect(projectKeys.dashboard("p1", "run-1", "shared")).toEqual(["project", "p1", "shared", "dashboard", "run-1"]);
   });
 
+
   it("a local prefix does not match a shared key (cache isolation)", () => {
     const localPrefix = projectKeys.project("p1", "local");
     const sharedKey = projectKeys.dashboard("p1", "run-1", "shared");
@@ -65,6 +66,14 @@ describe("query key factories", () => {
 
   it("systemKeys.ollama is the global ollama key", () => {
     expect(systemKeys.ollama()).toEqual(["system", "ollama"]);
+  });
+
+  it("projectsKeys.list points to the projects list", () => {
+    expect(projectsKeys.list()).toEqual(["projects", "list"]);
+  });
+
+  it("projectsKeys.clone points to the clone job slot", () => {
+    expect(projectsKeys.clone()).toEqual(["projects", "clone"]);
   });
 
   it("standardsKeys.list points to the standards list", () => {

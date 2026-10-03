@@ -14,7 +14,10 @@ from quodeq.data.fs.report_parser._report_parsing import build_finding, empty_se
 from quodeq.data.fs.report_parser._principle_map import build_principle_map
 
 _logger = logging.getLogger(__name__)
-_OVERALL_PRINCIPLE = "Overall"
+
+# The synthetic principle-grade entry's "principle" value below.
+# services/violations.py reads it back to find that entry after a rescore.
+OVERALL_PRINCIPLE = "Overall"
 
 
 def _build_principle_grades(
@@ -40,7 +43,7 @@ def _build_principle_grades(
     ]
     principle_grades.append(
         {
-            "principle": _OVERALL_PRINCIPLE,
+            "principle": OVERALL_PRINCIPLE,
             "score": data.get("overallScore"),
             "grade": data.get("overallGrade"),
             "isOverall": True,

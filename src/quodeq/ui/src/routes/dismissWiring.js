@@ -9,6 +9,7 @@
  * here, once.
  */
 import { dismissWithReconcile } from '../features/findings/dismissFlow.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 /**
  * Whether the selection points at the shared repository mirror.
@@ -17,18 +18,7 @@ import { dismissWithReconcile } from '../features/findings/dismissFlow.js';
  * @returns {boolean}
  */
 export function isSharedSource(selectedSource) {
-  return selectedSource === 'shared';
-}
-
-/**
- * Find a project in `projects` by the id-or-name key the app routes on.
- *
- * @param {Array|undefined} projects
- * @param {string|undefined} key
- * @returns {Object|null}
- */
-export function findProject(projects, key) {
-  return projects?.find((p) => (p.id || p.name) === key) || null;
+  return selectedSource === PROJECT_SOURCE.SHARED;
 }
 
 /**

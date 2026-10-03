@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
+from quodeq.data.projection.grade_projector import report_stamp
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 
 
@@ -54,6 +55,9 @@ def build_projected_run(
     evidence_dir.mkdir(parents=True, exist_ok=True)
     (evidence_dir / "manifest.json").write_text(
         json.dumps({"language_stats": {}}), encoding="utf-8")
+    # Same freeze for the coverage stamp: the reports above are newer than any
+    # stamp, so without it ensure_projected re-derives the baked grades.
+    store.save_coverage_stamp(report_stamp(run_dir))
     return run_dir
 
 

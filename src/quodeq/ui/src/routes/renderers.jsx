@@ -1,15 +1,14 @@
 /**
  * Route renderers: the per-route view composition App.jsx's MainContent
  * dispatches to, plus the prop-bundle builders the renderers consume.
- * Moved out of App.jsx verbatim (move-only refactor); App state arrives via
- * the explicit `props` bundles — no context. Everything here is exported so
- * the route contracts stay unit-testable without mounting the whole App
- * (which needs ~8 providers).
+ * App state arrives via the explicit `props` bundles — no context.
+ * Everything here is exported so the route contracts stay unit-testable
+ * without mounting the whole App (which needs ~8 providers).
  */
 import { lazy } from 'react';
 import EmptyState from '../components/EmptyState.jsx';
 import EmptyStateWithTour from '../features/onboarding/components/EmptyStateWithTour.jsx';
-import { isSharedSource, findProject, makeDismissHandler } from './dismissWiring.js';
+import { isSharedSource, makeDismissHandler } from './dismissWiring.js';
 import { t } from '../strings/index.js';
 import { buildEvalPrincipal, ViolationsRoute } from './violationsRoute.jsx';
 import { mapRoute } from './mapRoute.jsx';
@@ -17,6 +16,8 @@ import { historyRoute } from './historyRoute.jsx';
 import { compareRoute } from './compareRoute.jsx';
 import { buildDashboardDataBundle } from './dashboardDataBundle.js';
 import { buildNavigationBundle } from './navigationBundle.js';
+import { NAV_TAB } from '../vocab/navTab.js';
+import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 import {
   EvaluateCase, SettingsCase, renderEvalPrincipleDetail,
   resolveSelectionAfterSharedDisconnect,
@@ -31,28 +32,44 @@ const GradeFormulaPage = lazy(() => import('../features/grade-formula/GradeFormu
 const StandardsPage = lazy(() => import('../features/standards/StandardsPage.jsx'));
 const HelpPage = lazy(() => import('../features/help/components/HelpPage.jsx'));
 
-// The source gate, the project lookup, buildEvalPrincipal,
-// buildDashboardDataBundle and buildNavigationBundle are re-exported below
+// The source gate, buildEvalPrincipal, buildDashboardDataBundle and
+// buildNavigationBundle are re-exported below
 // (their consumers -- App.jsx, this file's own route renderers, and the tests
-// that pin producer/consumer contracts -- all import them from here) even
-// though they now live in sibling modules; see dismissWiring.js,
+// that pin producer/consumer contracts -- all import them from here); they
+// are defined in sibling modules: dismissWiring.js,
 // violationsRoute.jsx, dashboardDataBundle.js and navigationBundle.js.
-export { isSharedSource, findProject, makeDismissHandler };
+export { isSharedSource, makeDismissHandler };
 export { buildEvalPrincipal };
 export { buildDashboardDataBundle };
 export { buildNavigationBundle };
-// resolveSelectionAfterSharedDisconnect moved to routeCases.jsx with the
-// Settings route it serves; App.jsx and its tests still import it from here.
+// resolveSelectionAfterSharedDisconnect is defined in routeCases.jsx with the
+// Settings route it serves; App.jsx and its tests import it from here.
 export { resolveSelectionAfterSharedDisconnect };
 
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
 // hitting the "no analyzed projects yet" wall.
-const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula', 'compare'];
-const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
+const NO_PROJECT_TABS = [
+  NAV_TAB.PROJECTS, NAV_TAB.EVALUATE, NAV_TAB.STANDARDS, NAV_TAB.SETTINGS, NAV_TAB.HELP, NAV_TAB.GRADE_FORMULA, NAV_TAB.COMPARE,
+];
+const SELF_HANDLED_EMPTY = new Set([NAV_TAB.OVERVIEW, NAV_TAB.MAP, NAV_TAB.VIOLATIONS, NAV_TAB.HISTORY]);
 
 /**
- * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
+ * The dashboard page for a route. Every dashboard route navigates and
+ * retries; `callbacks` adds the route's own.
+ */
+function dashboardElement(props, runMode, callbacks = {}) {
+  return (
+    <DashboardPage
+      data={props.dashboardData}
+      callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry, ...callbacks }}
+      runMode={runMode}
+    />
+  );
+}
+
+/**
+ * @param {{ serverHealth: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
 // Exported for the same reason as buildEvalPrincipal — a unit-testable pin
@@ -60,25 +77,44 @@ const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history'])
 // whole App (which needs ~8 providers). Calling e.g.
 // ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
 // doesn't render, so the returned element's props can be asserted on directly.
+// After a disconnect (from Settings or the Repositories strip), a team
+// project selection has nowhere left to resolve: move it to a local one.
+function reselectAfterSharedDisconnect(navigation) {
+  const next = resolveSelectionAfterSharedDisconnect({
+    selectedSource: navigation.selectedSource,
+    projects: navigation.projects,
+  });
+  if (next) navigation.handleProjectChange(next.id, next.source);
+}
+
+// What the grade-formula editor knows about the reader's run: the worked
+// example and the TYPES tab read the selected run's dimensions.
+function gradeFormulaScope(params, props) {
+  const dashboard = props.dashboardData.dashboard;
+  const runDimensions = dashboard?.dimensions || [];
+  return {
+    project: props.navigation.selectedProject,
+    runId: dashboard?.selectedRun?.runId ?? null,
+    dimensions: runDimensions.map((d) => d.dimension),
+    dimension: params.dimension ?? null,
+    runDimensions,
+    selectedSource: props.navigation.selectedSource,
+  };
+}
+
 export const ROUTE_RENDERERS = {
-  overview: (params, props) => (
-    <DashboardPage
-      data={props.dashboardData}
-      callbacks={{
-        onNavigate: props.navigation.handleNavigate,
-        onRunSelect: props.navigation.handleRunSelect,
-        onProjectsReload: props.navigation.loadProjects,
-        onRetry: props.dashboardData.onRetry,
-        onProjectsRetry: props.dashboardData.onProjectsRetry,
-      }}
-      runMode={false}
-    />
-  ),
+  overview: (params, props) => dashboardElement(props, false, {
+    onRunSelect: props.navigation.handleRunSelect,
+    onRunHover: props.navigation.prefetchHandlers?.onRunHover,
+    onRunHoverEnd: props.navigation.prefetchHandlers?.onRunHoverEnd,
+    onProjectsReload: props.navigation.loadProjects,
+    onProjectsRetry: props.dashboardData.onProjectsRetry,
+  }),
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: mapRoute,
-  run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry, onProjectsRetry: props.dashboardData.onProjectsRetry }} runMode={true} />,
+  run: (params, props) => dashboardElement(props, true, { onProjectsRetry: props.dashboardData.onProjectsRetry }),
   history: historyRoute,
-  'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
+  [NAV_TAB.HISTORY_RUN]: (params, props) => dashboardElement(props, true),
   explorer: (params, props) => (
     <ExplorerPage
       project={params.fromProject || props.navigation.selectedProject}
@@ -90,6 +126,8 @@ export const ROUTE_RENDERERS = {
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}
       trend={props.dashboardData.dashboard?.trend || []}
+      sinceBaseline={params.fromProject ? undefined : props.dashboardData.dashboard?.sinceBaseline}
+      sinceBaselineRunId={props.dashboardData.dashboard?.selectedRun?.runId}
       granularity={props.dashboardData.granularity}
       onGranularityChange={props.dashboardData.onGranularityChange}
     />
@@ -108,12 +146,11 @@ export const ROUTE_RENDERERS = {
     }
     return (
       <EvaluateCase
-        evaluation={props.evaluation}
         selectedProject={props.navigation.selectedProject}
         projects={props.navigation.projects}
         preselectDims={params.preselectDims}
-        onGoToProjects={() => props.navigation.navTab('projects')}
-        onGoToSettings={() => props.navigation.navTab('settings')}
+        onGoToProjects={() => props.navigation.navTab(NAV_TAB.PROJECTS)}
+        onGoToSettings={() => props.navigation.navTab(NAV_TAB.SETTINGS)}
       />
     );
   },
@@ -136,8 +173,8 @@ export const ROUTE_RENDERERS = {
       })}
     />
   ),
-  evalprinciple: renderEvalPrincipleDetail,
-  'eval-principle-detail': renderEvalPrincipleDetail,
+  [NAV_TAB.EVAL_PRINCIPLE]: renderEvalPrincipleDetail,
+  [NAV_TAB.EVAL_PRINCIPLE_DETAIL]: renderEvalPrincipleDetail,
   finding: (params, props) => (
     <FindingDetailPage
       finding={params.finding}
@@ -156,16 +193,17 @@ export const ROUTE_RENDERERS = {
   ),
   settings: (params, props) => <SettingsCase
     settings={props.settings}
-    onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')}
-    onSharedDisconnected={() => {
-      const next = resolveSelectionAfterSharedDisconnect({
-        selectedSource: props.navigation.selectedSource,
-        projects: props.navigation.projects,
-      });
-      if (next) props.navigation.handleProjectChange(next.id, next.source);
-    }}
+    onOpenGradeFormula={() => props.navigation.handleNavigate(NAV_TAB.GRADE_FORMULA)}
+    onSharedDisconnected={() => reselectAfterSharedDisconnect(props.navigation)}
+    onShowWelcome={() => props.navigation.onTakeTour(WIZARD_SOURCE.SETTINGS)}
   />,
-  'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
+  [NAV_TAB.GRADE_FORMULA]: (params, props) => (
+    <GradeFormulaPage
+      navigation={props.navigation}
+      scope={gradeFormulaScope(params, props)}
+      runLabel={props.dashboardData.dashboard?.selectedRun?.dateLabel ?? null}
+    />
+  ),
   projects: (params, props) => (
     <ProjectsPage
       projects={props.navigation.projects}
@@ -176,21 +214,23 @@ export const ROUTE_RENDERERS = {
       actions={{
         onSelect: (id, source) => {
           props.navigation.handleProjectChange(id, source);
-          props.navigation.navTab('overview');
+          props.navigation.navTab(NAV_TAB.OVERVIEW);
         },
         onDelete: props.navigation.handleDeleteProject,
         onExport: props.navigation.handleExportProject,
         onRelocate: props.navigation.handleRelocateProject,
         onAddProject: props.navigation.onAddProject,
+        onStartAnalyze: props.navigation.onStartAnalyze,
         onImportProject: props.navigation.onImportProject,
+        onConnectEvaluations: props.navigation.onConnectEvaluations,
         onResumeSetup: props.navigation.onResumeSetup,
-        onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }),
-        onProjectsReload: props.navigation.loadProjects,
+        onFiltersChange: (filters) => props.navigation.handleNavigateReplace(NAV_TAB.PROJECTS, { filters }),
+        onSharedDisconnected: () => reselectAfterSharedDisconnect(props.navigation),
       }}
     />
   ),
-  standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
-  help: () => <HelpPage />,
+  standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab(NAV_TAB.EVALUATE, { preselectDims: dims })} />,
+  help: (params) => <HelpPage initialSection={params.section} />,
   compare: compareRoute,
 };
 
@@ -235,7 +275,7 @@ export function MainContent({ activePage, props }) {
     }
     return (
       <EmptyStateWithTour
-        onAdd={() => props.navigation.onAddProject()}
+        onAdd={() => props.navigation.onStartAnalyze()}
         onTour={() => props.navigation.onTakeTour()}
         onBrowseRemote={props.navigation.onBrowseRemote}
         isEvaluating={props.navigation.isEvaluating}

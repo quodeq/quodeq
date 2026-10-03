@@ -1,6 +1,6 @@
 """The CLI boundary resolves the run's environment once and passes it on.
 
-``_environ`` is that seam: ``os.environ`` when nothing is injected, and the
+``cli_environ`` is that seam: ``os.environ`` when nothing is injected, and the
 injected mapping otherwise — including an empty one, which means "no
 variables set" rather than "fall back to the process".
 """
@@ -9,15 +9,27 @@ from __future__ import annotations
 import argparse
 import io
 import os
+from unittest.mock import patch
 
-from quodeq._cli_env import _environ
+from quodeq._cli_env import cli_environ
+from quodeq.cli_evaluation import cli_env_int  # re-export
+
+
+def test_cli_env_int_logs_and_falls_back_on_malformed_value():
+    with patch("quodeq._cli_env._logger.warning") as warning:
+        result = cli_env_int("QUODEQ_MAX_TURNS", 5, env={"QUODEQ_MAX_TURNS": "not-a-number"})
+    assert result == 5
+    assert warning.called
+    message = warning.call_args.args[0] % warning.call_args.args[1:]
+    assert "QUODEQ_MAX_TURNS" in message
+    assert "not-a-number" in message
 
 
 def test_environ_returns_the_injected_mapping(monkeypatch):
     monkeypatch.setenv("FROM_PROCESS", "1")
-    assert _environ({"A": "1"}) == {"A": "1"}
-    assert _environ({}) == {}
-    assert _environ() is os.environ
+    assert cli_environ({"A": "1"}) == {"A": "1"}
+    assert cli_environ({}) == {}
+    assert cli_environ() is os.environ
 
 
 def test_update_notice_reads_the_injected_env(monkeypatch):
@@ -61,7 +73,7 @@ def _limits_args() -> argparse.Namespace:
 
 
 def test_resolve_limits_reads_every_cap_from_the_injected_env(monkeypatch):
-    from quodeq._cli_run_config import _resolve_limits
+    from quodeq._cli_run_config import resolve_limits
 
     # Every cap this phase reads, exported in the process environment.
     exported = {
@@ -72,7 +84,7 @@ def test_resolve_limits_reads_every_cap_from_the_injected_env(monkeypatch):
     for var, value in exported.items():
         monkeypatch.setenv(var, value)
 
-    injected = _resolve_limits(_limits_args(), {
+    injected = resolve_limits(_limits_args(), {
         "QUODEQ_MAX_TURNS": "12",
         "QUODEQ_MAX_DURATION": "34",
         "QUODEQ_TIME_LIMIT": "56",
@@ -89,7 +101,7 @@ def test_resolve_limits_reads_every_cap_from_the_injected_env(monkeypatch):
 
     # An empty mapping means "no variables set": every cap falls back to its
     # packaged default even though all six are exported in the process.
-    empty = _resolve_limits(_limits_args(), {})
+    empty = resolve_limits(_limits_args(), {})
     assert empty.max_turns is None
     assert empty.max_duration is None
     assert empty.time_limit is None

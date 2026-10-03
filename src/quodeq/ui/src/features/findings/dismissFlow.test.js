@@ -25,12 +25,11 @@ test('buildDismissPayload falls back req -> principle and dimension -> fallbackD
   assert.equal(own.dimension, 'Testing');
 });
 
-test('buildDismissPayload defaults every optional field to its empty shape', () => {
-  const p = buildDismissPayload({ file: 'a.py', principle: 'P', reason: 'r' });
-  assert.deepEqual(
-    { title: p.title, reqRefs: p.reqRefs, context: p.context, snippet: p.snippet, scope: p.scope, endLine: p.endLine, line: p.line },
-    { title: '', reqRefs: [], context: '', snippet: '', scope: '', endLine: 0, line: 0 },
-  );
+test('buildDismissPayload posts the identity only, never the detail', () => {
+  const p = buildDismissPayload({
+    file: 'a.py', principle: 'P', reason: 'r', snippet: 's', context: 'c', reqRefs: [{ req: 'x' }], title: 't', severity: 'major',
+  });
+  assert.deepEqual(p, { req: 'P', file: 'a.py', line: 0, dimension: '', principle: 'P' });
 });
 
 // ── resolveDismissTargetProject ────────────────────────────────────────

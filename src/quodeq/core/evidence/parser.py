@@ -9,7 +9,7 @@ from quodeq.core.evidence._options import EvidenceParseOptions
 from quodeq.core.evidence.refs import enrich_judgment, resolve_llm_refs
 from quodeq.core.utils.io import open_text
 from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
-from quodeq.core.evidence.req_mapping import _GroupedJudgments, _group_judgments
+from quodeq.core.evidence.req_mapping import GroupedJudgments, group_judgments
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 # Re-export for backward compatibility (external code imports these from parser)
@@ -35,7 +35,7 @@ class EvidenceContext:
 
 
 def _build_principles(
-    grouped: _GroupedJudgments, dimension_name: str, source_file_count: int = 0,
+    grouped: GroupedJudgments, dimension_name: str, source_file_count: int = 0,
 ) -> dict[str, PrincipleEvidence]:
     """Build scored PrincipleEvidence entries from grouped judgments."""
     all_keys = set(grouped.violations.keys()) | set(grouped.compliance.keys())
@@ -63,6 +63,22 @@ def _build_evidence(
         coverage_pct=compute_coverage_pct(context.files_read, context.source_file_count),
         principles=principles, dismissed_count=0, quarantined_count=quarantined,
         module=context.module, exit_reason=context.exit_reason,
+    )
+
+
+def _group(judgments: list[Judgment], dimension: str, options: EvidenceParseOptions) -> GroupedJudgments:
+    """Group *judgments* for *dimension* with the standards sources *options* names."""
+    return group_judgments(
+        judgments, dimension=dimension, evaluators_dir=options.evaluators_dir,
+        compiled_dir=options.compiled_dir, req_map_reader=options.req_map_reader,
+    )
+
+
+def _grouped_evidence(context: EvidenceContext, grouped: GroupedJudgments, dimension: str) -> Evidence:
+    """The Evidence for one dimension's *grouped* judgments."""
+    return _build_evidence(
+        context, _build_principles(grouped, dimension, context.source_file_count),
+        grouped.quarantined,
     )
 
 
@@ -100,14 +116,9 @@ def parse_jsonl_to_evidence_by_dimension(
     result: dict[str, Evidence] = {}
     all_quarantined = []
     for dim, dj in by_dim.items():
-        grouped = _group_judgments(dj, dimension=dim, evaluators_dir=options.evaluators_dir,
-                                   compiled_dir=options.compiled_dir,
-                                   req_map_reader=options.req_map_reader)
+        grouped = _group(dj, dim, options)
         all_quarantined.extend(grouped.quarantined_findings)
-        result[dim] = _build_evidence(
-            context, _build_principles(grouped, dim, context.source_file_count),
-            grouped.quarantined,
-        )
+        result[dim] = _grouped_evidence(context, grouped, dim)
     if options.on_quarantine is not None and all_quarantined:
         options.on_quarantine(all_quarantined)
     return result
@@ -119,17 +130,12 @@ def parse_jsonl_to_evidence(
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
     # NOTE: read_judgments materializes all judgments into a list.  This is
-    # intentional because _group_judgments needs random access and the caller
+    # intentional because group_judgments needs random access and the caller
     # indexes judgments[0] for the dimension name.  For streaming scenarios use
     # parse_jsonl_to_evidence_by_dimension which groups incrementally.
     judgments = read_judgments(jsonl_file, options)
     dim = judgments[0].dimension if judgments else ""
-    grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=options.evaluators_dir,
-                               compiled_dir=options.compiled_dir,
-                               req_map_reader=options.req_map_reader)
+    grouped = _group(judgments, dim, options)
     if options.on_quarantine is not None and grouped.quarantined_findings:
         options.on_quarantine(grouped.quarantined_findings)
-    return _build_evidence(
-        context, _build_principles(grouped, dim, context.source_file_count),
-        grouped.quarantined,
-    )
+    return _grouped_evidence(context, grouped, dim)

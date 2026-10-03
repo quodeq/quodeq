@@ -1,8 +1,12 @@
 from __future__ import annotations
+
+import json
+import os
 from pathlib import Path
 
 import pytest
 
+from quodeq.data.fs import run_artifacts
 from quodeq.data.fs.dimensions_state_store import (
     DimState,
     IllegalDimTransitionError,
@@ -53,8 +57,7 @@ class TestStateMachine:
 
     def test_atomic_write_rename(self, tmp_path: Path):
         write_dim_state(tmp_path, "security", DimState.PENDING)
-        # No leftover .tmp files.
-        assert not (tmp_path / "dimensions.json.tmp").exists()
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["dimensions.json"]
 
 
 class TestTransitionTimestampsPreserved:
@@ -99,3 +102,30 @@ class TestRead:
         callers like build_job_snapshot."""
         (tmp_path / "dimensions.json").write_bytes(b"\xff\xfe\x00\x01")
         assert read_dimensions(tmp_path) == {"schema_version": 1, "dimensions": {}}
+
+
+def _failing_dump(fd, tmp_path, path, data, *, indent=None, mode=None):
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write('{"schema_version": ')
+    raise OSError("disk full")
+
+
+class TestAtomicWrite:
+    def test_write_succeeds_when_the_old_fixed_temp_name_is_taken(self, tmp_path: Path):
+        (tmp_path / "dimensions.json.tmp").mkdir()
+        write_dim_state(tmp_path, "security", DimState.PENDING)
+        assert read_dimensions(tmp_path)["dimensions"]["security"]["state"] == "pending"
+
+    def test_failed_write_leaves_the_target_untouched_and_no_temp_file(self, tmp_path: Path, monkeypatch):
+        write_dim_state(tmp_path, "security", DimState.PENDING)
+        before = (tmp_path / "dimensions.json").read_text(encoding="utf-8")
+        monkeypatch.setattr(run_artifacts, "dump_json_and_replace", _failing_dump)
+        with pytest.raises(OSError):
+            write_dim_state(tmp_path, "security", DimState.RUNNING)
+        assert (tmp_path / "dimensions.json").read_text(encoding="utf-8") == before
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["dimensions.json"]
+
+    def test_on_disk_format_is_indented_json_without_trailing_newline(self, tmp_path: Path):
+        write_dim_state(tmp_path, "security", DimState.PENDING)
+        text = (tmp_path / "dimensions.json").read_text(encoding="utf-8")
+        assert text == json.dumps(json.loads(text), indent=2)

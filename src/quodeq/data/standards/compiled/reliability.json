@@ -2,6 +2,9 @@
   "id": "reliability",
   "name": "Reliability",
   "description": "How dependably the system performs its required functions over time. Maturity, fault tolerance, and recoverability keep failures rare, contained, and easy to bounce back from when they happen.",
+  "type": "iso",
+  "subtype": "25010",
+  "version": "2023.11",
   "sources": [
     "iso25010",
     "cisq",
@@ -489,7 +492,7 @@
         {
           "id": "R-FT-7",
           "source": "iso25010",
-          "text": "Catch blocks MUST target specific exception types, not generic Exception",
+          "text": "Catch blocks MUST target specific exception types, not generic Exception. A generic catch is compliant only when it re-raises the caught exception (or checks its type and rethrows every other one), or at a fault-isolation boundary (a thread or task entry point, one iteration of an event loop or work queue, or a third-party or plugin callback) that records the error with its stack trace at warning level or above and does not continue with partially-updated state; a generic catch around ordinary logic is a violation",
           "severity": null,
           "scope": null,
           "refs": [

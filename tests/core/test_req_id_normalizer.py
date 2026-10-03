@@ -80,7 +80,7 @@ class TestResolverUsesTheFold:
 
     def test_canonical_id_tuple_is_built_once(self, monkeypatch):
         """resolve() runs once per judgment; the fold's id tuple must not be rebuilt per call."""
-        import quodeq.core.evidence.req_mapping as mod
+        import quodeq.core.admission.index as mod  # the resolver folds through admission
         seen: list[object] = []
 
         def spy(raw, canonical_ids):

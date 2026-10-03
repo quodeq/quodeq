@@ -13,12 +13,12 @@ from ._finding_enricher_helpers import _enricher
 # dedup_key
 # ---------------------------------------------------------------------------
 
-def test_dedup_key_resolves_principle_from_reqs() -> None:
+def test_dedup_key_identifies_a_finding_by_its_canonical_requirement() -> None:
     reqs = {"S-CON-1": {"principle": "Confidentiality", "text": "..."}}
-    key = _enricher(compiled_reqs=reqs).dedup_key(
-        {"req": "S-CON-1", "file": "a.py", "line": 1, "t": "violation"}
+    key = _enricher(compiled_reqs=reqs, dimension="security").dedup_key(
+        {"req": "s-con-1", "file": "a.py", "line": 1, "t": "violation"}
     )
-    assert key == ("Confidentiality", "a.py", 1, "violation")
+    assert key == ("S-CON-1", "a.py", 1, "violation")
 
 
 def test_dedup_key_uses_explicit_principle() -> None:

@@ -1,9 +1,11 @@
 """Shared helpers for the ``/api/shared/*`` route modules.
 
-``_with_shared_root`` and ``_validate_segment`` are used by the config, pull,
-and read-only mirror route registrars alike; ``_shared_project_dir`` by the
-pull route and two of the mirrors. Split out of routes_shared.py so
-those registrars can share one implementation instead of three copies.
+``with_shared_root`` is used by the config, pull and read-only mirror route
+registrars alike; ``shared_project_dir`` by the pull route and two of the
+mirrors. Every shared route validates its path segments with
+``helpers.validate_segment``, even where the local route it mirrors relies
+on the service layer's own traversal check: defense in depth for a surface
+that serves a second, independently-controlled clone.
 """
 from __future__ import annotations
 
@@ -15,20 +17,31 @@ from pathlib import Path
 
 from flask import Response
 
+from quodeq.api._constants import CODE_NO_SHARED_REPO, MESSAGE_NO_SHARED_REPO
 from quodeq.api.helpers import json_error
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import (
+    RepoFormat,
     read_state,
     shared_evaluations_root,
     shared_score_cache_path,
 )
 from quodeq.services.shared_settings import read_settings
-from quodeq.shared.validation import resolve_child_dir, validate_path_segment
+from quodeq.shared.validation import resolve_child_dir
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
-def _with_shared_root(fn):
+def no_shared_repo_error(status: int) -> tuple[Response, int]:
+    """The answer for a shared-repository route when none is configured.
+
+    The read mirrors and assistant sessions answer 409; config actions that
+    need a repository to act on answer 400.
+    """
+    return json_error(MESSAGE_NO_SHARED_REPO, status, CODE_NO_SHARED_REPO)
+
+
+def with_shared_root(fn):
     """Resolve the configured clone; inject eval_root; scope the score cache.
 
     Every decorated route becomes: 409 when unconfigured, 409 when the
@@ -52,24 +65,22 @@ def _with_shared_root(fn):
     def wrapper(*args, **kwargs):
         settings = read_settings()
         if not settings.url:
-            return json_error(
-                "no shared repository configured", HTTPStatus.CONFLICT, "NO_SHARED_REPO"
-            )
+            return no_shared_repo_error(HTTPStatus.CONFLICT)
         state = read_state(settings.url)
-        if state == "unsupported_version":
+        if state == RepoFormat.UNSUPPORTED_VERSION:
             return json_error(
                 "this shared repository requires a newer version of quodeq",
                 HTTPStatus.CONFLICT,
                 "UNSUPPORTED_VERSION",
             )
-        if state == "foreign":
+        if state == RepoFormat.FOREIGN:
             return json_error(
                 "the configured repository does not look like a quodeq results repository"
                 " — reconnect it in Settings",
                 HTTPStatus.CONFLICT,
                 "FOREIGN_REPO",
             )
-        if state == "missing":
+        if state == RepoFormat.MISSING:
             return json_error(
                 "the shared repository has not been cloned yet — reconnect it in Settings",
                 HTTPStatus.SERVICE_UNAVAILABLE,
@@ -85,28 +96,13 @@ def _with_shared_root(fn):
     return wrapper
 
 
-def _validate_segment(*segments: str) -> tuple[Response, int] | None:
-    """Shared-route path-segment guard.
-
-    Every shared mirror that takes a project/run/dimension segment validates
-    it here, even where the local route it mirrors relies solely on the
-    service layer's own traversal check — defense in depth for a surface
-    that serves a second, independently-controlled clone.
-    """
-    try:
-        validate_path_segment(*segments)
-    except ValueError:
-        return json_error("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-    return None
-
-
-def _shared_project_dir(eval_root: Path, project: str) -> Path | None:
+def shared_project_dir(eval_root: Path, project: str) -> Path | None:
     """Resolve *project* under *eval_root* by listing; None if there is no such entry.
 
     *project* is matched against real directory entries rather than joined onto
     *eval_root*, so a hostile value matches nothing instead of needing to be
     contained afterwards. None means absent, not invalid: callers run
-    _validate_segment first, so a bad name is already a 400 by this point.
+    validate_segment first, so a bad name is already a 400 by this point.
     """
     resolved = resolve_child_dir(eval_root, project)
     return Path(resolved) if resolved is not None else None

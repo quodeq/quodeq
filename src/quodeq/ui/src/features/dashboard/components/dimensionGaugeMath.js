@@ -1,5 +1,7 @@
 import { exitReasonLabel, exitReasonHint } from '../../../models/exitReason.js';
 import { t, LOCALE } from '../../../strings/index.js';
+import { EXIT_REASON } from '../../../vocab/exitReason.js';
+import { PERCENT } from '../../../constants.js';
 
 /**
  * Build a coverage record for the gauge card's footer line.
@@ -24,10 +26,10 @@ function hasFileCounts(filesRead, sourceFileCount) {
 export function computeCoverageInfo(filesRead, sourceFileCount, exitReason) {
   const hasCounts = hasFileCounts(filesRead, sourceFileCount);
   const coveragePct = hasCounts
-    ? Math.round((filesRead / sourceFileCount) * 100)
+    ? Math.round((filesRead / sourceFileCount) * PERCENT)
     : null;
   const coverageIncomplete = hasCounts && filesRead < sourceFileCount;
-  const exitIncomplete = typeof exitReason === 'string' && exitReason !== 'done';
+  const exitIncomplete = typeof exitReason === 'string' && exitReason !== EXIT_REASON.DONE;
   const isPartial = coverageIncomplete || exitIncomplete;
   return { filesRead, sourceFileCount, coveragePct, exitReason, isPartial };
 }
@@ -42,7 +44,7 @@ export function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) 
     parts.push(t('overview.stoppedReason', { reason: exitReasonLabel(exitReason) }));
     // A failure-streak (circuit-breaker) dimension is salvaged and shown with a
     // provisional score, but kept out of the overall grade. Say so explicitly.
-    if (exitReason === 'failure_streak') {
+    if (exitReason === EXIT_REASON.FAILURE_STREAK) {
       parts.push(t('overview.excludedFromGrade'));
     }
     const hint = exitReasonHint(exitReason);

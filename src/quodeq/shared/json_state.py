@@ -11,10 +11,12 @@ import json
 import logging
 import os
 import tempfile
-from dataclasses import asdict
+import typing
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
+from quodeq.shared.env_paths import home_state_dir
 from quodeq.shared.env_resolve import resolve_env
 
 _StateT = TypeVar("_StateT")
@@ -33,8 +35,25 @@ def state_file_path(
     explicit = environ.get(explicit_var)
     if explicit:
         return explicit
-    base = environ.get("QUODEQ_DIR") or str(Path.home() / ".quodeq")
+    base = environ.get("QUODEQ_DIR") or str(home_state_dir())
     return str(Path(base) / filename)
+
+
+def _matches_declared_type(value: Any, hint: Any) -> bool:
+    """True when *value* fits *hint* (a resolved dataclass field annotation).
+
+    *hint* missing (no annotation could be resolved) fits anything, so a
+    schema this helper cannot introspect never drops a field it shouldn't.
+    A parameterized generic (e.g. ``list[str]``) also fits anything: none of
+    the fields this module reads use one today, and ``isinstance`` rejects
+    those outright rather than checking the element type.
+    """
+    if hint is None:
+        return True
+    try:
+        return isinstance(value, hint)
+    except TypeError:
+        return True
 
 
 def read_json_state(path: Path, cls: type[_StateT]) -> _StateT:
@@ -42,7 +61,12 @@ def read_json_state(path: Path, cls: type[_StateT]) -> _StateT:
 
     A missing, unreadable, non-JSON or non-object file yields ``cls()``.
     Unknown keys are dropped so an older process can read a file written by
-    a newer one.
+    a newer one. A known key whose value's runtime type does not match the
+    field's declared type is dropped too, so a type-corrupt file (e.g. a
+    number where a version string belongs) still yields a *cls* instance
+    every field of which has the type callers expect -- one bad field must
+    not turn into an ``AttributeError`` several calls downstream, in code
+    that has no reason to expect this file's shape.
     """
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -51,7 +75,46 @@ def read_json_state(path: Path, cls: type[_StateT]) -> _StateT:
     if not isinstance(raw, dict):
         return cls()
     known = {f for f in cls().__dict__}
-    return cls(**{k: v for k, v in raw.items() if k in known})
+    hints = typing.get_type_hints(cls)
+    return cls(**{
+        k: v for k, v in raw.items()
+        if k in known and _matches_declared_type(v, hints.get(k))
+    })
+
+
+def dump_json_to_fd(
+    fd: int, data: object, *, indent: int | None = None, fsync: bool = False,
+) -> None:
+    """Write *data* as JSON into the open file *fd* and close it.
+
+    *fsync* forces the bytes to disk before the close, for files a crash must
+    not leave empty once they are published. *fd* is closed on return or on
+    error.
+    """
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=indent)
+        if fsync:
+            fh.flush()
+            os.fsync(fh.fileno())
+
+
+def dump_json_and_replace(
+    fd: int, tmp_path: str, path: Path, data: object, *,
+    indent: int | None = None, mode: int | None = None,
+) -> None:
+    """Write *data* as JSON into the open temp file *fd*, then move *tmp_path* onto *path*.
+
+    The publish step of an atomic JSON write: the caller makes the temp file
+    (``tempfile.mkstemp`` next to *path*) and owns cleanup and error policy.
+    ``os.replace`` is atomic and overwrites on every platform, so a reader
+    never sees a half-written file. *fd* is closed on return or on error.
+    *mode*, when given, is set on the temp file before the replace, so the
+    file is never visible at *path* with looser permissions.
+    """
+    dump_json_to_fd(fd, data, indent=indent)
+    if mode is not None:
+        os.chmod(tmp_path, mode)
+    os.replace(tmp_path, str(path))
 
 
 def write_json_state(
@@ -67,14 +130,41 @@ def write_json_state(
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp_fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
-            fh.write(json.dumps(asdict(state), indent=2))
-        os.replace(tmp_name, path)
+        dump_json_and_replace(tmp_fd, tmp_name, path, asdict(state), indent=2)
     except OSError as exc:
-        # fail-silent: this write is never worth crashing over
-        logger.debug("%s state write failed (fail-soft): %s", label, exc)
+        # fail-silent: this write is never worth crashing over, but a warning
+        # (not debug) means the failure is actually visible.
+        logger.warning("%s state write failed (fail-soft): %s", label, exc)
         if tmp_name is not None:
             try:
                 os.unlink(tmp_name)
             except OSError as inner_exc:
                 logger.debug("temp %s state file %s not removed: %s", label, tmp_name, inner_exc)
+
+
+@dataclass(frozen=True)
+class JsonStateFile(Generic[_StateT]):
+    """One named state file: where it lives, how it is read, how it is written.
+
+    *explicit_var* is the env var that overrides the location, *filename* the
+    name under the state directory, *cls* the dataclass stored in it, *label*
+    the name used in *logger*'s debug lines when a write fails.
+    """
+
+    cls: type[_StateT]
+    explicit_var: str
+    filename: str
+    label: str
+    logger: logging.Logger
+
+    def path(self, env: dict[str, str] | None = None) -> str:
+        """The file's path; *env* overrides ``os.environ`` for tests."""
+        return state_file_path(self.explicit_var, self.filename, env)
+
+    def read(self, path: str) -> _StateT:
+        """The state stored at *path*, or defaults when the file is missing or corrupt."""
+        return read_json_state(Path(path), self.cls)
+
+    def write(self, state: _StateT, path: str) -> None:
+        """Persist *state* to *path* atomically; failures are logged, never raised."""
+        write_json_state(state, Path(path), self.label, self.logger)

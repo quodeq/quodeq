@@ -8,8 +8,9 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from quodeq.api._constants import ERROR_CODE_BAD_REQUEST
+from quodeq.api._constants import CODE_FORBIDDEN, CODE_INVALID_INPUT, CODE_NOT_FOUND, ERROR_CODE_BAD_REQUEST
 from quodeq.shared.errors import ClientMessageError  # noqa: F401 -- re-export for api modules
+from quodeq.shared.validation import validate_path_segment
 
 
 def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
@@ -17,18 +18,22 @@ def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any]
     return {"error": message, "code": code}, status
 
 
-def json_error(message: str, status: int, code: str) -> tuple[Response, int]:
-    """``error_response`` already jsonified, as a ``(Response, status)`` tuple.
+def jsonify_error(error: tuple[dict[str, Any], int]) -> tuple[Response, int]:
+    """Turn an ``error_response``-style ``(body, status)`` pair into ``(Response, status)``.
 
-    For the handlers annotated to return a ``Response``: one call replaces
-    the ``body, status = error_response(...)`` plus
-    ``return jsonify(body), status`` pair that stood at a hundred-odd sites.
+    For handlers annotated to return a ``Response`` that receive an error
+    pair from a validator such as ``path_from_body`` or ``scan_target_error``.
     """
-    body, status_code = error_response(message, status, code)
-    return jsonify(body), status_code
+    body, status = error
+    return jsonify(body), status
 
 
-def _json_object_or_error(
+def json_error(message: str, status: int, code: str) -> tuple[Response, int]:
+    """``error_response`` already jsonified, as a ``(Response, status)`` tuple."""
+    return jsonify_error(error_response(message, status, code))
+
+
+def json_object_or_error(
     code: str = ERROR_CODE_BAD_REQUEST,
 ) -> dict[str, Any] | tuple[dict[str, Any], int]:
     """Return the request's JSON object body, or a 400 error tuple.
@@ -47,7 +52,57 @@ def _json_object_or_error(
     return payload
 
 
-def _path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
+def optional_json_object_or_error(
+    code: str = ERROR_CODE_BAD_REQUEST, *, force: bool = False,
+) -> dict[str, Any] | tuple[dict[str, Any], int]:
+    """Return the JSON object body, ``{}`` when there is none, or a 400 tuple.
+
+    For handlers where every field is optional: no body (or an unparseable
+    one) means ``{}``, as the old ``get_json(silent=True) or {}`` did. A body
+    that parses to a list or scalar answers a coded 400 instead of reaching
+    ``.get`` and answering an HTML 500.
+
+    ``cache=False``: Flask's ``get_json`` caches its parsed result keyed only
+    by ``silent``, not by ``force`` -- a bare ``or {}`` call after a
+    ``force=True`` one in the same request would otherwise see the earlier
+    call's cached body instead of re-checking the content type.
+    """
+    payload = request.get_json(force=force, silent=True, cache=False)
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, code)
+    return payload
+
+
+def optional_json_object_or_response(
+    code: str = ERROR_CODE_BAD_REQUEST, *, force: bool = False,
+) -> dict[str, Any] | tuple[Response, int]:
+    """``optional_json_object_or_error`` with the error already jsonified.
+
+    Returns the body dict (``{}`` when there is none), or the ``(Response,
+    status)`` pair a handler returns as-is.
+    """
+    payload = optional_json_object_or_error(code, force=force)
+    if isinstance(payload, dict):
+        return payload
+    return jsonify_error(payload)
+
+
+def validate_segment(*segments: str, message: str = "Invalid parameter") -> tuple[Response, int] | None:
+    """A coded 400 when any of *segments* is not a plain path segment, else None.
+
+    Guards every route parameter that is joined onto a filesystem path;
+    *message* lets a route name what it expected (e.g. "Invalid project name").
+    """
+    try:
+        validate_path_segment(*segments)
+    except ValueError:
+        return json_error(message, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
+    return None
+
+
+def path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
     """Return the request body's stripped ``path``, or a 400 error tuple.
 
     Shared by PATCH /api/projects/<project>/path and POST /api/scan so both
@@ -57,7 +112,7 @@ def _path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
     """
     raw = data.get("path", "")
     if not isinstance(raw, str):
-        return error_response("path must be a string", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return error_response("path must be a string", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     return raw.strip()
 
 
@@ -78,7 +133,7 @@ def _page_int(args, name: str, default: int, minimum: int, kind: str, code: str)
         return default
     try:
         value = int(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         # TypeError: request.args only ever holds str, but a direct call
         # with a list or other non-str value must answer the same 400.
         return error_response(f"{name} must be {kind}, got {raw!r}", HTTPStatus.BAD_REQUEST, code)
@@ -93,7 +148,7 @@ def page_params(
     default_limit: int,
     default_offset: int = _DEFAULT_PAGE_OFFSET,
     min_limit: int = _MIN_PAGE_LIMIT,
-    code: str = "INVALID_INPUT",
+    code: str = CODE_INVALID_INPUT,
 ) -> tuple[int, int] | tuple[dict[str, Any], int]:
     """Parse and validate ``limit``/``offset`` for a paginated route.
 
@@ -120,7 +175,7 @@ def page_params(
     return limit, offset
 
 
-def _sanitize_for_log(value: str) -> str:
+def sanitize_for_log(value: str) -> str:
     """Remove CR/LF from a value before including it in a log message.
 
     Prevents log forging when client-supplied values contain embedded
@@ -148,11 +203,11 @@ def scan_target_error(target_path: Path | str, reports_root: str) -> tuple[dict[
     _allowed_roots = (os.path.realpath(str(Path.home())), os.path.realpath(reports_root))
     if not any(candidate == root or candidate.startswith(root + os.sep) for root in _allowed_roots):
         return error_response(
-            "Scan path must be under home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN",
+            "Scan path must be under home directory", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN,
         )
     # Block scanning system directories to prevent information disclosure
     if any(candidate.startswith(b) for b in _BLOCKED_SCAN_PATHS):
-        return error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
+        return error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)
     return None
 
 
@@ -162,7 +217,8 @@ def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
     Returns an error message string if validation fails, or ``None`` if valid.
     Required fields: ``repo`` (non-empty string).
     Optional typed fields: ``discipline`` (str), ``dimensions`` (str),
-    ``numerical`` (bool), ``aiCmd`` (str), ``aiModel`` (str),
+    ``numerical``, ``verifyFindings``, ``perDimension``, ``cleanScan``,
+    ``incremental`` (bool), ``aiCmd`` (str), ``aiModel`` (str),
     ``subagentModel`` (str).
     """
     missing: list[str] = []
@@ -188,9 +244,11 @@ def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
         if value is not None and not isinstance(value, str):
             invalid.append(f"{field} (must be a string)")
 
-    numerical = payload.get("numerical")
-    if numerical is not None and not isinstance(numerical, bool):
-        invalid.append("numerical (must be a boolean)")
+    bool_fields = ("numerical", "verifyFindings", "perDimension", "cleanScan", "incremental")
+    for field in bool_fields:
+        value = payload.get(field)
+        if value is not None and not isinstance(value, bool):
+            invalid.append(f"{field} (must be a boolean)")
 
     parts: list[str] = []
     if missing:
@@ -218,9 +276,19 @@ def register_static_routes(app: Flask, static_dist: str | None) -> None:
         """Serve a static file or fall back to the SPA index."""
         resolved = (dist / path).resolve()
         if not resolved.is_relative_to(dist):
-            return jsonify({"error": "Forbidden", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+            return json_error("Forbidden", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)
         if resolved.is_file():
             return send_from_directory(str(dist), path)
         if path.startswith('api/'):
-            return jsonify({"error": "Not found", "code": "NOT_FOUND"}), HTTPStatus.NOT_FOUND
+            return json_error("Not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return send_from_directory(str(dist), 'index.html')
+
+
+def dimension_eval_response(payload: Any) -> Response | tuple[Response, int]:
+    """Old path for the wire shaping now in ``api.dimension_eval_wire``.
+
+    Deferred import: ``dimension_eval_wire`` imports ``json_error`` from
+    this module, so importing it back at module level here would cycle.
+    """
+    from quodeq.api.dimension_eval_wire import dimension_eval_response as _impl  # noqa: PLC0415
+    return _impl(payload)

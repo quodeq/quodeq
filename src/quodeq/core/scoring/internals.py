@@ -6,17 +6,18 @@ from typing import Any
 
 from quodeq.core.scoring.constants import (  # noqa: F401 — re-exports
     GRADE_LADDER,
+    MAX_SCORE,
     SCALE_TIER_NAMES,
-    _MAX_PENALTY_MULTIPLIER,
-    _RATIO_DAMPENING_TABLE,
-    _SCALE_TIERS,
-    _SEVERITY_WEIGHT,
-    _WEIGHT_DOUBLE,
-    _WEIGHT_TRIPLE,
+    MAX_PENALTY_MULTIPLIER,
+    RATIO_DAMPENING_TABLE,
+    SCALE_TIERS,
+    SEVERITY_WEIGHT,
+    WEIGHT_DOUBLE,
+    WEIGHT_TRIPLE,
     scale_multiplier,
 )
 from quodeq.core.scoring._tallies import (  # noqa: F401 — re-exports
-    _weighted_sum,
+    weighted_sum,
     evidence_has_taxonomy,
     tally_types,
 )
@@ -42,10 +43,10 @@ def violation_base(
     Uses a hyperbolic curve: ``base = 10 / (1 + K * weighted_violations)``
     Returns a value in [0, 10].
     """
-    wv = _weighted_sum(violation_type_counts, params.severity_weight)
+    wv = weighted_sum(violation_type_counts, params.severity_weight)
     if wv == 0:
-        return 10.0
-    return 10.0 / (1.0 + params.base_k * wv)
+        return float(MAX_SCORE)
+    return MAX_SCORE / (1.0 + params.base_k * wv)
 
 
 def compliance_lift(
@@ -57,8 +58,8 @@ def compliance_lift(
 
     Returns a value in [0, 1] representing the fraction of the gap filled.
     """
-    wv = _weighted_sum(violation_type_counts, params.severity_weight)
-    cc = sum(compliance_type_counts.get(sev, 0) for sev in compliance_type_counts)
+    wv = weighted_sum(violation_type_counts, params.severity_weight)
+    cc = sum(compliance_type_counts.values())
     if cc == 0 or wv == 0:
         return 0.0
     raw_lift = cc / (cc + wv)
@@ -73,10 +74,10 @@ def violation_ceiling(
 
     ``ceiling = 10 - log2(1 + wv) * CEIL_SCALE``
     """
-    wv = _weighted_sum(violation_type_counts, params.severity_weight)
+    wv = weighted_sum(violation_type_counts, params.severity_weight)
     if wv == 0:
-        return 10.0
-    return 10.0 - math.log2(1.0 + wv) * params.ceil_scale
+        return float(MAX_SCORE)
+    return MAX_SCORE - math.log2(1.0 + wv) * params.ceil_scale
 
 
 def severity_grade_floor(
@@ -90,20 +91,23 @@ def severity_grade_floor(
         return params.floor_major
     if violation_type_counts.get("minor", 0) > 0:
         return params.floor_minor
-    return 10.0
+    return float(MAX_SCORE)
 
 
 def finding_to_scoring_dict(f: Finding) -> dict[str, Any]:
     """Convert a Finding dataclass to the dict format scoring internals expect.
 
-    Only includes 'vt' when the finding has an explicit violation_type, so
-    ``evidence_has_taxonomy()`` selects the same mode (taxonomy vs reason)
-    that the original evaluation used.
+    Carries ``req`` so the tally groups untagged findings by requirement code
+    on the SQL path exactly as the evidence path does. Includes ``vt`` only
+    when the finding has an explicit violation_type, so
+    ``evidence_has_taxonomy()`` reports the same mode the evaluation used.
     """
     d: dict[str, Any] = {
         "severity": f.severity or "minor",
         "reason": f.reason or "",
     }
+    if f.req:
+        d["req"] = f.req
     if f.violation_type:
         d["vt"] = f.violation_type
     return d
@@ -139,12 +143,25 @@ def principle_score_and_grade(
     to it, so a principle with violations can never reach a clean score on
     volume of compliance alone. Returns (score, grade_label).
     """
-    base = violation_base(vt_counts, params=params)
-    lift = compliance_lift(ct_counts, vt_counts, params=params)
-    raw = base + (10.0 - base) * lift
-    final = clamp_principle_score(raw, vt_counts, params=params)
+    _base, _lift, _raw, final = principle_stages(vt_counts, ct_counts, params=params)
     grade = score_to_grade_label(final, params=params)
     return final, grade
+
+
+def principle_stages(
+    vt_counts: dict[str, int],
+    ct_counts: dict[str, int],
+    *, params: ScoringParams = DEFAULT_PARAMS,
+) -> tuple[float, float, float, float]:
+    """``(base, lift, raw, final)`` for one principle: the base from the
+    violation types, the compliance lift, the lifted score and the clamped
+    result. ``principle_score_and_grade`` and the help page's explain view
+    both read these."""
+    base = violation_base(vt_counts, params=params)
+    lift = compliance_lift(ct_counts, vt_counts, params=params)
+    raw = base + (MAX_SCORE - base) * lift
+    final = clamp_principle_score(raw, vt_counts, params=params)
+    return base, lift, raw, final
 
 
 # ---------------------------------------------------------------------------
@@ -166,19 +183,19 @@ def compliance_dampening(
     violation_type_counts: dict[str, int],
 ) -> float:
     """Legacy dampening multiplier for the non-numerical (graded) mode."""
-    weighted_compliance = _weighted_sum(compliance_type_counts)
-    weighted_violations = _weighted_sum(violation_type_counts)
+    weighted_compliance = weighted_sum(compliance_type_counts)
+    weighted_violations = weighted_sum(violation_type_counts)
 
     if weighted_violations == 0:
         return 1.0
     if weighted_compliance == 0:
-        return _MAX_PENALTY_MULTIPLIER
+        return MAX_PENALTY_MULTIPLIER
 
     ratio = weighted_compliance / weighted_violations
-    for threshold, multiplier in _RATIO_DAMPENING_TABLE:
+    for threshold, multiplier in RATIO_DAMPENING_TABLE:
         if ratio >= threshold:
             return multiplier
-    return _MAX_PENALTY_MULTIPLIER
+    return MAX_PENALTY_MULTIPLIER
 
 
 def drop_grade(grade: str, drops: int) -> str:
@@ -191,10 +208,14 @@ def drop_grade(grade: str, drops: int) -> str:
     return GRADE_LADDER[new_position]
 
 
+_MULTIPLIER_TRIPLE = 3  # the "x3" of WEIGHT_TRIPLE, spelled out
+_MULTIPLIER_DOUBLE = 2  # the "x2" of WEIGHT_DOUBLE, spelled out
+
+
 def weight_as_multiplier(weight_str: str) -> int:
     """Extract the integer multiplier from a weight label like 'High (x3)'."""
-    if _WEIGHT_TRIPLE in weight_str:
-        return 3
-    if _WEIGHT_DOUBLE in weight_str:
-        return 2
+    if WEIGHT_TRIPLE in weight_str:
+        return _MULTIPLIER_TRIPLE
+    if WEIGHT_DOUBLE in weight_str:
+        return _MULTIPLIER_DOUBLE
     return 1

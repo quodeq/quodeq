@@ -12,8 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.data.fs.report_parser.runs import read_run_data
-from quodeq.data.fs.run_files import count_eval_files, read_run_state
+from quodeq.services.wiring import count_eval_files, read_run_status_json
 from quodeq.core.types import DimensionResult
 
 _logger = logging.getLogger(__name__)
@@ -37,11 +38,6 @@ class DimensionCacheContext:
         return self.reader if self.reader is not None else read_run_data
 
 
-# Terminal status.json states, mirroring data/fs/report_parser/runs.py. Any
-# other state means the run's evaluation/ set may still be growing.
-_TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
-
-
 def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
     """Count ``evaluation/*.json`` files on disk for a run.
 
@@ -57,13 +53,19 @@ def _run_is_in_progress(reports_root: Path, project: str, run_id: str) -> bool:
     """True when the run's ``status.json`` reports a non-terminal state.
 
     A missing or unreadable status.json counts as terminal: legacy runs never
-    wrote one and their data is immutable. The PID-liveness refinement in
-    ``data/fs/report_parser/runs.py`` is deliberately not replicated here -- a
-    run that crashed without flipping its state reads fresh forever, which is
-    the safe direction for a cache guard.
+    wrote one and their data is immutable. An unrecognized ``state`` string
+    (a corrupt file, or a schema this code predates) counts as non-terminal
+    instead -- deliberately the raw string, not ``run_files.read_run_state``'s
+    normalized ``RunState`` (which maps an unrecognized string to None, and
+    None means terminal here): staying cautious about a state this code can't
+    make sense of is the safe direction for a cache guard, same as the
+    PID-liveness refinement in ``data/fs/report_parser/runs.py`` (deliberately
+    not replicated here) leaving a crashed-without-flipping-state run reading
+    fresh forever.
     """
-    state = read_run_state(reports_root / project / run_id)
-    return state is not None and state not in _TERMINAL_RUN_STATES
+    data = read_run_status_json(reports_root / project / run_id)
+    state = data.get("state") if isinstance(data, dict) else None
+    return isinstance(state, str) and state not in TERMINAL_STATES
 
 
 def _cached_entry_is_stale(
@@ -124,7 +126,9 @@ def _cache_store(
 def _wait_for_inflight(
     key: tuple, event: threading.Event, ctx: DimensionCacheContext,
 ) -> list[DimensionResult] | None:
-    """Wait for another thread's in-flight fetch; None if it did not finish in time."""
+    """Wait for another thread's in-flight fetch; None if it did not finish in time
+    or left nothing in the cache (it failed, or found no data), so the caller
+    reads for itself."""
     if not event.wait(timeout=_CACHE_WAIT_TIMEOUT_S):
         _logger.debug(
             "in-flight dimension fetch for %s did not finish within %ss; fetching directly",
@@ -132,21 +136,28 @@ def _wait_for_inflight(
         )
         return None
     with ctx.lock:
-        return list(ctx.cache.get(key, []))
+        data = ctx.cache.get(key)
+    return None if data is None else list(data)
 
 
 def _fetch_and_store(
     key: tuple, reports_root: Path, project: str, run_id: str,
     ctx: DimensionCacheContext,
 ) -> list[DimensionResult]:
-    """Perform the disk fetch, store in cache, and notify waiters."""
-    data = _fetch_dimensions_from_disk(reports_root, project, run_id, ctx.get_reader())
-    if data:
-        _cache_store(key, data, ctx)
-    with ctx.lock:
-        notify_event = ctx.inflight.pop(key, None)
-    if notify_event is not None:
-        notify_event.set()
+    """Perform the disk fetch, store in cache, and notify waiters.
+
+    The inflight entry is released and its waiters woken even when the
+    reader raises; the exception still reaches the caller.
+    """
+    try:
+        data = _fetch_dimensions_from_disk(reports_root, project, run_id, ctx.get_reader())
+        if data:
+            _cache_store(key, data, ctx)
+    finally:
+        with ctx.lock:
+            notify_event = ctx.inflight.pop(key, None)
+        if notify_event is not None:
+            notify_event.set()
     return data
 
 
@@ -196,6 +207,7 @@ def make_lru_dimension_fetcher(
     project: str,
     ctx: DimensionCacheContext,
     version: str = "",
+    version_for: Callable[[str], str] | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a callable that fetches dimension data for a run.
 
@@ -206,6 +218,9 @@ def make_lru_dimension_fetcher(
     that at most one thread performs disk I/O for any given cache key.  Other
     threads that request the same key while I/O is in progress wait on the
     event and then read the result from the cache.
+
+    *version_for*, when given, replaces *version* with a per-run value, for
+    callers whose entries go stale on per-run inputs (see the trend fetcher).
 
     Self-healing guards (every caller inherits them, so a request landing
     mid-run can never freeze a partial dim list in the cache):
@@ -221,6 +236,7 @@ def make_lru_dimension_fetcher(
        cache, so the next request also reads fresh.
     """
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
-        return _get_run_dimensions(run_id, reports_root, project, version, ctx)
+        run_version = version if version_for is None else version_for(run_id)
+        return _get_run_dimensions(run_id, reports_root, project, run_version, ctx)
 
     return get_run_dimensions

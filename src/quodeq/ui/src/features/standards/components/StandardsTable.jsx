@@ -1,20 +1,17 @@
 import { useMemo, useState } from 'react';
-import { STANDARD_TYPES, UNKNOWN_STANDARD_TYPE } from '../hooks/useStandards.js';
+import { STANDARD_TYPES, UNKNOWN_STANDARD_TYPE, standardBaseLabel } from '../hooks/useStandards.js';
 import { useStandardRowModals } from '../hooks/useStandardRowModals.js';
 import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigation.jsx';
 import Icon from '../../../components/Icon.jsx';
 import { DownloadGlyph, TrashGlyph } from '../../../components/glyphs.jsx';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
+import { pluralKey } from '../../../utils/plural.js';
+import StandardsModal from './StandardsModal.jsx';
 
 // The row-action glyph box, a step down from the sidebar rail's icons.
 const ROW_ICON_SIZE = 14;
 
-const BASE_LABELS = {
-  [STANDARD_TYPES.BUILTIN]: t('standards.baseIso'),
-  [STANDARD_TYPES.QUODEQ]: t('standards.baseQuodeq'),
-  [STANDARD_TYPES.COMMUNITY]: t('standards.baseCommunity'),
-  [STANDARD_TYPES.CUSTOM]: t('standards.baseCustom'),
-};
 
 function ConfirmDeleteModal({ standardName, principleCount, requirementCount, onConfirm, onCancel }) {
   const [typed, setTyped] = useState('');
@@ -23,43 +20,37 @@ function ConfirmDeleteModal({ standardName, principleCount, requirementCount, on
   const canDelete = !hasContent || typed.toLowerCase().trim() === confirmText;
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">{t('standards.deleteStandardTitle')}</h3>
-        {hasContent ? (
-          <>
-            <p className="modal-body modal-body--warning">
-              <strong>{standardName}</strong> {t('standards.contains')} <strong>{principleCount === 1 ? t('standards.principlesCountOne', { count: principleCount }) : t('standards.principlesCountMany', { count: principleCount })}</strong> {t('standards.and')} <strong>{requirementCount === 1 ? t('standards.requirementsCountOne', { count: requirementCount }) : t('standards.requirementsCountMany', { count: requirementCount })}</strong>. {t('standards.cannotBeUndone')}
-            </p>
-            <p className="modal-body">{t('standards.typePrefix')} <strong>{standardName}</strong> {t('standards.toConfirmSuffix')}</p>
-            <input className="modal-input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={standardName} autoFocus />
-          </>
-        ) : (
-          <p className="modal-body">{t('standards.deleteConfirmPrefix')} <strong>{standardName}</strong>?</p>
-        )}
-        <div className="modal-actions">
-          <button type="button" className="btn-secondary" onClick={onCancel}>{t('common.cancel')}</button>
-          <button type="button" className="btn-danger" onClick={onConfirm} disabled={!canDelete}>{t('violations.delete')}</button>
-        </div>
-      </div>
-    </div>
+    <StandardsModal
+      title={t('standards.deleteStandardTitle')}
+      onCancel={onCancel}
+      actions={<button type="button" className="btn-danger" onClick={onConfirm} disabled={!canDelete}>{t('violations.delete')}</button>}
+    >
+      {hasContent ? (
+        <>
+          <p className="modal-body modal-body--warning">
+            <strong>{standardName}</strong> {t('standards.contains')} <strong>{t(pluralKey(principleCount, 'standards.principlesCountOne', 'standards.principlesCountMany'), { count: principleCount })}</strong> {t('standards.and')} <strong>{t(pluralKey(requirementCount, 'standards.requirementsCountOne', 'standards.requirementsCountMany'), { count: requirementCount })}</strong>. {t('standards.cannotBeUndone')}
+          </p>
+          <p className="modal-body">{t('standards.typePrefix')} <strong>{standardName}</strong> {t('standards.toConfirmSuffix')}</p>
+          <input className="modal-input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={standardName} autoFocus />
+        </>
+      ) : (
+        <p className="modal-body">{t('standards.deleteConfirmPrefix')} <strong>{standardName}</strong>?</p>
+      )}
+    </StandardsModal>
   );
 }
 
 function DuplicateModal({ standardId, onConfirm, onCancel }) {
   const [newId, setNewId] = useState(`${standardId}-copy`);
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">{t('standards.duplicateStandardTitle')}</h3>
-        <p className="modal-body">{t('standards.enterNewId')}</p>
-        <input className="modal-input" value={newId} onChange={(e) => setNewId(e.target.value)} autoFocus />
-        <div className="modal-actions">
-          <button type="button" className="btn-secondary" onClick={onCancel}>{t('common.cancel')}</button>
-          <button type="button" className="btn-primary" onClick={() => onConfirm(newId)} disabled={!newId.trim()}>{t('standards.duplicate')}</button>
-        </div>
-      </div>
-    </div>
+    <StandardsModal
+      title={t('standards.duplicateStandardTitle')}
+      onCancel={onCancel}
+      actions={<button type="button" className="btn-primary" onClick={() => onConfirm(newId)} disabled={!newId.trim()}>{t('standards.duplicate')}</button>}
+    >
+      <p className="modal-body">{t('standards.enterNewId')}</p>
+      <input className="modal-input" value={newId} onChange={(e) => setNewId(e.target.value)} autoFocus />
+    </StandardsModal>
   );
 }
 
@@ -112,7 +103,7 @@ function RowActions({ standard, isDeletable, isEditable, onOpen, onDuplicate, on
 }
 
 function isDeletableStandard(type) {
-  return type !== STANDARD_TYPES.BUILTIN && type !== STANDARD_TYPES.QUODEQ;
+  return type !== STANDARD_TYPES.ISO && type !== STANDARD_TYPES.WCAG && type !== STANDARD_TYPES.QUODEQ;
 }
 
 function StandardRowMain({
@@ -126,7 +117,7 @@ function StandardRowMain({
       tabIndex={0}
       aria-pressed={isVisible}
       onClick={() => onToggleVisibility(standard.id)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleVisibility(standard.id); } }}
+      onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggleVisibility(standard.id); } }}
     >
       <div className="standards-cell standards-cell--name">
         <span className="standards-row-name">{standard.name}</span>
@@ -170,7 +161,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
   const principleCount = standard.principleCount ?? standard.principles?.length ?? 0;
   const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce((sum, p) => sum + (p.requirements?.length ?? 0), 0);
   const isDeletable = isDeletableStandard(standard.type);
-  const baseLabel = BASE_LABELS[standard.type] || standard.type || t('standards.baseUnknown');
+  const baseLabel = standardBaseLabel(standard) || standard.type || t('standards.baseUnknown');
 
   return (
     <>
@@ -207,7 +198,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
 export default function StandardsTable({ grouped, actions, customizedCounts }) {
   const { onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility } = actions;
   const all = useMemo(
-    () => [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || []), ...(grouped[UNKNOWN_STANDARD_TYPE] || [])],
+    () => [...(grouped[STANDARD_TYPES.ISO] || []), ...(grouped[STANDARD_TYPES.WCAG] || []), ...(grouped[STANDARD_TYPES.QUODEQ] || []), ...(grouped[STANDARD_TYPES.COMMUNITY] || []), ...(grouped[STANDARD_TYPES.CUSTOM] || []), ...(grouped[UNKNOWN_STANDARD_TYPE] || [])],
     [grouped],
   );
 

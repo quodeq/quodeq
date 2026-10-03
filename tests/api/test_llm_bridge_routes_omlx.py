@@ -139,7 +139,7 @@ class TestOmlxBaseUrlValidation:
 
 
 # ---------------------------------------------------------------------------
-# Task 2 — backend secure storage for provider API keys.
+# Backend secure storage for provider API keys.
 # ---------------------------------------------------------------------------
 
 class TestProviderKeyRoutes:
@@ -226,6 +226,7 @@ class TestProviderKeyRoutes:
 
         monkeypatch.setattr(ai_provider.keyring, "set_password", raise_keyring_error)
         monkeypatch.setattr(ai_provider.keyring, "get_password", raise_keyring_error)
+        monkeypatch.setenv("QUODEQ_ALLOW_PLAINTEXT_KEY", "1")
 
         store_resp = client.post(
             "/api/provider/key",

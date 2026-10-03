@@ -49,7 +49,7 @@ def _manifest_missing(path: Path) -> bool:
     return True
 
 
-def _read_text(path: Path) -> str | None:
+def read_text(path: Path) -> str | None:
     if _manifest_missing(path):
         return None
     try:
@@ -57,12 +57,12 @@ def _read_text(path: Path) -> str | None:
     except _ABSENT_MANIFEST:
         _logger.debug("Manifest %s vanished mid-scan", path)
         return None
-    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
+    except (OSError, UnicodeDecodeError) as exc:
         _logger.warning("Ignoring unreadable manifest %s: %s", path, exc)
         return None
 
 
-def _read_toml(path: Path) -> dict[str, object] | None:
+def read_toml(path: Path) -> dict[str, object] | None:
     if _manifest_missing(path):
         return None
     try:
@@ -71,32 +71,34 @@ def _read_toml(path: Path) -> dict[str, object] | None:
     except _ABSENT_MANIFEST:
         _logger.debug("Manifest %s vanished mid-scan", path)
         return None
-    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
-        # Wider than OSError/TOMLDecodeError on purpose: tomllib is a
-        # recursive-descent parser, so deeply nested tables overflow the stack
-        # and raise RecursionError. It bottoms out far shallower than the C
-        # JSON decoder -- a few thousand levels, not tens of thousands.
+    except (OSError, ValueError, RecursionError) as exc:
+        # ValueError covers both tomllib.TOMLDecodeError and the
+        # UnicodeDecodeError tomllib.load raises on non-UTF-8 bytes (both are
+        # ValueError subclasses). RecursionError separately: tomllib is a
+        # recursive-descent parser, so deeply nested tables overflow the stack.
+        # It bottoms out far shallower than the C JSON decoder -- a few
+        # thousand levels, not tens of thousands.
         _logger.warning("Ignoring unreadable TOML manifest %s: %s", path, exc)
         return None
 
 
-def _read_json(path: Path) -> dict[str, object] | None:
-    # Absence is already handled quietly by _read_text, so reaching the handler
+def read_json(path: Path) -> dict[str, object] | None:
+    # Absence is already handled quietly by read_text, so reaching the handler
     # below means the file exists and its contents are unusable.
-    text = _read_text(path)
+    text = read_text(path)
     if text is None:
         return None
     try:
         data = json.loads(text)
-    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
-        # Wider than json.JSONDecodeError: deeply nested arrays exhaust the C
-        # decoder's call stack and raise RecursionError, a RuntimeError.
+    except (ValueError, RecursionError) as exc:
+        # ValueError covers json.JSONDecodeError; RecursionError separately
+        # for deeply nested arrays that exhaust the C decoder's call stack.
         _logger.warning("Ignoring unreadable JSON manifest %s: %s", path, exc)
         return None
     return data if isinstance(data, dict) else None
 
 
-def _flat_dep_names(*sources: object) -> list[str]:
+def flat_dep_names(*sources: object) -> list[str]:
     out: list[str] = []
     for src in sources:
         if not isinstance(src, dict):
@@ -106,7 +108,7 @@ def _flat_dep_names(*sources: object) -> list[str]:
     return out
 
 
-def _matches_any(haystack: list[str], needles: tuple[str, ...]) -> list[str]:
+def matches_any(haystack: list[str], needles: tuple[str, ...]) -> list[str]:
     needle_set = {n.lower() for n in needles}
     return [n for n in haystack if n in needle_set]
 
@@ -114,7 +116,7 @@ def _matches_any(haystack: list[str], needles: tuple[str, ...]) -> list[str]:
 _DEP_SPEC_RE = re.compile(r"^([A-Za-z0-9_.\-]+)")
 
 
-def _strip_dep_spec(spec: str) -> str:
+def strip_dep_spec(spec: str) -> str:
     """Reduce a PEP 508 spec like ``flask>=3.0`` to its bare name."""
     m = _DEP_SPEC_RE.match(spec.strip())
     return m.group(1) if m else spec.strip()

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
+from quodeq.core.run.exit_reason import ExitReason
 
 
 def _merge_principles(
@@ -36,7 +37,7 @@ def _resolve_exit_reason(evidence_list: list[Evidence]) -> str | None:
     anything-not-done as partial."""
     incomplete = next(
         (ev.exit_reason for ev in evidence_list
-         if ev.exit_reason and ev.exit_reason != "done"),
+         if ev.exit_reason and ev.exit_reason != ExitReason.DONE),
         None,
     )
     if incomplete is not None:

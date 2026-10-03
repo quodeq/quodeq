@@ -2,11 +2,16 @@ import { useMemo } from 'react';
 import { t } from '../../../strings/index.js';
 
 const TYPE_CONFIG = {
-  quodeq:    { labelKey: 'evaluate.stdQuodeq',    className: 'dimension-chip-type--quodeq',    order: 1 },
-  custom:    { labelKey: 'evaluate.stdCustom',    className: 'dimension-chip-type--custom',    order: 3 },
-  community: { labelKey: 'evaluate.stdCommunity', className: 'dimension-chip-type--community', order: 2 },
+  wcag:      { labelKey: 'evaluate.stdWcag',      className: 'dimension-chip-type--wcag',      order: 1 },
+  quodeq:    { labelKey: 'evaluate.stdQuodeq',    className: 'dimension-chip-type--quodeq',    order: 2 },
+  custom:    { labelKey: 'evaluate.stdCustom',    className: 'dimension-chip-type--custom',    order: 4 },
+  community: { labelKey: 'evaluate.stdCommunity', className: 'dimension-chip-type--community', order: 3 },
 };
-const DEFAULT_TYPE_CONFIG = { labelKey: 'evaluate.stdIso', className: 'dimension-chip-type--builtin', order: 0 };
+const DEFAULT_TYPE_CONFIG = { labelKey: 'evaluate.stdIso', className: 'dimension-chip-type--iso', order: 0 };
+
+// This component's own terminal-styled picker variant (ReEvaluateCard); the
+// default (no variant passed) is the chip grid. Not a shared UI concept.
+export const DIMENSION_SELECTOR_VARIANT_TERMINAL = 'terminal';
 
 function typeConfig(dim) { return TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG; }
 
@@ -15,9 +20,14 @@ function typeInfo(dim) {
   return { label: t(labelKey), className, order };
 }
 
+// The name a dimension is shown and sorted by: its label, else its id.
+function dimensionName(dim) {
+  return dim.label || dim.id;
+}
+
 // The dimension's ISO 25010 mapping when it has one, its own name otherwise.
 function dimensionTitle(dim) {
-  return dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dim.label || dim.id;
+  return dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dimensionName(dim);
 }
 
 // Both the compact chip and the full card are one toggle button for one
@@ -45,7 +55,7 @@ function DimensionChip({ dim, isSelected, onToggle }) {
       onToggle={onToggle}
       className={`dimension-chip-btn${isSelected ? ' selected' : ''}`}
     >
-      {dim.label || dim.id}
+      {dimensionName(dim)}
       <span className={`dimension-chip-type ${info.className}`}>{info.label}</span>
     </DimensionToggle>
   );
@@ -63,7 +73,7 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
       <span className="eval-dim-card__check" aria-hidden="true">{isSelected ? '✓' : ''}</span>
       <span className="eval-dim-card__body">
         <span className="eval-dim-card__title-row">
-          <span className="eval-dim-card__name">{dim.label || dim.id}</span>
+          <span className="eval-dim-card__name">{dimensionName(dim)}</span>
           {/* Plain bordered tag on purpose: the legacy dimension-chip-type--*
               classes paint a tinted pill that fights the card style and
               drops contrast on several themes. */}
@@ -149,12 +159,12 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
     const oa = typeConfig(a).order;
     const ob = typeConfig(b).order;
     if (oa !== ob) return oa - ob;
-    return (a.label || a.id).localeCompare(b.label || b.id);
+    return dimensionName(a).localeCompare(dimensionName(b));
   }), [allDimensions]);
 
   const shared = { sorted, selectedDims, onToggle, onSelectAll, onClearAll };
 
-  return variant === 'terminal'
+  return variant === DIMENSION_SELECTOR_VARIANT_TERMINAL
     ? <DimensionSelectorTerminal {...shared} dimMetas={dimMetas} metasLoading={metasLoading} />
     : <DimensionSelectorChips {...shared} />;
 }

@@ -6,17 +6,67 @@ Shared fixtures live in tests/api/_routes_shared_fixtures.py.
 """
 from __future__ import annotations
 
+import functools
 import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from quodeq.data.fs.shared_repo import FORMAT_NAME
+from quodeq.services import shared_connect_job
 from quodeq.services.shared_connect import ConnectOutcome
+from quodeq.services.shared_connect_job import ConnectJobStatus, start_connect
 from tests.api._routes_shared_fixtures import (  # noqa: F401 -- client/_clean_publish_status are pytest fixtures
     _ORIGIN,
     _clean_publish_status,
     client,
 )
+
+_EXAMPLE_URL = "https://example.invalid/x.git"
+
+
+@pytest.fixture(autouse=True)
+def inline_connect(monkeypatch):
+    """A fresh connect slot, and a PUT that runs the connect job inline.
+
+    The route answers 202 as in production; by the time it returns, the job
+    has finished and GET /api/shared/status reports its outcome.
+    """
+    status = ConnectJobStatus()
+    monkeypatch.setattr(shared_connect_job, "_default_status", status)
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared_config.start_connect",
+        functools.partial(start_connect, spawn=lambda fn: fn()),
+    )
+    return status
+
+
+def _skip_url_validation(monkeypatch):
+    # validate_remote_url legitimately rejects file:// (SSRF guard scopes
+    # accepted schemes to https/ssh); bypass just that check, in the route
+    # and in the connect use case, so a local bare origin can be connected.
+    monkeypatch.setattr("quodeq.services.shared_connect_job.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
+    # The access ladder runs the same guard (plus the remote-URL shape check) before probing.
+    monkeypatch.setattr("quodeq.services.github_access.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.github_access.is_repo_url", lambda url: True)
+
+
+def _fake_outcome(monkeypatch, kind):
+    _skip_url_validation(monkeypatch)
+    monkeypatch.setattr(
+        shared_connect_job, "connect_shared_repo",
+        lambda url, **_kwargs: ConnectOutcome(status=kind, url=url),
+    )
+
+
+def _connect(client, url: str) -> dict:
+    """PUT *url*, expect 202, and return the connect job status."""
+    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
+    assert resp.status_code == 202
+    assert resp.get_json() == {"started": True, "url": url}
+    return client.get("/api/shared/status").get_json()["connect"]
 
 
 def test_put_config_rejects_invalid_url(client, monkeypatch, tmp_path):
@@ -46,39 +96,51 @@ def test_put_shared_config_missing_url_has_code(client):
 
 
 def test_put_shared_config_clone_failed_has_code(client, monkeypatch):
-    monkeypatch.setattr(
-        "quodeq.api.routes_shared_config.connect_shared_repo",
-        lambda url, **_kwargs: ConnectOutcome(status="clone_failed", url=url),
-    )
-    resp = client.put(
-        "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
-    )
-    assert resp.status_code == 502
-    assert resp.get_json()["code"] == "CLONE_FAILED"
+    _fake_outcome(monkeypatch, "clone_failed")
+    connect = _connect(client, _EXAMPLE_URL)
+    assert connect["state"] == "error"
+    assert connect["code"] == "CLONE_FAILED"
+    assert connect["finishedAt"] is not None
 
 
 def test_put_shared_config_foreign_repo_has_code(client, monkeypatch):
-    monkeypatch.setattr(
-        "quodeq.api.routes_shared_config.connect_shared_repo",
-        lambda url, **_kwargs: ConnectOutcome(status="foreign", url=url),
-    )
-    resp = client.put(
-        "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
-    )
-    assert resp.status_code == 400
-    assert resp.get_json()["code"] == "FOREIGN_REPO"
+    _fake_outcome(monkeypatch, "foreign")
+    connect = _connect(client, _EXAMPLE_URL)
+    assert connect["state"] == "error"
+    assert connect["code"] == "FOREIGN_REPO"
+    assert connect["finishedAt"] is not None
 
 
 def test_put_shared_config_unsupported_version_has_code(client, monkeypatch):
-    monkeypatch.setattr(
-        "quodeq.api.routes_shared_config.connect_shared_repo",
-        lambda url, **_kwargs: ConnectOutcome(status="unsupported_version", url=url),
-    )
-    resp = client.put(
-        "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
-    )
+    _fake_outcome(monkeypatch, "unsupported_version")
+    connect = _connect(client, _EXAMPLE_URL)
+    assert connect["state"] == "error"
+    assert connect["code"] == "UNSUPPORTED_VERSION"
+    assert connect["finishedAt"] is not None
+
+
+def test_put_config_invalid_url_is_synchronous(client, inline_connect):
+    """A malformed URL fails the PUT itself and never claims the connect slot."""
+    resp = client.put("/api/shared/config", json={"url": "not a url"}, headers=_ORIGIN)
     assert resp.status_code == 400
-    assert resp.get_json()["code"] == "UNSUPPORTED_VERSION"
+    assert resp.get_json()["code"] == "INVALID_URL"
+    assert inline_connect.copy()["state"] == "idle"
+
+
+def test_put_config_while_connecting_is_409(client, monkeypatch, inline_connect):
+    _skip_url_validation(monkeypatch)
+    inline_connect.claim("https://example.invalid/first.git")
+    resp = client.put("/api/shared/config", json={"url": _EXAMPLE_URL}, headers=_ORIGIN)
+    assert resp.status_code == 409
+    assert resp.get_json()["code"] == "CONNECT_IN_PROGRESS"
+
+
+def test_status_reports_idle_connect_slot(client):
+    connect = client.get("/api/shared/status").get_json()["connect"]
+    assert connect == {
+        "state": "idle", "url": None, "code": None, "error": None, "finishedAt": None,
+        "kind": None, "phase": None, "percent": None, "bytes": None, "projectsFound": None,
+    }
 
 
 def test_put_config_rejects_non_string_url(client, monkeypatch, tmp_path):
@@ -88,16 +150,15 @@ def test_put_config_rejects_non_string_url(client, monkeypatch, tmp_path):
     assert "error" in resp.get_json()
 
 
-def test_put_config_clone_failure_returns_502(client, monkeypatch):
-    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
-    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url: None)
-    resp = client.put(
-        "/api/shared/config",
-        json={"url": "https://github.com/example/repo.git"},
-        headers=_ORIGIN,
-    )
-    assert resp.status_code == 502
-    assert "error" in resp.get_json()
+def test_put_config_clone_failure_reports_clone_failed(client, monkeypatch):
+    _skip_url_validation(monkeypatch)
+    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url, env=None, progress=None: None)
+    url = "https://github.com/example/repo.git"
+    connect = _connect(client, url)
+    assert connect["state"] == "error"
+    assert connect["code"] == "CLONE_FAILED"
+    assert connect["error"] == f"could not clone the repository, check that git can access {url}"
+    assert client.get("/api/shared/status").get_json()["configured"] is False
 
 
 def _push_seed_file(origin: Path, name: str, content: str) -> None:
@@ -113,23 +174,20 @@ def _push_seed_file(origin: Path, name: str, content: str) -> None:
 
 
 def test_put_config_rejects_foreign_repo_after_clone(client, monkeypatch, tmp_path):
-    """Audit A1: PUT must validate format AFTER a real clone succeeds --
+    """PUT must validate format AFTER a real clone succeeds --
     a real, clonable git repo that isn't a quodeq results repo (no
     quodeq.json marker) is rejected, and settings are never written for it.
     """
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
-    # validate_remote_url legitimately rejects file:// (SSRF guard scopes
-    # accepted schemes to https/ssh); bypass just that check so the local
-    # bare origin below can exercise the real clone + format-check path.
-    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
+    _skip_url_validation(monkeypatch)
     origin = tmp_path / "foreign-origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
     _push_seed_file(origin, "README.md", "some other project")
     url = f"file://{origin}"
 
-    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
-    assert resp.status_code == 400
-    assert resp.get_json()["error"] == (
+    connect = _connect(client, url)
+    assert connect["code"] == "FOREIGN_REPO"
+    assert connect["error"] == (
         "the repository exists but does not look like a quodeq results repository"
     )
 
@@ -139,10 +197,10 @@ def test_put_config_rejects_foreign_repo_after_clone(client, monkeypatch, tmp_pa
 
 
 def test_put_config_rejects_unsupported_version_after_clone(client, monkeypatch, tmp_path):
-    """Audit A1: same AFTER-clone validation for a repo whose quodeq.json
+    """Same AFTER-clone validation for a repo whose quodeq.json
     marker declares a format version newer than this build understands."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
-    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
+    _skip_url_validation(monkeypatch)
     origin = tmp_path / "future-origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
     _push_seed_file(
@@ -150,9 +208,9 @@ def test_put_config_rejects_unsupported_version_after_clone(client, monkeypatch,
     )
     url = f"file://{origin}"
 
-    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
-    assert resp.status_code == 400
-    assert resp.get_json()["error"] == "this shared repository requires a newer version of quodeq"
+    connect = _connect(client, url)
+    assert connect["code"] == "UNSUPPORTED_VERSION"
+    assert connect["error"] == "this shared repository requires a newer version of quodeq"
 
     status = client.get("/api/shared/status").get_json()
     assert status["configured"] is False
@@ -160,17 +218,15 @@ def test_put_config_rejects_unsupported_version_after_clone(client, monkeypatch,
 
 
 def test_put_config_accepts_empty_repo(client, monkeypatch, tmp_path):
-    """Audit A1: a real clone of a bare origin with zero commits ("empty",
+    """A real clone of a bare origin with zero commits ("empty",
     never published into) must be accepted, not rejected as foreign."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
-    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
+    _skip_url_validation(monkeypatch)
     origin = tmp_path / "empty-origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
     url = f"file://{origin}"
 
-    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
-    assert resp.status_code == 200
-    assert resp.get_json()["configured"] is True
+    assert _connect(client, url)["state"] == "done"
 
     status = client.get("/api/shared/status").get_json()
     assert status["configured"] is True
@@ -180,17 +236,12 @@ def test_put_config_accepts_empty_repo(client, monkeypatch, tmp_path):
 def test_put_config_happy_path(client, monkeypatch, tmp_path):
     fake_repo = tmp_path / "fake-clone"
     fake_repo.mkdir()
-    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
-    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url: fake_repo)
-    resp = client.put(
-        "/api/shared/config",
-        json={"url": "https://github.com/example/repo.git"},
-        headers=_ORIGIN,
-    )
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["configured"] is True
-    assert body["url"] == "https://github.com/example/repo.git"
+    _skip_url_validation(monkeypatch)
+    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url, env=None, progress=None: fake_repo)
+    connect = _connect(client, "https://github.com/example/repo.git")
+    assert connect["state"] == "done"
+    assert connect["url"] == "https://github.com/example/repo.git"
+    assert connect["code"] is None
 
     status = client.get("/api/shared/status").get_json()
     assert status["configured"] is True
@@ -198,14 +249,14 @@ def test_put_config_happy_path(client, monkeypatch, tmp_path):
 
 
 def test_put_config_reconnect_refreshes_pre_existing_clone(client, monkeypatch, tmp_path):
-    """Audit A4: reconnecting to a URL whose clone already exists in the
+    """Reconnecting to a URL whose clone already exists in the
     cache must fetch fresh content before returning, not silently keep
     serving whatever was last fetched. Regression: a project is published
     directly to origin AFTER the first connect, then the same URL is
     reconnected (second PUT) -- the listing must already show it, with no
     separate POST /api/shared/refresh in between."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
-    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
+    _skip_url_validation(monkeypatch)
     origin = tmp_path / "origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
     url = f"file://{origin}"
@@ -222,8 +273,7 @@ def test_put_config_reconnect_refreshes_pre_existing_clone(client, monkeypatch, 
         subprocess.run(cmd, cwd=work, check=True, capture_output=True)
 
     # First connect clones the (currently project-less) repo.
-    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
-    assert resp.status_code == 200
+    assert _connect(client, url)["state"] == "done"
     listing = client.get("/api/shared/projects").get_json()
     assert listing["projects"] == []
 
@@ -243,8 +293,7 @@ def test_put_config_reconnect_refreshes_pre_existing_clone(client, monkeypatch, 
     # Reconnect the SAME url -- the cache dir from the first PUT already
     # exists on disk. Before this fix, ensure_shared_clone early-returns it
     # unfetched, so proj-new would only appear after a manual refresh.
-    resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
-    assert resp.status_code == 200
+    assert _connect(client, url)["state"] == "done"
 
     listing = client.get("/api/shared/projects").get_json()
     ids = [p.get("id") or p.get("name") for p in listing["projects"]]

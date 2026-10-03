@@ -47,4 +47,20 @@ describe('openExternal', () => {
     openExternal('not a url');
     expect(open).not.toHaveBeenCalled();
   });
+
+  it('falls back to window.open when the desktop bridge rejects', async () => {
+    const open = vi.fn(() => null);
+    const openBrowser = vi.fn().mockRejectedValue(new Error('bridge down'));
+    vi.stubGlobal('open', open);
+    vi.stubGlobal('pywebview', { api: { open_browser: openBrowser } });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      openExternal('https://example.com/download');
+      await vi.waitFor(() => expect(open).toHaveBeenCalledWith('https://example.com/download', '_blank', 'noopener'));
+      expect(openBrowser).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

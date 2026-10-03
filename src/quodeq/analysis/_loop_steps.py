@@ -1,13 +1,12 @@
 """Per-dimension steps shared by the dimension loops.
 
-Split out of ``_loops.py`` (M-MOD-6). This module imports only
-downward (``_loop_state``, ``runner_markers``, ``run_types``, ``dimension_runner``,
+This module imports only downward (``_loop_state``, ``runner_markers``, ``run_types``, ``dimension_runner``,
 core/data/shared) and never imports back from ``_loops`` -- ``_loops.py``
-imports it at the top instead. ``_loop_should_stop`` and ``_finalize_dim_result``
-moved here too because ``run_incremental_loop``'s per-iteration step
-(``_run_one_incremental_dim``) needs them and a same-layer import back into
-``_loops`` would have recreated the cycle this split exists to avoid;
-``_loops.py``'s ``run_per_dimension_loop`` imports them back from here instead.
+imports it at the top instead. ``loop_should_stop`` and ``finalize_dim_result``
+live here because ``run_incremental_loop``'s per-iteration step
+(``run_one_incremental_dim``) needs them and an import back into ``_loops``
+would create a cycle; ``_loops.py``'s ``run_per_dimension_loop`` imports them
+from here.
 """
 from __future__ import annotations
 
@@ -17,21 +16,20 @@ from dataclasses import dataclass, replace
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.analysis._drop_stats import DropStatsCounter
 from quodeq.analysis._loop_state import (
     DimTransition,
-    _interruption_reason,
-    _run_dir_for,
-    _safe_write_dim_state,
-    _silence_broken_stdout,
+    interruption_reason,
+    run_dir_for,
+    safe_write_dim_state,
+    silence_broken_stdout,
 )
 from quodeq.analysis.runner_markers import emit_marker
-from quodeq.analysis.run_types import RunConfig, _AnalysisContext
-from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
+from quodeq.analysis.dimension_runner import DimensionRunner, log_dimension_result
 from quodeq.shared.constants import CC_PHASE_ANALYZING
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.data.fs.dimensions_state_store import DimState
+from quodeq.core.run.dimensions import DimState
 from quodeq.shared import cancellation
 
 
@@ -41,14 +39,14 @@ class LoopDeps:
 
     ``runner`` analyses a dimension; ``on_dimension_done`` receives each
     finished dimension's Evidence (scoring, in production); ``log`` is the
-    loop's sink and ``drop_counter`` the per-run drop-stats aggregate the
-    loop reports once it finishes.
+    loop's sink. The per-run drop-stats aggregate lives on
+    ``RunConfig.drop_counter`` instead of here, so every dimension loop of
+    one run (and its pool worker threads) shares the same counter.
     """
 
     runner: DimensionRunner
     on_dimension_done: Callable[[str, Evidence], None] | None = None
     log: LogSink = NULL_LOG
-    drop_counter: DropStatsCounter | None = None
 
 
 def default_loop_deps(
@@ -60,14 +58,14 @@ def default_loop_deps(
 
 
 @dataclass(frozen=True, slots=True)
-class _LoopRun:
+class LoopRun:
     """One loop's collaborators plus the Evidence accumulator it returns."""
 
     deps: LoopDeps
     result: dict[str, Evidence]
 
 
-def _loop_should_stop(config: RunConfig, dimension: str, log: LogSink) -> bool:
+def loop_should_stop(config: RunConfig, dimension: str, log: LogSink) -> bool:
     """True if the loop should stop before ``dimension`` (deadline or cancel).
 
     Both cases leave the remaining dims PENDING (they never went RUNNING),
@@ -83,7 +81,7 @@ def _loop_should_stop(config: RunConfig, dimension: str, log: LogSink) -> bool:
     return False
 
 
-def _retry_dim_callback(dimension: str, ev: Evidence, run: _LoopRun) -> None:
+def _retry_dim_callback(dimension: str, ev: Evidence, run: LoopRun) -> None:
     """Retry ``on_dimension_done`` once after a BrokenPipeError.
 
     Stdout pipe to parent died mid-callback. Silence stdout/stderr, then
@@ -94,7 +92,7 @@ def _retry_dim_callback(dimension: str, ev: Evidence, run: _LoopRun) -> None:
     """
     log = run.deps.log
     on_dimension_done = run.deps.on_dimension_done
-    _silence_broken_stdout()
+    silence_broken_stdout()
     run.result.setdefault(dimension, ev)
     if not on_dimension_done:
         log.warning(f"[loop] {dimension} - callback broken pipe, no retry needed, continuing loop")
@@ -105,15 +103,15 @@ def _retry_dim_callback(dimension: str, ev: Evidence, run: _LoopRun) -> None:
             f"[loop] {dimension} - callback broken pipe, "
             f"retried after silencing stdout, result persisted",
         )
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
         log.warning(
             f"[loop] {dimension} - callback retry after broken pipe raised "
             f"{type(exc).__name__}: {exc} - result NOT persisted, continuing loop",
         )
 
 
-def _finalize_dim_result(
-    run_dir: Path | None, dimension: str, ev: Evidence, run: _LoopRun,
+def finalize_dim_result(
+    run_dir: Path | None, dimension: str, ev: Evidence, run: LoopRun,
     *, log_result: Callable[[], None] | None = None,
 ) -> None:
     """Write the DONE dim-state and run the ``on_dimension_done`` callback.
@@ -125,7 +123,7 @@ def _finalize_dim_result(
     because the runner already logged with ``emit_log=True``.
     """
     log = run.deps.log
-    _safe_write_dim_state(
+    safe_write_dim_state(
         run_dir, dimension, DimTransition(DimState.DONE, exit_reason=ev.exit_reason), log=log,
     )
     try:
@@ -136,7 +134,7 @@ def _finalize_dim_result(
             run.deps.on_dimension_done(dimension, ev)
     except BrokenPipeError:
         _retry_dim_callback(dimension, ev, run)
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
         log.warning(
             f"[loop] {dimension} - callback raised "
             f"{type(exc).__name__}: {exc} - result kept, continuing loop",
@@ -144,22 +142,27 @@ def _finalize_dim_result(
         run.result.setdefault(dimension, ev)
 
 
-def _dispatch_incremental_dim(
-    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext, deps: LoopDeps,
-) -> tuple[Evidence | None, BaseException | None]:
-    """Run one dimension incrementally, falling back to a full scan on failure.
+def _stdout_gone(exc: BrokenPipeError) -> tuple[None, BrokenPipeError]:
+    """Silence the closed stdout and report the dimension as not run because of *exc*."""
+    silence_broken_stdout()
+    return None, exc
 
-    Returns ``(ev, last_exc)``: ``ev`` is the resulting Evidence (or None if
-    both the incremental attempt and any fallback failed), ``last_exc`` is
-    the most recent exception encountered (or None on success), used to
-    pick the dim-state ``INCOMPLETE`` reason.
+
+def _attempt_incremental_dim(
+    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
+) -> tuple[Evidence | None, BaseException | None]:
+    """Try the incremental run, falling back to a full scan on a known-bad exception.
+
+    A failure of a type this function doesn't recognize (from either the
+    incremental attempt or the fallback) is left to propagate --
+    ``run_incremental_loop`` isolates it, along with the rest of the step
+    (finalize included), at the loop-iteration boundary.
     """
     runner, log = deps.runner, deps.log
     try:
         return runner.run(config, dimension, idx, ctx, emit_log=False), None
     except BrokenPipeError as exc:
-        _silence_broken_stdout()
-        return None, exc
+        return _stdout_gone(exc)
     except (OSError, KeyError, ValueError, RuntimeError) as exc:
         if cancellation.is_cancelled():
             # The run is being torn down (signal, breaker, fatal provider
@@ -177,50 +180,48 @@ def _dispatch_incremental_dim(
         try:
             return runner.run(fallback_config, dimension, idx, ctx, emit_log=True), None
         except BrokenPipeError as inner_exc:
-            _silence_broken_stdout()
+            return _stdout_gone(inner_exc)
+        except (OSError, KeyError, ValueError, RuntimeError) as inner_exc:
             return None, inner_exc
-        except Exception as inner_exc:  # noqa: BLE001
-            return None, inner_exc
-    except Exception as exc:  # noqa: BLE001
-        # Loop-level diagnostic: an unanticipated exception class would
-        # otherwise propagate up silently and the lifecycle would treat it
-        # as failed without saying which dim. Log + swallow + continue so
-        # subsequent dims still run; the surfaced log line gives us the
-        # trail we need next time this happens.
-        log.warning(
-            f"[loop] {dimension} - unexpected exception "
-            f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
-        )
-        return None, exc
 
 
-def _run_one_incremental_dim(
-    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext, run: _LoopRun,
-) -> bool:
-    """Run one incremental-loop iteration for *dimension*.
+def run_one_incremental_dim(
+    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, run: LoopRun,
+) -> None:
+    """Run one incremental dimension: RUNNING -> dispatch (+ fallback) ->
+    finalize-or-incomplete.
 
-    Returns True if the loop should stop before this dimension ran (deadline
-    or cancellation reached), in which case the caller must break the loop
-    without counting the iteration as completed.
+    A known-bad exception from the incremental attempt or its full-scan
+    fallback is handled inside ``_attempt_incremental_dim`` itself: both
+    attempts failing on a recognized exception type is a clean
+    ``(None, exc)``, not a raise. Anything else -- an exception type neither
+    attempt recognizes, or one from ``finalize_dim_result``'s
+    ``on_dimension_done`` callback -- propagates out of this function
+    uncaught. Exactly one boundary per iteration: ``run_incremental_loop``
+    isolates the whole step (dispatch, fallback *and* finalize) at the
+    loop-iteration boundary, so one dimension's bug cannot abort the rest of
+    the run. (There used to be a second, nested ``run_isolated`` here around
+    the dispatch/fallback pair alone; removed -- one boundary per iteration
+    is the contract, and the outer one's ``on_error`` records the identical
+    INCOMPLETE reason via the same ``interruption_reason`` call.)
+
+    The caller (``run_incremental_loop``) has already logged the "entering
+    iteration" line and checked ``loop_should_stop`` before calling this.
     """
     log = run.deps.log
-    log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
-    if _loop_should_stop(config, dimension, log):
-        return True
-    run_dir = _run_dir_for(config)
-    _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=log)
+    run_dir = run_dir_for(config)
+    safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=log)
     emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
     log.info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
-    ev, last_exc = _dispatch_incremental_dim(config, dimension, idx, ctx, run.deps)
+    ev, last_exc = _attempt_incremental_dim(config, dimension, idx, ctx, run.deps)
     if ev:
-        _finalize_dim_result(
+        finalize_dim_result(
             run_dir, dimension, ev, run,
-            log_result=lambda ev=ev: _log_dimension_result(ev, dimension, idx, ctx.total, log=log),
+            log_result=lambda ev=ev: log_dimension_result(ev, dimension, idx, ctx.total, log=log),
         )
     else:
-        _safe_write_dim_state(
+        safe_write_dim_state(
             run_dir, dimension,
-            DimTransition(DimState.INCOMPLETE, reason=_interruption_reason(last_exc)), log=log,
+            DimTransition(DimState.INCOMPLETE, reason=interruption_reason(last_exc)), log=log,
         )
     log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
-    return False

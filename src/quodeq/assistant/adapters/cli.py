@@ -20,7 +20,9 @@ from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
 from quodeq.assistant.adapters._cli_events import StreamOutcome, consume_stream_events
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
+from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.mcp import mcp_config
+from quodeq.assistant.message_role import MessageRole
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.data.ports.assistant import AssistantStore
 from quodeq.shared.process_kill import kill_proc_tree as _kill_proc_tree
@@ -60,7 +62,7 @@ class CliTurnSession:
 
 def _latest_user(messages: list[dict]) -> str:
     for m in reversed(messages):
-        if m["role"] == "user":
+        if m["role"] == MessageRole.USER:
             return m["content"]
     return ""
 
@@ -117,23 +119,24 @@ def _arm_kill_guards(proc, session: CliTurnSession) -> threading.Timer:
     return timer
 
 
-def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession):
+def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession,
+                      resources: TurnResources):
     """Build the sandboxed argv, spawn the CLI, and stream its output.
 
-    Returns ``(cwd, proc, timer, sandbox_cleanup, stream_result)`` — the
-    first four feed ``_run_once``'s ``finally`` cleanup. *session* must
-    carry resolved ``spawn_fn``/``cancel`` (``run_cli_turn`` fills them in).
+    Records each acquired cwd, sandbox cleanup, process and timer on
+    *resources* as soon as it exists, so ``_run_once``'s ``finally`` releases
+    them even when a later step raises. Returns the stream result. *session*
+    must carry resolved ``spawn_fn``/``cancel`` (``run_cli_turn`` fills them in).
     """
-    cwd = scratch_cwd(cfg.scratch_base)
+    resources.cwd = scratch_cwd(cfg.scratch_base)
     argv = spec.argv
-    sandbox_cleanup = None
     if cli_cfg.requires_external_sandbox:
-        prefix, sandbox_cleanup = _external_sandbox(cfg, cwd)
+        prefix, resources.sandbox_cleanup = _external_sandbox(cfg, resources.cwd)
         argv = prefix + argv
-    proc = session.spawn_fn(argv, cwd=cwd, env=build_chat_env(provider=cfg.provider))
-    timer = _arm_kill_guards(proc, session)
-    stream_result = consume_stream_events(proc.stdout, session.emit, spec.session_id)
-    return cwd, proc, timer, sandbox_cleanup, stream_result
+    resources.proc = session.spawn_fn(argv, cwd=resources.cwd,
+                                      env=build_chat_env(provider=cfg.provider))
+    resources.timer = _arm_kill_guards(resources.proc, session)
+    return consume_stream_events(resources.proc.stdout, session.emit, spec.session_id)
 
 
 class TurnOutcome(NamedTuple):
@@ -194,8 +197,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
             cfg, prompt=prompt, mcp_config=mcp_config_ref,
             prior_session_id=session.prior_session_id, new_session_id=new_session_id)
         spec = build_turn_argv(cli_cfg, request)
-        (resources.cwd, resources.proc, resources.timer, resources.sandbox_cleanup,
-         stream_result) = _spawn_and_stream(cfg, cli_cfg, spec, session)
+        stream_result = _spawn_and_stream(cfg, cli_cfg, spec, session, resources)
         return _finalize_turn_result(resources.proc, stream_result, repository=session.repository,
                                      session_id=session.session_id)
     finally:
@@ -263,7 +265,7 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig,
     # error is not trustworthy). A non-empty answer with only a benign non-zero
     # exit is still success.
     if session.prior_session_id is not None and (outcome.final == "" or outcome.structured_error):
-        session.emit({"type": "warning", "message": "session rebuilt"})
+        session.emit({"type": FrameType.WARNING, "message": "session rebuilt"})
         outcome = _run_once(
             config, cli_cfg, replace(session, prior_session_id=None),
             _full_transcript(messages), str(uuid.uuid4()))

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ViolationsRoute, violationsLookupsFor } from './violationsRoute.jsx';
+import { ViolationsRoute, violationsLookupsFor, buildEvalPrincipal } from './violationsRoute.jsx';
 
 function dims() {
   return [
@@ -50,5 +50,24 @@ describe('ViolationsRoute', () => {
   it('renders with no accumulated payload', () => {
     const el = ViolationsRoute({ params: {}, props: routeProps(null) });
     expect(el.props.data.accumulatedDimensions).toEqual([]);
+  });
+
+  it('onTypeClick opens the file page on the type\'s own findings with the dimension\'s run', () => {
+    const d = dims();
+    d[0].violations = [{ req: 'S-1', file: 'a.py', line: 1, severity: 'minor' }, { req: 'S-1', file: 'b.py', line: 2, severity: 'major' }, { req: 'S-2', file: 'c.py', line: 3, severity: 'minor' }];
+    const props = routeProps({ dimensions: d });
+    const el = ViolationsRoute({ params: {}, props });
+    el.props.callbacks.onTypeClick({ req: 'S-1', text: 'Hash it', dimension: 'security', runId: 'run-1', dateLabel: '26 Sep', violations: d[0].violations.slice(0, 2) });
+    expect(props.navigation.handleNavigate).toHaveBeenCalledWith('file', expect.objectContaining({
+      file: expect.objectContaining({ file: 'S-1 · Hash it', total: 2 }),
+      runId: 'run-1', dateLabel: '26 Sep', sourceTab: 'violations',
+    }));
+  });
+});
+
+describe('buildEvalPrincipal', () => {
+  it('keeps a genuine score of 0, not coercing it to null', () => {
+    const result = buildEvalPrincipal({ principle: 'P1', dimension: 'security' }, { score: 0, grade: 'F' }, 'run-1');
+    expect(result.score).toBe(0);
   });
 });

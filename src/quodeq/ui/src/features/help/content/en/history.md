@@ -6,12 +6,13 @@ The **History** tab is your project's quality timeline. Every completed run live
 
 - **Grade and score** for each run.
 - **Delta** against the previous run, so you can spot regressions immediately.
+- **Majors and types**: the run's blocking findings (criticals plus majors) and its open types (distinct requirement codes with an open finding), each with the change against the previous run over the dimensions both runs scored. Down is good for both.
 - **Run metadata** model, sub-agent count, scope, branch, duration.
 - **Tombstones** deleted runs leave a marker so the trend stays continuous.
 
 ### The trend chart
 
-A small chart above the list plots overall score over time, with per-dimension lines you can toggle. Hover a point to see that run's stats; click to open it.
+A small chart above the list plots each run's own score over time. Hover a bar to read the run's score, criticals, majors and open types; click to highlight that run.
 
 ### Group the Overview chart by day, week, or month
 

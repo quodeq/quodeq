@@ -8,6 +8,9 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.api.app import create_app
+from quodeq.services.base import CreateProjectResult, CreateProjectStatus
+from quodeq.services.github_access import AccessMethod, AccessResult
+from quodeq.shared.git_errors import GitFailureKind
 
 _ORIGIN = {"Origin": "http://localhost"}
 
@@ -24,16 +27,45 @@ def client(tmp_path, monkeypatch):
         yield c
 
 
-def test_post_projects_url_requires_clone_dest_or_ephemeral(client):
-    resp = client.post(
-        "/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN
-    )
-    assert resp.status_code == 400
+def test_post_projects_url_without_clone_dest_uses_the_default_root(client, tmp_path, monkeypatch, inline_clone_job):
+    root = tmp_path / "repos"
+    monkeypatch.setattr("quodeq.api.routes_project_create.default_clone_root", lambda env=None: root)
+    result = CreateProjectResult(status=CreateProjectStatus.CREATED, project_id="p", scan_data={})
+    with patch("quodeq.services.filesystem.FilesystemActionProvider.create_project", return_value=result) as create:
+        resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN)
+    assert resp.status_code == 202 and resp.get_json()["dest"] == str(root / "y")
+    assert root.is_dir() and create.call_args.args[1].clone_dest == str(root)
+
+
+def test_post_projects_configured_default_root_outside_home_is_trusted(client, tmp_path, monkeypatch, inline_clone_job):
+    # An operator-set QUODEQ_REPOS_DIR is trusted when no cloneDest is sent.
+    root = tmp_path.parent / f"{tmp_path.name}-elsewhere" / "repos"
+    monkeypatch.setattr("quodeq.api.routes_project_create.default_clone_root", lambda env=None: root)
+    result = CreateProjectResult(status=CreateProjectStatus.CREATED, project_id="p", scan_data={})
+    with patch("quodeq.services.filesystem.FilesystemActionProvider.create_project", return_value=result):
+        resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN)
+    assert resp.status_code == 202 and root.is_dir()
+
+
+def test_post_projects_default_root_that_cannot_be_created_names_no_clone_dest(client, tmp_path, monkeypatch):
+    # No cloneDest was sent, so the refusal must not blame one.
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file where the folder should be")
+    monkeypatch.setattr("quodeq.api.routes_project_create.default_clone_root", lambda env=None: blocker / "repos")
+    resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git"}, headers=_ORIGIN)
     body = resp.get_json()
-    assert body["code"] == "MISSING_CLONE_DEST"
+    assert resp.status_code == 400 and body["code"] == "INVALID_CLONE_DEST"
+    assert body["error"] == "The default working-copy folder could not be created"
 
 
-def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path):
+def test_post_projects_user_clone_dest_outside_home_is_still_rejected(client, tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    resp = client.post("/api/projects", json={"repo": "https://github.com/x/y.git", "cloneDest": str(outside)}, headers=_ORIGIN)
+    assert resp.status_code == 400 and resp.get_json()["code"] == "INVALID_CLONE_DEST"
+
+
+def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path, inline_clone_job):
     # cloneDest must be under home (the fixture sets home to tmp_path).
     parent = tmp_path / "code"
     parent.mkdir()
@@ -53,16 +85,13 @@ def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path):
     ):
         resp = client.post(
             "/api/projects",
-            json={
-                "repo": "https://github.com/x/y.git",
-                "cloneDest": str(parent),
-            },
+            json={"repo": "https://github.com/x/y.git", "cloneDest": str(parent)},
             headers=_ORIGIN,
         )
-    assert resp.status_code == 200, resp.get_json()
-    body = resp.get_json()
-    assert body["projectId"] == "test-uuid"
-    assert body["scanData"]["total_files"] == 5
+    assert resp.status_code == 202, resp.get_json()
+    snap = client.get("/api/projects/clone-status").get_json()
+    assert snap["state"] == "done" and snap["projectId"] == "test-uuid"
+    assert snap["scanData"]["total_files"] == 5
 
 
 def test_post_projects_url_ephemeral_skips_clone_dest(client, tmp_path):
@@ -106,22 +135,38 @@ def test_post_projects_rejects_metadata_endpoint_ssrf(client):
             headers=_ORIGIN,
         )
     assert resp.status_code == 400, resp.get_json()
-    assert resp.get_json()["code"] == "INVALID_REPO"
+    assert resp.get_json()["code"] == "INVALID_URL"  # the access ladder's URL guard answers first
     assert clone_calls == [], "SSRF: git clone must never run for a metadata-endpoint URL"
 
 
-def test_post_projects_clone_dest_must_exist(client, tmp_path):
-    nonexistent = tmp_path / "no-such-dir"
+def test_post_projects_clone_dest_under_home_is_created_when_missing(client, tmp_path):
+    """A missing folder under home is created rather than refused: the wizard's
+    default destination (~/quodeq/repos) does not exist on a fresh machine."""
+    missing = tmp_path / "quodeq" / "repos"
     resp = client.post(
         "/api/projects",
         json={
             "repo": "https://github.com/x/y.git",
-            "cloneDest": str(nonexistent),
+            "cloneDest": str(missing),
         },
         headers=_ORIGIN,
     )
-    assert resp.status_code == 400
-    assert resp.get_json()["code"] == "INVALID_CLONE_DEST"
+    assert resp.status_code != 400 or resp.get_json()["code"] != "INVALID_CLONE_DEST", resp.get_json()
+    assert missing.is_dir()
+
+
+def test_post_projects_clone_dest_tilde_means_home(client, tmp_path):
+    """The wizard sends "~/quodeq/repos"; the server expands the tilde to the home folder."""
+    resp = client.post(
+        "/api/projects",
+        json={
+            "repo": "https://github.com/x/y.git",
+            "cloneDest": "~/quodeq/repos",
+        },
+        headers=_ORIGIN,
+    )
+    assert resp.status_code != 400 or resp.get_json()["code"] != "INVALID_CLONE_DEST", resp.get_json()
+    assert (tmp_path / "quodeq" / "repos").is_dir()
 
 
 def test_post_projects_clone_dest_must_be_directory_not_file(client, tmp_path):
@@ -176,3 +221,53 @@ def test_post_projects_local_repo_path_must_be_directory_not_file(client, tmp_pa
     body = resp.get_json()
     assert body["code"] == "INVALID_REPO"
     assert "file, not a directory" in body["error"]
+
+
+def _capture_spec(specs):
+    def fake_register(reports_dir, spec, **kw):
+        specs.append(spec)
+        d = Path(reports_dir) / "u1"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "scan.json").write_text(json.dumps({"total_files": 1}))
+        (d / "repository_info.json").write_text(json.dumps({"location": "local", "ephemeral": True}))
+        return "u1"
+    return fake_register
+
+
+def test_create_project_url_probes_first_and_threads_env(client, monkeypatch):
+    env = {"GIT_CONFIG_COUNT": "1"}
+    reachable = AccessResult(True, AccessMethod.GH, GitFailureKind.OK, "", "github.com", True, env, "https://github.com/o/r.git")
+    monkeypatch.setattr("quodeq.api.routes_project_create.resolve_access", lambda url: reachable)
+    specs = []
+    with patch("quodeq.services.project_registration.register_project", side_effect=_capture_spec(specs)):
+        client.post("/api/projects", json={"repo": "git@github.com:o/r.git", "ephemeral": True}, headers=_ORIGIN)
+    assert specs[0].git_env == env
+    assert specs[0].clone_url == "https://github.com/o/r.git"
+    assert specs[0].repo == "git@github.com:o/r.git"
+
+
+def test_create_project_url_probe_failure_is_400(client, monkeypatch):
+    unreachable = AccessResult(False, AccessMethod.NONE, GitFailureKind.NOT_FOUND, "nope", "github.com", True, None)
+    monkeypatch.setattr("quodeq.api.routes_project_create.resolve_access", lambda url: unreachable)
+    specs = []
+    with patch("quodeq.services.project_registration.register_project", side_effect=_capture_spec(specs)):
+        resp = client.post("/api/projects", json={"repo": "https://github.com/o/r.git", "ephemeral": True}, headers=_ORIGIN)
+    assert resp.status_code == 400 and resp.get_json()["code"] == "ACCESS_NOT_FOUND"
+    assert specs == []
+
+
+def test_create_project_local_path_never_probes(client, monkeypatch, tmp_path):
+    monkeypatch.setattr("quodeq.api.routes_project_create.resolve_access", lambda url: pytest.fail("probed a local path"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    client.post("/api/projects", json={"repo": str(repo)}, headers=_ORIGIN)
+
+
+def test_create_project_clone_failure_forgets_the_cached_method(client, monkeypatch):
+    from quodeq.services.base import CreateProjectResult, CreateProjectStatus
+    forgotten = []
+    monkeypatch.setattr("quodeq.api.routes_project_create.forget_url", forgotten.append)
+    result = CreateProjectResult(status=CreateProjectStatus.CLONE_FAILED, message="x", clone_error_kind=GitFailureKind.UNKNOWN)
+    with patch("quodeq.services.filesystem.FilesystemActionProvider.create_project", return_value=result):
+        client.post("/api/projects", json={"repo": "https://github.com/o/r.git", "ephemeral": True}, headers=_ORIGIN)
+    assert forgotten == ["https://github.com/o/r.git"]

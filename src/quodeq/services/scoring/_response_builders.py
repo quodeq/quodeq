@@ -2,18 +2,17 @@
 
 Builds the camelCase ``{dimensions, summary}`` payloads from either the
 SQL grade tables (modern, event-log-projected runs) or the eval JSON
-files (legacy runs). Moved out of the package ``__init__`` in the
-ScoringReader decomposition; the facade re-exports every name, so
-callers and patch targets are unchanged.
+files (legacy runs). The package ``__init__`` re-exports every name, so
+callers and patch targets use the package path.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.core.evidence.model import violations_per_100_files
-from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.core.types.finding import Finding
+from quodeq.core.types.finding_type import FindingType
 from quodeq.core.scoring.dimension_summary import build_dimension_summary
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
@@ -21,7 +20,7 @@ from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult
 from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
-from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.dismissed import dismissed_keys, recount_totals
 from quodeq.services.ports import GradeTablesReader
 from quodeq.services.wiring import (
     SQLiteStateStore,
@@ -35,49 +34,7 @@ from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 
 
-def _severity_bucket(severity: str) -> str:
-    """Map DB severity strings to the legacy tally buckets.
-
-    The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``. Only
-    ``critical``, ``major``, and ``minor`` have dedicated buckets; everything
-    else (including ``high``, ``medium``, ``low``) falls into ``unknown``.
-    This mirrors the legacy ``recount_totals`` in ``services/dismissed.py`` —
-    a pre-existing bucketing semantics worth a follow-up but out of PR 2 scope.
-    """
-    s = (severity or "").lower()
-    if s == "critical":
-        return "critical"
-    if s == "major":
-        return "major"
-    if s == "minor":
-        return "minor"
-    return "unknown"
-
-
-def _build_totals_from_findings(
-    violations: list[Finding], compliance_count: int, files_read: int | None = None,
-) -> Totals:
-    """Build a Totals dataclass from a list of active (non-dismissed) violations."""
-    critical = major = minor = unknown = 0
-    for v in violations:
-        bucket = _severity_bucket(v.severity or "")
-        if bucket == "critical":
-            critical += 1
-        elif bucket == "major":
-            major += 1
-        elif bucket == "minor":
-            minor += 1
-        else:
-            unknown += 1
-    return Totals(
-        violation_count=len(violations),
-        compliance_count=compliance_count,
-        severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
-        violations_per100_files=violations_per_100_files(len(violations), files_read),
-    )
-
-
-def _build_dimension_dict(
+def build_dimension_dict(
     dim_row: dict,
     p_rows: list[dict],
     violations: list[Finding],
@@ -102,9 +59,7 @@ def _build_dimension_dict(
     ]
 
     files_read = dim_row.get("files_read")
-    totals = _build_totals_from_findings(
-        violations, compliance_count=len(compliance), files_read=files_read,
-    )
+    totals = recount_totals(violations, compliance_count=len(compliance), files_read=files_read)
 
     dim = DimensionResult(
         dimension=dim_row["dimension"],
@@ -119,14 +74,14 @@ def _build_dimension_dict(
     return to_camel_dict(dim)
 
 
-def _build_summary_from_dim_dicts(
+def build_summary_from_dim_dicts(
     dim_dicts: list[dict], params: ScoringParams = DEFAULT_PARAMS,
     *, score_pairs: list[tuple[str | None, float]],
 ) -> dict:
     """Build a camelCase summary dict from a list of dimension camelCase dicts.
 
     Same shape as ``summarize_dimensions`` but working directly on the
-    already-serialised dicts produced by ``_build_dimension_dict``. The
+    already-serialised dicts produced by ``build_dimension_dict``. The
     grade fallback is deliberately NOT shared: a tied vote resolves here on
     ``Counter`` insertion order (first grade seen wins) and there on grade
     rank, because only the parser side has the rank table. *score_pairs* are
@@ -162,17 +117,18 @@ def _default_grade_tables_reader(run_dir: Path) -> GradeTablesReader:
     return SQLiteStateStore(run_dir)
 
 
-def _build_response_from_grade_tables(
+def build_response_from_grade_tables(
     run_dir: Path, params: ScoringParams = DEFAULT_PARAMS,
     store_factory: Callable[[Path], GradeTablesReader] | None = None,
+    findings_reader: Callable[[Path], Iterable[dict]] | None = None,
 ) -> dict:
     """Build the full scores response from SQL grade tables + findings.
 
     Reads dimension_scores and principle_grades from the grade-tables reader
     built by *store_factory* (the SQLite state store by default), reads
-    active (non-dismissed) findings via the adapter-side
-    ``read_active_findings``, and assembles the same camelCase dict shape as
-    the legacy rescore path.
+    active (non-dismissed) findings via *findings_reader* (the adapter-side
+    ``read_active_findings`` by default), and assembles the same camelCase
+    dict shape as the legacy rescore path.
     """
     store = (store_factory or _default_grade_tables_reader)(run_dir)
     dim_rows = store.read_dimension_scores()
@@ -186,10 +142,10 @@ def _build_response_from_grade_tables(
     # Active findings grouped by dimension and verdict.
     violations_by_dim: dict[str, list[Finding]] = {}
     compliance_by_dim: dict[str, list[Finding]] = {}
-    for row in read_active_findings(run_dir):
+    for row in (findings_reader or read_active_findings)(run_dir):
         f = row_to_finding(row)
         dim = f.dimension or ""
-        if f.verdict == "violation":
+        if f.verdict == FindingType.VIOLATION:
             violations_by_dim.setdefault(dim, []).append(f)
         else:
             compliance_by_dim.setdefault(dim, []).append(f)
@@ -198,7 +154,7 @@ def _build_response_from_grade_tables(
     score_pairs: list[tuple[str | None, float]] = []
     for dim_row in dim_rows:
         dim_name = dim_row["dimension"]
-        dim_dicts.append(_build_dimension_dict(
+        dim_dicts.append(build_dimension_dict(
             dim_row,
             p_rows_by_dim.get(dim_name, []),
             violations_by_dim.get(dim_name, []),
@@ -207,11 +163,11 @@ def _build_response_from_grade_tables(
         if dim_row.get("score") is not None:
             score_pairs.append((dim_row["dimension"], float(dim_row["score"])))
 
-    summary = _build_summary_from_dim_dicts(dim_dicts, params=params, score_pairs=score_pairs)
+    summary = build_summary_from_dim_dicts(dim_dicts, params=params, score_pairs=score_pairs)
     return {"dimensions": dim_dicts, "summary": summary}
 
 
-def _build_response_from_eval_files(
+def build_response_from_eval_files(
     reports_root: Path, project: str, run_id: str,
     params: ScoringParams = DEFAULT_PARAMS,
     deps: ScoringDeps | None = None,

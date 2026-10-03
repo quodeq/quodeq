@@ -6,33 +6,32 @@ from __future__ import annotations
 
 import atexit
 import json
-import logging
 import os
 import struct
-import subprocess
 import threading
+from http import HTTPStatus
 
 from flask import Flask, jsonify, request
 from flask_sock import Sock
 
-from quodeq.api._terminal_gate import _env_reason, _forbidden, _gate_reason
+from quodeq.api._terminal_gate import env_reason, gate_reason, gated
 from quodeq.api._terminal_ws_helpers import (
     pump_terminal_out,
     resolve_ws_session,
     setup_terminal_session,
     terminal_read_loop,
 )
-from quodeq.api.helpers import json_error
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_MISSING_PARAM, CODE_UNKNOWN_SESSION
+from quodeq.api.helpers import json_error, optional_json_object_or_response
+from quodeq.core.utils.numbers import clamp, int_or_none
 from quodeq.terminal.links import (
-    build_open_argv,
     detect_editor,
+    open_in_editor,
     resolve_bases,
     resolve_path,
     safe_editor_path,
 )
-from quodeq.terminal.sessions import TerminalSessionRegistry, shell_name
-
-_logger = logging.getLogger(__name__)
+from quodeq.terminal.sessions import TerminalSessionRegistry, TerminalSessionView, shell_name
 
 
 # App-specific WS close codes (4000-4999 range). The client's auto-reconnect
@@ -46,16 +45,23 @@ _WS_CLOSE_REFUSED = 4003   # terminal gate refused the handshake
 
 def _coerce_int(value) -> int | None:
     """Line/col from a JSON body: accept ints or numeric strings, else None."""
-    try:
-        n = int(value)
-    except (TypeError, ValueError):
-        return None
-    return n if n > 0 else None
+    n = int_or_none(value)
+    return n if n is not None and n > 0 else None
+
+
+_WINSIZE_MAX = 65535  # struct.pack('HH') upper bound for a terminal dimension
 
 
 def _clamp_winsize(value: int) -> int:
-    """Keep a terminal dimension within struct.pack('HH') range (1..65535)."""
-    return max(1, min(int(value), 65535))
+    """Keep a terminal dimension within struct.pack('HH') range (1..65535).
+
+    Raises ValueError for a value int() rejects (junk or an infinite float),
+    which _apply_control's handler turns into a no-op.
+    """
+    n = int_or_none(value)
+    if n is None:
+        raise ValueError(f"terminal dimension is not an integer: {value!r}")
+    return clamp(n, 1, _WINSIZE_MAX)
 
 
 def _apply_control(manager, payload: str) -> None:
@@ -80,7 +86,7 @@ def _session_bases(registry: TerminalSessionRegistry, body: dict) -> list:
 
 
 def _terminal_status(registry: TerminalSessionRegistry):
-    reason = _env_reason()
+    reason = env_reason()
     return jsonify({
         "enabled": reason is None,
         "running": registry.any_alive,
@@ -89,52 +95,66 @@ def _terminal_status(registry: TerminalSessionRegistry):
     })
 
 
+def _session_wire(view: TerminalSessionView) -> dict:
+    """Route-owned wire shape for one tab: camelCase keys, $HOME collapsed to
+    ``~`` (None cwd, e.g. a dead PTY, passes through unchanged)."""
+    cwd = view.cwd
+    home = os.path.expanduser("~")
+    if cwd and home != "~" and (cwd == home or cwd.startswith(home + os.sep)):
+        cwd = "~" + cwd[len(home):]
+    return {
+        "id": view.id,
+        "name": view.name,
+        "alive": view.alive,
+        "createdAt": view.created_at,
+        "cwd": cwd,
+    }
+
+
+# env_reason, not the full gate: same-origin GETs carry no Origin
+# header (same reasoning as /status).
+@gated(env_reason)
 def _terminal_sessions(registry: TerminalSessionRegistry):
-    # _env_reason, not the full gate: same-origin GETs carry no Origin
-    # header (same reasoning as /status).
-    if _env_reason() is not None:
-        return _forbidden()
-    return jsonify({"sessions": registry.list(), "max": registry.MAX_SESSIONS})
+    sessions = [_session_wire(view) for view in registry.list()]
+    return jsonify({"sessions": sessions, "max": registry.MAX_SESSIONS})
 
 
+@gated()
 def _terminal_session_create(registry: TerminalSessionRegistry):
-    if _gate_reason() is not None:
-        return _forbidden()
     session = registry.create()
     if session is None:
-        return json_error("session limit reached", 409, "SESSION_LIMIT")
-    return jsonify({"id": session.id, "name": session.name}), 201
+        return json_error("session limit reached", HTTPStatus.CONFLICT, "SESSION_LIMIT")
+    return jsonify({"id": session.id, "name": session.name}), HTTPStatus.CREATED
 
 
+@gated()
 def _terminal_session_kill(registry: TerminalSessionRegistry, sid):
-    if _gate_reason() is not None:
-        return _forbidden()
     if not registry.kill(sid):
-        return json_error("unknown session", 404, "UNKNOWN_SESSION")
+        return json_error("unknown session", HTTPStatus.NOT_FOUND, CODE_UNKNOWN_SESSION)
     return jsonify({"ok": True})
 
 
+@gated()
 def _terminal_kill(registry: TerminalSessionRegistry):
     # Kills EVERY session — this backs Settings' "Restart terminal", which
     # is a full reset; the client reconciles its tabs via /sessions after.
-    if _gate_reason() is not None:
-        return _forbidden()
     registry.kill_all()
     return jsonify({"ok": True})
 
 
+@gated()
 def _terminal_resolve(registry: TerminalSessionRegistry):
     """Resolve candidate path tokens the client detected in a terminal line
     to absolute paths, reporting which exist. The client makes only the
     existing ones clickable, so path-shaped text never becomes a dead link.
     Gated exactly like the other terminal routes (same threat model: a
     single-user localhost app whose terminal already grants a full shell)."""
-    if _gate_reason() is not None:
-        return _forbidden()
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_response(CODE_INVALID_INPUT)
+    if not isinstance(body, dict):
+        return body
     paths = body.get("paths")
     if not isinstance(paths, list):
-        return json_error("paths must be a list", 400, "INVALID_INPUT")
+        return json_error("paths must be a list", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     bases = _session_bases(registry, body)
     resolved = []
     for token in paths:
@@ -149,29 +169,21 @@ def _launch_editor(editor, safe: str, body: dict):
     """Spawn *editor* on *safe* at the body's optional line/col; fail-soft."""
     line = _coerce_int(body.get("line"))
     col = _coerce_int(body.get("col"))
-    try:
-        argv = build_open_argv(editor, safe, line, col)
-        if argv is None:  # Windows startfile sentinel
-            os.startfile(safe)  # type: ignore[attr-defined]
-        else:
-            # Detached: the editor outlives this request; we don't wait on it.
-            subprocess.Popen(argv, start_new_session=True)
-        return jsonify({"opened": True, "editor": editor.name})
-    except (OSError, ValueError):
-        _logger.warning("failed to open %s in %s", safe, editor.name, exc_info=True)
-        return jsonify({"opened": False, "editor": editor.name})
+    opened = open_in_editor(editor, safe, line, col)
+    return jsonify({"opened": opened, "editor": editor.name})
 
 
+@gated()
 def _terminal_open(registry: TerminalSessionRegistry):
     """Open an already-resolved absolute path in the user's editor at an
     optional line/col. Fail-soft: any error returns opened=false rather than
     raising, so a missing editor never surfaces as a 500."""
-    if _gate_reason() is not None:
-        return _forbidden()
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_response(CODE_INVALID_INPUT)
+    if not isinstance(body, dict):
+        return body
     path = body.get("path")
     if not isinstance(path, str) or not path:
-        return json_error("path is required", 400, "MISSING_PARAM")
+        return json_error("path is required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     # Confine the launch to the terminal's own working directories (shell
     # cwd, server cwd, home) and normalize the untrusted path to its real,
     # canonical form. Everything below uses this sanitized value, never the
@@ -189,7 +201,7 @@ def _terminal_open(registry: TerminalSessionRegistry):
 
 
 def _terminal_ws(registry: TerminalSessionRegistry, ws):
-    if _gate_reason() is not None:
+    if gate_reason() is not None:
         ws.close(_WS_CLOSE_REFUSED)
         return
     session, close_code = resolve_ws_session(registry, request.args.get("session"))

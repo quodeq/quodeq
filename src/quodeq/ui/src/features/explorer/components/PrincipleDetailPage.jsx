@@ -1,17 +1,20 @@
 import { memo, useMemo, useEffect } from 'react';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeLetter } from '../../../utils/formatters.js';
+import { gradeLetter } from '../../../utils/formatters.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
-import { headerRowKey } from './findingListRows.js';
+import { ROW_KIND } from './findingListRows.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 import { usePrincipleFiltering } from './principleFiltering.js';
 import { usePrincipleReportSpec } from './usePrincipleReportSpec.jsx';
 import { usePrincipleFixPlanSpec } from './usePrincipleFixPlanSpec.jsx';
-import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
-import DeferredMount from './DeferredMount.jsx';
-import CardListSkeleton from './CardListSkeleton.jsx';
+import { useDashboardScrollElement } from './VirtualList.jsx';
+import DeferredViolationList from './DeferredViolationList.jsx';
 import { t } from '../../../strings/index.js';
+import { GRADE } from '../../../vocab/grade.js';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 
 // Rows are virtualized (same VirtualList as FileDetailPage): a principle can
 // carry hundreds of findings, and each card runs pretext measurement layout
@@ -21,48 +24,33 @@ import { t } from '../../../strings/index.js';
 // The compliance section shows unless the user has narrowed to one severity:
 // no filter, the explicit "all", and the compliance-only view all keep it.
 function showsComplianceSection(activeSevFilter) {
-  return !activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance';
+  return !activeSevFilter || activeSevFilter === SEVERITY_FILTER_ALL || activeSevFilter === FINDING_TYPE.COMPLIANCE;
 }
 
 function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
   const arr = [];
-  if (activeSevFilter !== 'compliance') {
-    for (const sev of EVAL_SEVERITY_ORDER) {
+  if (activeSevFilter !== FINDING_TYPE.COMPLIANCE) {
+    for (const sev of KNOWN_SEVERITIES) {
       const vs = displayedBySeverity[sev];
       if (!vs || vs.length === 0) continue;
-      arr.push({ kind: 'sev-header', sev, count: vs.length });
-      vs.forEach((v, idx) => arr.push({ kind: 'violation', v, idx }));
+      arr.push({ kind: ROW_KIND.SEV_HEADER, sev, count: vs.length });
+      vs.forEach((v, idx) => arr.push({ kind: FINDING_TYPE.VIOLATION, v, idx }));
     }
   }
   if (showsComplianceSection(activeSevFilter) && compliance.length > 0) {
-    arr.push({ kind: 'compliance-header', count: compliance.length });
-    compliance.forEach((c, idx) => arr.push({ kind: 'compliance', c, idx }));
+    arr.push({ kind: ROW_KIND.COMPLIANCE_HEADER, count: compliance.length });
+    compliance.forEach((c, idx) => arr.push({ kind: FINDING_TYPE.COMPLIANCE, c, idx }));
   }
   return arr;
 }
 
-// Estimated row heights for the virtualizer: a finding/compliance card vs a
-// section header row.
-const ROW_HEIGHT_CARD = 160;
-const ROW_HEIGHT_HEADER = 36;
+// Estimated row heights for the virtualizer: a finding/compliance card
+// (also the estimate for a row not materialised yet) vs a section header row.
+const ROW_HEIGHT_PX = Object.freeze({ missing: 160, header: 36, row: 160 });
 
-function estimateItemSize(items) {
-  return (i) => {
-    const item = items[i];
-    if (!item) return ROW_HEIGHT_CARD;
-    return item.kind === 'sev-header' || item.kind === 'compliance-header' ? ROW_HEIGHT_HEADER : ROW_HEIGHT_CARD;
-  };
-}
-
-function itemKey(items) {
-  return (i) => {
-    const item = items[i];
-    if (!item) return i;
-    const header = headerRowKey(item);
-    if (header) return header;
-    if (item.kind === 'violation') return `v-${item.v.file || ''}:${item.v.line ?? ''}:${item.idx}`;
-    return `c-${item.c.file || ''}:${item.c.line ?? ''}:${item.idx}`;
-  };
+function principleFindingKey(item) {
+  if (item.kind === FINDING_TYPE.VIOLATION) return `v-${item.v.file || ''}:${item.v.line ?? ''}:${item.idx}`;
+  return `c-${item.c.file || ''}:${item.c.line ?? ''}:${item.idx}`;
 }
 
 function SevBadgeRow({ sevCounts }) {
@@ -78,12 +66,12 @@ function SevBadgeRow({ sevCounts }) {
 
 function PrincipleHeader({ data }) {
   const { principle, description, score, grade, violations, compliance, sevCounts, dateLabel, runId } = data;
-  const scoreDisplay = score ? String(score).replace('/10', '') : '—';
+  const scoreDisplay = score != null ? String(score).replace('/10', '') : '—';
   const ratioDisplay = (compliance.length > 0 && violations.length > 0)
     ? `1:${Math.round(compliance.length / violations.length)}`
     : '—';
 
-  const scoreHint = grade === 'Insufficient'
+  const scoreHint = grade === GRADE.INSUFFICIENT
     ? t('explorer.notEnoughEvidence')
     : grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null;
 
@@ -121,13 +109,13 @@ function PrincipleContext({ principleData }) {
 
 function renderPrincipleItem(item, { principle, cardDismiss }) {
   switch (item.kind) {
-    case 'sev-header':
+    case ROW_KIND.SEV_HEADER:
       return <SectionLabel>{item.sev.toUpperCase()} · {item.count}</SectionLabel>;
-    case 'compliance-header':
+    case ROW_KIND.COMPLIANCE_HEADER:
       return <SectionLabel>{t('overview.statCompliance')} · {item.count}</SectionLabel>;
-    case 'violation':
+    case FINDING_TYPE.VIOLATION:
       return <EvalViolationCard v={item.v} principle={principle} index={item.idx} onDismiss={cardDismiss} />;
-    case 'compliance':
+    case FINDING_TYPE.COMPLIANCE:
       return <ComplianceCard c={item.c} principle={principle} index={item.idx} />;
     default:
       return null;
@@ -155,21 +143,14 @@ function PrincipleDetailBody({
           onFilterChange={setActiveSevFilter}
         />
       )}
-      {/* This page gets all its data through nav params — nothing fetches, so
-          without this split the first paint waits for every visible card's
-          pretext layout effect and the click that navigated here looks
-          ignored. Header first, cards one commit later. */}
-      <DeferredMount fallback={<CardListSkeleton />}>
-        <VirtualList
-          key={virtualKey}
-          items={items}
-          scrollElement={scrollElement}
-          estimateSize={estimateItemSize(items)}
-          getItemKey={itemKey(items)}
-          label={t('explorer.violationsListAria')}
-          renderItem={(item) => renderPrincipleItem(item, { principle, cardDismiss })}
-        />
-      </DeferredMount>
+      <DeferredViolationList
+        resetKey={virtualKey}
+        items={items}
+        scrollElement={scrollElement}
+        rowHeights={ROW_HEIGHT_PX}
+        findingKey={principleFindingKey}
+        renderItem={(item) => renderPrincipleItem(item, { principle, cardDismiss })}
+      />
     </>
   );
 }

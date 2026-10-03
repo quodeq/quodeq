@@ -72,3 +72,17 @@ describe('DimensionSelector standard-type labels', () => {
     expect(container.querySelector('.dimension-chip-type').textContent).toBe('ISO');
   });
 });
+
+describe('DimensionSelector WCAG chip', () => {
+  it('labels a WCAG standard WCAG, not the ISO fallback', () => {
+    const { container } = render(
+      <DimensionSelector
+        allDimensions={[{ id: 'accessibility', label: 'Accessibility', standardType: 'wcag' }]}
+        selectedDims={new Set()} onToggle={() => {}} onSelectAll={() => {}} onClearAll={() => {}} variant="chips"
+      />,
+    );
+    const chip = container.querySelector('.dimension-chip-type');
+    expect(chip.textContent).toBe('WCAG');
+    expect(chip.classList.contains('dimension-chip-type--wcag')).toBe(true);
+  });
+});

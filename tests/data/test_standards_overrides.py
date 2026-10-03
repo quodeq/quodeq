@@ -1,4 +1,7 @@
 import json
+from pathlib import Path
+
+import pytest
 
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
@@ -90,6 +93,19 @@ def test_load_project_overrides_drops_non_dict_entries(tmp_path):
     assert load_project_overrides(tmp_path) == {"M-ANA-2": {"max_lines": 60}}
 
 
+def test_load_project_overrides_unnamed_read_failure_propagates(tmp_path, monkeypatch):
+    """The catch narrows to (OSError, ValueError, RecursionError); a bug
+    that raises anything else must not be silently absorbed as '{}'."""
+    _write_overrides(tmp_path, {"M-ANA-2": {"max_lines": 60}})
+
+    def _boom(self, *a, **kw):
+        raise RuntimeError("unexpected read failure")
+
+    monkeypatch.setattr(Path, "read_text", _boom)
+    with pytest.raises(RuntimeError, match="unexpected read failure"):
+        load_project_overrides(tmp_path)
+
+
 def test_collect_declared_params(tmp_path):
     (tmp_path / "maintainability.json").write_text(json.dumps({
         "id": "maintainability",
@@ -103,6 +119,23 @@ def test_collect_declared_params(tmp_path):
     declared = collect_declared_params(tmp_path)
     assert set(declared) == {"M-ANA-2"}
     assert declared["M-ANA-2"]["max_lines"]["default"] == 50
+
+
+def test_collect_declared_params_unnamed_read_failure_propagates(tmp_path, monkeypatch):
+    """The catch narrows to (OSError, ValueError, RecursionError); a bug
+    that raises anything else must not be silently skipped as 'one bad
+    standard'."""
+    (tmp_path / "maintainability.json").write_text(json.dumps({
+        "id": "maintainability",
+        "principles": [{"name": "Analyzability", "requirements": [REQ]}],
+    }))
+
+    def _boom(self, *a, **kw):
+        raise RuntimeError("unexpected read failure")
+
+    monkeypatch.setattr(Path, "read_text", _boom)
+    with pytest.raises(RuntimeError, match="unexpected read failure"):
+        collect_declared_params(tmp_path)
 
 
 def test_validate_overrides_accepts_valid_document():

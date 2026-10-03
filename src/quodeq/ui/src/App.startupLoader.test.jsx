@@ -10,13 +10,13 @@ import {
 // Split from App.test.jsx: history route onRunDeleted wiring,
 // projects-load-failure threading, and shouldShowStartupLoader.
 
-// Deleting a run changes the accumulated rollup the Overview grade is built
-// from -- the same class of mutation as dismiss/restore/delete-finding, which
-// all get the debounced ACTIVE reconcile. mark-stale alone leaves the
-// always-mounted Overview observer on pre-deletion numbers indefinitely
-// (pywebview never fires a focus refetch).
+// Deleting a run drops it from every cached run list, moves a selection off
+// it, and then gets the same debounced ACTIVE reconcile dismiss/restore use
+// (mark-stale alone leaves the always-mounted Overview observer on
+// pre-deletion numbers). That composition is the app-level handleRunDeleted
+// (hooks/runDeletion.js); the route must hand it through untouched.
 describe('history route onRunDeleted wiring', () => {
-  it('wires onRunDeleted to the debounced active reconcile, not mark-stale only', () => {
+  it('wires onRunDeleted to the app-level handleRunDeleted', () => {
     const props = {
       dashboardData: {
         dashboard: { trend: [] }, availableRuns: [], overviewRunIndex: 0,
@@ -29,10 +29,10 @@ describe('history route onRunDeleted wiring', () => {
       },
       refreshDashboard: vi.fn(),
       scheduleDashboardReconcile: vi.fn(),
+      handleRunDeleted: vi.fn(),
     };
     const el = ROUTE_RENDERERS.history({}, props);
-    el.props.callbacks.onRunDeleted();
-    expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
+    expect(el.props.callbacks.onRunDeleted).toBe(props.handleRunDeleted);
   });
 });
 

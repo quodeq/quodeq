@@ -1,6 +1,6 @@
 """_on_open: bringing the dashboard window to front (or re-launching it) must
-not crash the menu bar app when subprocess.Popen fails (cluster 10,
-fault-tolerance cycle 1). Mirrors _launch_dashboard_process's `except
+not crash the menu bar app when subprocess.Popen fails. Mirrors
+_launch_dashboard_process's `except
 OSError` handling in the same class.
 """
 from __future__ import annotations

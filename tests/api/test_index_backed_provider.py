@@ -91,7 +91,7 @@ def test_provider_list_repeated_call_works(tmp_path, monkeypatch) -> None:
 
 def test_list_evaluations_internal_job_overrides_index_row(tmp_path, monkeypatch) -> None:
     """When JobManager has an in-memory job with the same job_id as an index
-    row, the in-memory version wins. Covers the Plan B1 precedence rule that
+    row, the in-memory version wins. Covers the precedence rule that
     had no explicit test before.
 
     Scenario: a dashboard-spawned job is running live (fresh `status="running"`,

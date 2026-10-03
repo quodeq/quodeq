@@ -2,10 +2,10 @@
 provider returns a job snapshot shape that doesn't guarantee a ``.job_id``
 attribute (e.g. a dict-shaped snapshot) for a failed/cancelled job.
 
-Guards routes_evaluations_item.py's _score_completed_dims_in_bg: it must use
-the route's URL job_id (passed in explicitly) for _claim_scoring and the
-background task name, never `job.job_id` — a job-snapshot-shaped object is
-not guaranteed to carry that attribute, unlike the production JobSnapshot
+Guards services/score_run.py's score_terminal_run_once: it must use the
+caller's job_id (passed in explicitly by the route) for claim_scoring and
+the background task name, never `job.job_id` — a job-snapshot-shaped object
+is not guaranteed to carry that attribute, unlike the production JobSnapshot
 dataclass.
 """
 from __future__ import annotations
@@ -72,7 +72,7 @@ class _DictShapedFailedJobProvider(ActionProvider):
             output_run_id="run-1",
         )
 
-    def cancel_evaluation(self, job_id, reports_dir=None, *, discard_partial=False):
+    def cancel_evaluation(self, job_id, reports_dir=None, *, discard_partial=False, wait_for_exit=False):
         return False
 
     def list_evaluations(self, *, limit=0, reports_dir=None, states=None):
@@ -112,7 +112,7 @@ def test_get_evaluation_with_dict_shaped_failed_job_does_not_500(client):
         scoring_started.set()
 
     with patch(
-        "quodeq.api._evaluation_routes.score_completed_evidence",
+        "quodeq.services.score_run.score_completed_evidence",
         side_effect=_score,
     ):
         resp = client.get("/api/evaluations/j1")
@@ -122,3 +122,29 @@ def test_get_evaluation_with_dict_shaped_failed_job_does_not_500(client):
     assert scoring_started.wait(timeout=budget(2)), (
         "Background scoring thread never started for the dict-shaped job."
     )
+
+
+class _DroppingRunner:
+    """Background runner whose queue is always full."""
+
+    def __init__(self):
+        self.submitted: list[str] = []
+
+    def submit(self, fn, *, name=""):
+        self.submitted.append(name)
+        return False
+
+
+def test_a_dropped_salvage_task_releases_its_claim_so_the_next_get_retries(monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path))
+    app = create_app(_DictShapedFailedJobProvider())
+    app.extensions["reset_scored_jobs"]()
+    runner = _DroppingRunner()
+    app.extensions["background"] = runner
+    client = app.test_client()
+
+    client.get("/api/evaluations/j1")
+    client.get("/api/evaluations/j1")
+    app.extensions["reset_scored_jobs"]()
+
+    assert runner.submitted == ["score-j1", "score-j1"]

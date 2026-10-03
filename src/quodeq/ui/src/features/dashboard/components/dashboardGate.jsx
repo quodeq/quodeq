@@ -1,7 +1,9 @@
 import {
-  NoLocalProjectsSharedContent, NoProjectsContent, NoProjectSelectedContent,
-  LoadingProjectContent, LoadProjectFailedContent, NoRunsEmptyContent, RunLoadFailedContent,
+  NoLocalProjectsSharedContent, NoProjectSelectedContent,
+  LoadingProjectContent, NoRunsEmptyContent, RunLoadFailedContent,
 } from './DashboardPageEmptyStates.jsx';
+import { LoadProjectFailedEmptyState, NoProjectsEmptyState } from '../../../components/ProjectEmptyStates.jsx';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 // The early-return ladder of DashboardPage, as plain functions and not as
 // components: DashboardPage.fadeOnceIdentity.test.jsx pins the .dashboard-page
@@ -22,9 +24,11 @@ function gateFrame(className, children) {
   );
 }
 
-export function dashboardPageClassName({ appearClass = '', dimmed = false, refreshing = false }) {
+// `pending` mutes the page text (section-pending) itself: only for
+// gate states with no sections of their own to carry it.
+export function dashboardPageClassName({ appearClass = '', dimmed = false, pending = false }) {
   const state = dimmed ? 'dashboard-loading' : `dashboard-ready${appearClass}`;
-  return `dashboard-page dashboard-fade ${state}${refreshing ? ' dashboard-refreshing' : ''}`;
+  return `dashboard-page dashboard-fade ${state}${pending ? ' section-pending' : ''}`;
 }
 
 function renderNoProjectsGate({ sharedHasContent, onNavigate, readyClass }) {
@@ -35,7 +39,7 @@ function renderNoProjectsGate({ sharedHasContent, onNavigate, readyClass }) {
   if (sharedHasContent) {
     return gateFrame(readyClass, <NoLocalProjectsSharedContent onNavigate={onNavigate} />);
   }
-  return gateFrame(readyClass, <NoProjectsContent onNavigate={onNavigate} />);
+  return gateFrame(readyClass, <NoProjectsEmptyState onNavigate={onNavigate} />);
 }
 
 function renderProjectErrorGate({ isFetching, projectName, error, onRetry, readyClass }) {
@@ -47,7 +51,7 @@ function renderProjectErrorGate({ isFetching, projectName, error, onRetry, ready
   if (isFetching) {
     return gateFrame(readyClass, <LoadingProjectContent projectName={projectName} />);
   }
-  return gateFrame(readyClass, <LoadProjectFailedContent error={error} onRetry={onRetry} />);
+  return gateFrame(readyClass, <LoadProjectFailedEmptyState error={error} onRetry={onRetry} />);
 }
 
 function renderRunModeGate({ isFetching, projectName, onRetry, readyClass }) {
@@ -69,7 +73,7 @@ export function renderDashboardGate({ data, callbacks, runMode, projectName, pro
   const { projects = [], selectedSource, sharedHasContent = false, selectedProject, dashboard, loading, error, isFetching } = data;
   const { onNavigate, onRetry } = callbacks;
   const readyClass = dashboardPageClassName({ appearClass: pageState.dashboardAppearClass });
-  if (projects.length === 0 && selectedSource !== 'shared') {
+  if (projects.length === 0 && selectedSource !== PROJECT_SOURCE.SHARED) {
     return renderNoProjectsGate({ sharedHasContent, onNavigate, readyClass });
   }
   if (!selectedProject) {
@@ -79,8 +83,8 @@ export function renderDashboardGate({ data, callbacks, runMode, projectName, pro
     return renderProjectErrorGate({ isFetching, projectName, error, onRetry, readyClass });
   }
   if (pageState.showNoRunsEmpty) {
-    const refreshingClass = dashboardPageClassName({ appearClass: pageState.dashboardAppearClass, refreshing: isFetching });
-    return gateFrame(refreshingClass, <NoRunsEmptyContent projectInfo={projectInfo} onComplete={onSetupComplete} projectName={projectName} onNavigate={onNavigate} />);
+    const pendingClass = dashboardPageClassName({ appearClass: pageState.dashboardAppearClass, pending: isFetching });
+    return gateFrame(pendingClass, <NoRunsEmptyContent projectInfo={projectInfo} onComplete={onSetupComplete} projectName={projectName} onNavigate={onNavigate} />);
   }
   if (runMode && !loading && !dashboard && !error) {
     return renderRunModeGate({ isFetching, projectName, onRetry, readyClass });

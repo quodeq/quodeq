@@ -40,6 +40,40 @@ def _ask_move(runner) -> bool:
     return result.returncode == 0 and "button returned:Move" in (result.stdout or "")
 
 
+def _swap_bundle(app: Path, dest: Path, runner) -> bool:
+    """Copy *app* next to *dest*, then rename it into place.
+
+    The previous bundle at *dest* stays usable on every failure: a failed
+    copy removes only the partial copy, and a failed rename puts the
+    previous bundle back. A bundle left aside by an interrupted swap is
+    put back before the copy starts. False means the swap did not happen.
+    """
+    tmp = dest.with_name(dest.name + ".partial")
+    aside = dest.with_name(dest.name + ".previous")
+    shutil.rmtree(tmp, ignore_errors=True)
+    if not dest.exists() and aside.exists():
+        _logger.info("restoring the bundle left aside at %s", aside)
+        aside.rename(dest)
+    shutil.rmtree(aside, ignore_errors=True)
+    copied = runner(["ditto", str(app), str(tmp)], capture_output=True, text=True, encoding="utf-8")
+    if copied.returncode != 0:
+        shutil.rmtree(tmp, ignore_errors=True)
+        _logger.warning("move to Applications failed: %s", copied.stderr)
+        return False
+    try:
+        if dest.exists():
+            dest.rename(aside)
+        tmp.rename(dest)
+    except OSError as exc:
+        if not dest.exists() and aside.exists():
+            aside.rename(dest)
+        shutil.rmtree(tmp, ignore_errors=True)
+        _logger.warning("could not swap in the new bundle at %s: %s", dest, exc)
+        return False
+    shutil.rmtree(aside, ignore_errors=True)
+    return True
+
+
 def offer_move_to_applications(
     bundle: Path | None = None,
     *,
@@ -54,21 +88,16 @@ def offer_move_to_applications(
         if not _ask_move(runner):
             return False
         dest = (applications_dir or APPLICATIONS_DIR) / app.name
-        if dest.exists():
-            try:
-                shutil.rmtree(dest)
-            except OSError as exc:
-                _logger.warning("could not remove the previous bundle at %s: %s", dest, exc)
-                return False
-        copied = runner(["ditto", str(app), str(dest)], capture_output=True, text=True, encoding="utf-8")
-        if copied.returncode != 0:
-            _logger.warning("move to Applications failed: %s", copied.stderr)
+        if not _swap_bundle(app, dest, runner):
             return False
         relaunched = runner(["open", "-n", str(dest)], capture_output=True, text=True, encoding="utf-8")
         if relaunched.returncode != 0:
             _logger.warning("relaunch from Applications failed: %s", relaunched.stderr)
             return False
         return True
-    except Exception:
-        _logger.debug("move-to-Applications offer failed", exc_info=True)
+    except (OSError, UnicodeDecodeError):
+        # subprocess.run(..., text=True, encoding="utf-8"): OSError when a
+        # tool (osascript/ditto/open) can't launch, UnicodeDecodeError when
+        # its output isn't valid UTF-8.
+        _logger.warning("move-to-Applications offer failed", exc_info=True)
         return False

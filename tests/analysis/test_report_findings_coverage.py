@@ -7,7 +7,7 @@ from quodeq.analysis._report_findings import (
     flatten_findings,
     build_principle_rows,
 )
-from quodeq.analysis._report_constants import GRADE_INSUFFICIENT
+from quodeq.core.scoring.constants import Grade
 
 
 # ---------------------------------------------------------------------------
@@ -61,10 +61,10 @@ class TestBuildPrincipleRow:
 
     def test_insufficient_grade_null_score(self):
         pdata = {"display_name": "Crypto"}
-        lookup = {"Crypto": {"finalScore": 3.0, "grade": GRADE_INSUFFICIENT}}
+        lookup = {"Crypto": {"finalScore": 3.0, "grade": Grade.INSUFFICIENT}}
         row = build_principle_row("crypto", pdata, lookup)
         assert row["score"] is None
-        assert row["grade"] == GRADE_INSUFFICIENT
+        assert row["grade"] == Grade.INSUFFICIENT
 
     def test_no_matching_score_computes_grade(self):
         pdata = {"display_name": "Auth"}

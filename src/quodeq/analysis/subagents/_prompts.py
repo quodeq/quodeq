@@ -5,7 +5,7 @@ from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.prompts.builder import build_analysis_prompt, prompt_context
 
 
-def _build_subagent_prompt(
+def build_subagent_prompt(
     config: RunConfig, dim_id: str, ctx: AnalysisContext,
     inline_findings: list[dict] | None = None,
 ) -> str:

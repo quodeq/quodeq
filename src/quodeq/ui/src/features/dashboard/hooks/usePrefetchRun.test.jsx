@@ -45,7 +45,7 @@ describe('usePrefetchRun', () => {
     vi.useRealTimers();
 
     await waitFor(() => {
-      expect(queryClient.getQueryData(projectKeys.dashboard('p1', 'r1'))).toBeTruthy();
+      expect(queryClient.getQueryData(projectKeys.dashboard('p1', 'r1', 'local'))).toBeTruthy();
       expect(queryClient.getQueryData(projectKeys.scores('p1', 'r1'))).toBeTruthy();
     });
     expect(getDashboard).toHaveBeenCalledWith('p1', 'r1');
@@ -158,4 +158,5 @@ describe('usePrefetchRun', () => {
       expect(getProjectScores).not.toHaveBeenCalled();
     });
   });
+
 });

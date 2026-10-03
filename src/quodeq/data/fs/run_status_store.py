@@ -13,7 +13,6 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +26,8 @@ from quodeq.core.run.state import (  # noqa: F401 — re-exported API
     UnsupportedSchemaError,
     validate_transition,
 )
+from quodeq.data.fs.run_artifacts import replace_json_file
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 _logger = logging.getLogger(__name__)
 
@@ -39,23 +40,19 @@ _logger = logging.getLogger(__name__)
 _write_lock = threading.RLock()
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
 def _build_status_payload(status: RunStatus) -> dict[str, Any]:
     pid = status.pid
     if pid is None:
         pid = os.getpid()
     finalized_at = status.finalized_at
     if finalized_at is None and status.state in TERMINAL_STATES:
-        finalized_at = _now_iso()
+        finalized_at = utc_now_iso(timespec=ISO_SECONDS)
     payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "job_id": status.job_id,
         "state": status.state.value,
         "started_at": status.started_at,
-        "updated_at": _now_iso(),
+        "updated_at": utc_now_iso(timespec=ISO_SECONDS),
         "finalized_at": finalized_at,
         "phase": status.phase,
         "current_dimension": status.current_dimension,
@@ -70,23 +67,25 @@ def _build_status_payload(status: RunStatus) -> dict[str, Any]:
         payload["ai_provider"] = status.ai_provider
     if status.ai_model is not None:
         payload["ai_model"] = status.ai_model
+    if status.commit_sha is not None:
+        payload["commit_sha"] = status.commit_sha
+    if status.commit_dirty is not None:
+        payload["commit_dirty"] = status.commit_dirty
     return payload
 
 
 def write_status(run_dir: Path, status: RunStatus) -> None:
     """Atomically write status.json for *status*.
 
-    Uses write-tmp-then-rename so readers never see a partial file.
+    Writes a unique temp file and renames it over status.json, so readers
+    never see a partial file.
     Caller is responsible for calling ``validate_transition`` first if a
     transition is being performed.
     """
     payload = _build_status_payload(status)
-    body = json.dumps(payload, indent=2)
-    tmp_path = run_dir / (STATUS_FILENAME + ".tmp")
     final_path = run_dir / STATUS_FILENAME
     with _write_lock:
-        tmp_path.write_text(body, encoding="utf-8")
-        tmp_path.replace(final_path)
+        replace_json_file(final_path, payload, indent=2)
 
 
 def read_status(run_dir: Path) -> dict[str, Any] | None:

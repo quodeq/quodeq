@@ -1,6 +1,6 @@
 {
   "minLines": 5,
-  "minTokens": 50,
+  "minTokens": 40,
   "format": [
     "python",
     "javascript",

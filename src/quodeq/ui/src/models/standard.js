@@ -15,12 +15,15 @@ export function slugify(text) {
 
 /**
  * True when the standard's id should keep tracking its (about-to-change)
- * name: it's a brand-new standard, has no id yet, or its current id still
- * equals the slug of its current name (the user hasn't manually diverged
- * it from an auto-generated one).
+ * name: it's a brand-new standard whose id still equals the slug of its
+ * current name (the user hasn't manually diverged it), or it has no id yet.
+ *
+ * An existing standard's id is its storage key (the update is sent to
+ * `/api/standards/<id>`), so it never follows a rename.
  */
 export function shouldSyncIdFromName(standard, isNew) {
-  return Boolean(isNew) || !standard.id || standard.id === slugify(standard.name || '');
+  if (!standard.id) return true;
+  return Boolean(isNew) && standard.id === slugify(standard.name || '');
 }
 
 /**

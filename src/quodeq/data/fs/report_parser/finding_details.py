@@ -3,7 +3,6 @@
 The SQL twin is ``quodeq.data.sqlite.findings_queries.read_finding_details``
 (the ``findings`` table); this reader serves runs that pre-date the
 event-log scoring engine and so never produced that table.
-services/dismissed.py used to walk and parse these files inline.
 """
 from __future__ import annotations
 
@@ -12,17 +11,50 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from quodeq.core.finding_identity import coerce_line, finding_dismiss_keys
+from quodeq.shared.constants import JSON_SUFFIX
 
 
-def iter_eval_reports(eval_dir: Path) -> Iterator[tuple[str, dict]]:
+def iter_eval_reports(eval_dir: Path, *, skip_corrupt: bool = False) -> Iterator[tuple[str, dict]]:
     """Yield ``(dimension, data)`` for every ``<dim>.json`` file in
     *eval_dir*, in filename order. ``dimension`` is the filename stem.
 
-    Malformed JSON propagates -- a corrupt evaluation report is a bug in the
-    run, not something callers should silently skip over.
+    Malformed JSON propagates by default -- a corrupt evaluation report is a
+    bug in the run, not something callers should silently skip over.
+    ``skip_corrupt=True`` instead skips just that one file and continues
+    with the rest, for callers (e.g. the assistant's finding-identity index)
+    that must keep serving every healthy dimension even when one report is
+    truncated or corrupt -- a known failure mode of deadline-cut runs.
     """
     for path in sorted(eval_dir.glob("*.json")):
-        yield path.stem, json.loads(path.read_text(encoding="utf-8"))
+        if skip_corrupt:
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            yield path.stem, data
+        else:
+            yield path.stem, json.loads(path.read_text(encoding="utf-8"))
+
+
+def iter_readable_eval_reports(run_dir: Path) -> Iterator[tuple[str, object]]:
+    """Yield ``(dimension, data)`` for each readable ``evaluation/<dim>.json`` in *run_dir*.
+
+    Directory order, not sorted (unlike ``iter_eval_reports``). A file that
+    cannot be read or is not valid JSON is skipped; ``data`` is whatever the
+    JSON holds, so callers that need an object check for one. No
+    ``evaluation/`` directory yields nothing.
+    """
+    eval_dir = run_dir / "evaluation"
+    if not eval_dir.is_dir():
+        return
+    for path in eval_dir.iterdir():
+        if path.suffix != JSON_SUFFIX:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        yield path.stem, data
 
 
 def read_eval_report(eval_dir: Path, dimension: str) -> dict | None:
@@ -48,19 +80,9 @@ def read_finding_details_from_json_eval(
     the filename so the entry stays linked to its standard. Unreadable files
     are skipped.
     """
-    eval_dir = run_dir / "evaluation"
-    if not eval_dir.is_dir():
-        return {}
     wanted = set(keys)
     out: dict[tuple, dict] = {}
-    for path in eval_dir.iterdir():
-        if path.suffix != ".json":
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        dimension = path.stem
+    for dimension, data in iter_readable_eval_reports(run_dir):
         for v in (data.get("violations") or []):
             req = str(v.get("req") or "")
             file = str(v.get("file") or "")

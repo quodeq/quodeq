@@ -3,6 +3,7 @@ import {
   resolveProjectDisplayName, selectSidebarCounts,
 } from './appGating.js';
 import { buildDashboardDataBundle, buildNavigationBundle } from './routes/renderers.jsx';
+import { NAV_TAB } from './vocab/navTab.js';
 
 // Pure prop-builders for App.jsx's Sidebar/TopBar wiring, extracted
 // verbatim from the inline JSX props so App.jsx itself stays a thin
@@ -12,14 +13,14 @@ import { buildDashboardDataBundle, buildNavigationBundle } from './routes/render
 
 export function buildSidebarProps({
   activeTab, navTab, selectedSource, hasCurrentProjectRuns, sharedProjectInfo,
-  projects, sharedHasContent, resolvedDisplayName, headerMeta, version, sidebarCounts,
+  projects, sharedHasContent, sharedPublishedCount, resolvedDisplayName, headerMeta, version, sidebarCounts,
   lastEvalAt, isPinned, onPinChange,
 }) {
   return {
     activeTab,
     onNavTab: navTab,
     showProjectTabs: shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, sharedProjectInfo }),
-    showCompareTab: shouldShowCompareTab({ projects, sharedHasContent }),
+    showCompareTab: shouldShowCompareTab({ projects, sharedHasContent, sharedPublishedCount }),
     selectedSource,
     projectInfo: { displayName: resolvedDisplayName, meta: headerMeta },
     version,
@@ -33,22 +34,22 @@ export function buildSidebarProps({
 
 export function buildTopBarProps({
   resolvedDisplayName, serverConnected, sidebarProvider, sidebarModel, selectedSource,
-  projectsCount, onEvaluateClick, evaluating, topbarRunProgress, navTab, setSidebarPinned,
-  breadcrumb, mobileTitle, navStackLength, navPop, effectiveDark, toggleTheme,
+  projectsCount, onEvaluateClick, evaluating, pending, navTab, setSidebarPinned,
+  breadcrumb, mobileTitle, navStackLength, navPop, effectiveDark, toggleTheme, serverUrl,
 }) {
   return {
     projectName: resolvedDisplayName,
     serverConnected,
-    serverUrl: typeof window !== 'undefined' ? window.location.origin : null,
+    serverUrl,
     provider: sidebarProvider,
     model: sidebarModel,
     selectedSource,
     onEvaluate: shouldShowEvaluateButton(projectsCount, selectedSource) ? onEvaluateClick : null,
     evaluating,
-    runProgress: topbarRunProgress,
-    onProviderClick: () => navTab('settings'),
+    pending,
+    onProviderClick: () => navTab(NAV_TAB.SETTINGS),
     onMenuToggle: () => setSidebarPinned((v) => !v),
-    onSelectProject: () => navTab('projects'),
+    onSelectProject: () => navTab(NAV_TAB.PROJECTS),
     breadcrumb,
     mobileTitle,
     canGoBack: navStackLength > 1,
@@ -73,7 +74,6 @@ export function buildContentProps({
       isEvaluating, showToast, setWizardEntry,
       sharedHasContent: sharedSignal.hasContent,
     }),
-    evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
@@ -85,6 +85,8 @@ export function buildContentProps({
     // other suppression mutation converge without waiting for a project
     // switch.
     scheduleDashboardReconcile: state.scheduleDashboardReconcile,
+    // A History run delete: cache drop + selection reset + reconcile + projects reload.
+    handleRunDeleted: state.handleRunDeleted,
     dismissFinding,
     // Patch the dashboard/scores caches from the dismiss response delta so the
     // Overview updates instantly. Additive — the refreshDashboard /
@@ -104,7 +106,7 @@ export function buildContentProps({
 export function buildAppShell({
   state, sharedSignal, navTab, navStack, activeTab, activePage, isEvaluating, showToast, setWizardEntry,
   dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo, hasCurrentProjectRuns,
-  assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel, topbarRunProgress,
+  assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel,
   navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, wizardEntry, wizardHandlers,
   filteredAccumulated, filteredTrend,
 }) {
@@ -130,9 +132,9 @@ export function buildAppShell({
   });
 
   return {
-    state, navTab, activeTab, activePage, hasCurrentProjectRuns, sharedSignal, assistantCtx,
+    state, navTab, activeTab, activePage, hasCurrentProjectRuns, sharedSignal, assistantCtx, isEvaluating,
     resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned,
-    sidebarProvider, sidebarModel, topbarRunProgress, navStack, navGoTo, navPop,
+    sidebarProvider, sidebarModel, navStack, navGoTo, navPop,
     breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, contentProps,
     wizardEntry, wizardHandlers,
   };

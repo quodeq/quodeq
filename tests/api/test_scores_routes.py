@@ -35,6 +35,25 @@ def test_project_run_scores_wraps_unexpected_error(client, monkeypatch):
     assert body["code"] == "SCORES_READ_FAILED"
 
 
+def test_project_run_scores_propagates_an_error_outside_the_narrowed_tuple(client, monkeypatch):
+    """A RuntimeError (not OSError/sqlite3.Error/ValueError) is a real bug in
+    get_scores_slim, not a read failure, so the route's own narrow tuple
+    does not catch it, and it is not wrapped into a SCORES_READ_FAILED 500.
+    It still escapes the route -- the app-wide fallback handler
+    (api/_error_handlers.py) is what turns it into a generic coded 500
+    instead of Flask's default HTML page."""
+    monkeypatch.setattr(
+        "quodeq.api._scores_routes.get_scores_slim",
+        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("unexpected bug")),
+    )
+    resp = client.get("/api/projects/demo/scores/run123")
+
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["code"] == "INTERNAL_ERROR"
+    assert "unexpected bug" not in resp.get_data(as_text=True)
+
+
 def test_get_scores_raw_reads_from_sql_after_projection(tmp_path: Path) -> None:
     """After ensure_projected runs, get_scores_raw returns SQL-backed grades.
 
@@ -59,7 +78,7 @@ def test_get_scores_raw_reads_from_sql_after_projection(tmp_path: Path) -> None:
 def test_get_scores_raw_surfaces_provenance_downgrade(tmp_path: Path) -> None:
     """Issue #656: a finding the provenance gate downgraded must keep its
     provenance_downgrade flag through the SQL-backed scores read path
-    (_build_response_from_grade_tables / _SELECT_ACTIVE), so the dashboard
+    (build_response_from_grade_tables / _SELECT_ACTIVE), so the dashboard
     badge can render. A dropped column here silently regresses it to False."""
     violations = _scorable_violations()  # 5 distinct Security violations
     violations[0] = {
@@ -81,7 +100,7 @@ def test_get_scores_raw_surfaces_provenance_downgrade(tmp_path: Path) -> None:
 def test_get_scores_raw_surfaces_scope_downgrade(tmp_path: Path) -> None:
     """A finding the scope gate capped from major to minor must keep its
     scope_downgrade marker -- including WHICH rule fired -- through the
-    SQL-backed scores read path (_build_response_from_grade_tables /
+    SQL-backed scores read path (build_response_from_grade_tables /
     _SELECT_ACTIVE), so the dashboard can show what was waived and why.
     A dropped column here silently makes a waived finding indistinguishable
     from an ordinary minor."""

@@ -167,23 +167,23 @@ class TestPromptsDirProvenance:
 
     def test_current_provenance_hashes_injected_prompts_dir(self, tmp_path: Path):
         from quodeq.analysis.cache.dimension_helpers import (
-            _current_provenance,
-            _hash_prompts_combined,
+            current_provenance,
+            hash_prompts_combined,
         )
 
         prompts = self._prompts_dir(tmp_path)
         _write_files(tmp_path / "src", {"a.py": "x"})
         config = replace(_make_config(tmp_path / "src"), prompts_dir=prompts)
 
-        prov = _current_provenance(config, "security")
-        expected = _hash_prompts_combined(prompts)
+        prov = current_provenance(config, "security")
+        expected = hash_prompts_combined(prompts)
         assert expected  # the temp dir has a rules-bearing prompt
         assert prov["prompts_hash"] == expected
 
     def test_persist_stamps_the_injected_prompts_dir(
         self, tmp_path: Path, cache: LocalFileBackend,
     ):
-        from quodeq.analysis.cache.dimension_helpers import _hash_prompts_combined
+        from quodeq.analysis.cache.dimension_helpers import hash_prompts_combined
 
         prompts = self._prompts_dir(tmp_path)
         files = _write_files(tmp_path / "src", {"a.py": "x"})
@@ -207,14 +207,14 @@ class TestPromptsDirProvenance:
 
         entry = cache.get(miss_keys["a.py"])
         assert entry is not None
-        assert entry.provenance["prompts_hash"] == _hash_prompts_combined(prompts)
+        assert entry.provenance["prompts_hash"] == hash_prompts_combined(prompts)
 
     def test_cache_writer_agrees_with_classify_time_provenance(self, tmp_path: Path):
-        """The synchronous cache writer and classify's _current_provenance
+        """The synchronous cache writer and classify's current_provenance
         must stamp the SAME prompts_hash for the same prompts_dir, or reused
         entries report phantom prompts drift."""
         from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
-        from quodeq.analysis.cache.dimension_helpers import _current_provenance
+        from quodeq.analysis.cache.dimension_helpers import current_provenance
         from quodeq.analysis.cache.local import LocalFileBackend
 
         prompts = self._prompts_dir(tmp_path)
@@ -236,6 +236,6 @@ class TestPromptsDirProvenance:
         key = build_cache_key_for_file(config, "a.py", "security")
         entry = LocalFileBackend(root=cache_root).get(key)
         assert entry is not None
-        current = _current_provenance(config, "security")
+        current = current_provenance(config, "security")
         assert entry.provenance["prompts_hash"] == current["prompts_hash"]
         assert current["prompts_hash"]  # non-empty: the hash is real, not two blanks

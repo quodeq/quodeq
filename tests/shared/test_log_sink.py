@@ -1,9 +1,9 @@
-"""Post-PR review M6: a stdlib Logger is not a LogSink.
+"""A stdlib Logger is not a LogSink.
 
 ``LogSink`` requires ``success`` alongside the four stdlib levels, and
 ``logging.Logger`` has no such method. ``services/mutation_rescore.py`` was
 passing its module logger straight into ``ThreadBackgroundRunner(log=...)``
-and ``_rescore_run(log=...)``; it only worked because neither callee happened
+and ``rescore_run(log=...)``; it only worked because neither callee happened
 to call ``.success`` yet. ``LoggerSink`` is the honest adapter for outer-layer
 modules that already own a stdlib logger.
 """

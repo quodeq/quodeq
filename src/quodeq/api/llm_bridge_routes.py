@@ -1,9 +1,12 @@
 """API routes for LLM bridge — provider status, models, testing."""
 from __future__ import annotations
 
+from http import HTTPStatus
+
 from flask import Flask, Response, jsonify, request
 
 from quodeq.config.ai_provider import store_api_key, get_api_key_secure
+from quodeq.config.ai_provider_errors import PLAINTEXT_KEY_REFUSED_MESSAGE, PlaintextKeyRefusedError
 from quodeq.llm_bridge import (
     get_ollama_status,
     list_ollama_models,
@@ -19,15 +22,19 @@ from quodeq.llm_bridge import (
     get_provider_configs,
     check_cloud_connection,
     resolve_api_key,
+    resolve_test_endpoint,
 )
 from quodeq.shared.url_validation import url_safety_error
 
+from quodeq.api._constants import CODE_INVALID_PARAM, CODE_KEYRING_UNAVAILABLE, CODE_MISSING_PARAM
 from quodeq.api._llm_bridge_validation import (
-    _BODY_NOT_OBJECT,
-    _invalid_base_url,
-    _json_body,
-    _require_model_name,
+    invalid_base_url,
+    model_request,
+    object_body_or_error,
+    query_base_url,
+    string_fields_error,
 )
+from quodeq.api.helpers import json_error
 
 
 def ollama_status() -> Response:
@@ -46,10 +53,7 @@ def ollama_test_concurrency() -> Response:
     Runs real inference, so it is slow; the settings UI calls it once when the
     user asks to measure rather than on every render.
     """
-    data = _json_body()
-    if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
-    model, err = _require_model_name(data, require_nonempty=True)
+    _, model, err = model_request(require_nonempty=True)
     if err is not None:
         return err
     result = run_concurrency_test(model)
@@ -62,15 +66,15 @@ def ollama_estimate_agents() -> Response:
     The cheap alternative to ``ollama_test_concurrency``: arithmetic only, no
     inference, so the settings UI can suggest a number while the user types.
     """
-    data = _json_body()
-    if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
+    data, err = object_body_or_error()
+    if err is not None:
+        return err
     model_size = data.get("model_size", 0)
     gpu_memory = data.get("gpu_memory", 0)
     if (isinstance(model_size, bool) or isinstance(gpu_memory, bool)
             or not isinstance(model_size, (int, float))
             or not isinstance(gpu_memory, (int, float))):
-        return jsonify({"error": "model_size and gpu_memory must be numbers", "code": "INVALID_PARAM"}), 400
+        return json_error("model_size and gpu_memory must be numbers", HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
     return jsonify(estimate_max_agents(model_size=model_size, gpu_memory=gpu_memory))
 
 
@@ -90,10 +94,7 @@ def llamacpp_test_concurrency() -> Response:
     Unlike the ollama route, an empty ``model`` is accepted: llama.cpp serves
     whatever it was started with.
     """
-    data = _json_body()
-    if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
-    model, err = _require_model_name(data, require_nonempty=False)
+    _, model, err = model_request(require_nonempty=False)
     if err is not None:
         return err
     result = run_llamacpp_concurrency_test(model)
@@ -107,8 +108,7 @@ def omlx_status() -> Response:
     typically self-hosted somewhere on the LAN and the user is still typing
     the address into settings when this is called.
     """
-    base_url = request.args.get("base_url", "").strip() or None
-    err = _invalid_base_url(base_url)
+    base_url, err = query_base_url()
     if err is not None:
         return err
     return jsonify(get_omlx_status(base_url=base_url))
@@ -119,8 +119,7 @@ def omlx_models() -> Response:
 
     The API key rides in the ``X-Api-Key`` header, never the query string.
     """
-    base_url = request.args.get("base_url", "").strip() or None
-    err = _invalid_base_url(base_url)
+    base_url, err = query_base_url()
     if err is not None:
         return err
     # The key rides in a header, never the query string: query params leak
@@ -135,19 +134,16 @@ def omlx_test_concurrency() -> Response:
     Takes the server address and key in the body rather than from config, so
     the user can measure a server before saving it.
     """
-    data = _json_body()
-    if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
-    model, err = _require_model_name(data, require_nonempty=False)
+    data, model, err = model_request(require_nonempty=False)
     if err is not None:
         return err
     base_url = data.get("base_url") or ""
     api_key = data.get("api_key") or ""
     if not isinstance(base_url, str) or not isinstance(api_key, str):
-        return jsonify({"error": "base_url and api_key must be strings", "code": "INVALID_PARAM"}), 400
+        return json_error("base_url and api_key must be strings", HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
     base_url = base_url.strip() or None
     api_key = api_key.strip() or None
-    err = _invalid_base_url(base_url)
+    err = invalid_base_url(base_url)
     if err is not None:
         return err
     result = run_omlx_concurrency_test(model, base_url=base_url, api_key=api_key)
@@ -162,25 +158,21 @@ def provider_test() -> Response:
     carries no key, the provider's env var is resolved by provider id, or by
     api_base match for clients predating the ``provider`` field.
     """
-    data = _json_body()
-    if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
-    configs = get_provider_configs()
+    data, err = object_body_or_error()
+    if err is not None:
+        return err
+    if (err := string_fields_error(data, ("provider", "api_base", "api_key", "model"))):
+        return err
     provider_id = data.get("provider", "")
-    provider_cfg = configs.get(provider_id, {}) if provider_id else {}
-
-    api_base = data.get("api_base") or provider_cfg.get("api_base", "")
-    api_key = data.get("api_key", "")
-    api_key_env = ""
-    if not api_key:
-        # Resolve env var via provider id when given, else by api_base
-        # match so old clients (without `provider`) still work.
-        api_key, api_key_env = resolve_api_key(provider_id, api_base)
+    # Resolves the env var via provider id when given, else by api_base
+    # match so old clients (without `provider`) still work.
+    api_base, api_key, api_key_env = resolve_test_endpoint(
+        provider_id, data.get("api_base") or "", data.get("api_key", ""))
 
     if api_base:
         err = url_safety_error(api_base, allow_private=True)
         if err is not None:
-            return jsonify({"error": err, "code": "INVALID_URL"}), 400
+            return json_error(err, HTTPStatus.BAD_REQUEST, "INVALID_URL")
     if not api_key and api_key_env:
         return jsonify({
             "success": False,
@@ -212,19 +204,28 @@ def provider_store_key() -> Response:
 
     Returns ``{"stored", "secure"}``; ``secure`` is False when the keychain
     was unavailable and the key fell back to ``.quodeq.env`` on disk, which
-    the UI surfaces as a warning.
+    the UI surfaces as a warning. That fallback is opt-in
+    (``QUODEQ_ALLOW_PLAINTEXT_KEY=1``): without it and without a keychain,
+    nothing is written and the answer is a 409 ``KEYRING_UNAVAILABLE``
+    whose ``envVar`` names the variable to export instead.
     """
-    data = _json_body()
-    if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
+    data, err = object_body_or_error()
+    if err is not None:
+        return err
     provider = data.get("provider", "")
     api_key = data.get("apiKey", "")
     if not provider or not isinstance(provider, str):
-        return jsonify({"error": "provider is required", "code": "MISSING_PARAM"}), 400
+        return json_error("provider is required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     if not api_key or not isinstance(api_key, str):
-        return jsonify({"error": "apiKey is required", "code": "MISSING_PARAM"}), 400
+        return json_error("apiKey is required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     try:
         stored, secure = store_api_key(provider, api_key)
+    except PlaintextKeyRefusedError as exc:
+        return jsonify({
+            "error": PLAINTEXT_KEY_REFUSED_MESSAGE.format(env_var=exc.env_var),
+            "code": CODE_KEYRING_UNAVAILABLE,
+            "envVar": exc.env_var,
+        }), HTTPStatus.CONFLICT
     except ValueError:
         # Provider names are interpolated into `.quodeq.env` lines, so a
         # name with control characters is rejected outright rather than
@@ -237,8 +238,8 @@ def provider_store_key() -> Response:
         # ValueError that reaches this handler already says exactly this.
         return jsonify({
             "error": "Provider name must contain only letters, digits, '-' and '_'",
-            "code": "INVALID_PARAM",
-        }), 400
+            "code": CODE_INVALID_PARAM,
+        }), HTTPStatus.BAD_REQUEST
     return jsonify({"stored": stored, "secure": secure})
 
 
@@ -250,7 +251,7 @@ def provider_key_status() -> Response:
     """
     provider = request.args.get("provider", "")
     if not provider:
-        return jsonify({"error": "provider is required", "code": "MISSING_PARAM"}), 400
+        return json_error("provider is required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     return jsonify({"configured": get_api_key_secure(provider) is not None})
 
 

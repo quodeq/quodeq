@@ -63,3 +63,14 @@ class TestIsStreamValidNonDictLine:
         p = tmp_path / "stream.json"
         p.write_text(json.dumps({"type": "result", "is_error": True}) + "\n", encoding="utf-8")
         assert is_stream_valid(p) is False
+
+
+class TestGetMcpStatusMalformedLine:
+    def test_malformed_line_skipped_valid_line_still_read(self, tmp_path: Path) -> None:
+        """A malformed JSON line must not abort the whole scan; a later valid
+        init event on a subsequent line must still answer the status."""
+        from quodeq.analysis.stream.validation import get_mcp_status
+        p = tmp_path / "stream.json"
+        payload = {"mcp_servers": [{"name": "findings", "status": "ready"}]}
+        p.write_text("{bad\n" + json.dumps(payload) + "\n", encoding="utf-8")
+        assert get_mcp_status(p) == "ready"

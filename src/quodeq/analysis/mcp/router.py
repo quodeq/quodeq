@@ -11,7 +11,9 @@ import sys
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
-if sys.platform != "win32":
+from quodeq.shared.constants import PLATFORM_WIN32
+
+if sys.platform != PLATFORM_WIN32:
     import fcntl
 
 from quodeq.analysis.mcp.enricher import (
@@ -19,9 +21,9 @@ from quodeq.analysis.mcp.enricher import (
     FileReader,
     FindingEnricher,
 )
-from quodeq.analysis.mcp.schemas import (
-    FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_OK, FILE_DONE_STATUS_SKIPPED,
-)
+from quodeq.analysis.mcp.finding_admission import ADMISSION_KEY, ADMISSION_UNMAPPED, unmapped_feedback
+from quodeq.analysis.mcp.receipt import Receipt, ReceiptStatus
+from quodeq.analysis.mcp.schemas import JSONL_MARKER_FILE_DONE, FileDoneStatus
 from quodeq.shared.log_sink import SHARED_LOG
 from typing import TYPE_CHECKING, TextIO
 
@@ -54,7 +56,7 @@ def _locked_write(fh: TextIO, line: str) -> None:
     write when the file handle doesn't support ``fileno()`` (e.g. StringIO
     in tests) or on Windows.
     """
-    use_lock = sys.platform != "win32"
+    use_lock = sys.platform != PLATFORM_WIN32
     if use_lock:
         try:
             fcntl.flock(fh, fcntl.LOCK_EX)
@@ -112,18 +114,37 @@ class FindingsRouter:
         self._event_log: EventLogWriter | None = event_log
         self._on_file_done: "Callable[[str, list[dict]], None] | None" = on_file_done
         self._findings_by_file: dict[str, list[dict]] = {}
+        # (file, line, reported req) refused once: the model gets one retry,
+        # a second unknown code is recorded as unmapped.
+        self._refused: set[tuple] = set()
         self.counter = 0
 
-    def receive(self, args: dict) -> tuple[str, bool]:
-        """Process a finding. Returns (message, is_duplicate)."""
+    def receive(self, args: dict) -> Receipt:
+        """Process one finding the model reported and say what happened to it."""
         key = self._enricher.dedup_key(args)
         if key in self._seen:
-            return "Duplicate finding, already captured. Move on.", True
-        self._seen.add(key)
+            return Receipt("Duplicate finding, already captured. Move on.", ReceiptStatus.DUPLICATE)
 
         finding = self._enricher.enrich(args)
+        unmapped = self._enricher.last_unmapped
+        if unmapped is not None:
+            attempt = (args.get("file"), args.get("line"), args.get("req"))
+            if attempt not in self._refused:
+                self._refused.add(attempt)
+                return Receipt(unmapped_feedback(unmapped, args.get("req")), ReceiptStatus.REJECTED)
+        self._seen.add(key)
         self._finish_finding(finding)
-        return f"Finding #{self.counter} recorded.", False
+        if unmapped is not None and finding.get(ADMISSION_KEY) == ADMISSION_UNMAPPED:
+            return Receipt(
+                f"Recorded as unmapped: {args.get('req')!r} is not in the standard. Move on.",
+                ReceiptStatus.UNMAPPED,
+            )
+        if unmapped is not None:
+            return Receipt(
+                f"Recorded under {finding.get('p')!r} without a valid requirement code. Move on.",
+                ReceiptStatus.RECORDED,
+            )
+        return Receipt(f"Finding #{self.counter} recorded.", ReceiptStatus.RECORDED)
 
     def receive_many(self, findings: list[dict]) -> list[dict]:
         """Process a batch of findings (typically one file's), enriched with
@@ -151,20 +172,30 @@ class FindingsRouter:
         """Write, event-emit, and file-track one already-enriched finding."""
         line = json.dumps(finding) + "\n"
         _locked_write(self._fh, line)
-        if self._event_log is not None:
+        # An unmapped finding has no principle; it never reaches the event log,
+        # so the grade tables can never score it under a blank one.
+        if self._event_log is not None and finding.get(ADMISSION_KEY) != ADMISSION_UNMAPPED:
             self._emit_event(finding)
         if self._on_file_done is not None:
             self._findings_by_file.setdefault(finding["file"], []).append(finding)
         self.counter += 1
 
     def _emit_event(self, finding: dict) -> None:
-        """Emit a JudgmentCreatedEvent to the event log. Never raises."""
+        """Emit a JudgmentCreatedEvent to the event log.
+
+        Absorbs the event log's own I/O and decode/malformed-payload
+        failures ((OSError, ValueError, KeyError, TypeError)) so the JSONL
+        write (the durable side effect) still succeeds. Anything else is a
+        real bug and propagates -- ``findings_server.py``'s per-message
+        ``run_isolated`` is the fault-isolation boundary that catches it
+        without losing the process.
+        """
         try:
             from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
             from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
             payload = wire_dict_to_judgment(finding)
             self._event_log.emit(JudgmentCreatedEvent(payload=payload))
-        except Exception:  # noqa: BLE001 — event log must never break JSONL durability
+        except (OSError, ValueError, KeyError, TypeError):  # event log must never break JSONL durability
             _logger.warning("FindingsRouter: event log emit failed (JSONL succeeded)", exc_info=True)
 
     def mark_file_done(self, *, file: str, status: str, reason: str | None = None) -> None:
@@ -186,23 +217,23 @@ class FindingsRouter:
             at all (API size cap / missing on disk) — an explicit record that
             the file was considered, not a transient failure to retry loudly.
         """
-        allowed = (FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_SKIPPED)
+        allowed = (FileDoneStatus.OK, FileDoneStatus.ERROR, FileDoneStatus.SKIPPED)
         if status not in allowed:
-            names = ", ".join(repr(s) for s in allowed)
+            names = ", ".join(repr(s.value) for s in allowed)
             raise ValueError(
                 f"mark_file_done: status must be one of {names}, got {status!r}"
             )
-        payload: dict = {"_marker": "file_done", "file": file, "status": status}
+        payload: dict = {"_marker": JSONL_MARKER_FILE_DONE, "file": file, "status": status}
         if reason is not None:
             payload["reason"] = reason
         line = json.dumps(payload) + "\n"
         _locked_write(self._fh, line)
         if self._on_file_done is not None:
             accumulated = self._findings_by_file.pop(file, [])
-            if status == FILE_DONE_STATUS_OK:
+            if status == FileDoneStatus.OK:
                 try:
                     self._on_file_done(file, accumulated)
-                except Exception:  # noqa: BLE001 — callback failure must never lose the ok marker
+                except (OSError, ValueError, TypeError):  # callback failure must never lose the ok marker
                     _logger.warning(
                         "FindingsRouter: on_file_done callback raised for %s", file,
                         exc_info=True,
@@ -222,4 +253,4 @@ def write_skip_markers(jsonl_file: Path, skipped: list[str], reason: str) -> Non
     with open(jsonl_file, "a", encoding="utf-8") as fh:
         router = FindingsRouter(fh)
         for f in skipped:
-            router.mark_file_done(file=f, status="skipped", reason=reason)
+            router.mark_file_done(file=f, status=FileDoneStatus.SKIPPED, reason=reason)

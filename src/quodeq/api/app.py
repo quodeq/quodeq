@@ -20,6 +20,8 @@ from quodeq.api.routes_registry import register_all_routes
 from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
+from quodeq.services.scored_jobs_registry import ScoringClaims
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_static_dist
@@ -29,6 +31,9 @@ _logger = logging.getLogger(__name__)
 _DEFAULT_EVALUATION_RATE_LIMIT_WINDOW = 300
 _DEFAULT_EVALUATION_RATE_LIMIT_MAX = 10
 _MULTIPART_FRAMING_HEADROOM_BYTES = 1 * 1024 * 1024  # 1 MiB over the zip cap for multipart overhead
+
+_BIND_HOST_ANY = "0.0.0.0"  # binds to every interface
+_BIND_HOST_LOOPBACK = "127.0.0.1"  # binds to loopback only
 
 
 def _default_provider(env: Mapping[str, str] | None = None) -> ActionProvider:
@@ -52,7 +57,7 @@ def _configure_logging(
     log_buffer = LogBuffer()
     app.extensions["log_buffer"] = log_buffer
 
-    verbose = resolve_env(env).get("QUODEQ_VERBOSE") == "1"
+    verbose = resolve_env(env).get("QUODEQ_VERBOSE") == ENV_TRUTHY
     for name in ("werkzeug", "quodeq.api"):
         lgr = logging.getLogger(name)
         lgr.handlers = [log_buffer.handler]
@@ -69,7 +74,7 @@ def _register_health_route(app: Flask, verbose: bool) -> None:
         """Return a simple health-check response with server info."""
         host = get_action_api_host()
         port = get_action_api_port()
-        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
+        display_host = "localhost" if host in (_BIND_HOST_LOOPBACK, _BIND_HOST_ANY) else host
         payload: dict[str, object] = {
             "ok": True,
             "version": __version__,
@@ -87,15 +92,14 @@ def _configure_upload_limits(app: Flask) -> None:
     limit, plus a small headroom for multipart framing. Flask aborts with
     413 before reading the full body, which keeps large bogus uploads cheap.
     """
-    from quodeq.api.zip import _max_zip_size_bytes
+    from quodeq.api.zip import max_zip_size_bytes
     app.config.setdefault(
-        "MAX_CONTENT_LENGTH", _max_zip_size_bytes() + _MULTIPART_FRAMING_HEADROOM_BYTES,
+        "MAX_CONTENT_LENGTH", max_zip_size_bytes() + _MULTIPART_FRAMING_HEADROOM_BYTES,
     )
 
 
 def _configure_extensions(app: Flask) -> None:
-    """Set up per-app extensions: assistant turn/SSE registry, background
-    task runner, and the CWE lookup cache."""
+    """Set up per-app extensions: caches, background runner, scoring claims."""
     # Per-app assistant turn/SSE registry (composition root for the state the
     # assistant routes used to keep in module globals).
     from quodeq.api.assistant_routes import AssistantTurnState
@@ -105,8 +109,20 @@ def _configure_extensions(app: Flask) -> None:
     from quodeq.shared.log_sink import SHARED_LOG
     app.extensions["background"] = ThreadBackgroundRunner(log=SHARED_LOG)
 
+    # One background grade-formula rescorer per app. It starts its worker
+    # thread on the first PUT/DELETE, or here when the last process quit
+    # mid-pass and left the pending marker. With no marker create_app stays
+    # thread-free for tests and embedding.
+    from pathlib import Path
+    from quodeq.api.routes_common import reports_dir
+    from quodeq.services.grade_formula_job import GradeFormulaRescorer
+    rescorer = GradeFormulaRescorer(log=SHARED_LOG)
+    app.extensions["grade_formula_rescore"] = rescorer
+    rescorer.resume_pending(Path(reports_dir()))
+
     from quodeq.api.standards_read_routes import CweCache
     app.extensions["cwe_cache"] = CweCache()
+    app.extensions["scoring_claims"] = ScoringClaims()
 
 
 def _configure_paths_and_cleanup(app: Flask, env: dict[str, str] | None = None) -> None:
@@ -120,7 +136,7 @@ def _configure_paths_and_cleanup(app: Flask, env: dict[str, str] | None = None) 
 
     try:
         sweep_orphaned_clones(get_clones_dir(env), Path(get_evaluations_dir(env=env)))
-    except Exception as exc:  # pragma: no cover - best-effort cleanup
+    except OSError as exc:  # pragma: no cover - best-effort cleanup
         _logger.warning("Orphaned-clone sweep failed at startup: %s", exc)
 
     if "STANDARDS_EVALUATORS_DIR" not in app.config:
@@ -229,7 +245,7 @@ def _install_shutdown_handlers() -> None:
 
     Evaluation subprocesses are spawned with start_new_session=True so they
     survive the API process dying, and are intentionally NOT killed here --
-    otherwise launching a second dashboard (which calls _kill_stale_action_api
+    otherwise launching a second dashboard (which calls kill_stale_action_api
     on the first) would cascade and kill any scan in flight. Scans have their
     own lifecycle; use the UI cancel button or the DELETE endpoint.
     """
@@ -255,7 +271,7 @@ def _start_background_work() -> None:
         from quodeq.shared.log_sink import SHARED_LOG  # noqa: PLC0415
         warmup_engine.start(reports_dir())
         start_cache_maintenance(log=SHARED_LOG)
-    except Exception:  # pragma: no cover - warm-up must never block serving
+    except (ImportError, RuntimeError, OSError):  # pragma: no cover - warm-up must never block serving
         _logger.warning("warm-up start failed", exc_info=True)
 
 

@@ -10,16 +10,20 @@ import json
 import logging
 from typing import Any
 
-from quodeq.core.events.models import DEFAULT_SEVERITY, VERDICT_VIOLATION, Judgment
+from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
 from quodeq.core.finding_coercions import coerce_confidence
+from quodeq.core.finding_identity import coerce_line
+from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.req_ref import ReqRef
+from quodeq.core.utils.numbers import int_or_none
 
 _logger = logging.getLogger(__name__)
 
 
-def _dedup_key(practice_id: str, file: str, line: int, verdict: str) -> str:
-    return f"{practice_id}|{file}|{line}|{verdict}"
+def _dedup_key(identity: str, file: str, line: int, verdict: str) -> str:
+    """One finding per requirement (the principle for rows without one), file, line and verdict."""
+    return f"{identity}|{file}|{line}|{verdict}"
 
 
 def _scope_downgrade_json(raw: Any) -> str | None:
@@ -38,11 +42,11 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
     """Translate a FindingsRouter wire dict into a row dict ready for SQL bind."""
     practice_id = finding.get("p", "")
     file = finding.get("file", "") or ""
-    line = int(finding.get("line", 0) or 0)
-    verdict = finding.get("t", VERDICT_VIOLATION)
+    line = coerce_line(finding.get("line"))
+    verdict = finding.get("t", FindingType.VIOLATION)
     refs = finding.get("req_refs")
     return {
-        "schema_version": int(finding.get("schema_version", 1)),
+        "schema_version": int_or_none(finding.get("schema_version")) or 1,
         "practice_id": practice_id,
         "dimension": finding.get("d", "") or "",
         "requirement": finding.get("req"),
@@ -50,7 +54,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         "severity": finding.get("severity", DEFAULT_SEVERITY),
         "file": file,
         "line": line,
-        "end_line": int(finding.get("end_line", 0) or 0),
+        "end_line": coerce_line(finding.get("end_line")),
         "title": finding.get("w", "") or "",
         "reason": finding.get("reason", "") or "",
         "snippet": finding.get("snippet", "") or "",
@@ -93,7 +97,7 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
         "context": j.context or "",
         "scope": j.scope or "",
         "req_refs_json": refs_json,
-        "dedup_key": _dedup_key(j.practice_id, j.file, j.line, j.verdict),
+        "dedup_key": _dedup_key(j.req or j.practice_id, j.file, j.line, j.verdict),
         "confidence": coerce_confidence(j.confidence),
         "provenance_downgrade": 1 if j.provenance_downgrade else 0,
         "scope_downgrade_json": json.dumps(j.scope_downgrade) if j.scope_downgrade else None,
@@ -129,7 +133,7 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
 
     return Finding(
         practice_id=row["practice_id"],
-        verdict=row.get("verdict", VERDICT_VIOLATION),
+        verdict=row.get("verdict", FindingType.VIOLATION),
         file=row.get("file", ""),
         line=row.get("line", 0),
         end_line=row.get("end_line", 0),
@@ -148,3 +152,21 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
         provenance_downgrade=bool(row.get("provenance_downgrade")),
         scope_downgrade=scope_downgrade,
     )
+
+
+def judgment_to_unmapped_row(j: Judgment, reason: str) -> dict[str, Any]:
+    """A judgment the standard cannot place, as an ``unmapped_findings`` row."""
+    return {
+        "dimension": j.dimension or "",
+        "requirement": j.req,
+        "principle_hint": j.practice_id or "",
+        "verdict": j.verdict,
+        "severity": j.severity or "",
+        "file": j.file or "",
+        "line": j.line or 0,
+        "title": j.title or "",
+        "reason": j.reason or "",
+        "snippet": j.snippet or "",
+        "unmapped_reason": reason,
+        "dedup_key": _dedup_key(j.req or j.practice_id or "", j.file or "", j.line or 0, j.verdict),
+    }

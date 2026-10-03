@@ -3,8 +3,8 @@ import {
   STANDARDS_CHANGED_REASON, notifyStandardsChanged,
 } from '../constants.js';
 import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
-import { readJSON, writeString } from '../adapters/storage.js';
-import { decideHydration } from './visibleStandardsModel.js';
+import { readJSON, STORAGE_FLAG_ON, writeString } from '../adapters/storage.js';
+import { decideHydration, HYDRATION_KIND } from './visibleStandardsModel.js';
 
 // Marks that the (per-browser, not per-project) cache has been reconciled
 // with SOME project's own real file -- either because that project already
@@ -40,23 +40,30 @@ export function readVisibleStandardIds(storage = localStorage) {
 // already landed a newer value, and this response is discarded instead of
 // clobbering it.
 //
-// The counter is module state: each call compares against its own sample
-// rather than an absolute value, and every caller awaits its in-flight
-// hydrate before the next one starts. A promise left dangling across a test
-// boundary would otherwise trip a later call's check, so `resetWriteGeneration`
-// below exists as the structural escape hatch that note used to only ask for.
-let writeGeneration = 0;
+// Keyed per Storage (WeakMap<Storage, number>) rather than one module-global
+// number: production has exactly one localStorage, so this is identical
+// there, but a write to one injected test storage must never supersede an
+// in-flight hydrate for a different storage. Every caller awaits its
+// in-flight hydrate before the next one starts. A promise left dangling
+// across a test boundary would otherwise trip a later call's check, so
+// `resetWriteGeneration` below exists as the structural escape hatch that
+// note used to only ask for.
+let writeGenerations = new WeakMap();
 
-/** Reset the write generation. Test-isolation hook; returns the new value. */
+function generationFor(storage) {
+  return writeGenerations.get(storage) || 0;
+}
+
+/** Reset every storage's write generation. Test-isolation hook; returns the new value. */
 export function resetWriteGeneration() {
-  writeGeneration = 0;
-  return writeGeneration;
+  writeGenerations = new WeakMap();
+  return 0;
 }
 
 /** Write the selection to the local cache. The server is the source of truth. */
 export function writeVisibleStandardIds(ids, storage = localStorage) {
   storage.setItem(VISIBLE_STANDARDS_STORAGE_KEY, JSON.stringify(ids));
-  writeGeneration += 1;
+  writeGenerations.set(storage, generationFor(storage) + 1);
   // Same-tab consumers (the Evaluate picker) read this cache synchronously
   // and only on mount; tell them it moved.
   notifyStandardsChanged(STANDARDS_CHANGED_REASON.VISIBILITY);
@@ -97,8 +104,8 @@ export function writeVisibleStandardIds(ids, storage = localStorage) {
  */
 export async function hydrateVisibleStandardIds(projectId, { storage = localStorage, isStale } = {}) {
   if (!projectId) return readVisibleStandardIds(storage);
-  const generationAtStart = writeGeneration;
-  const supersededByNewerWrite = () => isStale?.() || writeGeneration !== generationAtStart;
+  const generationAtStart = generationFor(storage);
+  const supersededByNewerWrite = () => isStale?.() || generationFor(storage) !== generationAtStart;
   try {
     const { visibleStandardIds, isDefault, defaultStandardIds } = await getStandardsVisibility(projectId);
     if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
@@ -113,11 +120,11 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
       alreadyMigrated: !!storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY),
       fallbackDefaults: DEFAULT_VISIBLE_STANDARDS,
     });
-    if (decision.kind === 'migrate') {
+    if (decision.kind === HYDRATION_KIND.MIGRATE) {
       const saved = await putStandardsVisibility(projectId, decision.ids);
       if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
       const ids = saved?.visibleStandardIds ?? decision.ids;
-      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, '1', storage);
+      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, STORAGE_FLAG_ON, storage);
       writeVisibleStandardIds(ids, storage);
       return ids;
     }
@@ -126,7 +133,7 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
       // to belong to a specific project's synced selection, so it must
       // never again be read as an unclaimed legacy value up for grabs by
       // the next project that happens to have no file yet.
-      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, '1', storage);
+      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, STORAGE_FLAG_ON, storage);
     }
     writeVisibleStandardIds(decision.ids, storage);
     return decision.ids;

@@ -1,6 +1,6 @@
 """Error-code coverage for the embedded-terminal routes.
 
-Task 2 of usability cycle 1 (findings 5892, 5893, 5894, 5895): the six
+The six
 identical ``{"error": "forbidden"}`` sites, the session-limit 409, the
 unknown-session 404, and the "paths must be a list" 400 all gain a
 machine-readable ``code``. The ``app``/``_FakeManager`` fixtures come from

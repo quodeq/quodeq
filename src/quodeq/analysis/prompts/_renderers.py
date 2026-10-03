@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 from quodeq.core.standards.overrides import resolve_requirement_text
@@ -11,6 +12,7 @@ from quodeq.shared.utils import read_json
 _logger = logging.getLogger(__name__)
 
 _NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
+_FIELD_ID = "id"  # the compiled-standards field name _require_field looks up
 
 
 def _require_field(entry: dict, field: str, kind: str) -> object:
@@ -28,7 +30,24 @@ def _require_field(entry: dict, field: str, kind: str) -> object:
     return value
 
 
-def _load_dimension_data(
+def _principles_with_requirements(data: dict) -> Iterator[tuple[dict, list[dict]]]:
+    """Yield each principle that has requirements, with its requirement list."""
+    for principle in data.get("principles", []):
+        reqs = principle.get("requirements", [])
+        if reqs:
+            yield principle, reqs
+
+
+def _resolved_requirements(
+    reqs: list[dict], overrides: dict[str, dict] | None,
+) -> Iterator[tuple[dict, object, str]]:
+    """Yield ``(req, id, text)`` per requirement, with the project's threshold overrides applied."""
+    for req in reqs:
+        req_id = _require_field(req, _FIELD_ID, "requirement")
+        yield req, req_id, resolve_requirement_text(req, (overrides or {}).get(req_id))
+
+
+def load_dimension_data(
     compiled_dir: Path,
     dimension: str,
     evaluators_dir: Path | None = None,
@@ -61,21 +80,16 @@ def render_compiled_standards(
     overrides: dict[str, dict] | None = None,
 ) -> str:
     """Render compiled standards as a requirements checklist organized by principle."""
-    data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    data = load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
         return _NO_STANDARDS_FOR_DIM
     lines = []
-    for principle in data.get("principles", []):
-        reqs = principle.get("requirements", [])
-        if not reqs:
-            continue
+    for principle, reqs in _principles_with_requirements(data):
         name = _require_field(principle, "name", "principle")
         lines.append(f"### {name}")
         if principle.get("description"):
             lines.append(principle["description"])
-        for req in reqs:
-            req_id = _require_field(req, "id", "requirement")
-            text = resolve_requirement_text(req, (overrides or {}).get(req_id))
+        for req, req_id, text in _resolved_requirements(reqs, overrides):
             req_line = f"- **{req_id}**: {text}"
             if req.get("description"):
                 req_line += f" — {req['description']}"
@@ -95,21 +109,15 @@ def render_compact_standards(
     Returns a compact JSON array grouped by principle with requirement IDs
     and rules. No pretty-printing — minimizes token usage.
     """
-    data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    data = load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
         return _NO_STANDARDS_FOR_DIM
     checklist = []
-    for principle in data.get("principles", []):
-        reqs = principle.get("requirements", [])
-        if not reqs:
-            continue
-        requirements = []
-        for r in reqs:
-            req_id = _require_field(r, "id", "requirement")
-            requirements.append({
-                "id": req_id,
-                "rule": resolve_requirement_text(r, (overrides or {}).get(req_id)),
-            })
+    for principle, reqs in _principles_with_requirements(data):
+        requirements = [
+            {"id": req_id, "rule": text}
+            for _req, req_id, text in _resolved_requirements(reqs, overrides)
+        ]
         checklist.append({
             "principle": principle.get("name", "Unknown"),
             "requirements": requirements,
@@ -122,7 +130,7 @@ def render_dimensions(dimensions_data: dict, dimension: str) -> str:
     applies = dimensions_data.get("applies", [])
     dim_entry = None
     for d in applies:
-        d_id = _require_field(d, "id", "dimension")
+        d_id = _require_field(d, _FIELD_ID, "dimension")
         if d_id == dimension:
             dim_entry = d
             break

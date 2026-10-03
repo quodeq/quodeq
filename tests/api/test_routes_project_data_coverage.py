@@ -1,12 +1,13 @@
 """Tests for quodeq.api.routes_project_data — dashboard/accumulated/eval/violation routes."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from flask import Flask
 
 from quodeq.api.routes_project_data import register_project_data_routes
+from quodeq.core.types import EvalPending
 
 
 @pytest.fixture
@@ -48,6 +49,38 @@ class TestDashboardRoute:
         assert body["error"] == "project must be a plain path segment, got '..secret'"
 
 
+class TestDashboardViewParam:
+    def test_overview_view_dispatches_to_the_overview_provider(self, client):
+        client._provider.get_dashboard_overview.return_value = {"dimensions": []}
+        resp = client.get("/api/projects/myproj/dashboard?run=r1&view=overview")
+        assert resp.status_code == 200
+        client._provider.get_dashboard_overview.assert_called_once_with(ANY, "myproj", "r1")
+        client._provider.get_dashboard.assert_not_called()
+
+    def test_full_view_and_no_view_use_the_full_provider(self, client):
+        client._provider.get_dashboard.return_value = {"dimensions": []}
+        assert client.get("/api/projects/myproj/dashboard").status_code == 200
+        assert client.get("/api/projects/myproj/dashboard?view=full").status_code == 200
+        assert client._provider.get_dashboard.call_count == 2
+        client._provider.get_dashboard_overview.assert_not_called()
+
+    def test_empty_view_means_full(self, client):
+        client._provider.get_dashboard.return_value = {"dimensions": []}
+        assert client.get("/api/projects/myproj/dashboard?view=").status_code == 200
+        client._provider.get_dashboard.assert_called_once()
+        client._provider.get_dashboard_overview.assert_not_called()
+
+    def test_unknown_view_is_400(self, client):
+        resp = client.get("/api/projects/myproj/dashboard?view=slim")
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_INPUT"
+        assert "view" in resp.get_json()["error"]
+
+    def test_overview_not_found_is_404(self, client):
+        client._provider.get_dashboard_overview.side_effect = FileNotFoundError()
+        assert client.get("/api/projects/myproj/dashboard?view=overview").status_code == 404
+
+
 class TestAccumulatedRoute:
     def test_success(self, client):
         client._provider.get_accumulated.return_value = {"dims": []}
@@ -77,7 +110,7 @@ class TestDimensionEvalRoute:
         assert resp.status_code == 404
 
     def test_waiting(self, client):
-        client._provider.get_dimension_eval.return_value = {"waiting": True}
+        client._provider.get_dimension_eval.return_value = EvalPending(project="p", run_id="r", dimension="d")
         resp = client.get("/api/projects/p/runs/r/dimensions/d/eval")
         assert resp.status_code == 202
 

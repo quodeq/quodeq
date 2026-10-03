@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path
 
@@ -30,7 +31,7 @@ def test_write_and_read_round_trip(tmp_path: Path) -> None:
 def test_run_status_from_status_dict_round_trips_to_same_json(tmp_path: Path, monkeypatch) -> None:
     """RunStatus.from_status_dict(read_status(run_dir)) must reproduce identical JSON."""
     import quodeq.data.fs.run_status_store as run_status_store
-    monkeypatch.setattr(run_status_store, "_now_iso", lambda: "2026-04-20T00:00:00+00:00")
+    monkeypatch.setattr(run_status_store, "utc_now_iso", lambda **_: "2026-04-20T00:00:00+00:00")
 
     original = RunStatus(
         state=RunState.DONE, job_id="ext-rt", started_at="2026-04-20T00:00:00+00:00",
@@ -51,17 +52,15 @@ def test_run_status_from_status_dict_round_trips_to_same_json(tmp_path: Path, mo
 def test_atomic_write_uses_tmp_then_rename(tmp_path: Path, monkeypatch) -> None:
     """Readers never see a partial file: write_status must rename a complete tmp."""
     calls: list[str] = []
-    real_replace = Path.replace
+    real_replace = os.replace
 
-    def spy_replace(self, target):
-        calls.append("replace")
-        return real_replace(self, target)
-    monkeypatch.setattr(Path, "replace", spy_replace)
+    def spy_replace(src, dst):
+        calls.append(Path(dst).name)
+        return real_replace(src, dst)
+    monkeypatch.setattr(os, "replace", spy_replace)
     write_status(tmp_path, RunStatus(state=RunState.PENDING, job_id="x", started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
-    assert calls == ["replace"]
-    tmp = tmp_path / "status.json.tmp"
-    assert not tmp.exists()
-    assert (tmp_path / "status.json").exists()
+    assert calls == ["status.json"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["status.json"]
 
 
 def test_transition_matrix_legal(tmp_path: Path) -> None:

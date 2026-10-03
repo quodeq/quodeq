@@ -76,7 +76,7 @@ def test_project_card_summary_applies_deletions(tmp_path, monkeypatch):
     """The repositories-card grade must apply project-wide DELETIONS, agreeing
     with the accumulated / scored per-run paths.
 
-    Regression: ``_read_accumulated_summary`` (the project-card path) read raw
+    Regression: ``read_accumulated_summary`` (the project-card path) read raw
     ``read_run_data`` and never applied the project-wide dismiss/delete rescore
     that every other read path routes through (``scored_run_dimensions``). So a
     project with deletions showed a stale, too-low card grade on the
@@ -91,7 +91,7 @@ def test_project_card_summary_applies_deletions(tmp_path, monkeypatch):
     # Isolate the project-summary cache so a real ~/.quodeq cache can't leak in.
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "score_cache.db"))
 
-    from quodeq.services._fs_metadata import _read_accumulated_summary
+    from quodeq.services._fs_metadata import read_accumulated_summary
     from quodeq.services.deleted import delete_finding
     from quodeq.data.fs.report_parser.runs import list_runs
 
@@ -108,7 +108,7 @@ def test_project_card_summary_applies_deletions(tmp_path, monkeypatch):
     # compute_on_miss=True: this test exercises the rescore-parity logic
     # itself, not the local list path's cache-only/pending contract.
     runs = list_runs(reports_root, project)
-    _grade, card_score, _files, _pending = _read_accumulated_summary(
+    _grade, card_score, _files, _pending = read_accumulated_summary(
         reports_root, project, runs, compute_on_miss=True)
     assert card_score == accumulated, f"card {card_score} != accumulated {accumulated}"
 
@@ -121,17 +121,17 @@ def test_deletion_actually_moves_the_card_score(tmp_path, monkeypatch):
     project_dir = reports_root / project
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "score_cache.db"))
 
-    from quodeq.services._fs_metadata import _read_accumulated_summary
+    from quodeq.services._fs_metadata import read_accumulated_summary
     from quodeq.services.deleted import delete_finding
     from quodeq.data.fs.report_parser.runs import list_runs
 
     # compute_on_miss=True: see test_project_card_summary_applies_deletions.
     runs = list_runs(reports_root, project)
-    _g, before, _f, _p = _read_accumulated_summary(
+    _g, before, _f, _p = read_accumulated_summary(
         reports_root, project, runs, compute_on_miss=True)
     delete_finding(project_dir, {"dimension": _DIM, "principle": "p1", "file": "a.py"})
     clear_shared_dimension_cache()
-    _g2, after, _f2, _p2 = _read_accumulated_summary(
+    _g2, after, _f2, _p2 = read_accumulated_summary(
         reports_root, project, runs, compute_on_miss=True)
     assert before is not None and after is not None
     assert after > before, f"deleting the critical should raise the card score; {before} -> {after}"

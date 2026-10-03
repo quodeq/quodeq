@@ -6,17 +6,12 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.scoring.overall import weighted_overall
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import SCALE_TIER_NAMES, scale_multiplier, score_to_grade_label
-from quodeq.core.scoring.principle import _score_all_principles
+from quodeq.core.scoring.principle import score_all_principles
 
 
 def grade_for_score(score: float) -> str:
     """Alias for score_to_grade_label — kept for public API compatibility."""
     return score_to_grade_label(score)
-
-
-def confidence_label(level: str) -> str:
-    """Return a human-readable confidence label."""
-    return {"low": "Low", "medium": "Medium", "high": "High"}.get(level, level)
 
 
 def run_scoring(
@@ -27,7 +22,7 @@ def run_scoring(
     files_read = evidence.get("files_read", 0)
     scale_mult = scale_multiplier(source_file_count)
 
-    per_principle = _score_all_principles(
+    per_principle = score_all_principles(
         evidence.get("principles", {}), mode, scale_mult, files_read, params,
     )
     return ScoringResult(

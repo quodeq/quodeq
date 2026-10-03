@@ -3,8 +3,13 @@ import { CopyIcon, COPY_FEEDBACK_MS } from './CopyButton.jsx';
 import { copyToClipboard } from '../utils/clipboard.js';
 import { t } from '../strings/index.js';
 
+// This button's own copy-feedback state, not the run/job/dim vocabulary --
+// 'failed' here means "the clipboard write failed", unrelated to a job or
+// run's status. Kept local rather than forced into vocab/*.js.
+const COPY_STATUS = Object.freeze({ IDLE: 'idle', COPYING: 'copying', COPIED: 'copied', FAILED: 'failed' });
+
 export default function FileCopyBtn({ display, copyText }) {
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState(COPY_STATUS.IDLE);
 
   const handleCopy = useCallback((e) => {
     // The live-evaluation row wraps this button in a clickable container
@@ -15,19 +20,19 @@ export default function FileCopyBtn({ display, copyText }) {
     // whether the copy worked or not.
     const settle = (outcome) => {
       setStatus(outcome);
-      setTimeout(() => setStatus('idle'), COPY_FEEDBACK_MS);
+      setTimeout(() => setStatus(COPY_STATUS.IDLE), COPY_FEEDBACK_MS);
     };
-    setStatus('copying');
+    setStatus(COPY_STATUS.COPYING);
     copyToClipboard(copyText)
-      .then(() => settle('copied'))
+      .then(() => settle(COPY_STATUS.COPIED))
       .catch((err) => {
         console.warn('Clipboard copy failed:', err?.message || err);
-        settle('failed');
+        settle(COPY_STATUS.FAILED);
       });
   }, [copyText]);
 
-  const showStatusLabel = status === 'copied' || status === 'failed';
-  const statusText = status === 'copied' ? t('common.copied') : t('common.copyFailed');
+  const showStatusLabel = status === COPY_STATUS.COPIED || status === COPY_STATUS.FAILED;
+  const statusText = status === COPY_STATUS.COPIED ? t('common.copied') : t('common.copyFailed');
   const label = showStatusLabel ? statusText : display;
 
   return (

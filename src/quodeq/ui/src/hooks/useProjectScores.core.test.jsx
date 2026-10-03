@@ -14,8 +14,8 @@ function makeFakeApi() {
           accumulated: { score: 80 },
           trend: [{ runId: asOf }],
           availableRuns: [
-            { runId: "r9", status: "complete" },
-            { runId: "r1", status: "complete" },
+            { runId: "r9", status: "done" },
+            { runId: "r1", status: "done" },
           ],
         };
       }
@@ -23,15 +23,15 @@ function makeFakeApi() {
         accumulated: { score: 90 },
         trend: [],
         availableRuns: [
-          { runId: "r9", status: "complete" },
-          { runId: "r1", status: "complete" },
+          { runId: "r9", status: "done" },
+          { runId: "r1", status: "done" },
         ],
       };
     }),
     sharedGetProjectScores: vi.fn(async () => ({
       accumulated: { score: 55 },
       trend: [],
-      availableRuns: [{ runId: "r1", status: "complete" }],
+      availableRuns: [{ runId: "r1", status: "done" }],
     })),
   };
 }
@@ -90,8 +90,8 @@ describe("useProjectScores", () => {
       accumulated: { score: asOf ? 80 : 90 },
       trend: [],
       availableRuns: [
-        { runId: "r_running", status: "in_progress" },
-        { runId: "r_done", status: "complete" },
+        { runId: "r_running", status: "running" },
+        { runId: "r_done", status: "done" },
       ],
     }));
     const { result } = renderHook(
@@ -110,7 +110,7 @@ describe("useProjectScores", () => {
     fakeApi.getProjectScores.mockImplementation(async (project, asOf) => ({
       accumulated: { score: asOf ? 80 : 90 },
       trend: [],
-      availableRuns: [{ runId: "r_done", status: "complete" }],
+      availableRuns: [{ runId: "r_done", status: "done" }],
     }));
     const { result } = renderHook(
       () => useProjectScores({ selectedProject: "p1", selectedRun: "r_ghost" }),
@@ -128,8 +128,8 @@ describe("useProjectScores", () => {
       accumulated: { score: asOf ? 80 : 90 },
       trend: [],
       availableRuns: [
-        { runId: "r_done", status: "complete" },
-        { runId: "r_old", status: "complete" },
+        { runId: "r_done", status: "done" },
+        { runId: "r_old", status: "done" },
       ],
     }));
     const { result } = renderHook(
@@ -152,7 +152,7 @@ describe("useProjectScores", () => {
     });
     client.setQueryData(
       projectKeys.scores("p1", null),
-      { accumulated: { score: 90 }, trend: [], availableRuns: [{ runId: "r1", status: "complete" }] },
+      { accumulated: { score: 90 }, trend: [], availableRuns: [{ runId: "r1", status: "done" }] },
       { updatedAt: Date.now() },
     );
     client.setQueryData(

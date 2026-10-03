@@ -17,22 +17,34 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     # Cap the whole job so a hanging test fails fast instead of burning
-    # runner minutes. Ubuntu + macOS run in ~2-3 min. Windows is far slower
-    # per test (no fork(), slow git-subprocess startup, NTFS small-file I/O,
-    # Defender scanning), so it runs under pytest-xdist (-n auto) with a
-    # Defender exclusion to stay well within this budget.
-    timeout-minutes: 15
+    # runner minutes. A genuine hang is already bounded by --timeout per
+    # test, so this cap only has to cover a slow runner: the Windows leg
+    # takes ~8 min under pytest-xdist (-n auto) and has hit 14m36s on a
+    # runner that was uniformly 2x slower (run 36233174070), so 15 left no
+    # headroom. Windows is far slower per test (no fork(), slow
+    # git-subprocess startup, NTFS small-file I/O, Defender scanning) and
+    # gets a Defender exclusion on top.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
+      # shard: QUODEQ_TEST_SHARD (tests/_sharding.py). Windows is already
+      # using every core of one runner, so the only way to cut its ~8-12 min
+      # further is two runners, each collecting half the test files. The
+      # other legs run the whole suite on one job (1/1 leaves collection
+      # untouched). Setup is paid twice on Windows, but in parallel.
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.13"]
+        shard: ["1/1"]
+        include:
+          - { os: windows-latest, python-version: "3.13", shard: "1/2" }
+          - { os: windows-latest, python-version: "3.13", shard: "2/2" }
 
     steps:
       - uses: actions/checkout@v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.1.0
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -46,7 +58,15 @@ jobs:
         # send signals, which are inherently timing-sensitive on shared CI
         # runners. They run elsewhere (e.g. nightly) where flakes are
         # tolerable. PR CI should be fast and deterministic.
-        run: uv run pytest tests/ -q --tb=short -m "not integration" --cov=quodeq --cov-report=term-missing
+        #
+        # -n auto: serial, these legs had grown to the same ~8 min as
+        # Windows. pytest-cov combines the workers' data itself. The same
+        # saturation knobs as the Windows step apply (see its comment):
+        # QUODEQ_TEST_TIMEOUT_SCALE widens every budget() wait and
+        # --timeout keeps the per-test cap proportional to them.
+        env:
+          QUODEQ_TEST_TIMEOUT_SCALE: "4"
+        run: uv run pytest tests/ -q --tb=short -m "not integration" -n auto --timeout=240 --cov=quodeq --cov-report=term-missing
 
       - name: Speed up Windows file I/O (exclude churn paths from Defender)
         if: runner.os == 'Windows'
@@ -86,9 +106,10 @@ jobs:
         # xdist blames it on "worker crashed while running <test>" - a
         # segfault-shaped message for what is really a timeout. 60 * 4 keeps
         # the cap proportional to the waits it has to cover; a genuine
-        # deadlock still fails inside the job's 15-minute budget.
+        # deadlock still fails inside the job's 25-minute budget.
         env:
           QUODEQ_TEST_TIMEOUT_SCALE: "4"
+          QUODEQ_TEST_SHARD: ${{ matrix.shard }}
         run: uv run pytest tests/ -v -ra --tb=short -m "not integration" -n auto --timeout=240
 
   ui:
@@ -148,6 +169,31 @@ jobs:
         # above its committed ceiling. Shrunk counts are locked in with
         # `npm run lint:magic:update`.
         run: npm run lint:magic
+
+      - name: Check UI vocabulary literals (vocab ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on bare run-state / severity / grade strings in comparisons
+        # beyond the per-file counts in tools/vocab_baseline.json, or a
+        # baseline total above its committed ceiling. Shrunk counts are
+        # locked in with `npm run lint:vocab:update`.
+        run: npm run lint:vocab
+
+      - name: Check UI magic strings (magic-string ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on a bare string the code compares against, or the same
+        # string 3+ times in one module, beyond the per-file counts in
+        # tools/magic_strings_baseline.json, or a baseline total above its
+        # committed ceiling. Shrunk counts are locked in with
+        # `npm run lint:magic-strings:update`.
+        run: npm run lint:magic-strings
+
+      - name: Check UI naming style (naming ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on a module constant holding a literal or frozen object that is
+        # not UPPER_SNAKE_CASE, or a module function that is not camelCase
+        # (PascalCase components in .jsx). Landed at zero with an empty
+        # tools/naming_baseline.json and a ceiling of 0.
+        run: npm run lint:naming
 
       - name: Check UI accessibility (a11y ratchet)
         working-directory: src/quodeq/ui

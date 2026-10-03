@@ -112,6 +112,36 @@ class TestProviderTest:
         data = resp.get_json()
         assert data["success"] is True
 
+    def test_missing_api_key_reports_env_var(self, client, monkeypatch):
+        # No api_key in the body and the provider's env var unset: the wire
+        # body is a frozen contract the UI keys off (success/code/error).
+        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        resp = client.post("/api/provider/test", json={
+            "provider": "openrouter",
+            "model": "test",
+        }, headers={"Origin": "http://localhost"})
+
+        assert resp.status_code == 200
+        assert resp.get_json() == {
+            "success": False,
+            "code": "MISSING_API_KEY",
+            "error": "OPENROUTER_API_KEY is not set in the dashboard's environment. "
+                     "Export it in your shell (e.g. ~/.zshrc) and relaunch the dashboard from that terminal.",
+        }
+
+
+class TestProviderEnvCheck:
+    def test_omlx_stays_absent_no_api_key_env_entry(self, client):
+        # omlx has no `api_key_env` (it takes base_url/api_key per-request,
+        # not from a settings env var), so it must never appear in the
+        # env-check payload — only providers with a configured env var do.
+        resp = client.get("/api/provider/env-check")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "omlx" not in data
+        assert "openrouter" in data
+        assert "custom" in data
+
 
 class TestKnownModels:
     def test_returns_models(self, client):
@@ -171,3 +201,57 @@ class TestEstimateAgentsValidation:
         )
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "INVALID_PARAM"
+
+
+class TestProviderTestFieldTypes:
+    """A non-string provider/api_base/api_key/model must 400, not 500."""
+
+    @pytest.mark.parametrize("body", [
+        {"provider": ["x"]},
+        {"api_base": 5},
+        {"api_key": 1},
+        {"model": {}},
+    ])
+    def test_non_string_field_returns_400(self, client, body):
+        resp = client.post(
+            "/api/provider/test", json=body, headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
+    def test_null_api_key_is_treated_as_absent(self, client, monkeypatch):
+        """An explicit JSON null for api_key is not a type error (it's the
+        same as omitting the field): the route falls through to env-var
+        resolution instead of 400ing."""
+        monkeypatch.setenv("OPENROUTER_API_KEY", _TEST_API_KEY)
+        with patch("quodeq.api.llm_bridge_routes.check_cloud_connection") as mock_check:
+            mock_check.return_value = {"success": True, "model": "test", "latency_ms": 200}
+            resp = client.post("/api/provider/test", json={
+                "provider": "openrouter",
+                "model": "test",
+                "api_base": "https://openrouter.ai/api/v1",
+                "api_key": None,
+            }, headers={"Origin": "http://localhost"})
+
+        assert resp.status_code == 200
+        mock_check.assert_called_once()
+        assert mock_check.call_args.kwargs["api_key"] == _TEST_API_KEY
+
+    def test_env_key_is_not_sent_to_a_base_the_request_chose(self, client, monkeypatch):
+        """The server's key belongs to the provider's configured endpoint. A
+        body naming another host gets no credential attached."""
+        monkeypatch.setenv("OPENROUTER_API_KEY", _TEST_API_KEY)
+        with patch("quodeq.api.llm_bridge_routes.check_cloud_connection") as mock_check:
+            mock_check.return_value = {"success": False, "error": "401"}
+            resp = client.post("/api/provider/test", json={
+                "provider": "openrouter",
+                "model": "test",
+                "api_base": "https://attacker.example/v1",
+                "api_key": "",
+            }, headers={"Origin": "http://localhost"})
+
+        assert resp.status_code == 200
+        assert resp.get_json().get("code") != "MISSING_API_KEY"
+        mock_check.assert_called_once()
+        assert mock_check.call_args.kwargs["api_key"] == ""
+        assert _TEST_API_KEY not in str(mock_check.call_args)

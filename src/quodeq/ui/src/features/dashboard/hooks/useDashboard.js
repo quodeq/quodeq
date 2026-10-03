@@ -1,12 +1,14 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
-import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
+import { projectKeys } from "../../../api/queryKeys.js";
+import { useScopedPlaceholder } from "../../../hooks/useScopedPlaceholder.js";
 import { isFrozenRun } from '../../../models/runRules.js';
 import { t } from '../../../strings/index.js';
 import { useDashboardInvalidation } from './useDashboardInvalidation.js';
-import { STALE_TIME_MS } from '../../../hooks/queryDefaults.js';
+import { STALE_TIME_MS, refetchWhileError } from '../../../hooks/queryDefaults.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 const EMPTY_TREND = [];
 
@@ -44,7 +46,7 @@ function buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedG
   return {
     queryKey: projectKeys.info(projectKey, selectedSource),
     queryFn: () => sharedGetProjectInfo(selectedProject),
-    enabled: selectedSource === "shared" && !!selectedProject,
+    enabled: selectedSource === PROJECT_SOURCE.SHARED && !!selectedProject,
   };
 }
 
@@ -53,15 +55,21 @@ function buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedG
 // run deletion), and every one of those invalidates the project query
 // subtree — which forces a refetch regardless of staleTime. Freezing the
 // query here removes the routine time-based background refetch (and the
-// dashboard-refreshing dim flash) on re-entering a run view. The rule
+// section-pending flash) on re-entering a run view. The rule
 // itself (including why an unknown run counts as frozen) lives in
 // models/runRules.js.
+// The payload is the overview shape on every page (scores and counts, ~0.1
+// MB); run pages read their finding lists from the run's scores query
+// (useRunFindings.js) instead of a 10-34 MB full dashboard.
 function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fetchDashboard, selectedProject, frozenRun, keepPlaceholder, keepInScope }) {
   return {
     queryKey: projectKeys.dashboard(projectKey, selectedRun, selectedSource),
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
     staleTime: frozenRun ? Infinity : STALE_TIME_MS,
+    // The webview has no focus/reconnect events, so an errored query must
+    // poll its own way back to health (see refetchWhileError).
+    refetchInterval: refetchWhileError,
     // Keep showing the previous run's data while a new run loads — instant
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.
@@ -75,7 +83,7 @@ function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fe
 
 function buildDashboardResult({
   dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresError,
-  availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfoQuery,
+  availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, dropRunFromCache, sharedProjectInfoQuery,
 }) {
   return {
     dashboard: dashboardWithTrend,
@@ -102,6 +110,7 @@ function buildDashboardResult({
     refreshDashboard,
     refreshDashboardActive,
     scheduleDashboardReconcile,
+    dropRunFromCache,
     sharedProjectInfo: sharedProjectInfoQuery.data || null,
   };
 }
@@ -144,15 +153,11 @@ function mergeTrendIntoDashboard(dashboardData, fallbackTrend) {
  * which History turns off because flashing a neighbouring run is misleading
  * there. Placeholders never cross a project or source boundary.
  */
-export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+export function useDashboard({ selectedProject, selectedRun, selectedSource = PROJECT_SOURCE.LOCAL, keepPlaceholder = true } = {}) {
   const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
-  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
+  const fetchDashboard = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetDashboard : getDashboard;
   const queryClient = useQueryClient();
-  const projectKey = selectedProject || "_none_";
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
+  const { projectKey, keepInScope } = useScopedPlaceholder(selectedProject, selectedSource);
 
   const sharedProjectInfoQuery = useQuery(buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedGetProjectInfo, selectedProject }));
 
@@ -176,10 +181,10 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     [dashboardQuery.data, fallbackTrend],
   );
 
-  const { refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile } = useDashboardInvalidation({ queryClient, selectedProject, selectedSource });
+  const { refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, dropRunFromCache } = useDashboardInvalidation({ queryClient, selectedProject, selectedSource });
 
   return buildDashboardResult({
     dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresError,
-    availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfoQuery,
+    availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, dropRunFromCache, sharedProjectInfoQuery,
   });
 }

@@ -6,6 +6,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_evaluations_dir
@@ -17,6 +18,8 @@ _ENV_ACTION_API_PORT = "QUODEQ_ACTION_API_PORT"
 _ENV_ACTION_API_HOST = "QUODEQ_ACTION_API_HOST"
 _ENV_STATIC_DIST = "QUODEQ_STATIC_DIST"
 _ENV_EVALUATIONS_DIR = "QUODEQ_EVALUATIONS_DIR"
+# How long a SIGTERM'd action API gets to exit before it is killed.
+TERMINATE_GRACE_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -55,7 +58,7 @@ def spawn_action_api(
     if cfg.static_dist:
         child_env[_ENV_STATIC_DIST] = str(cfg.static_dist)
     child_env[_ENV_EVALUATIONS_DIR] = cfg.evaluations_dir or get_evaluations_dir(env=env)
-    verbose = child_env.get("QUODEQ_VERBOSE") == "1"
+    verbose = child_env.get("QUODEQ_VERBOSE") == ENV_TRUTHY
     proc = subprocess.Popen(
         subprocess_cmd("api"),
         env=child_env,
@@ -73,6 +76,16 @@ def spawn_action_api(
     return proc
 
 
+def _terminate_then_kill(process: subprocess.Popen) -> None:
+    """SIGTERM *process*; if it outlives the grace period, SIGKILL and reap it."""
+    process.terminate()
+    try:
+        process.wait(timeout=TERMINATE_GRACE_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 def spawn_and_wait(
     port: int,
     base_url: str,
@@ -86,7 +99,6 @@ def spawn_and_wait(
         wait_for_action_api(base_url)
     except (subprocess.TimeoutExpired, OSError, TimeoutError):
         if process.poll() is None:
-            process.terminate()
-            process.wait()
+            _terminate_then_kill(process)
         raise
     return base_url, process

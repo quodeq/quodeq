@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApi } from '../../api/ApiContext.jsx';
 import { readString, writeString } from '../../adapters/storage.js';
+import { apiErrorMessage } from '../../strings/apiErrors.js';
+import { useOptionalSidePane } from '../side-pane/SidePaneContext.jsx';
 
 // Closing the drawer unmounts the pane (and this hook), so the selected tab
 // must survive outside React state or reopening always lands on the newest
@@ -66,15 +68,18 @@ function makeReconcile({ listTerminalSessions, createTerminalSession, setSession
   };
 }
 
-function makeOpenSession({ createTerminalSession, reconcile, setActiveId }) {
+function makeOpenSession({ createTerminalSession, reconcile, setActiveId, showToast }) {
   return async () => {
     try {
       const created = await createTerminalSession();
       await reconcile();
       if (created?.id) setActiveId(created.id);
     } catch (err) {
-      // 409 at the cap (or a race): the server is the source of truth.
+      // 409 at the cap (or a race): the server is the source of truth. The
+      // toast tells the user why no tab appeared; without a side-pane
+      // provider the warning is the only trace.
       console.warn('[useTerminalSessions] create session failed:', err);
+      showToast?.(apiErrorMessage(err, 'terminal.newSessionFailed'));
       await reconcile();
     }
   };
@@ -124,6 +129,7 @@ function makeSelectSession({ setActiveId, reconcile }) {
  */
 export function useTerminalSessions({ enabled }) {
   const { listTerminalSessions, createTerminalSession, killTerminalSession } = useApi();
+  const showToast = useOptionalSidePane()?.showToast;
   const [sessions, setSessions] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [max, setMax] = useState(DEFAULT_SESSION_CAP);
@@ -149,7 +155,10 @@ export function useTerminalSessions({ enabled }) {
     writeString(ACTIVE_SESSION_KEY, activeId);
   }, [activeId]);
 
-  const openSession = useCallback(makeOpenSession({ createTerminalSession, reconcile, setActiveId }), [reconcile, createTerminalSession]);
+  const openSession = useCallback(
+    makeOpenSession({ createTerminalSession, reconcile, setActiveId, showToast }),
+    [reconcile, createTerminalSession, showToast],
+  );
 
   const closeSession = useCallback(
     makeCloseSession({ sessionsRef, setSessions, setActiveId, killTerminalSession, reconcile }),

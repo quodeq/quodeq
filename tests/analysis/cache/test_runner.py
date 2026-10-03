@@ -193,9 +193,9 @@ class TestSchemaDefault:
         # schema, so it can never silently key into a stale namespace (whose
         # writes the one-time GC would then reclaim). Keeps the runner
         # byte-identical to the two live key sites by default.
-        from quodeq.analysis.cache.dimension_helpers import _SCHEMA_VERSION
+        from quodeq.analysis.cache.key import SCHEMA_VERSION
         result = analyze_unit(_unit(), cache=cache, dispatcher=_RecordingDispatcher())
-        assert result.entry.schema_version == _SCHEMA_VERSION
+        assert result.entry.schema_version == SCHEMA_VERSION
 
 
 # ---------- self-describing entry (file_content_hash + provenance) ----------

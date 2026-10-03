@@ -16,10 +16,13 @@ const evaluationState = {
   cancelEvaluation: vi.fn(),
   startedProject: null,
 };
-vi.mock("../features/evaluation/hooks/useEvaluation.js", () => ({
-  useEvaluation: () => evaluationState,
-  LOCAL_API_PROVIDERS: new Set(["ollama", "llamacpp", "omlx"]),
-}));
+vi.mock("../features/evaluation/hooks/useEvaluation.js", async () => {
+  const actual = await vi.importActual("../features/evaluation/hooks/useEvaluation.js");
+  return {
+    ...actual,
+    useEvaluation: () => evaluationState,
+  };
+});
 
 import { useEvaluationLifecycle } from "./useEvaluationLifecycle.js";
 
@@ -130,7 +133,7 @@ describe("handleEvalDismiss('view') cross-project jump", () => {
   });
 });
 
-// Finding 1 (P5 final review): removing useAppState's dashboard-key refetch
+// Removing useAppState's dashboard-key refetch
 // (69b67347) orphaned the scores side. projectKeys.scores(project, null,
 // source) -- the `latest` query behind useProjectScores's `accumulated` and
 // `availableRuns` -- never changes key when selectedRun flips to the new

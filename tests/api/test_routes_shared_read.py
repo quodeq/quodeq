@@ -3,7 +3,7 @@
 Read-only invariant: every route under /api/shared/projects/... is a thin GET
 delegation to the same service functions the local /api/projects/... routes
 use, pointed at the shared clone's evaluations root instead of the local
-reports directory. This module covers the ``_with_shared_root`` decorator's
+reports directory. This module covers the ``with_shared_root`` decorator's
 failure branches, the read-only route sweep and GET /api/shared/projects;
 the per-project mirror routes live in the test_routes_shared_read_* siblings,
 all built against a REAL published clone (tests/api/conftest.py).
@@ -28,7 +28,7 @@ from tests.api._routes_shared_read_fixtures import (  # noqa: F401 -- pytest fix
 )
 
 
-# --- _with_shared_root decorator ---------------------------------------------
+# --- with_shared_root decorator ---------------------------------------------
 
 def test_shared_routes_409_when_unconfigured(client, monkeypatch, tmp_path):
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
@@ -66,7 +66,7 @@ def test_shared_routes_409_when_unsupported_version(client):
 
 
 def test_shared_routes_409_when_foreign(client):
-    """Audit A1: a foreign repo (real content, no quodeq.json marker) must
+    """A foreign repo (real content, no quodeq.json marker) must
     be rejected at read time with a distinct 409, not silently 503'd or
     served as if it were a real quodeq clone."""
     url = "file:///dummy/foreign.git"
@@ -86,7 +86,7 @@ def test_shared_routes_409_when_foreign(client):
 
 
 def test_empty_repo_lists_zero_projects_not_503(client, empty_shared_clone_fixture):
-    """Audit A1: first connect to an empty (never-published) repo must be
+    """First connect to an empty (never-published) repo must be
     servable -- an empty projects list, not a false "not cloned yet" 503."""
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200
@@ -144,11 +144,11 @@ def test_shared_projects_refresh_success_reports_fresh_and_syncs_index(
     sync_shared_index and the response gains "stale": False."""
     calls: list[str] = []
     monkeypatch.setattr(
-        "quodeq.api.routes_shared.refresh_shared_clone",
-        lambda url: (calls.append(f"refresh:{url}") or True, ""),
+        "quodeq.api.routes_shared_mirrors.refresh_shared_clone",
+        lambda url, env=None: (calls.append(f"refresh:{url}") or True, ""),
     )
     monkeypatch.setattr(
-        "quodeq.api.routes_shared.sync_shared_index",
+        "quodeq.api.routes_shared_mirrors.sync_shared_index",
         lambda url: calls.append(f"sync:{url}"),
     )
     resp = client.get("/api/shared/projects?refresh=1")
@@ -164,10 +164,10 @@ def test_shared_projects_refresh_failure_reports_stale_and_skips_sync(
     sync_shared_index is never called (nothing new was fetched to index)."""
     sync_calls: list[str] = []
     monkeypatch.setattr(
-        "quodeq.api.routes_shared.refresh_shared_clone", lambda url: (False, "network unreachable")
+        "quodeq.api.routes_shared_mirrors.refresh_shared_clone", lambda url, env=None: (False, "network unreachable")
     )
     monkeypatch.setattr(
-        "quodeq.api.routes_shared.sync_shared_index",
+        "quodeq.api.routes_shared_mirrors.sync_shared_index",
         lambda url: sync_calls.append(url),
     )
     resp = client.get("/api/shared/projects?refresh=1")
@@ -237,7 +237,7 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
     """Finding 1 regression: build_project_list runs _build_one (which
     ultimately calls cached_project_summary) inside a ThreadPoolExecutor.
     contextvars do NOT propagate into pool worker threads by default, so the
-    score_cache_path_override set by _with_shared_root would be invisible
+    score_cache_path_override set by with_shared_root would be invisible
     there and per-project summaries would read/write the LOCAL score cache
     DB instead of this clone's own one. Both must hold: the per-clone cache
     gets written, and the local (sandboxed-default) cache never does."""

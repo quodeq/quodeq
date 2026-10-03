@@ -1,6 +1,6 @@
-// The clone ratchet burned its baseline to zero in maintainability cycle 3
-// (PR 5): the Python clones went into shared helpers, the UI tool clones into
-// tools/_ratchet_common.mjs and tools/_token_utils.mjs. This pins it there --
+// The clone ratchet burned its baseline to zero: the Python clones went into
+// shared helpers, the UI tool clones into tools/_ratchet_common.mjs and
+// tools/_token_utils.mjs. This pins it there --
 // an entry creeping back in means a copy-paste was grandfathered instead of
 // extracted.
 import assert from 'node:assert/strict';
@@ -19,4 +19,10 @@ test('the clone baseline stays empty', () => {
 test('the clone ceiling stays at zero', () => {
   const source = readFileSync(join(here, 'check_clones.mjs'), 'utf8');
   assert.match(source, /const TOTAL_CEILING = 0;/);
+});
+
+test('the clone threshold stays at 40 tokens over 5 lines', () => {
+  const config = JSON.parse(readFileSync(join(here, '..', '..', '..', '..', '.jscpd.json'), 'utf8'));
+  assert.equal(config.minTokens, 40);
+  assert.equal(config.minLines, 5);
 });

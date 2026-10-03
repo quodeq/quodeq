@@ -7,6 +7,7 @@
  * logic-identical) so useEvaluationMutations itself clears the
  * max-lines-per-function gate.
  */
+import { useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import { t } from "../../../strings/index.js";
@@ -57,7 +58,33 @@ function startOnError(setJobError) {
   };
 }
 
-function cancelOnSuccess({ queryClient, jobId, setJobId, setStartedProject }) {
+// A keep-findings cancel answers as soon as SIGTERM is sent. The run then
+// drains (up to the 30s SIGTERM grace, then SIGKILL) and the server scores
+// its finished dimensions only after it exits, so the refresh right after the
+// DELETE sees none of that. Under SSE the status query never refetches on its
+// own, so refresh again at these points: the common quick exit, a slower one,
+// and past the grace window plus scoring.
+const QUICK_EXIT_MS = 5_000; // SIGTERM honored at once, dims scored in seconds
+const SLOW_EXIT_MS = 15_000; // a drain that takes a while
+const PAST_GRACE_MS = 45_000; // 30s grace + SIGKILL settle + scoring
+export const CANCEL_RECONCILE_DELAYS_MS = [QUICK_EXIT_MS, SLOW_EXIT_MS, PAST_GRACE_MS];
+
+function refreshAfterCancel(queryClient, jobId) {
+  if (jobId) queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
+  queryClient.invalidateQueries({ queryKey: projectKeys.all() });
+}
+
+function clearCancelReconcile(timersRef) {
+  timersRef.current.forEach(clearTimeout);
+  timersRef.current = [];
+}
+
+function scheduleCancelReconcile(queryClient, jobId, timersRef) {
+  clearCancelReconcile(timersRef);
+  timersRef.current = CANCEL_RECONCILE_DELAYS_MS.map((ms) => setTimeout(() => refreshAfterCancel(queryClient, jobId), ms));
+}
+
+function cancelOnSuccess({ queryClient, jobId, setJobId, setStartedProject, reconcileTimersRef }) {
   return (_data, variables) => {
     if (variables?.discard) {
       // Discard deletes the run server-side (dir + index row + job entry),
@@ -69,8 +96,9 @@ function cancelOnSuccess({ queryClient, jobId, setJobId, setStartedProject }) {
       }
       setJobId(null);
       setStartedProject(null);
-    } else if (jobId) {
-      queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
+    } else {
+      scheduleCancelReconcile(queryClient, jobId, reconcileTimersRef);
+      if (jobId) queryClient.invalidateQueries({ queryKey: evaluationKeys.evaluation(jobId) });
     }
     // Mirror startMutation: refresh the project subtree so History's
     // availableRuns drops the cancelled run from the in-progress list
@@ -109,6 +137,8 @@ function cancelOnError({ queryClient, jobId, setJobId, setJobError }) {
  * @returns {{startMutation: object, cancelMutation: object}}
  */
 export function useEvaluationMutations({ api, queryClient, jobId, setJobId, setJobError, setStartedProject }) {
+  const reconcileTimersRef = useRef([]);
+  useEffect(() => () => clearCancelReconcile(reconcileTimersRef), []);
   const startMutation = useMutation({
     mutationFn: startMutationFn(api),
     onSuccess: startOnSuccess({ queryClient, setJobError, setJobId, setStartedProject }),
@@ -117,7 +147,7 @@ export function useEvaluationMutations({ api, queryClient, jobId, setJobId, setJ
 
   const cancelMutation = useMutation({
     mutationFn: ({ discard } = {}) => api.cancelEvaluation(jobId, { discard }),
-    onSuccess: cancelOnSuccess({ queryClient, jobId, setJobId, setStartedProject }),
+    onSuccess: cancelOnSuccess({ queryClient, jobId, setJobId, setStartedProject, reconcileTimersRef }),
     onError: cancelOnError({ queryClient, jobId, setJobId, setJobError }),
   });
 

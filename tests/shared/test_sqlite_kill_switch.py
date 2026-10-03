@@ -13,6 +13,14 @@ def test_sqlite_disabled_default(monkeypatch):
     assert sqlite_disabled() is False
 
 
+def test_sqlite_disabled_reads_the_injected_env_over_os_environ(monkeypatch):
+    """#10946 — env is injectable, same shape as its _env_db.py siblings."""
+    monkeypatch.setenv("QUODEQ_DISABLE_SQLITE", "1")
+    assert sqlite_disabled(env={}) is False
+    assert sqlite_disabled(env={"QUODEQ_DISABLE_SQLITE": "true"}) is True
+    assert sqlite_disabled() is True  # os.environ (the real default) is untouched
+
+
 @pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes"])
 def test_sqlite_disabled_respects_truthy_values(monkeypatch, value):
     monkeypatch.setenv("QUODEQ_DISABLE_SQLITE", value)

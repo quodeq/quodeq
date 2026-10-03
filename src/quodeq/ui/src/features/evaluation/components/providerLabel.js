@@ -1,4 +1,4 @@
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import { readString } from '../../../adapters/storage.js';
 
 /**
@@ -10,6 +10,6 @@ import { readString } from '../../../adapters/storage.js';
 export function readActiveProviderModel(storage = localStorage) {
   const provider = readString(ACTIVE_PROVIDER_KEY, '', storage);
   if (!provider) return null;
-  const model = readString(providerKey(provider, 'model'), '', storage);
+  const model = readString(providerKey(provider, PROVIDER_SETTING_KEY.MODEL), '', storage);
   return { provider, model };
 }

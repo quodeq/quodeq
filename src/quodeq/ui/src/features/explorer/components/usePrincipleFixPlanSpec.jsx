@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER } from '../../../utils/formatters.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { filterTitleSuffix } from './usePrincipleReportSpec.jsx';
+import { SEVERITY } from '../../../vocab/severity.js';
 
 /** Registers the principle's fix-plan side-pane window spec, kept in sync
  * with the active severity filter. */
@@ -13,18 +14,18 @@ export function usePrincipleFixPlanSpec({
     if (!principle || filteredViolations.length === 0) return null;
     const buildBySeverity = () => {
       const bucket = {};
-      for (const sev of EVAL_SEVERITY_ORDER) {
-        bucket[sev] = filteredViolations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
+      for (const sev of KNOWN_SEVERITIES) {
+        bucket[sev] = filteredViolations.filter((v) => (v.severity || SEVERITY.MINOR).toLowerCase() === sev);
       }
       return bucket;
     };
-    const buildMarkdown = () => buildPrinciplePlanText(
+    const buildMarkdown = () => buildPrinciplePlanText({
       principle,
-      filteredViolations,
-      buildBySeverity(),
+      violations: filteredViolations,
+      violationsBySeverity: buildBySeverity(),
       principleData,
-      activeSevFilter,
-    );
+      severityFilter: activeSevFilter,
+    });
     const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
     return {
       id: `fixplan:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,

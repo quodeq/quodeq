@@ -30,12 +30,9 @@ export function disciplineLabel(d) {
 
 export function formatDate(iso) {
   if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
-  } catch (err) {
-    console.warn('[projectDisplayHelpers] date format failed:', err);
-    return null;
-  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
 }
 
 export function formatPath(path) {
