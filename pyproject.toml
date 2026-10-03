@@ -162,6 +162,11 @@ build-backend = "uv_build"
 wheel-exclude = [
     "src/quodeq/ui/node_modules",
     "src/quodeq/ui/src/assets/help",
+    # The UI's unit tests (600+ files, ~2.5 MB) are never run from a wheel;
+    # the built app ships in static/, so they only pad the 5 MB budget.
+    "src/quodeq/ui/src/**/*.test.js",
+    "src/quodeq/ui/src/**/*.test.jsx",
+    "src/quodeq/ui/src/**/__tests__",
 ]
 # Keep the installed JS dependency tree (~28MB / 11k files, reproducible from
 # package-lock.json) and local build cruft out of the published source tarball.
