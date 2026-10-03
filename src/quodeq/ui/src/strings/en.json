@@ -24,7 +24,7 @@
   "apiError.flowFailed": "The GitHub sign-in failed. Try again.",
   "apiError.flowStartFailed": "Couldn't start the sign-in. Check the server logs.",
   "apiError.forbidden": "You do not have permission to do that.",
-  "apiError.foreignRepo": "That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.",
+  "apiError.foreignRepo": "That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.",
   "apiError.gitMissing": "git isn't installed on this computer.",
   "apiError.githubNotConfigured": "GitHub sign-in isn't available in this build.",
   "apiError.githubOffline": "GitHub couldn't be reached. Check your connection and try again.",

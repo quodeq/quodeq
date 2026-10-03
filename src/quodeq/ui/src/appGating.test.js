@@ -147,9 +147,18 @@ test('shouldShowCompareTab: one local project with runs plus shared content is e
   assert.equal(shouldShowCompareTab({ projects: [{ runsCount: 1 }], sharedHasContent: true }), true);
 });
 
-test('shouldShowCompareTab: shared content alone (zero local projects with runs) is not enough', () => {
-  assert.equal(shouldShowCompareTab({ projects: [], sharedHasContent: true }), false);
+test('shouldShowCompareTab: a single published project with no local runs is not enough', () => {
+  assert.equal(shouldShowCompareTab({ projects: [], sharedHasContent: true, sharedPublishedCount: 1 }), false);
   assert.equal(shouldShowCompareTab({ projects: [{ runsCount: 0 }], sharedHasContent: true }), false);
+});
+
+test('shouldShowCompareTab: two published projects are enough with zero local projects', () => {
+  assert.equal(shouldShowCompareTab({ projects: [], sharedHasContent: true, sharedPublishedCount: 2 }), true);
+  assert.equal(shouldShowCompareTab({ projects: [{ runsCount: 0 }], sharedHasContent: true, sharedPublishedCount: 5 }), true);
+});
+
+test('shouldShowCompareTab: one local project with runs plus one published project is enough', () => {
+  assert.equal(shouldShowCompareTab({ projects: [{ runsCount: 1 }], sharedHasContent: true, sharedPublishedCount: 1 }), true);
 });
 
 test('shouldShowCompareTab: projects without a runsCount field count as zero runs', () => {

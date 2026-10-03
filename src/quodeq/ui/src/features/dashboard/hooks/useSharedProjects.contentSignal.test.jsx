@@ -58,6 +58,7 @@ describe('useSharedContentSignal', () => {
     });
     await waitFor(() => expect(result.current.settled).toBe(true));
     expect(result.current.hasContent).toBe(false);
+    expect(result.current.publishedCount).toBe(0);
     expect(fakeApi.sharedListProjects).not.toHaveBeenCalled();
   });
 
@@ -68,6 +69,8 @@ describe('useSharedContentSignal', () => {
     });
     await waitFor(() => expect(result.current.settled).toBe(true));
     expect(result.current.hasContent).toBe(true);
+    // The Compare gate counts published projects, so the signal carries the number.
+    expect(result.current.publishedCount).toBeGreaterThan(0);
   });
 
   it('reports hasContent=false when configured but the list is empty', async () => {

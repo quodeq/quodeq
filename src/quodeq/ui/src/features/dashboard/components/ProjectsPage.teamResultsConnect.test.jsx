@@ -7,7 +7,7 @@ import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { DISMISSED_CONNECT_KEY } from '../hooks/useDismissedConnectFailure.js';
 import { LOCAL, makeApi, pageActions, renderPage } from './_projectsPageTeam.fixtures.jsx';
 
-const FOREIGN_COPY = 'That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.';
+const FOREIGN_COPY = 'That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.';
 const foreign = { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', url: 'https://github.com/team/other.git', finishedAt: 5 };
 const urlField = () => screen.queryByRole('textbox', { name: /evaluations repository url/i });
 

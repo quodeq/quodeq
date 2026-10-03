@@ -4,7 +4,7 @@ import AccessPanel from '../../github-access/components/AccessPanel.jsx';
 
 /**
  * "▸ evaluations repository": the Repositories tab's inline form for connecting the
- * team's results repository (spec 4.1). Submitting only starts the connect
+ * evaluations repository (spec 4.1). Submitting only starts the connect
  * job; its progress shows in the sync strip and a failure comes back here,
  * either as the access panel (the probe refused the URL) or as the connect
  * slot's mapped error under the field.

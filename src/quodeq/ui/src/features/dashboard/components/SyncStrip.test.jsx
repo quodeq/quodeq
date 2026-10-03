@@ -71,7 +71,7 @@ describe('SyncStrip', () => {
     render(<SyncStrip status={{ ...base, connect: { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', error: 'raw' } }} projectsCount={5} onUpdate={onUpdate} />);
     expect(screen.getByText('5 projects · synced 2 min ago')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'update evaluations repository' })).toBeInTheDocument();
-    expect(screen.queryByText(/not a quodeq results repository/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not a quodeq evaluations repository/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'retry' })).not.toBeInTheDocument();
   });
   it('a failed first connect renders no strip (the card carries the error)', () => {

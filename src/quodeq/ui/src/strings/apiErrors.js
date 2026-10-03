@@ -67,7 +67,7 @@ const CODE_KEYS = {
   UNAUTHORIZED: 'apiError.unauthorized',
   FORBIDDEN: 'apiError.forbidden',
 
-  // Shared results repository: connect (PUT /api/shared/config), refresh,
+  // Evaluations repository: connect (PUT /api/shared/config), refresh,
   // publish (routes_shared_config.py), and the assistant's own gate for
   // starting a session against it (assistant_routes.py's _shared_source_error).
   NO_SHARED_REPO: 'apiError.noSharedRepo',

@@ -85,7 +85,7 @@ describe('ProjectsPage — a failed connect', () => {
     const user = userEvent.setup();
     const { api } = makeApi({ slots: { connect: foreign } });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
-    expect(await screen.findByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).toBeInTheDocument();
+    expect(await screen.findByText('That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /evaluations repository url/i })).toHaveValue(foreign.url);
     await user.click(screen.getByRole('button', { name: 'connect' }));
     await waitFor(() => expect(api.connectShared).toHaveBeenCalledWith(foreign.url));
@@ -97,10 +97,10 @@ describe('ProjectsPage — a failed connect', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     expect(await screen.findByText('1 project · synced 2 min ago')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'update evaluations repository' })).toBeInTheDocument();
-    expect(screen.queryByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).not.toBeInTheDocument();
+    expect(screen.queryByText('That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'more repository actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'change repository' }));
-    expect(screen.getAllByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).toHaveLength(1);
+    expect(screen.getAllByText('That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.')).toHaveLength(1);
   });
 });
 

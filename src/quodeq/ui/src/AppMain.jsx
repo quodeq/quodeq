@@ -67,6 +67,7 @@ function AppSidebar({ shell }) {
         sharedProjectInfo: state.sharedProjectInfo,
         projects: state.projects,
         sharedHasContent: sharedSignal.hasContent,
+        sharedPublishedCount: sharedSignal.publishedCount,
         resolvedDisplayName,
         headerMeta: state.headerMeta,
         version: APP_VERSION,
