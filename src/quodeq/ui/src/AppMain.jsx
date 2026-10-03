@@ -18,6 +18,7 @@ import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLo
 import { RescoreTrackerProvider } from './features/grade-formula/rescore/RescoreTrackerProvider.jsx';
 import { MainContent } from './routes/renderers.jsx';
 import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
+import { useSyncActivity } from './hooks/useSyncActivity.js';
 import { NAV_TAB } from './vocab/navTab.js';
 
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
@@ -66,6 +67,7 @@ function AppSidebar({ shell }) {
         sharedProjectInfo: state.sharedProjectInfo,
         projects: state.projects,
         sharedHasContent: sharedSignal.hasContent,
+        sharedPublishedCount: sharedSignal.publishedCount,
         resolvedDisplayName,
         headerMeta: state.headerMeta,
         version: APP_VERSION,
@@ -83,6 +85,10 @@ function AppTopBar({ shell }) {
     state, activeTab, navTab, resolvedDisplayName, sidebarProvider, sidebarModel, isEvaluating,
     activePage, navStack, navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, setSidebarPinned,
   } = shell;
+  // A running team-results job (connect, refresh, pull) sweeps the same
+  // loading hairline as pending page data, so the top bar moves while the
+  // strip says "downloading" or "reading projects".
+  const syncActive = useSyncActivity();
   return (
     <TopBar
       {...buildTopBarProps({
@@ -95,7 +101,7 @@ function AppTopBar({ shell }) {
         projectsCount: state.projects?.length,
         onEvaluateClick: () => navTab(NAV_TAB.EVALUATE, { preselectDims: deriveEvaluatePreselect(activePage) }),
         evaluating: !!isEvaluating,
-        pending: state.navPending || state.isDataPending,
+        pending: state.navPending || state.isDataPending || syncActive,
         navTab,
         setSidebarPinned,
         breadcrumb: (

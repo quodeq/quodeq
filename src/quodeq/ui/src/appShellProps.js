@@ -13,14 +13,14 @@ import { NAV_TAB } from './vocab/navTab.js';
 
 export function buildSidebarProps({
   activeTab, navTab, selectedSource, hasCurrentProjectRuns, sharedProjectInfo,
-  projects, sharedHasContent, resolvedDisplayName, headerMeta, version, sidebarCounts,
+  projects, sharedHasContent, sharedPublishedCount, resolvedDisplayName, headerMeta, version, sidebarCounts,
   lastEvalAt, isPinned, onPinChange,
 }) {
   return {
     activeTab,
     onNavTab: navTab,
     showProjectTabs: shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, sharedProjectInfo }),
-    showCompareTab: shouldShowCompareTab({ projects, sharedHasContent }),
+    showCompareTab: shouldShowCompareTab({ projects, sharedHasContent, sharedPublishedCount }),
     selectedSource,
     projectInfo: { displayName: resolvedDisplayName, meta: headerMeta },
     version,

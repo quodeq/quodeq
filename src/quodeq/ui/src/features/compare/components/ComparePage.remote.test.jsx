@@ -101,3 +101,27 @@ describe('ComparePage remote projects', () => {
     expect(screen.queryByText('remote')).toBeNull();
   });
 });
+
+// A connected evaluations repository is a comparable fleet on its own: with
+// no local project at all, the published rows are ranked instead of the
+// "nothing to compare" empty state.
+describe('ComparePage with published projects only', () => {
+  const PUBLISHED = [
+    { id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { rb: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(3) },
+    { id: 'delta', name: 'delta', displayName: 'delta', languageStats: { go: 20 }, totalFiles: 80, analyzedFiles: 80, runsCount: 2, latestDate: iso(1) },
+  ];
+
+  beforeEach(() => {
+    sharedListProjects.mockResolvedValue({ projects: PUBLISHED, lastSynced: null, stale: false });
+    sharedGetFleetCompare.mockImplementation(fleetOf((id) => (id === 'gamma' ? summary(6.5, 6.2) : summary(7.1, 6.9))));
+  });
+
+  it('ranks the published rows and never shows the empty state', async () => {
+    renderPage({ projects: [] });
+    expect(await screen.findByText('gamma')).toBeInTheDocument();
+    // The leader is named in the table and again in the attention strip.
+    expect(screen.getAllByText('delta').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Nothing to compare yet')).toBeNull();
+    expect(getFleetCompare).not.toHaveBeenCalled();
+  });
+});

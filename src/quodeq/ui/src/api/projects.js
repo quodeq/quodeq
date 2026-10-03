@@ -155,7 +155,7 @@ function restoreFallbackMessage(err, label) {
 }
 
 /**
- * Import a previously-exported project zip.
+ * Import a previously exported evaluations zip.
  *
  * Sends multipart/form-data (request() skips the JSON Content-Type for a
  * FormData body) with a 10-minute abort: large project zips can take a

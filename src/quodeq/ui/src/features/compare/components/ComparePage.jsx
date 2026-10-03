@@ -129,11 +129,14 @@ function useComparePageState({
  * pushed from the fleet's "compare these two" action (back pops to the
  * fleet).
  */
-function comparePageStatus(projectsLoaded, localProjects, rootRef) {
+// Published projects from the evaluations repository are rows like any
+// other, so the fleet (local plus remote) decides whether there is
+// anything to compare, not the local list alone.
+function comparePageStatus(projectsLoaded, fleetProjects, rootRef) {
   if (!projectsLoaded) {
     return <div className="compare-page" ref={rootRef}><CompareSkeleton /></div>;
   }
-  if (!localProjects.length) {
+  if (!fleetProjects.length) {
     return (
       <div className="compare-page" ref={rootRef}>
         <EmptyState title={t('compare.emptyTitle')} description={t('compare.emptyBody')} />
@@ -172,7 +175,7 @@ export default function ComparePage({
   duel = null,
   onOpenDuel,
 }) {
-  const { localProjects, fleetProjects } = useFleetProjects(projects);
+  const { fleetProjects } = useFleetProjects(projects);
   const { summariesById, errorsById } = useCompareData(fleetProjects);
   const {
     view, sortDir, setSortDir, pickerOpen, setPickerOpen, scopeIds, now,
@@ -191,7 +194,7 @@ export default function ComparePage({
     rootRef.current?.closest('main')?.scrollTo?.(0, 0);
   }, [view, duel]);
 
-  const status = comparePageStatus(projectsLoaded, localProjects, rootRef);
+  const status = comparePageStatus(projectsLoaded, fleetProjects, rootRef);
   if (status) return status;
 
   const scopeCount = scopeSet && scopeSet.size ? scopeRows.length : rows.length;

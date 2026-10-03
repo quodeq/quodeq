@@ -198,7 +198,8 @@ export function useSharedContentSignal() {
   const statusSettled = statusQuery.isSuccess || statusQuery.isError;
   const listSettled = listQuery.isSuccess || listQuery.isError;
   const settled = statusSettled && (!configured || listSettled);
-  const hasContent = configured && (listQuery.data?.projects?.length ?? 0) > 0;
+  const publishedCount = configured ? (listQuery.data?.projects?.length ?? 0) : 0;
+  const hasContent = publishedCount > 0;
 
-  return { settled, hasContent };
+  return { settled, hasContent, publishedCount };
 }

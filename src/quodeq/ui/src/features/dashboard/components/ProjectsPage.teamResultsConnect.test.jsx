@@ -7,9 +7,9 @@ import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { DISMISSED_CONNECT_KEY } from '../hooks/useDismissedConnectFailure.js';
 import { LOCAL, makeApi, pageActions, renderPage } from './_projectsPageTeam.fixtures.jsx';
 
-const FOREIGN_COPY = 'That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.';
+const FOREIGN_COPY = 'That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.';
 const foreign = { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', url: 'https://github.com/team/other.git', finishedAt: 5 };
-const urlField = () => screen.queryByRole('textbox', { name: /team results repository url/i });
+const urlField = () => screen.queryByRole('textbox', { name: /evaluations repository url/i });
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -40,7 +40,7 @@ describe('ProjectsPage — closing a failed connect', () => {
     expect(urlField()).not.toBeInTheDocument();
 
     // Reopened on purpose, the card no longer carries the closed failure.
-    const toggle = screen.getByRole('button', { name: 'connect team results' });
+    const toggle = screen.getByRole('button', { name: 'connect evaluations repository' });
     await user.click(toggle);
     expect(urlField()).toBeInTheDocument();
     expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('ProjectsPage — closing a failed connect', () => {
     view.unmount();
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(2));
-    await screen.findByRole('button', { name: 'connect team results' });
+    await screen.findByRole('button', { name: 'connect evaluations repository' });
     expect(urlField()).not.toBeInTheDocument();
     expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
   });
@@ -87,12 +87,12 @@ describe('ProjectsPage — an empty page while a connect reads the team projects
     const { api, server } = makeApi({ configured: true, slots: { connect: reading } });
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
 
-    expect(await screen.findByText("Your team's results will appear here when reading finishes.")).toBeInTheDocument();
+    expect(await screen.findByText("Published evaluations will appear here when reading finishes.")).toBeInTheDocument();
     expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
 
     server.slots.connect = { state: 'done', phase: SYNC_PHASE.DONE, projectsFound: 1, finishedAt: 8 };
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument(), { timeout: 4000 });
-    expect(screen.queryByText("Your team's results will appear here when reading finishes.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Published evaluations will appear here when reading finishes.")).not.toBeInTheDocument();
     expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
   });
 });

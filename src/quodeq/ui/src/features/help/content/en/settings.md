@@ -20,9 +20,9 @@ Power tiers (Fast / Balanced / Thorough) ship with sensible defaults. You can pi
 
 Shows the current dashboard server: port, version, and status. Live log streams (server, Ollama, evaluation) are wired into the side-pane log viewer. Open it from the bottom-bar log buttons to tail what is happening.
 
-### Shared repository
+### Evaluations repository
 
-Paste a git URL here to share results with your team: you publish finished runs from the projects list, teammates see them in theirs. The **Shared Repository** help section walks through connect, publish, pull, and disconnect.
+Paste a git URL here to publish evaluations to a git repository, yours across machines or shared with your team: you publish finished runs from the projects list, and anyone connected sees them in theirs. The **Shared Repository** help section walks through connect, publish, pull, and disconnect.
 
 ### Appearance
 
@@ -45,6 +45,10 @@ The same background rebuild runs whenever score caches need re-deriving for othe
 ### Assistant and terminal
 
 Both ship disabled. The *Assistant* section turns the chat drawer on and picks its provider and model; *Enable terminal* switches on the embedded shell. See the **Assistant** and **Terminal** help sections.
+
+### Onboarding
+
+The *onboarding* section has one row, **show welcome**: it opens the welcome and the first-run steps again, even if you skipped them before. Nothing else changes; your projects and settings stay as they are.
 
 ### Grade formula
 

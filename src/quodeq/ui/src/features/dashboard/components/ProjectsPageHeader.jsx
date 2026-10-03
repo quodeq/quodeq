@@ -7,7 +7,7 @@ export const EVAL_BLOCKED_TITLE = t('projects.evalBlockedTitle');
 
 // Until the list has loaded there is no count to report, so the header says
 // "loading" rather than "0 repositories evaluated". With a team repository
-// configured it counts both sides: "1 local · 5 from your team".
+// configured it counts both sides: "1 local · 5 published".
 function headerSub({ projectsLoaded, localCount, teamCount, configured }) {
   if (!projectsLoaded) return t('overview.loading');
   if (configured) return t('projects.headerLocalAndTeam', { local: localCount, team: teamCount });
@@ -16,7 +16,7 @@ function headerSub({ projectsLoaded, localCount, teamCount, configured }) {
 
 /**
  * The Repositories header: title, counts, and the three actions (spec 4.1):
- * `import project`, `connect team results` (only while no team repository is
+ * `import evaluations`, `connect evaluations repository` (only while no team repository is
  * configured; toggles the connect card), and the primary `▸ add project`.
  * The actions are hidden on an empty page, whose own call to action carries them.
  */

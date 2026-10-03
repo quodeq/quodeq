@@ -194,6 +194,7 @@ export const ROUTE_RENDERERS = {
     settings={props.settings}
     onOpenGradeFormula={() => props.navigation.handleNavigate(NAV_TAB.GRADE_FORMULA)}
     onSharedDisconnected={() => reselectAfterSharedDisconnect(props.navigation)}
+    onShowWelcome={() => props.navigation.onTakeTour()}
   />,
   [NAV_TAB.GRADE_FORMULA]: (params, props) => (
     <GradeFormulaPage

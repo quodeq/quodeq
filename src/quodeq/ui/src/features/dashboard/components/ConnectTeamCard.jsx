@@ -3,8 +3,8 @@ import { t } from '../../../strings/index.js';
 import AccessPanel from '../../github-access/components/AccessPanel.jsx';
 
 /**
- * "▸ team results": the Repositories tab's inline form for connecting the
- * team's results repository (spec 4.1). Submitting only starts the connect
+ * "▸ evaluations repository": the Repositories tab's inline form for connecting the
+ * evaluations repository (spec 4.1). Submitting only starts the connect
  * job; its progress shows in the sync strip and a failure comes back here,
  * either as the access panel (the probe refused the URL) or as the connect
  * slot's mapped error under the field.
@@ -29,8 +29,8 @@ export default function ConnectTeamCard({ onConnect, connecting = false, error =
           <span className="connect-team-card__marker" aria-hidden="true">▸</span> {t('projects.connectTeamTitle')}
         </h3>
         {onClose && (
-          <button type="button" className="term-btn connect-team-card__close" onClick={onClose}>
-            {t('projects.connectTeamClose')}
+          <button type="button" className="connect-team-card__close" onClick={onClose} aria-label={t('projects.connectTeamClose')}>
+            <span aria-hidden="true">×</span>
           </button>
         )}
       </div>

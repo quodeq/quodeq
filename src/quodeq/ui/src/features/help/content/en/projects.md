@@ -14,17 +14,17 @@ The **Projects** tab is your home base. Every codebase you evaluate becomes a pr
 | Key | Value |
 | --- | --- |
 | Select project | Open it. Goes to Overview if it has runs, otherwise Evaluate. |
-| Connect team results | Shown as a card when no repository is configured: paste your team's results repository address. Once connected, a strip replaces it. |
+| Connect evaluations repository | Shown as a card when no repository is configured: paste the address of a git repository where evaluations are published, yours or your team's. Once connected, a strip replaces it. |
 | + Add project | Open the wizard at Repo Scan to add another codebase. |
-| Import project | Restore a project from a previously-exported file. |
+| Import evaluations | Restore evaluations from a previously exported file. |
 | Resume setup | Pick up an interrupted wizard with the same draft. |
 | Relocate | Update the local path if the repo moved on disk. |
 | Export | Download the run findings as JSON. |
 | Delete | Remove the project and all its runs. Not reversible. |
-| Publish / update | Send completed runs to the connected shared repository. |
+| Publish / update | Send completed runs to the connected evaluations repository. |
 | Pull local copy | Import a teammate's shared project into your local list. |
 
-The header offers **import project** and **add project**. With a shared repository connected, a sync strip above the list shows its state, with **update**, **copy invite**, and a **⋯** menu for *change repository* and *disconnect*. Every card also carries a *LOCAL*, *PUBLISHED*, or *REMOTE* badge, and a location filter appears above the list. The **Shared Repository** help section covers the whole workflow.
+The header offers **import evaluations** and **add project**: add project analyzes a repository, import evaluations brings existing results in. With an evaluations repository connected, a sync strip above the list shows its state, with **update**, **copy invite**, and a **⋯** menu for *change repository* and *disconnect*. Every card also carries a *LOCAL*, *PUBLISHED*, or *REMOTE* badge, and a location filter appears above the list. The **Shared Repository** help section covers the whole workflow.
 
 ### Sub-projects and monorepos
 

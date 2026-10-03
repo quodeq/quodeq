@@ -113,16 +113,23 @@ export function selectSidebarCounts({ filteredAccumulated, accumulated, filtered
   };
 }
 
+// Compare ranks projects against each other, so it needs at least two.
+const COMPARE_MIN_PROJECTS = 2;
+
 /**
  * Compare needs two analyzed projects to rank anything; below that the tab
- * is redundant and stays hidden. Remote projects from the shared repository
- * count toward the pair: one local project plus published teammates is a
- * comparable fleet. Exported so this contract is unit-testable without
- * mounting the whole App.
+ * is redundant and stays hidden. Every project that can be ranked counts:
+ * local projects with runs and projects published in the connected
+ * evaluations repository, in any mix (two published ones with nothing local
+ * is a comparable fleet). The inputs are live query data, so the tab appears
+ * the moment a connect or a pull brings the count to two. Exported so this
+ * contract is unit-testable without mounting the whole App.
  */
-export function shouldShowCompareTab({ projects, sharedHasContent }) {
+export function shouldShowCompareTab({ projects, sharedHasContent, sharedPublishedCount }) {
   const localWithRuns = (projects || []).filter((p) => (p.runsCount ?? 0) > 0).length;
-  return localWithRuns >= 2 || (localWithRuns >= 1 && !!sharedHasContent);
+  // Callers that only know "there is published content" count it as one project.
+  const published = sharedPublishedCount ?? (sharedHasContent ? 1 : 0);
+  return localWithRuns + published >= COMPARE_MIN_PROJECTS;
 }
 
 /**

@@ -18,41 +18,41 @@ vi.mock('../../../utils/clipboard.js', () => ({ copyToClipboard: vi.fn(async () 
 afterEach(() => { vi.clearAllMocks(); });
 
 describe('ProjectsPage — header actions and the connect card', () => {
-  it('shows import, connect team results and add project while nothing is connected', async () => {
+  it('shows import, connect evaluations repository and add project while nothing is connected', async () => {
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(api.getSyncStatus).toHaveBeenCalled());
-    expect(screen.getByRole('button', { name: 'Import project' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'connect team results' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import evaluations' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'connect evaluations repository' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add project' })).toBeInTheDocument();
   });
 
-  it('drops "connect team results" once a repository is configured, and counts both sides', async () => {
+  it('drops "connect evaluations repository" once a repository is configured, and counts both sides', async () => {
     const { api } = makeApi({ configured: true });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
-    await waitFor(() => expect(screen.getByText('1 local · 1 from your team')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'connect team results' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Import project' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('1 local · 1 published')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'connect evaluations repository' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import evaluations' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add project' })).toBeInTheDocument();
   });
 
-  it('"connect team results" toggles the connect card', async () => {
+  it('"connect evaluations repository" toggles the connect card', async () => {
     const user = userEvent.setup();
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
-    const toggle = await screen.findByRole('button', { name: 'connect team results' });
-    expect(screen.queryByText('team results')).not.toBeInTheDocument();
+    const toggle = await screen.findByRole('button', { name: 'connect evaluations repository' });
+    expect(screen.queryByText('evaluations repository')).not.toBeInTheDocument();
     await user.click(toggle);
-    expect(screen.getByText('team results')).toBeInTheDocument();
+    expect(screen.getByText('evaluations repository')).toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await user.click(toggle);
-    expect(screen.queryByText('team results')).not.toBeInTheDocument();
+    expect(screen.queryByText('evaluations repository')).not.toBeInTheDocument();
   });
 
   it('an empty page with nothing connected always shows the connect card next to the add-first call to action', async () => {
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
-    await waitFor(() => expect(screen.getByText('team results')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('evaluations repository')).toBeInTheDocument());
     expect(screen.getByText('Add your first project')).toBeInTheDocument();
   });
 
@@ -65,13 +65,15 @@ describe('ProjectsPage — header actions and the connect card', () => {
       }),
     });
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
-    await user.type(await screen.findByRole('textbox', { name: /team results repository url/i }), URL);
+    await user.type(await screen.findByRole('textbox', { name: /evaluations repository url/i }), URL);
     await user.click(screen.getByRole('button', { name: 'connect' }));
 
     await waitFor(() => expect(screen.getByText('downloading evaluations · 45% · 12.0 MB')).toBeInTheDocument());
     expect(api.connectShared).toHaveBeenCalledWith(URL);
-    expect(screen.getByRole('progressbar', { name: 'team results sync progress' })).toHaveAttribute('aria-valuenow', '45');
-    expect(screen.getByRole('button', { name: 'connecting…' })).toBeDisabled();
+    expect(screen.getByRole('progressbar', { name: 'evaluations repository sync progress' })).toHaveAttribute('aria-valuenow', '45');
+    // The strip carries the progress; the form steps aside until the job ends.
+    expect(screen.queryByRole('textbox', { name: /evaluations repository url/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'connecting…' })).not.toBeInTheDocument();
   });
 });
 
@@ -83,8 +85,8 @@ describe('ProjectsPage — a failed connect', () => {
     const user = userEvent.setup();
     const { api } = makeApi({ slots: { connect: foreign } });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
-    expect(await screen.findByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: /team results repository url/i })).toHaveValue(foreign.url);
+    expect(await screen.findByText('That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /evaluations repository url/i })).toHaveValue(foreign.url);
     await user.click(screen.getByRole('button', { name: 'connect' }));
     await waitFor(() => expect(api.connectShared).toHaveBeenCalledWith(foreign.url));
   });
@@ -94,11 +96,11 @@ describe('ProjectsPage — a failed connect', () => {
     const { api } = makeApi({ configured: true, slots: { connect: foreign } });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     expect(await screen.findByText('1 project · synced 2 min ago')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'update team results' })).toBeInTheDocument();
-    expect(screen.queryByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'update evaluations repository' })).toBeInTheDocument();
+    expect(screen.queryByText('That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'more repository actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'change repository' }));
-    expect(screen.getAllByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).toHaveLength(1);
+    expect(screen.getAllByText('That address is not a quodeq evaluations repository. It needs a quodeq.json and an evaluations folder.')).toHaveLength(1);
   });
 });
 
@@ -109,7 +111,7 @@ describe('ProjectsPage — sync strip actions', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await user.click(await screen.findByRole('button', { name: 'copy invite' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'copied' })).toBeInTheDocument());
-    expect(copyToClipboard).toHaveBeenCalledWith(`Open quodeq, choose Join your team's results, paste ${URL}`);
+    expect(copyToClipboard).toHaveBeenCalledWith(`Open quodeq, choose Connect evaluations repository, paste ${URL}`);
   });
 
   it('without a clipboard the invite text shows inline, read-only', async () => {
@@ -118,8 +120,8 @@ describe('ProjectsPage — sync strip actions', () => {
     const { api } = makeApi({ configured: true });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await user.click(await screen.findByRole('button', { name: 'copy invite' }));
-    const field = await screen.findByRole('textbox', { name: 'invite text for teammates' });
-    expect(field).toHaveValue(`Open quodeq, choose Join your team's results, paste ${URL}`);
+    const field = await screen.findByRole('textbox', { name: 'invite text for others' });
+    expect(field).toHaveValue(`Open quodeq, choose Connect evaluations repository, paste ${URL}`);
     expect(field).toHaveAttribute('readonly');
   });
 
@@ -129,7 +131,7 @@ describe('ProjectsPage — sync strip actions', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await user.click(await screen.findByRole('button', { name: 'more repository actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'change repository' }));
-    expect(screen.getByRole('textbox', { name: /team results repository url/i })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /evaluations repository url/i })).toBeInTheDocument();
   });
 
   it('disconnect confirms, calls the API and hands the selection back to the app', async () => {
@@ -150,7 +152,7 @@ describe('ProjectsPage — sync strip actions', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await screen.findByText('1 project · synced 2 min ago');
     api.getSyncStatus.mockRejectedValue(new Error('offline'));
-    await user.click(screen.getByRole('button', { name: 'update team results' })); // re-reads the status
+    await user.click(screen.getByRole('button', { name: 'update evaluations repository' })); // re-reads the status
     await waitFor(() => expect(screen.getByText('offline · showing results from 2 min ago')).toBeInTheDocument());
   });
 });
