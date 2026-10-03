@@ -241,4 +241,7 @@ class TestDefaultPersistDir:
     def test_falls_back_to_home_without_any_env(self, monkeypatch):
         monkeypatch.delenv("QUODEQ_JOB_PERSIST_DIR", raising=False)
         monkeypatch.delenv("QUODEQ_INDEX_DB_PATH", raising=False)
+        # The index (and so the jobs folder) follows QUODEQ_DIR; "without any
+        # env" means that one is unset too.
+        monkeypatch.delenv("QUODEQ_DIR", raising=False)
         assert _default_persist_dir() == Path.home() / ".quodeq" / "run" / "jobs"

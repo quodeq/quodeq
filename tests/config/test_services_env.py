@@ -8,7 +8,34 @@ from pathlib import Path
 import pytest
 
 from quodeq.config import services_env
-from quodeq.shared.env import get_index_db_path
+from quodeq.shared.env import get_index_db_path, get_score_cache_path
+
+
+class TestIndexDbPathFollowsQuodeqDir:
+    """A second instance with its own QUODEQ_DIR must not read the live app's
+    run index (it listed the live app's running evaluation, 2026-10-03)."""
+
+    def test_the_default_lives_under_quodeq_dir(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("QUODEQ_INDEX_DB_PATH", raising=False)
+        monkeypatch.delenv("QUODEQ_SCORE_CACHE_PATH", raising=False)
+        monkeypatch.setenv("QUODEQ_DIR", str(tmp_path / "state"))
+        assert get_index_db_path() == str(tmp_path / "state" / "index.db")
+        assert get_score_cache_path() == str(tmp_path / "state" / "score_cache.db")
+
+    def test_without_quodeq_dir_the_default_stays_under_home(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("QUODEQ_INDEX_DB_PATH", raising=False)
+        monkeypatch.delenv("QUODEQ_SCORE_CACHE_PATH", raising=False)
+        monkeypatch.delenv("QUODEQ_DIR", raising=False)
+        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        assert get_index_db_path() == str(tmp_path / ".quodeq" / "index.db")
+        assert get_score_cache_path() == str(tmp_path / ".quodeq" / "score_cache.db")
+
+    def test_an_explicit_index_path_still_wins(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("QUODEQ_DIR", str(tmp_path / "state"))
+        monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "elsewhere" / "index.db"))
+        monkeypatch.delenv("QUODEQ_SCORE_CACHE_PATH", raising=False)
+        assert get_index_db_path() == str(tmp_path / "elsewhere" / "index.db")
+        assert get_score_cache_path() == str(tmp_path / "elsewhere" / "score_cache.db")
 
 
 @pytest.mark.parametrize("resolver, var, default", [

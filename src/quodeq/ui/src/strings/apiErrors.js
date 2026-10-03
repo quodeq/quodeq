@@ -48,6 +48,8 @@ const CODE_KEYS = {
   PATH_MISSING: 'apiError.pathMissing',
   MISSING_PATH: 'apiError.pathMissing',
   NOT_DIR: 'apiError.notDirectory',
+  // POST /api/evaluations with a git url: only the registered local copy can be evaluated.
+  URL_NOT_EVALUABLE: 'apiError.urlNotEvaluable',
 
   // Provider configuration.
   MISSING_API_KEY: 'apiError.missingApiKey',
