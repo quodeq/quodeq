@@ -29,8 +29,8 @@ export default function ConnectTeamCard({ onConnect, connecting = false, error =
           <span className="connect-team-card__marker" aria-hidden="true">▸</span> {t('projects.connectTeamTitle')}
         </h3>
         {onClose && (
-          <button type="button" className="term-btn connect-team-card__close" onClick={onClose}>
-            {t('projects.connectTeamClose')}
+          <button type="button" className="connect-team-card__close" onClick={onClose} aria-label={t('projects.connectTeamClose')}>
+            <span aria-hidden="true">×</span>
           </button>
         )}
       </div>

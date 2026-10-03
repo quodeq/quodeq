@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
+import { SYNC_ACTIVE_PHASES, SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { useCopyInvite } from '../hooks/useCopyInvite.js';
 import { useSharedDisconnect } from '../hooks/useSharedDisconnect.js';
 import { useDismissedConnectFailure } from '../hooks/useDismissedConnectFailure.js';
@@ -16,23 +16,38 @@ function useCloseOnConnected(connect, onConnectOpenChange) {
   }, [phase, finishedAt, onConnectOpenChange]);
 }
 
+// While a connect runs the strip carries the progress; the form has nothing
+// left to offer, so it steps aside and comes back only on a failure.
+// Otherwise the card shows when opened, when it is the empty page's connect
+// entry (nothing configured, no projects), or to report a live failure
+// while nothing is configured.
+function cardVisible({ connect, configured, connectOpen, pinned, liveFailure }) {
+  if (SYNC_ACTIVE_PHASES.has(connect?.phase)) return false;
+  return connectOpen || pinned || (!configured && Boolean(liveFailure));
+}
+
+// The URL to retry: this screen's last attempt, else the one the failed slot
+// carries (a connect started from Settings, or before this page remounted).
+function retryUrlFor(failedConnect, lastConnectUrl) {
+  if (!failedConnect) return null;
+  return lastConnectUrl ?? failedConnect.url ?? null;
+}
+
 // Whether the connect card shows, and what it carries: the failure (unless it
 // was closed), the URL to retry and the close handler.
 function useConnectCard({ shared, connectOpen, onConnectOpenChange, emptyPage }) {
-  const failedConnect = shared.status?.connect?.phase === SYNC_PHASE.ERROR ? shared.status.connect : null;
+  const connect = shared.status?.connect;
+  const failedConnect = connect?.phase === SYNC_PHASE.ERROR ? connect : null;
   const { dismissed, dismiss } = useDismissedConnectFailure(failedConnect);
   const liveFailure = dismissed ? null : failedConnect;
-  // Unconfigured with no projects at all, the card is the empty page's connect entry.
   const pinned = !shared.configured && emptyPage;
   const close = () => {
     dismiss();
     onConnectOpenChange(false);
   };
   return {
-    showCard: connectOpen || pinned || (!shared.configured && Boolean(liveFailure)),
-    // The URL to retry: this screen's last attempt, else the one the failed slot carries (a
-    // connect started from Settings, or before this page remounted).
-    retryUrl: failedConnect ? (shared.lastConnectUrl ?? failedConnect.url ?? null) : null,
+    showCard: cardVisible({ connect, configured: shared.configured, connectOpen, pinned, liveFailure }),
+    retryUrl: retryUrlFor(failedConnect, shared.lastConnectUrl),
     error: dismissed ? shared.connectStartError : shared.connectError,
     onClose: pinned && !liveFailure ? null : close,
   };

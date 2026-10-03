@@ -71,7 +71,9 @@ describe('ProjectsPage — header actions and the connect card', () => {
     await waitFor(() => expect(screen.getByText('downloading evaluations · 45% · 12.0 MB')).toBeInTheDocument());
     expect(api.connectShared).toHaveBeenCalledWith(URL);
     expect(screen.getByRole('progressbar', { name: 'team results sync progress' })).toHaveAttribute('aria-valuenow', '45');
-    expect(screen.getByRole('button', { name: 'connecting…' })).toBeDisabled();
+    // The strip carries the progress; the form steps aside until the job ends.
+    expect(screen.queryByRole('textbox', { name: /team results repository url/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'connecting…' })).not.toBeInTheDocument();
   });
 });
 

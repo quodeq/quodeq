@@ -2905,22 +2905,22 @@
   flex-shrink: 0;
 }
 
-/* Pill-style import button — visually aligned with the topbar provider/model
-   pill (muted text, subtle border, transparent bg) so it reads as a
-   secondary action next to the red filled "add project" CTA. */
+/* Secondary header actions (import project, connect team results): the same
+   size and shape as the filled "add project" term-btn beside them (mono 13px,
+   term-btn padding and radius), muted colours so only the primary one
+   carries the accent. */
 .projects-page__import-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  min-height: 28px;
+  padding: var(--term-space-2) var(--term-space-3);
   box-sizing: border-box;
   border: 1px solid var(--color-border);
   border-radius: var(--term-radius);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.4;
+  font-family: var(--term-font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: normal;
   color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;
@@ -3160,7 +3160,7 @@
 }
 
 .connect-team-card__title {
-  margin: 0 0 var(--space-1);
+  margin: 0;
   font-family: var(--term-font-mono);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -3173,13 +3173,36 @@
 
 .connect-team-card__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
+/* Icon-only dismiss, the same quiet "×" the dialogs use: no border, muted
+   until hovered, sized to the title row so it never towers over it. */
 .connect-team-card__close {
-  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--term-radius);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.connect-team-card__close:hover {
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+.connect-team-card__close:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .connect-team-card__desc {
