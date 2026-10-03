@@ -101,6 +101,7 @@ from quodeq.data.fs.report_parser.finding_details import (  # noqa: F401
 from quodeq.data.fs.repo_clone import clone_repo  # noqa: F401
 from quodeq.data.fs.git_access_probe import ProbeResult, probe_remote  # noqa: F401
 from quodeq.data.fs.git_pin import pinned_git_config  # noqa: F401
+from quodeq.data.fs.repo_refresh import RefreshResult, refresh_working_copy  # noqa: F401
 
 # Per-run findings-table reads (SQL stays in the adapter) and their row-dict → Finding mapper.
 from quodeq.data.sqlite.findings_queries import (  # noqa: F401
@@ -221,7 +222,7 @@ from quodeq.data.fs.shared_repo import (  # noqa: F401
 
 # Run status + dim-state file names and readers.
 from quodeq.data.fs.report_parser.run_dates import project_run_dates  # noqa: F401
-from quodeq.data.git_cli import GIT_FLAG_C, run_git as git_stdout  # noqa: F401
+from quodeq.data.git_cli import GIT_FLAG_C, remote_origin_url_raw, run_git as git_stdout  # noqa: F401
 from quodeq.data.fs.run_status_store import (  # noqa: F401
     STATUS_FILENAME,
     UnsupportedSchemaError,
@@ -279,7 +280,6 @@ from quodeq.data.fs.project_index import (  # noqa: F401
 )
 
 # Project registration: remote-url resolution + validation.
-from quodeq.data.git_cli import remote_origin_url_raw  # noqa: F401
 from quodeq.data.fs.project_resolver import resolve_project_uuid  # noqa: F401
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
 

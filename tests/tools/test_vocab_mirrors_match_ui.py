@@ -28,6 +28,7 @@ from quodeq.core.types.project_source import ProjectSource
 from quodeq.core.types.provider import Provider, ProviderType
 from quodeq.core.types.severity import Severity
 from quodeq.core.types.sync_phase import SyncKind, SyncPhase
+from quodeq.core.types.working_copy_refresh import RefreshOutcome
 from quodeq.llm_bridge import LOCAL_PROVIDERS
 from quodeq.services.shared_publish import PublishState
 from quodeq.services.grade_formula_job import RescoreState
@@ -53,6 +54,7 @@ _MIRRORS = [
     ("vocab/providerType.js", "PROVIDER_TYPE", ProviderType),
     ("vocab/syncPhase.js", "SYNC_PHASE", SyncPhase),
     ("vocab/syncPhase.js", "SYNC_KIND", SyncKind),
+    ("vocab/refreshOutcome.js", "REFRESH_OUTCOME", RefreshOutcome),
     ("features/dashboard/dashboardVocab.js", "PUBLISH_STATE", PublishState),
 ]
 

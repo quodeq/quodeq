@@ -21,6 +21,7 @@ from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.routes_project_create import handle_create_project
+from quodeq.api.routes_project_refresh import handle_refresh_project
 from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
 from quodeq.services.warmup import WarmupEngine, engine as warmup_engine
@@ -210,6 +211,11 @@ def register_project_list_routes(
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its run data."""
         return _invalid_project_name(project) or handle_delete_project(provider)
+
+    @app.post("/api/projects/<project>/refresh")
+    def refresh_project(project: str) -> Response | tuple[Response, int]:
+        """Update a project's working copy from its git remote."""
+        return _invalid_project_name(project) or handle_refresh_project(provider, project)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:
