@@ -54,6 +54,7 @@ export function TeamResultsArea({ shared, onConnectEvaluations, onSharedDisconne
         loadFailed={Boolean(shared.error)}
         lastSynced={shared.lastSynced}
         projectsCount={shared.projects.length}
+        warming={shared.warming}
         invite={invite}
         onUpdate={shared.refresh}
         onCopyInvite={copyInvite}
