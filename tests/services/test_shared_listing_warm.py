@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from quodeq.core.types import ProjectEntry
 from quodeq.services import shared_connect_job, shared_listing
 from quodeq.services.shared_connect import ConnectOutcome
 from quodeq.services.shared_connect_job import ConnectJobStatus, ConnectState, get_connect_status, start_connect
@@ -103,6 +104,25 @@ def test_listing_hides_a_cold_card_until_the_shared_warmup_has_it(tmp_path, monk
     assert listing["warmup"]["projectsTotal"] == 1
     assert _wait_until(lambda: warmed == [(str(tmp_path), "cold")])
     assert _wait_until(lambda: fresh_shared_warmup.snapshot()["active"] is False)
+
+
+def test_a_card_whose_warm_up_failed_is_listed_without_a_grade(tmp_path, monkeypatch, fresh_shared_warmup):
+    """A failed warm never hides the card for good: it is listed as settled, with no grade."""
+    def fail(*_a, **_k):
+        raise RuntimeError("corrupt run")
+    monkeypatch.setattr(shared_listing, "warm_project", fail)
+    _fake_hydration(monkeypatch, [], entries=[ProjectEntry(id="bad", name="bad", summary_pending=True)])
+    monkeypatch.setattr(shared_listing, "last_synced_at", lambda url: None)
+
+    def listing():
+        return shared_listing.list_shared_projects(
+            tmp_path, _URL, refresh=False, refresh_clone=None, sync_index=None,
+            serialize=lambda p: {"id": p.id, "summaryPending": p.summary_pending},
+        )["projects"]
+
+    assert listing() == []
+    assert _wait_until(lambda: fresh_shared_warmup.snapshot()["active"] is False)
+    assert [(p["id"], p["summaryPending"]) for p in listing()] == [("bad", False)]
 
 
 def test_defer_queues_a_cold_project_and_reports_pending(tmp_path, monkeypatch, fresh_shared_warmup):

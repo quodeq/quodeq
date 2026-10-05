@@ -165,6 +165,11 @@ class WarmupEngine:
         with self._cond:
             return project_id == self._current or project_id in self._queued
 
+    def failed(self, project_id: str) -> bool:
+        """True when the last warm of *project_id* raised and no later warm succeeded."""
+        with self._cond:
+            return project_id in self._failed_at
+
     def generation(self) -> int:
         """How many projects the worker has finished; moves on every completion."""
         with self._cond:
@@ -232,6 +237,8 @@ class WarmupEngine:
             with self._cond:
                 self._current_name = current_name
             self._warm_fn(reports_dir, project_id)
+            with self._cond:
+                self._failed_at.pop(project_id, None)
         except Exception:
             with self._cond:
                 self._failed_at[project_id] = time.monotonic()

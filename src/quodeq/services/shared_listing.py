@@ -12,6 +12,7 @@ route supplies its own serializer instead of this module reaching for it.
 """
 from __future__ import annotations
 
+import dataclasses
 import threading
 from pathlib import Path
 from typing import Any, Callable
@@ -76,6 +77,12 @@ class SharedWarmup:
             engine = self._engine
         if engine is not None:
             engine.enqueue_pending(entries)
+
+    def failed(self, project_id: str) -> bool:
+        """True when the worker's last warm of *project_id* raised (False before ``bind``)."""
+        with self._lock:
+            engine = self._engine
+        return engine is not None and engine.failed(project_id)
 
     def snapshot(self) -> dict | None:
         """Warm-up progress for the listing payload, or None before ``bind``."""
@@ -187,6 +194,26 @@ def warm_shared_listing(eval_root: Path, url: str) -> int:
     return len(projects)
 
 
+def _listed(projects: list[ProjectEntry]) -> list[ProjectEntry]:
+    """The entries the listing shows: warm ones, and settled failures.
+
+    A card still being warmed stays off the listing (the payload's
+    ``warmup`` counts it): Victor's ruling is that a shared card appears
+    only once it is fully readable, never as a placeholder whose Overview
+    then loads again and again. A card whose warm raised is shown anyway,
+    settled and without a grade: otherwise it would vanish with no signal
+    once the worker went idle. ``_hydrate`` still re-queues it, so the
+    engine retries after its failure backoff.
+    """
+    listed = []
+    for project in projects:
+        if not getattr(project, "summary_pending", False):
+            listed.append(project)
+        elif shared_warmup.failed(project.id):
+            listed.append(dataclasses.replace(project, summary_pending=False))
+    return listed
+
+
 def list_shared_projects(
     eval_root: Path, url: str,
     *, refresh: bool, refresh_clone: Callable[[str], tuple[bool, object]],
@@ -213,11 +240,7 @@ def list_shared_projects(
         else:
             stale = True
     projects, meta = _hydrate(eval_root, url)
-    # A card still being warmed stays off the listing (the payload's
-    # ``warmup`` counts it): Victor's ruling is that a shared card appears
-    # only once it is fully readable, never as a placeholder whose Overview
-    # then loads again and again.
-    listing = {"projects": [serialize(p) for p in projects if not getattr(p, "summary_pending", False)]}
+    listing = {"projects": [serialize(p) for p in _listed(projects)]}
     for project in listing["projects"]:
         key = project.get("id") or project.get("name")
         _merge_published_meta(project, key, meta)
