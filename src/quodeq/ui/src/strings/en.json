@@ -499,6 +499,7 @@
   "evaluate.permanentNote": "every future scan of this repository will discard the cache and re-analyze every file. slower, and it overrides incremental runs triggered from CI.",
   "evaluate.phasePrefix": "phase:",
   "evaluate.pickOneDim": "pick at least one dimension to start a scan",
+  "evaluate.noModelHint": "no model selected · choose one to start a scan",
   "evaluate.powerLevelAria": "Power level {level}",
   "evaluate.preparing": "preparing…",
   "evaluate.progressLabel": "progress",
