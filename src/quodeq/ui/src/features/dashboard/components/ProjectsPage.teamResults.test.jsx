@@ -147,7 +147,7 @@ describe('ProjectsPage — a failed connect', () => {
     const { api } = makeApi({ slots: { connect: plain } });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('That folder is not a git repository. Run git init there first, or point at a bare repository.');
-    expect(screen.getByText('/Users/me/plain')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /evaluations repository url/i })).toHaveValue('file:///Users/me/plain');
   });
 });
 
