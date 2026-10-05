@@ -51,7 +51,7 @@ export default function AnalyzeStep({ state, actions, onAdded }) {
       <TermHeader name={t('onboarding.termAddProject')} sub={t('onboarding.subAddProject')} />
       <RepositoryBlock form={form} locked={add.busy} />
       <AddProblem add={add} url={form.repo.trim()} />
-      <div className="onboarding-step__actions">
+      <div className="onboarding-step__actions onboarding-step__actions--end">
         <button type="button" className="term-btn term-btn--primary term-btn--filled" disabled={!form.canSubmit || add.busy} onClick={add.run}>
           {add.busy ? t('onboarding.adding') : t('onboarding.addButton')}
         </button>

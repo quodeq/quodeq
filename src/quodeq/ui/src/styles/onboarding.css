@@ -80,6 +80,11 @@
   margin-top: var(--term-space-3);
   flex-wrap: wrap;
 }
+/* The add panel's one button sits at the bottom right, where a dialog's
+   confirming action is expected. */
+.onboarding-step__actions--end {
+  justify-content: flex-end;
+}
 /* Wizard CTA rows: on narrow viewports the buttons grow to fill the
    row so longer labels (e.g. "scan and run", "start evaluation")
    stay legible and the primary action is comfortably tappable. */
