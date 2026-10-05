@@ -117,15 +117,17 @@ def _do_clone(
     if not outcome.ok:
         _fail(status, outcome.error or MESSAGE_CLONE_DEFAULT, outcome.code or CODE_CLONE_UNKNOWN, outcome.detail)
         return
+    # Where the seconds went, phase by phase: the one place to read when an
+    # add felt slow. Read before the DONE stamp, so the last working phase
+    # ends at finished_at and no zero-length "done" trails the line.
     finished_at = time.time()
+    durations = phase_durations(status.copy(), finished_at)
     status.set(
         state=CloneState.DONE, phase=SyncPhase.DONE, percent=_PERCENT_DONE,
         project_id=outcome.project_id, project_name=outcome.project_name, scan_data=outcome.scan_data,
         code=None, error=None, finished_at=finished_at,
     )
-    # Where the seconds went, phase by phase: the one place to read when an add felt slow.
-    snap = status.copy()
-    log.info(f"add project {outcome.project_name or snap.get('repo')}: {phase_durations(snap, finished_at)}")
+    log.info(f"add project {outcome.project_name or status.copy().get('repo')}: {durations}")
     if on_done is not None:
         _notify_done(on_done, log)  # the project exists; a failing hook must not downgrade the slot
 

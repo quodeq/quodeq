@@ -10,26 +10,27 @@ import time
 from collections.abc import Callable, Mapping
 from enum import StrEnum
 
-# The status field that times each phase: {phase: unix seconds it started}.
-# Written whenever ``phase`` changes, so a finished job tells how long the
-# download, the delta resolution, the checkout and the read each took.
+# The status field that times each phase: an ordered list of
+# ``[phase, unix seconds it started]``, one entry per change of ``phase``.
+# A list, not a dict keyed by phase: a clone that retries (a shallow attempt,
+# then a full one) passes through downloading again, and each pass must keep
+# its own start or the log books the failed attempt to the wrong phase.
 PHASE_TIMES_FIELD = "phase_times"
 
 
 def phase_durations(snapshot: Mapping[str, object], finished_at: float | None = None) -> str:
-    """One line per phase with its length, for the server log: ``downloading 12.3s · resolving 4.1s``.
+    """One entry per phase pass with its length, for the server log: ``downloading 12.3s · resolving 4.1s``.
 
-    Phases are read in the order they started; the last one ends at
+    Entries are read in the order they started; the last one ends at
     *finished_at* (now when absent). Empty when the job timed nothing.
     """
-    times = snapshot.get(PHASE_TIMES_FIELD) or {}
-    if not isinstance(times, Mapping) or not times:
+    times = snapshot.get(PHASE_TIMES_FIELD) or []
+    if not isinstance(times, list) or not times:
         return ""
-    ordered = sorted(times.items(), key=lambda item: item[1])
     end = finished_at if finished_at is not None else time.time()
     parts = []
-    for i, (phase, started) in enumerate(ordered):
-        stop = ordered[i + 1][1] if i + 1 < len(ordered) else end
+    for i, (phase, started) in enumerate(times):
+        stop = times[i + 1][1] if i + 1 < len(times) else end
         parts.append(f"{phase} {max(0.0, stop - started):.1f}s")
     return " · ".join(parts)
 
@@ -74,6 +75,6 @@ class JobSlotStatus:
         phase = fields.get("phase")
         if phase is None or phase == self._status.get("phase"):
             return dict(fields)
-        times = dict(self._status.get(PHASE_TIMES_FIELD) or {})
-        times[str(phase)] = self._clock()
+        times = list(self._status.get(PHASE_TIMES_FIELD) or [])
+        times.append([str(phase), self._clock()])
         return {**fields, PHASE_TIMES_FIELD: times}

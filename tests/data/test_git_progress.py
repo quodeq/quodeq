@@ -18,6 +18,8 @@ from quodeq.data.fs.git_progress import ProgressUpdate, parse_progress
     ("Resolving deltas:  30% (300/1000)", ProgressUpdate(30, None, SyncPhase.RESOLVING)),
     ("Resolving deltas: 100% (1000/1000), done.", ProgressUpdate(100, None, SyncPhase.RESOLVING)),
     ("Updating files:  12% (1200/9876)", ProgressUpdate(12, None, SyncPhase.CHECKOUT)),
+    ("Updating files: 120% (9999/9876)", ProgressUpdate(100, None, SyncPhase.CHECKOUT)),
+    ("Resolving deltas: 101% (1001/1000)", ProgressUpdate(100, None, SyncPhase.RESOLVING)),
     ("Checking out files:  99% (9800/9876)", ProgressUpdate(99, None, SyncPhase.CHECKOUT)),
     ("remote: Enumerating objects: 2650, done.", None),
     ("Cloning into '/tmp/x'...", None),
