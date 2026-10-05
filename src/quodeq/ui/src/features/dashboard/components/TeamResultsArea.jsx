@@ -43,7 +43,7 @@ function useConnectCard(shared) {
  */
 export function TeamResultsArea({ shared, onConnectEvaluations, onSharedDisconnected }) {
   const { invite, copyInvite } = useCopyInvite();
-  const disconnect = useSharedDisconnect({ onDisconnected: onSharedDisconnected });
+  const { disconnect, disconnecting } = useSharedDisconnect({ onDisconnected: onSharedDisconnected });
   const card = useConnectCard(shared);
   return (
     <>
@@ -60,6 +60,7 @@ export function TeamResultsArea({ shared, onConnectEvaluations, onSharedDisconne
         onCopyInvite={copyInvite}
         onChange={onConnectEvaluations}
         onDisconnect={disconnect}
+        disconnecting={disconnecting}
       />
       {card.showCard && (
         <ConnectTeamCard
