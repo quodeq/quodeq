@@ -120,21 +120,19 @@ export function shouldShowCompareTab({ projects, sharedHasContent, sharedPublish
 }
 
 /**
- * The landing decision. With zero local projects the default
- * 'overview' landing is a dead-end empty state; when a configured shared
- * repo has published content, land on the repositories tab instead so the
- * remote projects are visible without scanning anything locally. Only the
- * default 'overview' landing redirects: a user who already navigated
- * elsewhere (settings, help) before the signals settled keeps their page,
- * and a restored 'shared' selection is already a working view. The caller
- * (useInitialLandingEffect) re-runs it when the project list or the shared
- * signal changes, never on a tab change, and only while the user is still on
- * the landing. Exported for unit tests.
+ * The landing decision. With zero local projects the default 'overview'
+ * landing is a dead end: the Repositories tab is the only one that does
+ * anything (the three ways in, or the team's projects once a repository is
+ * connected), so that is where the app lands. Only the default 'overview'
+ * landing redirects: a user who already navigated elsewhere (settings,
+ * help) before the list settled keeps their page, and a restored 'shared'
+ * selection is already a working view. The caller (useInitialLandingEffect)
+ * re-runs it when the project list changes, never on a tab change, and only
+ * while the user is still on the landing. Exported for unit tests.
  */
-export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCount, selectedSource, sharedSettled, sharedHasContent, activeTab }) {
-  if (!projectsLoaded || !sharedSettled) return false;
+export function shouldRedirectToRepositories({ projectsLoaded, projectsCount, selectedSource, activeTab }) {
+  if (!projectsLoaded) return false;
   if ((projectsCount ?? 0) > 0) return false;
   if (selectedSource === PROJECT_SOURCE.SHARED) return false;
-  if (!sharedHasContent) return false;
   return activeTab === NAV_TAB.OVERVIEW;
 }

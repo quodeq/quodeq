@@ -127,8 +127,8 @@ export function useAppStartupGate({ state, activeTab }) {
 }
 
 /** The derived no-projects landing redirect, the Evaluate-hidden redirect and the native macOS Help-menu nav bridge. */
-export function useAppNavigationEffects({ state, activeTab, navTab, sharedSignal, showEvaluate }) {
-  useInitialLandingEffect({ state, sharedSignal, activeTab, navTab });
+export function useAppNavigationEffects({ state, activeTab, navTab, showEvaluate }) {
+  useInitialLandingEffect({ state, activeTab, navTab });
   useEvaluateHiddenEffect({ state, activeTab, navTab, showEvaluate });
   useNativeNavBridge(navTab);
 }

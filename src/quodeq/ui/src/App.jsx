@@ -19,7 +19,7 @@ export {
 } from './routes/renderers.jsx';
 export {
   shouldShowEvaluate, resolveProjectDisplayName,
-  shouldShowProjectTabs, selectSidebarCounts, shouldRedirectToRemoteRepositories,
+  shouldShowProjectTabs, selectSidebarCounts, shouldRedirectToRepositories,
 } from './appGating.js';
 export {
   buildAssistantSessionPayload, buildAssistantActionAppliedHandler,

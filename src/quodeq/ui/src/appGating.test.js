@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   isEvaluatableSource, shouldShowEvaluate,
   resolveProjectDisplayName, shouldShowProjectTabs, selectSidebarCounts,
-  shouldRedirectToRemoteRepositories, shouldShowCompareTab,
+  shouldRedirectToRepositories, shouldShowCompareTab,
 } from './appGating.js';
 
 // ---------------------------------------------------------------------------
@@ -158,17 +158,14 @@ test('shouldShowCompareTab: a missing/undefined projects list is treated as empt
 });
 
 // ---------------------------------------------------------------------------
-// shouldRedirectToRemoteRepositories
+// shouldRedirectToRepositories
 // ---------------------------------------------------------------------------
 
-test('shouldRedirectToRemoteRepositories: redirects only from the default overview landing with zero local projects', () => {
-  const base = {
-    projectsLoaded: true, projectsCount: 0, selectedSource: 'local',
-    sharedSettled: true, sharedHasContent: true, activeTab: 'overview',
-  };
-  assert.equal(shouldRedirectToRemoteRepositories(base), true);
-  assert.equal(shouldRedirectToRemoteRepositories({ ...base, activeTab: 'settings' }), false);
-  assert.equal(shouldRedirectToRemoteRepositories({ ...base, projectsCount: 2 }), false);
-  assert.equal(shouldRedirectToRemoteRepositories({ ...base, selectedSource: 'shared' }), false);
-  assert.equal(shouldRedirectToRemoteRepositories({ ...base, sharedHasContent: false }), false);
+test('shouldRedirectToRepositories: redirects only from the default overview landing with zero local projects', () => {
+  const base = { projectsLoaded: true, projectsCount: 0, selectedSource: 'local', activeTab: 'overview' };
+  assert.equal(shouldRedirectToRepositories(base), true);
+  assert.equal(shouldRedirectToRepositories({ ...base, activeTab: 'settings' }), false);
+  assert.equal(shouldRedirectToRepositories({ ...base, projectsCount: 2 }), false);
+  assert.equal(shouldRedirectToRepositories({ ...base, selectedSource: 'shared' }), false);
+  assert.equal(shouldRedirectToRepositories({ ...base, projectsLoaded: false }), false);
 });
