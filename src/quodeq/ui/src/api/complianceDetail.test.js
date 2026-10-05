@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   attachComplianceDetailRefs, groupDeferredCompliance, mergeComplianceDetail,
-  attachFindingDetailRefs, mergeFindingDetail,
+  attachFindingDetailRefs, mergeFindingDetail, markDetailOutdated,
 } from './complianceDetail.js';
 
 const slim = (file, line, principle, extra = {}) => ({
@@ -109,6 +109,27 @@ test('merge: an item with no match stays as it was', () => {
   const item = { ...slim('gone.py', 1, 'P1'), detailRef: ref };
   const merged = mergeComplianceDetail([item], [{ ref, items: [] }]);
   assert.equal(merged[0], item);
+});
+
+// A group that LOADED and has no row for an item means the item's identity
+// (file, line, principle, title) no longer exists on the server: the client
+// renders a snapshot older than the server's state. Saying so beats a card
+// that shows only its title.
+test('outdated: an item with no row in its loaded group is outdated, not deferred', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'd', generation: 1 };
+  const otherRef = { ...ref, dimension: 'e' };
+  const gone = { ...slim('gone.py', 1, 'P1'), detailRef: ref };
+  const waiting = { ...slim('later.py', 2, 'P1'), detailRef: otherRef };
+  const marked = markDetailOutdated([gone, waiting], [ref]);
+  assert.equal(marked[0].detailDeferred, false);
+  assert.equal(marked[0].detailOutdated, true);
+  assert.equal(marked[0].reason, null);
+  assert.equal(marked[1], waiting);
+});
+
+test('outdated: nothing loaded leaves the array alone', () => {
+  const items = [slim('a.py', 1, 'P1')];
+  assert.equal(markDetailOutdated(items, []), items);
 });
 
 test('merge: nothing loaded returns the same array', () => {

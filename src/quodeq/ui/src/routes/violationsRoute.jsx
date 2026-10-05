@@ -15,32 +15,13 @@ import { NAV_TAB } from '../vocab/navTab.js';
 import { ROW_TYPE, VIOLATIONS_SUB_TAB } from '../features/violations/violationsVocab.js';
 import { typeFile } from '../features/violations/byTypeModel.js';
 import { SEVERITY_FILTER_ALL } from '../vocab/severity.js';
+import { FILE_SELECTOR_KIND, buildEvalPrincipal } from './liveSelectors.js';
+
+// buildEvalPrincipal moved to routes/liveSelectors.js (the Principle page
+// rebuilds it from the live payload there); re-exported for its tests.
+export { buildEvalPrincipal };
 
 const ViolationsPage = lazy(() => import('../features/violations/components/ViolationsPage.jsx'));
-
-// Exported so unit tests can pin the runId-threading contract without having
-// to mount the whole App. Callers from the Violations page must pass the
-// dimension's ``fromRunId`` — see ``ViolationsRoute.navigateToPrinciple`` for
-// the regression history.
-export function buildEvalPrincipal(principleObj, principleGrade, runId) {
-  const violations = principleObj.violations || [];
-  const compliance = principleObj.compliance || [];
-  return {
-    principle: principleObj.principle,
-    score: principleGrade?.score ?? null,
-    grade: principleGrade?.grade || null,
-    dimension: principleObj.dimension || '',
-    runId: runId || '',
-    principleData: {
-      name: principleObj.principle,
-      grade: principleGrade?.grade || null,
-      violations,
-      compliance,
-    },
-    dimViolations: violations,
-    dimCompliance: compliance,
-  };
-}
 
 function makeNavigateToPrinciple({ dimMap, principleMap, nav }) {
   return (principleObj, severity) => {
@@ -51,8 +32,11 @@ function makeNavigateToPrinciple({ dimMap, principleMap, nav }) {
     // backend can rescore and project the action into SQL — without this the
     // PrincipleDetail score never moves on dismiss and the entry never lands
     // on the Dismissed tab.
+    // The selector next to the snapshot lets the page rebuild the principal
+    // from the live payload (routes/liveSelectors.js).
     nav(NAV_TAB.EVAL_PRINCIPLE, {
       evalPrincipal: buildEvalPrincipal(principleObj, pg, dim?.fromRunId),
+      principleSelector: { dimension: principleObj.dimension, principle: principleObj.principle },
       severity,
       sourceTab: NAV_TAB.VIOLATIONS,
     });
@@ -71,6 +55,7 @@ function makeNavigateToDimension({ dimMap, nav }) {
     const severityFilter = severity || 'all';
     nav(NAV_TAB.FILE, {
       file: dimFile,
+      fileSelector: { kind: FILE_SELECTOR_KIND.DIMENSION, dimension: dim.dimension },
       severityFilter,
       runId: dim.fromRunId,
       dateLabel: dim.fromDateLabel,
@@ -109,6 +94,7 @@ function makeNavigateToType({ dimMap, nav }) {
     if (!dim) return;
     nav(NAV_TAB.FILE, {
       file: typeFile(row, dim, `${row.req} · ${row.text || dim.dimension}`),
+      fileSelector: { kind: FILE_SELECTOR_KIND.TYPE, dimension: row.dimension, req: row.req, text: row.text },
       severityFilter: SEVERITY_FILTER_ALL,
       runId: row.runId,
       dateLabel: row.dateLabel,

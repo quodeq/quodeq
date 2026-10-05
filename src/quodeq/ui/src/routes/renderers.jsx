@@ -11,6 +11,7 @@ import EmptyStateWithTour from '../features/onboarding/components/EmptyStateWith
 import { isSharedSource, makeDismissHandler } from './dismissWiring.js';
 import { t } from '../strings/index.js';
 import { buildEvalPrincipal, ViolationsRoute } from './violationsRoute.jsx';
+import { liveAccumulated, liveFileFor } from './liveSelectors.js';
 import { mapRoute } from './mapRoute.jsx';
 import { historyRoute } from './historyRoute.jsx';
 import { compareRoute } from './compareRoute.jsx';
@@ -156,7 +157,10 @@ export const ROUTE_RENDERERS = {
   },
   file: (params, props) => (
     <FileDetailPage
-      file={params.file}
+      // Rebuilt from the live payload when the navigation left a selector,
+      // so a refreshed /scores reaches the page instead of the click-time
+      // snapshot (routes/liveSelectors.js); the snapshot otherwise.
+      file={liveFileFor(params, liveAccumulated(props)) ?? params.file}
       runId={params.runId}
       dateLabel={params.dateLabel}
       severityFilter={params.severityFilter || params.severity || null}
