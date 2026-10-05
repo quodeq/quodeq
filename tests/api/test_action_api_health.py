@@ -10,3 +10,7 @@ def test_action_api_health():
     data = response.get_json()
     assert data["ok"] is True
     assert "version" in data
+    # The state folder's identity: the UI keys the welcome's skip on it, so a
+    # wiped folder shows the welcome again. Stable across calls.
+    assert len(data["instanceId"]) == 32
+    assert client.get("/api/health").get_json()["instanceId"] == data["instanceId"]

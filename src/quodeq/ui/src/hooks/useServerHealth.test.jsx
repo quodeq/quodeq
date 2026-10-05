@@ -49,6 +49,23 @@ describe('useServerHealth', () => {
     expect(candidates).toEqual(expect.arrayContaining([7863, 9100, 9101, 9104]));
   });
 
+  // The instance id is the state folder's identity; the welcome's skip is
+  // keyed on it. It reads undefined until the first poll answers (callers
+  // wait rather than decide on a stale flag) and null for a server without one.
+  it('reports the server version and instance id once the poll answers', async () => {
+    getHealth.mockResolvedValue({ ok: true, version: '1.12.1', instanceId: 'inst-1' });
+    const { result } = renderHook(() => useServerHealth(), { wrapper: withQueryClient() });
+    expect(result.current[3]).toBeUndefined();
+    await waitFor(() => expect(result.current[3]).toBe('inst-1'));
+    expect(result.current[2]).toBe('1.12.1');
+  });
+
+  it('reports a null instance id for a server that has none', async () => {
+    getHealth.mockResolvedValue({ ok: true });
+    const { result } = renderHook(() => useServerHealth(), { wrapper: withQueryClient() });
+    await waitFor(() => expect(result.current[3]).toBeNull());
+  });
+
   it('exposes setServerConnected for optimistic reconnect', async () => {
     getHealth.mockResolvedValue({ ok: true });
     const { result } = renderHook(() => useServerHealth(), { wrapper: withQueryClient() });

@@ -37,6 +37,12 @@ describe('useOnboardingWizardHandlers handleSkipWelcome', () => {
     expect(opts.onGoToRepositories).toHaveBeenCalledTimes(1);
   });
 
+  it('records the instance id as the skip when the server reports one', () => {
+    const { result } = setup({ instanceId: 'inst-1' });
+    result.current.handleSkipWelcome();
+    expect(localStorage.getItem(SKIP_FLAG)).toBe('inst-1');
+  });
+
   it('from Settings never writes the skip flag', () => {
     const { result } = setup({ fromSettings: true });
     result.current.handleSkipWelcome();

@@ -8,8 +8,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateProjects } from '../../hooks/invalidateProjects.js';
 import { selectLandedProject } from '../../hooks/selectLandedProject.js';
-import { readString } from '../../adapters/storage.js';
-import { STEP_WELCOME, SKIPPED_KEY, SKIPPED_VALUE } from './wizardSteps.js';
+import { STEP_WELCOME } from './wizardSteps.js';
+import { wasWelcomeSkipped } from './hooks/useWizardDraft.js';
 import { WIZARD_SOURCE } from './onboardingVocab.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 import { NAV_TAB } from '../../vocab/navTab.js';
@@ -138,13 +138,18 @@ function useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, set
       sharedSettled: sharedSignal.settled,
       sharedHasContent: sharedSignal.hasContent,
     })) return;
-    if (readString(SKIPPED_KEY, null) === SKIPPED_VALUE) return;
+    // The skip is keyed on the server's instance id (undefined until the
+    // health poll answers; null for a server without one): deciding before
+    // the answer would let a flag from a wiped state folder still count.
+    if (state.serverInstanceId === undefined) return;
+    if (wasWelcomeSkipped(undefined, state.serverInstanceId)) return;
     const entry = {
-      startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN, onImportProject: state.handleImportProject,
+      startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN,
+      onImportProject: state.handleImportProject, instanceId: state.serverInstanceId,
     };
     Object.assign(seen, { spent: true, autoEntry: entry, step: STEP_WELCOME });
     setWizardEntry(entry);
-  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps -- re-evaluates on input changes only; wizardEntry and the setter are read current
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, state.serverInstanceId]); // eslint-disable-line react-hooks/exhaustive-deps -- re-evaluates on input changes only; wizardEntry and the setter are read current
 }
 
 /**

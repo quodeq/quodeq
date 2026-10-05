@@ -16,6 +16,7 @@ from quodeq.api._rate_limit import (
     create_rate_limit_store,
 )
 from quodeq import __version__
+from quodeq.shared.instance_id import read_instance_id
 from quodeq.api.routes_registry import register_all_routes
 from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
@@ -76,11 +77,10 @@ def _register_health_route(app: Flask, verbose: bool) -> None:
         port = get_action_api_port()
         display_host = "localhost" if host in (_BIND_HOST_LOOPBACK, _BIND_HOST_ANY) else host
         payload: dict[str, object] = {
-            "ok": True,
-            "version": __version__,
-            "host": host,
-            "port": port,
+            "ok": True, "version": __version__, "host": host, "port": port,
             "address": f"{display_host}:{port}",
+            # The state folder's identity: the UI keys per-install choices on it.
+            "instanceId": read_instance_id(),
         }
         if verbose:
             payload["pid"] = os.getpid()

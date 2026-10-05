@@ -35,12 +35,28 @@ export function clearDraft(storage) {
   removeKey(DRAFT_KEY, storage);
 }
 
-/** Mark that the user dismissed the welcome step ("skip for now"). */
-export function markWelcomeSkipped(storage) {
-  writeString(SKIPPED_KEY, SKIPPED_VALUE, storage);
+/**
+ * Mark that the user dismissed the welcome step ("skip for now"). The flag
+ * records the server's instance id (the state folder's identity), so a
+ * wiped state folder, which gets a new id, shows the welcome again even
+ * though the browser storage outlived the folder. Without an id (an older
+ * server) it falls back to the plain flag.
+ * @param {Storage} [storage]
+ * @param {string|null} [instanceId]
+ */
+export function markWelcomeSkipped(storage, instanceId = null) {
+  writeString(SKIPPED_KEY, instanceId || SKIPPED_VALUE, storage);
 }
 
-/** Whether the user previously dismissed the welcome step. */
-export function wasWelcomeSkipped(storage) {
-  return readString(SKIPPED_KEY, null, storage) === SKIPPED_VALUE;
+/**
+ * Whether the user dismissed the welcome for THIS state folder. With an
+ * instance id known, only a flag written for that id counts; a flag from
+ * another folder (or the plain legacy value) does not.
+ * @param {Storage} [storage]
+ * @param {string|null} [instanceId]
+ */
+export function wasWelcomeSkipped(storage, instanceId = null) {
+  const flag = readString(SKIPPED_KEY, null, storage);
+  if (!flag) return false;
+  return instanceId ? flag === instanceId : flag === SKIPPED_VALUE;
 }
