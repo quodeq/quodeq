@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateProjects } from '../../hooks/invalidateProjects.js';
+import { selectLandedProject } from '../../hooks/selectLandedProject.js';
 import { readString } from '../../adapters/storage.js';
 import { STEP_WELCOME, SKIPPED_KEY, SKIPPED_VALUE } from './wizardSteps.js';
 import { WIZARD_SOURCE } from './onboardingVocab.js';
@@ -49,12 +50,15 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab, queryClient
     invalidateProjects(queryClient).catch((err) => console.warn('[wizard] project list refetch failed:', err));
   };
   return {
-    onClose: ({ saved, projectId }) => {
+    // `cloning`: the add panel closed on a 202, the project arrives through
+    // the clone slot (the app re-lists and selects it on the DONE edge).
+    onClose: ({ saved, projectId, cloning = false }) => {
       setWizardEntry(null);
-      if (saved && projectId) {
+      if (saved && (projectId || cloning)) {
         refreshProjects();
         state.refreshDashboard?.();
       }
+      selectLandedProject(state, projectId);
     },
     onLaunch: ({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
       setWizardEntry(null);

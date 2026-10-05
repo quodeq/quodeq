@@ -7,6 +7,7 @@ import {
 } from './useAppShellHooks.js';
 import { useAssistantActionAppliedEffect } from './useAppEffects.js';
 import { findProject } from '../utils/projectIdentity.js';
+import { selectLandedProject } from './selectLandedProject.js';
 
 /**
  * Boot-time extras plus the dismiss-delta bridge shared by the manual dismiss
@@ -17,7 +18,9 @@ import { findProject } from '../utils/projectIdentity.js';
  */
 export function useAppDismissBridge(state) {
   const queryClient = useQueryClient();
-  const boot = useAppBootExtras();
+  // A clone that lands becomes the selected project on the Repositories tab
+  // (or when nothing is selected yet); elsewhere the card simply appears.
+  const boot = useAppBootExtras({ onCloneLanded: (slot) => selectLandedProject(state, slot.projectId) });
   const applyDelta = (project, scores, delta) =>
     applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions });
   useAssistantActionAppliedEffect({

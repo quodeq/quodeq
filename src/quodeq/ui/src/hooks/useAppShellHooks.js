@@ -41,10 +41,10 @@ export function computeIsEvaluating(state) {
  * ProjectsPage/Settings, no extra fetching) and the two pieces of App-local
  * UI state that don't depend on anything else.
  */
-export function useAppBootExtras() {
+export function useAppBootExtras({ onCloneLanded } = {}) {
   useEffect(() => { warmOverviewChunks(); }, []);
   const sharedSignal = useSharedContentSignal();
-  useCloneTransitions();
+  useCloneTransitions({ onLanded: onCloneLanded });
   const [sidebarPinned, setSidebarPinned] = useState(false);
   // Incremented after every successful dismiss POST so the violations
   // page's dismissed sub-tab knows to refetch its list. Without this, a

@@ -3615,6 +3615,26 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
+/* The strip's bar sizes itself along a row (flex-basis 180px); inside the
+   tile's column that basis became its height. Here it is a 6 px line
+   across the tile. */
+.project-card--ghost .sync-strip__bar {
+  flex: none;
+  width: 100%;
+}
+/* Placeholder cards while a connect reads the team's projects: the tile's
+   dashed look with two faint lines where the name and the path will be. */
+.project-card--placeholder {
+  min-height: 72px;
+  justify-content: center;
+}
+.project-card--placeholder__line {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--color-surface-alt);
+}
+.project-card--placeholder__line--name { width: 38%; }
+.project-card--placeholder__line--meta { width: 24%; }
 .project-card--ghost__error {
   display: flex;
   align-items: center;

@@ -60,6 +60,15 @@ describe('ProjectsPage — header actions', () => {
     expect(onImportProject).toHaveBeenCalledTimes(1);
   });
 
+  it('while a connect reads, one placeholder card per project found heads the list', async () => {
+    const reading = { state: 'running', phase: SYNC_PHASE.READING, percent: null, projectsFound: 3, url: URL };
+    const { api } = makeApi({ slots: { connect: reading } });
+    renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
+    await waitFor(() => expect(screen.getByText('reading projects · 3 found…')).toBeInTheDocument());
+    expect(screen.getAllByLabelText('team project arriving')).toHaveLength(3);
+    expect(screen.getByText('app')).toBeInTheDocument();
+  });
+
   it('a running first connect shows its progress in the strip, with no form', async () => {
     const running = { state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 45, bytes: 12582912, url: URL };
     const { api } = makeApi({ slots: { connect: running } });

@@ -61,7 +61,7 @@ function ConnectRoute({ wizard, entry, handleClose, onGoToRepositories }) {
  */
 export function OnboardingStepSwitch({
   wizard, entry, standards, currentIndex, visibleCount,
-  nextStep, prevStep, handleSkipWelcome, handleImport, handleLaunch, handleClose, onGoToRepositories,
+  nextStep, prevStep, handleSkipWelcome, handleImport, handleAdded, handleLaunch, handleClose, onGoToRepositories,
 }) {
   const step = wizard.state.step;
   return (
@@ -80,8 +80,8 @@ export function OnboardingStepSwitch({
       )}
 
       {step === STEP_ANALYZE && (
-        // useAnalyzeLaunch registers the project, then hands over its id and the standards.
-        <AnalyzeStep state={wizard.state} actions={wizard} standards={standards} onLaunch={handleLaunch} />
+        // useAnalyzeLaunch registers the project (or starts its clone), then hands over.
+        <AnalyzeStep state={wizard.state} actions={wizard} onAdded={handleAdded} />
       )}
 
       {step === STEP_PROVIDER && (

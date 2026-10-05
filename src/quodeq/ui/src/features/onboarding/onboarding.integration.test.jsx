@@ -63,7 +63,7 @@ describe('Onboarding integration — happy path', () => {
     localStorage.setItem('quodeq-visible-standards', JSON.stringify(['std-a', 'std-b']));
   });
 
-  it('walks Welcome → Analyze, clones the url and emits onLaunch with the project, the configured provider and the default standard', async () => {
+  it('walks Welcome → add, posts the clone and closes the panel as cloning; nothing launches', async () => {
     const onLaunch = vi.fn();
     const onClose = vi.fn();
     render(<OnboardingWizard entry={{ isFirstProject: true }} onLaunch={onLaunch} onClose={onClose} />, { wrapper: withQueryClient() });
@@ -72,19 +72,17 @@ describe('Onboarding integration — happy path', () => {
     expect(screen.getByText('how quodeq works')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'start' }));
 
-    // Analyze: a configured provider collapses the reviewer and the standard
-    // (every visible standard, read as the default) into one line.
-    expect(await screen.findByText('reviewed by Codex CLI · against quodeq default standard')).toBeInTheDocument();
+    // The add panel: one field, no reviewer, no standard.
+    expect(await screen.findByText('Your repository')).toBeInTheDocument();
+    expect(screen.queryByText(/reviewed by/)).toBeNull();
     fireEvent.change(screen.getByRole('textbox', { name: 'repository' }), { target: { value: 'https://github.com/acme/billing.git' } });
-    fireEvent.click(screen.getByRole('button', { name: 'scan and run' }));
+    fireEvent.click(screen.getByRole('button', { name: 'add' }));
 
-    // The clone lands as a project, and only then does the evaluation start.
-    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
-    expect(onLaunch.mock.calls[0][0].projectId).toBe('uuid-9');
-    expect(onLaunch.mock.calls[0][0].standardIds).toEqual(['std-a', 'std-b']);
-    expect(onLaunch.mock.calls[0][0].repo).toBe('https://github.com/acme/billing.git');
-    expect(onLaunch.mock.calls[0][0].provider.id).toBe('codex');
-    expect(onLaunch.mock.calls[0][0].provider.model).toBe('gpt-5.2-codex');
+    // The clone job is posted and the panel hands over; the evaluation is
+    // started from the Evaluate tab later, never from here.
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ saved: true, projectId: null, cloning: true }));
+    expect(clone.posted).toBe(true);
+    expect(onLaunch).not.toHaveBeenCalled();
   });
 });
 
