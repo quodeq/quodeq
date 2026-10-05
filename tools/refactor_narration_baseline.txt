@@ -86,7 +86,7 @@ src/quodeq/ui/src/api/applyMutationDelta.dismissDerived.test.jsx:64
 src/quodeq/ui/src/api/applyMutationDelta.dismissScores.test.jsx:72
 src/quodeq/ui/src/api/shared.config.test.jsx:7
 src/quodeq/ui/src/api/shared.reads.test.jsx:5
-src/quodeq/ui/src/appShellProps.js:62
+src/quodeq/ui/src/appShellProps.js:64
 src/quodeq/ui/src/components/TopBarProviderPill.jsx:5
 src/quodeq/ui/src/features/assistant/AssistantDrawerProvider.panels.test.jsx:5
 src/quodeq/ui/src/features/assistant/AssistantDrawerProvider.session.test.jsx:5
