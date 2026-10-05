@@ -14,7 +14,8 @@ import { projectKeys } from "../api/queryKeys.js";
 import { useScopedPlaceholder } from "./useScopedPlaceholder.js";
 import { resolveAsOf, deriveAvailableRuns } from './projectScoresDerived.js';
 import { t } from '../strings/index.js';
-import { STALE_TIME_MS, refetchWhileError } from './queryDefaults.js';
+import { STALE_TIME_MS, refetchWhilePendingOrError } from './queryDefaults.js';
+import { isPendingPayload } from '../api/scoresShape.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 import { LATEST_RUN_ID } from '../constants.js';
 
@@ -40,8 +41,9 @@ function buildLatestQueryConfig({ projectKey, selectedSource, fetchScores, selec
     enabled: !!selectedProject,
     staleTime: STALE_TIME_MS,
     // Self-heal after a failed fetch; the webview never fires the focus
-    // refetch a browser would recover through (see refetchWhileError).
-    refetchInterval: refetchWhileError,
+    // refetch a browser would recover through. A pending body (the server's
+    // warm-up still owes the project) polls the same way (see queryDefaults).
+    refetchInterval: refetchWhilePendingOrError,
     // Latest scores are project-wide (no per-run swap), so within one project
     // there is nothing to flash — but a project/source switch must still drop
     // to a real loading state rather than showing the old project's grades.
@@ -63,20 +65,28 @@ function buildScoresQueryConfig({ projectKey, asOf, selectedSource, fetchScores,
     // the project subtree and force a refetch regardless of staleTime.
     // Freeze to skip the routine background refetch on re-entry.
     staleTime: asOf ? Infinity : STALE_TIME_MS,
-    // Self-heal after a failed fetch (see refetchWhileError); frozen as-of
-    // queries only poll while errored, never while holding data.
-    refetchInterval: refetchWhileError,
+    // Self-heal after a failed fetch, or poll a pending body (see
+    // queryDefaults); frozen as-of queries only poll while errored or
+    // pending, never while holding real data.
+    refetchInterval: refetchWhilePendingOrError,
     // Keep prior scores visible while switching runs — see useDashboard for
     // rationale. Scoped to this project+source, so a project switch loads clean.
     placeholderData: keepPlaceholder ? keepInScope : undefined,
   };
 }
 
+// A pending body (the server's warm-up still owes the project) is loading,
+// not scores: nothing downstream may read it as a project with no runs.
+function settledData(query) {
+  return query.data == null || isPendingPayload(query.data) ? null : query.data;
+}
+
 function buildProjectScoresResult({ scoresQuery, latestQuery, availableRuns, refreshScores }) {
   return {
-    scores: scoresQuery.data ?? null,
-    latestScores: latestQuery.data ?? null,
-    loading: scoresQuery.isLoading || latestQuery.isLoading,
+    scores: settledData(scoresQuery),
+    latestScores: settledData(latestQuery),
+    loading: scoresQuery.isLoading || latestQuery.isLoading
+      || isPendingPayload(scoresQuery.data) || isPendingPayload(latestQuery.data),
     // True while the panel is rendering the PREVIOUS selection's scores because
     // the newly-picked run is still in flight. placeholderData keeps those old
     // numbers on screen, so without this the dimension cards look settled while
@@ -123,8 +133,8 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
   const scoresQuery = useQuery(buildScoresQueryConfig({ projectKey, asOf, selectedSource, fetchScores, selectedProject, isLatestSelection, latestQuery, keepPlaceholder, keepInScope }));
 
   const availableRuns = useMemo(
-    () => deriveAvailableRuns({ scoresQueryData: scoresQuery.data, latestQueryData: latestQuery.data }),
-    [scoresQuery.data, latestQuery.data]
+    () => deriveAvailableRuns({ scoresQueryData: settledData(scoresQuery), latestQueryData: settledData(latestQuery) }),
+    [scoresQuery.data, latestQuery.data] // eslint-disable-line react-hooks/exhaustive-deps -- settledData reads only .data
   );
 
   const refreshScores = useCallback(() => {

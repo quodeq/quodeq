@@ -24,7 +24,7 @@ from quodeq.api.routes_common import reports_dir
 from quodeq.core.types.finding_type import FindingType, parse_finding_type
 from quodeq.services.scoring import get_project_scores, get_scores_raw, get_scores_slim
 from quodeq.services.scoring.compliance_detail import defer_finding_detail, dimension_detail, finding_detail
-from quodeq.services.warmup import engine as warmup_engine
+from quodeq.services.warmup_defer import defer_to_warmup
 
 _logger = logging.getLogger(__name__)
 
@@ -123,7 +123,12 @@ def register_scores_routes(app: Flask) -> None:
         err = validate_segment(project)
         if err:
             return err
-        warmup_engine.prioritise(project)
+        # While the warm-up still owes this project its caches, the client
+        # polls a pending body instead of this request building the payload
+        # inline beside the worker (see defer_to_warmup).
+        deferred = defer_to_warmup(reports_dir(), project)
+        if deferred is not None:
+            return jsonify(deferred), HTTPStatus.ACCEPTED
         loaded, err = _load_scores(project)
         if err:
             return err

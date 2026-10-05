@@ -35,6 +35,18 @@ export function sharedListQueryOptions({ sharedListProjects, configured, status,
     queryKey: sharedKeys.list(),
     queryFn: () => sharedListProjects({ refresh: false }),
     enabled: enabled && configured && !connectActive(status),
+    refetchInterval: summaryRefetchInterval,
     ...observerOptions,
   };
+}
+
+/** How often the list re-asks while a card's summary is still being computed. */
+export const SUMMARY_POLL_MS = 3000;
+
+// The server lists a cold card as pending and warms it in the background
+// (the same contract as the local list), so the list re-asks every few
+// seconds while any card is pending and the grades fill in as they land;
+// otherwise it does not poll.
+function summaryRefetchInterval(query) {
+  return query.state.data?.projects?.some((p) => p.summaryPending) ? SUMMARY_POLL_MS : false;
 }

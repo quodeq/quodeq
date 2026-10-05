@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from pathlib import Path
 
 from quodeq.data.fs.shared_repo import (
@@ -194,6 +195,19 @@ def test_shared_projects_refresh_stale_when_origin_unreachable(
     assert "proj-a" in ids
 
 
+def _wait_shared_warmup_idle(timeout_s: float = 10.0) -> None:
+    """Block until the shared warm-up has no project queued or in flight."""
+    from quodeq.services.shared_listing import shared_warmup
+
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        snapshot = shared_warmup.snapshot()
+        if snapshot is None or not snapshot["active"]:
+            return
+        time.sleep(0.02)
+    raise AssertionError("shared warm-up did not settle in time")
+
+
 def _git_porcelain(repo: Path) -> str:
     return subprocess.run(
         ["git", "status", "--porcelain"], cwd=repo, check=True, capture_output=True, text=True,
@@ -224,6 +238,10 @@ def test_shared_projects_listing_does_not_dirty_clone_worktree(client, shared_cl
 
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200
+    # The listing queues cold cards on the shared warm-up, whose worker holds
+    # a run's evaluation.db open (transient -wal/-shm files) while it scores.
+    # Let it settle so the status compares what the request itself wrote.
+    _wait_shared_warmup_idle()
 
     status_after = _git_porcelain(repo)
     assert status_after == status_before
@@ -251,6 +269,9 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
 
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200
+    # The summaries themselves are computed by the shared warm-up's worker
+    # thread, which must scope the same override the route did.
+    _wait_shared_warmup_idle()
 
     assert clone_cache_path.exists()
     assert not local_cache_path.exists()
@@ -264,6 +285,15 @@ def test_shared_projects_expose_origin_url_and_score_fields(client, shared_clone
         if (p.get("id") or p.get("name")) == "proj-a"
     )
     assert proj.get("originUrl") == "https://github.com/example/proj-a.git"
-    # Regression lock: shared listings compute scores from the clone-scoped
-    # score cache; the merge UI sorts on this field.
-    assert "latestScore" in proj
+    # Regression lock: shared listings carry scores from the clone-scoped
+    # score cache; the merge UI sorts on this field. A cold card is reported
+    # pending (no score yet) and queued, and lands scored on the next listing.
+    assert proj["summaryPending"] is True
+    assert "latestScore" not in proj
+    _wait_shared_warmup_idle()
+    warmed = next(
+        p for p in client.get("/api/shared/projects").get_json()["projects"]
+        if (p.get("id") or p.get("name")) == "proj-a"
+    )
+    assert warmed["summaryPending"] is False
+    assert "latestScore" in warmed

@@ -14,6 +14,7 @@ from quodeq.api.routes_common import reports_dir
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.services.run_constants import LATEST_RUN
+from quodeq.services.warmup_defer import defer_to_warmup
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -48,6 +49,19 @@ def _parse_view(raw: str | None) -> DashboardView | tuple[Response, int]:
         )
 
 
+def _pending_response(project: str) -> tuple[Response, int] | None:
+    """202 with the pending body while the warm-up still owes *project*, else None.
+
+    Both Overview payloads answer this way so the client polls instead of
+    this request building a large project inline beside the worker (see
+    ``defer_to_warmup``).
+    """
+    deferred = defer_to_warmup(reports_dir(), project)
+    if deferred is None:
+        return None
+    return jsonify(deferred), HTTPStatus.ACCEPTED
+
+
 def _dashboard_response(provider: ActionProvider, project: str, args: Any) -> Response | tuple[Response, int]:
     """The dashboard body for ``?run=`` and ``?view=``: the full shape by
     default, the overview shape (no dimension bodies) on request."""
@@ -67,16 +81,16 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects/<project>/dashboard")
     def dashboard(project: str) -> Response | tuple[Response, int]:
-        err = _validate_params(project=project)
-        if err:
-            return err
+        early = _validate_params(project=project) or _pending_response(project)
+        if early:
+            return early
         return _dashboard_response(provider, project, request.args)
 
     @app.get("/api/projects/<project>/accumulated")
     def accumulated(project: str) -> Response | tuple[Response, int]:
-        err = _validate_params(project=project)
-        if err:
-            return err
+        early = _validate_params(project=project) or _pending_response(project)
+        if early:
+            return early
         as_of = request.args.get("asOf")
         payload = provider.get_accumulated(reports_dir(), project, as_of)
         if payload is None:

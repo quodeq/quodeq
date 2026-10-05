@@ -8,6 +8,8 @@
  * warms would disagree about whether the cache entry still counts.
  */
 
+import { isPendingPayload } from '../api/scoresShape.js';
+
 /** How long a fetched payload stays fresh before react-query refetches it. */
 export const STALE_TIME_MS = 60_000;
 
@@ -31,3 +33,20 @@ export const ERROR_RETRY_MS = 15_000;
  * background refetch of them fails.
  */
 export const refetchWhileError = (query) => (query.state.error ? ERROR_RETRY_MS : false);
+
+/** How often a query re-asks for a payload the server reported as still warming. */
+export const WARMUP_POLL_MS = 3000;
+
+/**
+ * refetchWhileError, plus polling while the payload is the server's pending
+ * body (`{ pending: true, warmup }`, see api/scoresShape.js isPendingPayload).
+ *
+ * At boot, or after an upgrade invalidated the score caches, the Overview
+ * routes answer 202 pending while the server's warm-up still owes the
+ * project, instead of building a large project inline beside the worker
+ * until the client gave up. The query keeps the pending body as data (so it
+ * is loading, not an error) and polls until the real payload replaces it;
+ * the interval turns off the moment it does.
+ */
+export const refetchWhilePendingOrError = (query) =>
+  (isPendingPayload(query.state.data) ? WARMUP_POLL_MS : refetchWhileError(query));

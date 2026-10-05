@@ -7,7 +7,8 @@ import { useScopedPlaceholder } from "../../../hooks/useScopedPlaceholder.js";
 import { isFrozenRun } from '../../../models/runRules.js';
 import { t } from '../../../strings/index.js';
 import { useDashboardInvalidation } from './useDashboardInvalidation.js';
-import { STALE_TIME_MS, refetchWhileError } from '../../../hooks/queryDefaults.js';
+import { STALE_TIME_MS, refetchWhilePendingOrError } from '../../../hooks/queryDefaults.js';
+import { isPendingPayload } from '../../../api/scoresShape.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 const EMPTY_TREND = [];
@@ -68,8 +69,9 @@ function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fe
     enabled: !!selectedProject,
     staleTime: frozenRun ? Infinity : STALE_TIME_MS,
     // The webview has no focus/reconnect events, so an errored query must
-    // poll its own way back to health (see refetchWhileError).
-    refetchInterval: refetchWhileError,
+    // poll its own way back to health; a pending body (the server's warm-up
+    // still owes the project) polls the same way (see queryDefaults).
+    refetchInterval: refetchWhilePendingOrError,
     // Keep showing the previous run's data while a new run loads — instant
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.
@@ -95,7 +97,9 @@ function buildDashboardResult({
     // the key here silently removes the warning.
     customFormula: Boolean(scores?.scoring?.customFormula),
     rescoreLookup: {},
-    loading: dashboardQuery.isLoading || scoresLoading,
+    // A pending body is "not yet", never an empty project: it keeps the
+    // loading state (and the boot loader) up until the real payload lands.
+    loading: dashboardQuery.isLoading || scoresLoading || isPendingPayload(dashboardQuery.data),
     // True during background refetch when we already have placeholder data
     // (e.g. user switched to a different run). Page shows a subtle
     // shimmer/dim instead of the full loading screen.
@@ -138,7 +142,7 @@ function computeFallbackTrend(scores, latestScores) {
 }
 
 function mergeTrendIntoDashboard(dashboardData, fallbackTrend) {
-  if (!dashboardData) return null;
+  if (!dashboardData || isPendingPayload(dashboardData)) return null;
   if (dashboardData.trend?.length) return dashboardData;
   return { ...dashboardData, trend: fallbackTrend };
 }
