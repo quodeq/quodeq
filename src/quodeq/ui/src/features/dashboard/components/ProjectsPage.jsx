@@ -130,13 +130,14 @@ function ProjectsCardsList({ visibleEntries, ctx }) {
 
 // While a connect reads the team's projects, one dashed placeholder per
 // project found so far heads the list; they become the real cards when
-// reading finishes.
+// reading finishes. Hidden from assistive tech: the strip's live region
+// already says "reading projects · N found", one announcement, not N.
 function ReadingPlaceholders({ count }) {
   if (!count) return null;
   return (
-    <div className="projects-cards projects-cards--placeholders">
+    <div className="projects-cards projects-cards--placeholders" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <article key={i} className="project-card project-card--ghost project-card--placeholder" aria-label={t('projects.placeholderAria')}>
+        <article key={i} className="project-card project-card--ghost project-card--placeholder">
           <span className="project-card--placeholder__line project-card--placeholder__line--name" />
           <span className="project-card--placeholder__line project-card--placeholder__line--meta" />
         </article>

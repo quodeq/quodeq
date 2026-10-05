@@ -51,7 +51,7 @@ describe('progressLabel and barPercent', () => {
   it('names each phase of a connect, with a percent where git reports one', () => {
     expect(progressLabel({ phase: SYNC_PHASE.CONNECTING }, SYNC_KIND.CONNECT, url)).toBe('connecting to github.com/team/evaluations…');
     expect(progressLabel({ phase: SYNC_PHASE.DOWNLOADING, percent: 38, bytes: 43_201_536 }, SYNC_KIND.CONNECT, url)).toBe('downloading evaluations · 38% · 41.2 MB');
-    expect(progressLabel({ phase: SYNC_PHASE.RESOLVING, percent: 60 }, SYNC_KIND.CONNECT, url)).toBe('resolving · 60%');
+    expect(progressLabel({ phase: SYNC_PHASE.RESOLVING, percent: 60 }, SYNC_KIND.CONNECT, url)).toBe('resolving deltas · 60%');
     expect(progressLabel({ phase: SYNC_PHASE.CHECKOUT, percent: 7 }, SYNC_KIND.CONNECT, url)).toBe('checking out · 7%');
     expect(progressLabel({ phase: SYNC_PHASE.READING, projectsFound: 3 }, SYNC_KIND.CONNECT, url)).toBe('reading projects · 3 found…');
   });

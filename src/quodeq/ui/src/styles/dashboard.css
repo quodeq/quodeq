@@ -2990,6 +2990,11 @@
     flex: 1 1 auto;
     justify-content: center;
   }
+  /* The menu's wrapper stretches too, so `more` and `add project` share the row as equals. */
+  .projects-page__more {
+    flex: 1 1 auto;
+    display: flex;
+  }
 }
 
 /* ── Empty Repositories page: the welcome's two paths, side by side ── */

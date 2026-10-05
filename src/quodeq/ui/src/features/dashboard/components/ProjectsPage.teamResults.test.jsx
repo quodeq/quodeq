@@ -65,7 +65,9 @@ describe('ProjectsPage — header actions', () => {
     const { api } = makeApi({ slots: { connect: reading } });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(screen.getByText('reading projects · 3 found…')).toBeInTheDocument());
-    expect(screen.getAllByLabelText('team project arriving')).toHaveLength(3);
+    expect(document.querySelectorAll('.project-card--placeholder')).toHaveLength(3);
+    // One announcement comes from the strip; the placeholders themselves are silent.
+    expect(document.querySelector('.projects-cards--placeholders')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('app')).toBeInTheDocument();
   });
 
@@ -154,7 +156,7 @@ describe('ProjectsPage — sync strip actions', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await user.click(await screen.findByRole('button', { name: 'copy invite' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'copied' })).toBeInTheDocument());
-    expect(copyToClipboard).toHaveBeenCalledWith(`Open quodeq, on Repositories choose more › add evaluations repository, paste ${URL}`);
+    expect(copyToClipboard).toHaveBeenCalledWith(`Open quodeq, go to Repositories, choose more › add evaluations repository and paste ${URL}`);
   });
 
   it('without a clipboard the invite text shows inline, read-only', async () => {
@@ -164,7 +166,7 @@ describe('ProjectsPage — sync strip actions', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await user.click(await screen.findByRole('button', { name: 'copy invite' }));
     const field = await screen.findByRole('textbox', { name: 'invite text for others' });
-    expect(field).toHaveValue(`Open quodeq, on Repositories choose more › add evaluations repository, paste ${URL}`);
+    expect(field).toHaveValue(`Open quodeq, go to Repositories, choose more › add evaluations repository and paste ${URL}`);
     expect(field).toHaveAttribute('readonly');
   });
 

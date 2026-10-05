@@ -38,7 +38,7 @@ describe('WelcomeStep', () => {
 
   it('the repository card names the code to evaluate, not a score', () => {
     renderWelcome();
-    expect(screen.getByText('the code you want to evaluate, a local folder or a git url.')).toBeInTheDocument();
+    expect(screen.getByText('the code you want to evaluate: a local folder or a git url.')).toBeInTheDocument();
   });
 
   it('skip for now calls onSkip', () => {

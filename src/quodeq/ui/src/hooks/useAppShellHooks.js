@@ -87,7 +87,7 @@ export function useAppAssistant(state) {
 }
 
 /**
- * Grade-formula boot sync and the wizard entry/auto-open lifecycle — see
+ * Grade-formula boot sync and the wizard entry/auto-open lifecycle. See
  * useAppEffects.js and features/onboarding/useWizardLifecycle.js for the
  * individual rationales. A project without runs is no longer bounced to
  * Evaluate: every project tab carries its own "No evaluations yet" state.

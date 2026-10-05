@@ -24,7 +24,7 @@ describe('CloningTile', () => {
 
   it('resolving and checkout keep a determinate bar with their own percent and the download size', () => {
     const { rerender } = render(<CloningTile slot={{ ...running, phase: SYNC_PHASE.RESOLVING, percent: 60 }} onRetry={() => {}} onClose={() => {}} />);
-    expect(screen.getByText('resolving · 60%')).toBeInTheDocument();
+    expect(screen.getByText('resolving deltas · 60%')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '60');
     rerender(<CloningTile slot={{ ...running, phase: SYNC_PHASE.CHECKOUT, percent: 7 }} onRetry={() => {}} onClose={() => {}} />);
     expect(screen.getByText('checking out · 7%')).toBeInTheDocument();
