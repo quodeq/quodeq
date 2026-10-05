@@ -7,29 +7,6 @@
 import { PROJECT_SOURCE } from './vocab/projectSource.js';
 import { NAV_TAB } from './vocab/navTab.js';
 
-// Project-data tabs (overview/violations/map/history) — module scope so both
-// the App component's bounce effect and the exported shouldBounceToEvaluate
-// helper below share one definition.
-const PROJECT_DATA_TABS = [NAV_TAB.OVERVIEW, NAV_TAB.VIOLATIONS, NAV_TAB.MAP, NAV_TAB.HISTORY];
-
-/**
- * Whether the "no runs yet" bounce-to-Evaluate effect should fire. Exported
- * (like isSharedSource/buildEvalPrincipal) so the source-gating contract is
- * unit-testable without mounting the whole App.
- *
- * There is no Evaluate flow for shared projects — the guard must reject any
- * non-'local' source outright, independent of hasCurrentProjectRuns (which is
- * computed from the LOCAL project list and can be misleading for a shared
- * selection whose id collides with a local one — see the call site).
- */
-export function shouldBounceToEvaluate({ projectsLoaded, projectsCount, selectedProjectInfo, hasCurrentProjectRuns, activeTab, selectedSource }) {
-  if (!projectsLoaded) return false;
-  if (!projectsCount) return false;
-  if (!selectedProjectInfo) return false;
-  if (selectedSource !== PROJECT_SOURCE.LOCAL) return false;
-  return !hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(activeTab);
-}
-
 /**
  * Whether a selected source has an Evaluate flow at all. Evaluation is
  * local-only server-side, so a 'shared' selection has no route for it —
@@ -81,12 +58,15 @@ export function resolveProjectDisplayName({
  * For 'shared', gate on the resolved sharedProjectInfo instead: the shared
  * info payload carries no runsCount at all, and a project only appears in
  * the shared repo once published with runs, so its info resolving is the
- * "has data to show" signal. Exported (like shouldBounceToEvaluate) so the
+ * "has data to show" signal. Exported (like shouldShowEvaluateButton) so the
  * source-gating contract is testable without mounting the whole App.
  */
-export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, sharedProjectInfo }) {
+export function shouldShowProjectTabs({ selectedSource, selectedProjectInfo, sharedProjectInfo }) {
   if (selectedSource === PROJECT_SOURCE.SHARED) return !!sharedProjectInfo;
-  return hasCurrentProjectRuns;
+  // A local project shows every tab from the moment it exists; one without a
+  // finished run says "No evaluations yet" on each of them. Only no project
+  // at all (nothing selected, or an empty list) hides them.
+  return !!selectedProjectInfo;
 }
 
 /**

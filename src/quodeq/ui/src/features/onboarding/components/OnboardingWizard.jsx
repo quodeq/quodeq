@@ -23,7 +23,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepos
   const currentIndex = SETUP_ORDER.indexOf(wizard.state.step) + 1;
 
   const {
-    handleSkipWelcome, handleImport, handleClose, handleLaunch, nextStep, prevStep,
+    handleSkipWelcome, handleImport, handleClose, handleAdded, handleLaunch, nextStep, prevStep,
   } = useOnboardingWizardHandlers({
     wizard, onClose, onLaunch, onGoToRepositories, fromSettings: entry.source === WIZARD_SOURCE.SETTINGS,
   });
@@ -52,6 +52,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepos
           prevStep={prevStep}
           handleSkipWelcome={handleSkipWelcome}
           handleImport={handleImport}
+          handleAdded={handleAdded}
           handleLaunch={handleLaunch}
           handleClose={handleClose}
           onGoToRepositories={onGoToRepositories}

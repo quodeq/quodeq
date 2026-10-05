@@ -16,7 +16,7 @@ import { useAssistantProvider } from '../features/settings/hooks/useAssistantPro
 import { deriveAssistantContext } from '../features/assistant/useAssistantContext.js';
 import { buildAssistantSessionPayload } from '../features/assistant/assistantAppBridge.js';
 import {
-  useGradeFormulaBootSyncEffect, useEvaluateBounceEffect,
+  useGradeFormulaBootSyncEffect,
   useInitialLandingEffect, useProjectScrollResetEffect, useVisibleStandardsHydrationEffect,
 } from './useAppEffects.js';
 import { buildBreadcrumbSiblingsFor } from '../features/side-pane/breadcrumbSiblings.js';
@@ -41,10 +41,10 @@ export function computeIsEvaluating(state) {
  * ProjectsPage/Settings, no extra fetching) and the two pieces of App-local
  * UI state that don't depend on anything else.
  */
-export function useAppBootExtras() {
+export function useAppBootExtras({ onCloneLanded } = {}) {
   useEffect(() => { warmOverviewChunks(); }, []);
   const sharedSignal = useSharedContentSignal();
-  useCloneTransitions();
+  useCloneTransitions({ onLanded: onCloneLanded });
   const [sidebarPinned, setSidebarPinned] = useState(false);
   // Incremented after every successful dismiss POST so the violations
   // page's dismissed sub-tab knows to refetch its list. Without this, a
@@ -87,18 +87,17 @@ export function useAppAssistant(state) {
 }
 
 /**
- * Grade-formula boot sync, wizard entry/auto-open lifecycle, and the
- * Evaluate-tab bounce guard — see useAppEffects.js and
- * features/onboarding/useWizardLifecycle.js for the individual rationales.
+ * Grade-formula boot sync and the wizard entry/auto-open lifecycle. See
+ * useAppEffects.js and features/onboarding/useWizardLifecycle.js for the
+ * individual rationales. A project without runs is no longer bounced to
+ * Evaluate: every project tab carries its own "No evaluations yet" state.
  */
-export function useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, sharedSignal }) {
+export function useAppWizardBounce({ state, isEvaluating, sharedSignal }) {
   useGradeFormulaBootSyncEffect();
   const { wizardEntry, setWizardEntry, wizardHandlers } = useWizardLifecycle({
     state, navTab: state.navTab, isEvaluating, sharedSignal,
   });
-  const hasCurrentProjectRuns = (selectedProjectInfo?.runsCount ?? 0) > 0;
-  useEvaluateBounceEffect({ state, selectedProjectInfo, hasCurrentProjectRuns });
-  return { wizardEntry, setWizardEntry, wizardHandlers, hasCurrentProjectRuns };
+  return { wizardEntry, setWizardEntry, wizardHandlers };
 }
 
 /** The sidebar's active provider/model, read fresh on every render. */

@@ -23,6 +23,11 @@ class SyncPhase(StrEnum):
 
     CONNECTING = "connecting"
     DOWNLOADING = "downloading"
+    # git's two phases after the download: "Resolving deltas" and the checkout
+    # ("Updating files"). Reported so a bar never sits at 100 percent while
+    # git still works.
+    RESOLVING = "resolving"
+    CHECKOUT = "checkout"
     READING = "reading"
     DONE = "done"
     ERROR = "error"

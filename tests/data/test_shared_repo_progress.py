@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.data.fs import shared_repo
+from quodeq.core.types.sync_phase import SyncPhase
 from quodeq.data.fs.git_progress import ProgressUpdate
 from quodeq.data.fs.shared_repo import ensure_shared_clone, refresh_shared_clone, shared_repo_path
 
@@ -32,7 +33,7 @@ def test_clone_streams_progress(tmp_path, monkeypatch):
     repo = ensure_shared_clone(_URL, env={"QUODEQ_CACHE_ROOT": str(tmp_path)}, progress=seen.append)
     assert repo == shared_repo_path(_URL, {"QUODEQ_CACHE_ROOT": str(tmp_path)})
     assert run.calls[0][0][:3] == ["clone", "--progress", "--"]
-    assert seen == [ProgressUpdate(45, 1048576), ProgressUpdate(100, None)]
+    assert seen == [ProgressUpdate(45, 1048576), ProgressUpdate(100, None, SyncPhase.RESOLVING)]
 
 
 def test_clone_without_callback_still_works(tmp_path, monkeypatch):

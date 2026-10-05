@@ -20,7 +20,7 @@ const VOCABULARIES = {
     'complete', 'completed', 'finished', 'in_progress', 'canceled', 'error', 'lost',
   ],
   jobStatus: ['running', 'done', 'failed', 'cancelled', 'lost'],
-  syncPhase: ['connecting', 'downloading', 'reading', 'done', 'error'],
+  syncPhase: ['connecting', 'downloading', 'resolving', 'checkout', 'reading', 'done', 'error'],
   exitReason: [
     'done', 'time_limit', 'deadline', 'failure_streak', 'cancelled', 'error',
     'stale_detected', 'stale_legacy_pid_dead', 'stale_legacy_no_pid',

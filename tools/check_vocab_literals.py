@@ -69,7 +69,7 @@ VOCABULARIES: dict[str, frozenset[str]] = {
     "DimState": frozenset({"pending", "running", "done", "incomplete"}),
     "Provider": frozenset({"claude", "codex", "gemini", "copilot", "ollama", "llamacpp", "openrouter", "custom"}),
     "FindingType": frozenset({"violation", "compliance"}),
-    "SyncPhase": frozenset({"connecting", "downloading", "reading", "done", "error"}),
+    "SyncPhase": frozenset({"connecting", "downloading", "resolving", "checkout", "reading", "done", "error"}),
 }
 
 VOCAB_WORDS = frozenset().union(*VOCABULARIES.values())

@@ -5,39 +5,34 @@ import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.j
 import '../../../styles/onboarding-welcome.css';
 
 /**
- * The two ways in: score a repository, or connect an evaluations repository
- * (where evaluations are published, yours or your team's). The welcome panel
- * stacks them in its right column; the empty Repositories page lays them out
- * side by side with `compact`.
+ * The three ways in: add a repository to evaluate, connect an evaluations
+ * repository (where evaluations are published, yours or your team's), or
+ * import an archive another machine exported. The welcome panel stacks them
+ * in its right column; the empty Repositories page lays them out side by
+ * side with `compact`.
  *
  * Adapts to what already exists: with local projects the first card's action
  * reads "add another"; with an evaluations repository connected the second
- * card names it and goes to repositories instead of connecting (no button when
- * `onGoToRepositories` is absent: the Repositories tab is already there). Importing one
- * exported archive is the rescue path of "existing evaluations", so it lives
- * on the second card as a link, shown only when `onImport` is wired.
+ * card names it and offers `disconnect` instead of `connect` (the card stays
+ * live either way, so a disconnect flips it back to connect in place). The
+ * third card renders only when `onImport` is wired.
  *
  * @param {object} props
  * @param {boolean} [props.compact]
  * @param {boolean} [props.isEvaluating] - marks start as blocked (aria-disabled + why); the handler swallows the click
  * @param {Function} props.onStart
  * @param {Function} props.onConnect
+ * @param {Function} [props.onDisconnect]
  * @param {Function} [props.onImport]
- * @param {Function} [props.onGoToRepositories]
  * @param {{ connected: boolean, host: string|null, hasLocalProjects: boolean }} props.adaptation
  */
-export default function WelcomePaths({ compact = false, isEvaluating = false, onStart, onConnect, onImport, onGoToRepositories, adaptation }) {
+export default function WelcomePaths({ compact = false, isEvaluating = false, onStart, onConnect, onDisconnect, onImport, adaptation }) {
   const { connected = false, host = null, hasLocalProjects = false } = adaptation ?? {};
   return (
     <div className={`onboarding-paths__cards${compact ? ' onboarding-paths__cards--compact' : ''}`}>
       <RepoPathCard hasLocalProjects={hasLocalProjects} onStart={onStart} isEvaluating={isEvaluating} />
-      <EvalsPathCard
-        connected={connected}
-        host={host}
-        onConnect={onConnect}
-        onImport={onImport}
-        onGoToRepositories={onGoToRepositories}
-      />
+      <EvalsPathCard connected={connected} host={host} onConnect={onConnect} onDisconnect={onDisconnect} />
+      {onImport && <ArchivePathCard onImport={onImport} />}
     </div>
   );
 }
@@ -61,7 +56,7 @@ function RepoPathCard({ hasLocalProjects, onStart, isEvaluating }) {
   );
 }
 
-function EvalsPathCard({ connected, host, onConnect, onImport, onGoToRepositories }) {
+function EvalsPathCard({ connected, host, onConnect, onDisconnect }) {
   return (
     <article className="onboarding-path-card">
       <h3 className="onboarding-path-card__title">{t('onboarding.pathEvalsTitle')}</h3>
@@ -74,9 +69,9 @@ function EvalsPathCard({ connected, host, onConnect, onImport, onGoToRepositorie
       )}
       <div className="onboarding-path-card__actions">
         {connected ? (
-          onGoToRepositories && (
-            <button type="button" className="term-btn term-btn--secondary" onClick={onGoToRepositories}>
-              {t('onboarding.pathEvalsGo')}
+          onDisconnect && (
+            <button type="button" className="term-btn term-btn--secondary" onClick={onDisconnect}>
+              {t('onboarding.pathEvalsDisconnect')}
             </button>
           )
         ) : (
@@ -84,11 +79,20 @@ function EvalsPathCard({ connected, host, onConnect, onImport, onGoToRepositorie
             {t('onboarding.pathEvalsConnect')}
           </button>
         )}
-        {onImport && (
-          <button type="button" className="onboarding-path-card__link" onClick={onImport}>
-            {t('onboarding.pathEvalsImport')}
-          </button>
-        )}
+      </div>
+    </article>
+  );
+}
+
+function ArchivePathCard({ onImport }) {
+  return (
+    <article className="onboarding-path-card">
+      <h3 className="onboarding-path-card__title">{t('onboarding.pathArchiveTitle')}</h3>
+      <p className="onboarding-path-card__desc">{t('onboarding.pathArchiveDesc')}</p>
+      <div className="onboarding-path-card__actions">
+        <button type="button" className="term-btn term-btn--secondary" onClick={onImport}>
+          {t('onboarding.pathArchiveImport')}
+        </button>
       </div>
     </article>
   );

@@ -10,7 +10,13 @@ vi.mock('../hooks/useProviderDetection.js', () => ({
   useProviderDetection: () => ({ status: 'detected', preselection: { id: 'codex-cli', classification: 'cli', model: 'gpt-5.2-codex' } }),
 }));
 
-const shared = vi.hoisted(() => ({ status: { configured: false } }));
+const shared = vi.hoisted(() => ({ status: { configured: false }, disconnect: null }));
+
+// The welcome's connected card runs the app's confirmed disconnect; the hook
+// needs the side pane (toasts), which this test does not mount.
+vi.mock('../../dashboard/hooks/useSharedDisconnect.js', () => ({
+  useSharedDisconnect: () => shared.disconnect,
+}));
 
 vi.mock('../../../api/index.js', () => ({
   registerProject: vi.fn().mockResolvedValue({ projectId: 'uuid-9', scanData: { total_files: 7, languages: { py: 7 }, branches: ['main'], modules: [] } }),
@@ -77,18 +83,22 @@ describe('OnboardingWizard', () => {
     expect(screen.getByText('how quodeq works')).toBeInTheDocument();
   });
 
-  it('a connected evaluations repository shows its host and goes to repositories', async () => {
+  it('a connected evaluations repository shows its host and offers disconnect in place', async () => {
     shared.status = { configured: true, url: 'https://github.com/quodeq/evaluations.git' };
-    const { onGoToRepositories } = renderWizard({ isFirstProject: true });
+    shared.disconnect = vi.fn();
+    renderWizard({ isFirstProject: true, source: WIZARD_SOURCE.SETTINGS });
     expect(await screen.findByText('your evaluations repository is connected · github.com/quodeq/evaluations')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'go to repositories' }));
-    expect(onGoToRepositories).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'connect' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'disconnect' }));
+    expect(shared.disconnect).toHaveBeenCalledTimes(1);
+    // The wizard stays open: the card re-reads the status and flips back to connect.
+    expect(screen.getByText('how quodeq works')).toBeInTheDocument();
   });
 
   it('import closes the wizard without the skip flag and runs the entry import action', async () => {
     const onImportProject = vi.fn();
     const { onClose } = renderWizard({ isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN, onImportProject });
-    fireEvent.click(screen.getByRole('button', { name: 'or import an exported archive' }));
+    fireEvent.click(screen.getByRole('button', { name: 'import' }));
     await waitFor(() => expect(onImportProject).toHaveBeenCalledTimes(1));
     expect(onClose).toHaveBeenCalledWith({ saved: false });
     expect(localStorage.getItem(SKIP_FLAG)).toBeNull();

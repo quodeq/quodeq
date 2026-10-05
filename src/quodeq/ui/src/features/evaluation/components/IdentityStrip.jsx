@@ -20,8 +20,11 @@ export function IdentityStrip({ children }) {
  * @param {React.ReactNode} [props.trailing] Accessory rendered next to the
  *   value but outside it — needed when the value is a button and the
  *   accessory is one too (buttons must not nest)
+ * @param {boolean} [props.attention] Marks a cell the user must act on
+ *   before a scan can start (the model cell with no model chosen): red
+ *   label, red underline under the words
  */
-export function IdentityCell({ label, grow = false, title, onClick, trailing, children }) {
+export function IdentityCell({ label, grow = false, title, onClick, trailing, attention = false, children }) {
   const value = onClick ? (
     <button type="button" className="eval-identity__value eval-identity__value--action" onClick={onClick}>
       {children}
@@ -29,7 +32,7 @@ export function IdentityCell({ label, grow = false, title, onClick, trailing, ch
   ) : (
     <span className="eval-identity__value">{children}</span>
   );
-  const cellClass = `eval-identity__cell${grow ? ' eval-identity__cell--grow' : ''}${onClick ? ' eval-identity__cell--action' : ''}`;
+  const cellClass = `eval-identity__cell${grow ? ' eval-identity__cell--grow' : ''}${onClick ? ' eval-identity__cell--action' : ''}${attention ? ' eval-identity__cell--attention' : ''}`;
   return (
     <div className={cellClass} title={title}>
       <span className="eval-identity__label">{label}</span>

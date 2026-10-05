@@ -55,7 +55,7 @@ function AppShell({ sidebar, header, content, drawer, startupLoader, booting }) 
 }
 
 function AppSidebar({ shell }) {
-  const { state, activeTab, navTab, hasCurrentProjectRuns, sharedSignal, resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned, showStartupLoader } = shell;
+  const { state, activeTab, navTab, selectedProjectInfo, sharedSignal, resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned, showStartupLoader } = shell;
   return (
     <Sidebar
       inert={showStartupLoader || undefined}
@@ -63,7 +63,7 @@ function AppSidebar({ shell }) {
         activeTab,
         navTab,
         selectedSource: state.selectedSource,
-        hasCurrentProjectRuns,
+        selectedProjectInfo,
         sharedProjectInfo: state.sharedProjectInfo,
         projects: state.projects,
         sharedHasContent: sharedSignal.hasContent,

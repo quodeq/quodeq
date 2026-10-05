@@ -82,9 +82,24 @@ export function progressLabel(slot, slotKind, url) {
         ? t('sync.downloading', { percent: Math.round(slot.percent), size })
         : t('sync.downloadingNoSize');
     }
+    case SYNC_PHASE.RESOLVING:
+      return t('sync.resolving', { percent: Math.round(slot.percent ?? 0) });
+    case SYNC_PHASE.CHECKOUT:
+      return t('sync.checkingOut', { percent: Math.round(slot.percent ?? 0) });
     default:
       return t('sync.reading', { count: slot.projectsFound ?? 0 });
   }
+}
+
+/**
+ * Whether the running job reports a percent the bar can show; the download
+ * and git's resolving and checkout do, connecting and reading do not.
+ * @param {Object} slot
+ * @returns {number|null}
+ */
+export function barPercent(slot) {
+  const withPercent = slot.phase === SYNC_PHASE.DOWNLOADING || slot.phase === SYNC_PHASE.RESOLVING || slot.phase === SYNC_PHASE.CHECKOUT;
+  return withPercent && typeof slot.percent === 'number' ? slot.percent : null;
 }
 
 /**
@@ -101,6 +116,9 @@ export function progressAnnouncement(slot, slotKind, url) {
       return progressLabel(slot, slotKind, url);
     case SYNC_PHASE.DOWNLOADING:
       return t('sync.downloadingNoSize');
+    case SYNC_PHASE.RESOLVING:
+    case SYNC_PHASE.CHECKOUT:
+      return t('sync.resolvingAnnounce');
     default:
       return t('sync.readingAnnounce');
   }

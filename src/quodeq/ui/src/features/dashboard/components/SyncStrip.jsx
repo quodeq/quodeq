@@ -1,10 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
 import { t } from '../../../strings/index.js';
 import { relativeTimeFine } from '../../../utils/relativeTime.js';
 import { pluralKey } from '../../../utils/plural.js';
-import { useDismissOnOutside } from '../../../hooks/useDismissOnOutside.js';
+import { useMenuToggle } from '../hooks/useMenuToggle.js';
 import { SyncBar } from './SyncBar.jsx';
-import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel } from './syncStripState.js';
+import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel, barPercent } from './syncStripState.js';
 
 function StripButton({ onClick, label, children }) {
   return (
@@ -14,14 +13,11 @@ function StripButton({ onClick, label, children }) {
   );
 }
 
-// The `⋯` menu: change repository and disconnect (both also in Settings),
-// plus importing an exported archive when the page wires it.
-function StripMenu({ onChange, onImport, onDisconnect }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismissOnOutside(open, rootRef, close);
-  const pick = (fn) => () => { close(); fn?.(); };
+// The `⋯` menu: change repository and disconnect (both also in Settings).
+// Importing an exported archive lives in the header's `more ▾`, which is
+// there whether or not a repository is connected.
+function StripMenu({ onChange, onDisconnect }) {
+  const { open, rootRef, toggle, pick } = useMenuToggle();
   return (
     <span className="sync-strip__menu" ref={rootRef}>
       <button
@@ -30,14 +26,13 @@ function StripMenu({ onChange, onImport, onDisconnect }) {
         aria-label={t('sync.moreAria')}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         <span aria-hidden="true">⋯</span>
       </button>
       {open && (
         <div className="projects-filter-pill-menu sync-strip__menu-list" role="menu" aria-label={t('sync.moreAria')}>
           <button type="button" role="menuitem" onClick={pick(onChange)}>{t('sync.changeRepo')}</button>
-          {onImport && <button type="button" role="menuitem" onClick={pick(onImport)}>{t('sync.importArchive')}</button>}
           <button type="button" role="menuitem" onClick={pick(onDisconnect)}>{t('sync.disconnect')}</button>
         </div>
       )}
@@ -119,7 +114,7 @@ function StripAnnouncement({ state, status, children }) {
  */
 export default function SyncStrip({
   status, offline = false, updateFailed = false, loadFailed = false, lastSynced, projectsCount = 0, invite,
-  onUpdate, onCopyInvite, onChange, onImport, onDisconnect,
+  onUpdate, onCopyInvite, onChange, onDisconnect,
 }) {
   const state = pickStripState({ status, offline, updateFailed, loadFailed });
   if (state.kind === STRIP_STATE.HIDDEN) return null;
@@ -134,13 +129,13 @@ export default function SyncStrip({
         <StripLabel state={state} status={status} when={when} projectsCount={projectsCount} onUpdate={onUpdate} />
       </StripAnnouncement>
       <span className="sync-strip__grow" />
-      {working ? <SyncBar percent={state.slot.percent} label={t('sync.progressAria')} /> : (
+      {working ? <SyncBar percent={barPercent(state.slot)} label={t('sync.progressAria')} /> : (
         <span className="sync-strip__actions">
           {state.kind === STRIP_STATE.SYNCED && onUpdate && (
             <StripButton onClick={onUpdate} label={t('sync.updateAria')}><span aria-hidden="true">⟳</span> {t('sync.update')}</StripButton>
           )}
           <InviteControl invite={invite} onCopyInvite={onCopyInvite} />
-          <StripMenu onChange={onChange} onImport={onImport} onDisconnect={onDisconnect} />
+          <StripMenu onChange={onChange} onDisconnect={onDisconnect} />
         </span>
       )}
     </div>

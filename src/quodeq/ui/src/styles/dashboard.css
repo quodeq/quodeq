@@ -2960,6 +2960,18 @@
   flex-wrap: wrap;
 }
 
+/* The header's `more ▾`: the pill menu anchored to the button's right edge,
+   wide enough for "add evaluations repository" on one line. */
+.projects-page__more {
+  position: relative;
+  display: inline-flex;
+}
+.projects-page__more-list {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+}
+
 /* Disabled (evaluation in progress) — `aria-disabled` keeps the click
    firing so a snackbar can explain the block, so we can't rely on
    the native :disabled selector. */
@@ -2977,6 +2989,11 @@
   .projects-page__import-btn {
     flex: 1 1 auto;
     justify-content: center;
+  }
+  /* The menu's wrapper stretches too, so `more` and `add project` share the row as equals. */
+  .projects-page__more {
+    flex: 1 1 auto;
+    display: flex;
   }
 }
 
@@ -3603,6 +3620,26 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
+/* The strip's bar sizes itself along a row (flex-basis 180px); inside the
+   tile's column that basis became its height. Here it is a 6 px line
+   across the tile. */
+.project-card--ghost .sync-strip__bar {
+  flex: none;
+  width: 100%;
+}
+/* Placeholder cards while a connect reads the team's projects: the tile's
+   dashed look with two faint lines where the name and the path will be. */
+.project-card--placeholder {
+  min-height: 72px;
+  justify-content: center;
+}
+.project-card--placeholder__line {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--color-surface-alt);
+}
+.project-card--placeholder__line--name { width: 38%; }
+.project-card--placeholder__line--meta { width: 24%; }
 .project-card--ghost__error {
   display: flex;
   align-items: center;

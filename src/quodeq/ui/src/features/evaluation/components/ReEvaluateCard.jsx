@@ -82,7 +82,7 @@ function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScope
   );
 }
 
-function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, allDimensions, selectedDims, toggleDim, selectAll, clearAll, dimMetas, estimatesLoading, handleScan, estimates, budget }) {
+function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, allDimensions, selectedDims, toggleDim, selectAll, clearAll, dimMetas, estimatesLoading, handleScan, estimates, budget, hasModel }) {
   return (
     <>
       <ScanModeCards value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
@@ -110,6 +110,7 @@ function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, a
         estimates={estimates}
         cleanScan={cleanScan}
         timeLimitS={budget.timeLimitS}
+        hasModel={hasModel}
       />
     </>
   );
@@ -171,6 +172,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         handleScan={handleScan}
         estimates={estimates}
         budget={budget}
+        hasModel={Boolean(activeModel)}
       />
     </div>
   );

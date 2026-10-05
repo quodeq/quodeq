@@ -1,88 +1,54 @@
-import { useEffect, useState } from 'react';
 import { REPO_SOURCE } from '../onboardingVocab.js';
-import { defaultStandardIds, describeStandards, toggledStandards } from '../standardSelection.js';
 import { useFolderPicker } from '../../dashboard/hooks/useFolderPicker.jsx';
-import { useReviewer } from './useReviewer.js';
 import { useWorkingCopy } from './useWorkingCopy.js';
 import { t } from '../../../strings/index.js';
 
-// The standard row: the wizard's pick (the default until the user changes
-// it), how it reads, and the picker's open state.
-function useStandardPick({ wizard, standards }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const picked = Array.from(wizard.state.standardIds);
-  const ids = picked.length > 0 ? picked : defaultStandardIds(standards);
-  return {
-    ids,
-    ...describeStandards(standards, ids),
-    // False while the standards list is still loading (no name to show yet).
-    ready: standards.length > 0,
-    pickerOpen,
-    openPicker: () => setPickerOpen(true),
-    closePicker: () => setPickerOpen(false),
-    pick: (id) => wizard.pickStandards(toggledStandards(standards, ids, id)),
-  };
-}
+// A scheme (https://, ssh://, file://), an scp-style git@host:path, or a
+// user@host:path reads as a url; anything else is a path on this machine.
+const URL_SHAPE = /^(?:[a-z][a-z0-9+.-]*:\/\/|git@|[\w.-]+@[\w.-]+:)/i;
 
-// The reviewer feeds the wizard's provider (and the configured time limit),
-// which the launch payload reads. Keyed on the values alone: the wizard
-// bundle is a new object every render, its setters are stable.
-function useSyncProvider(wizard, provider) {
-  const { id, model, classification } = provider.selection ?? {};
-  const { setProvider, setTimeLimit } = wizard;
-  useEffect(() => {
-    if (id) setProvider({ id, model: model ?? null, classification: classification ?? null });
-  }, [id, model, classification, setProvider]);
-  useEffect(() => {
-    if (provider.timeLimitS !== null) setTimeLimit(provider.timeLimitS);
-  }, [provider.timeLimitS, setTimeLimit]);
+/**
+ * Which source a typed value is: a git url or a local folder.
+ * @param {string} value
+ * @returns {string} REPO_SOURCE.URL or REPO_SOURCE.FOLDER
+ */
+export function inferRepoSource(value) {
+  return URL_SHAPE.test((value || '').trim()) ? REPO_SOURCE.URL : REPO_SOURCE.FOLDER;
 }
 
 /**
- * The analyze screen's form: the repository (a pasted url or a picked folder,
- * kept in the wizard's `repo`), its working copy, who reviews it and against
- * which standard. A returning user (a provider configured in Settings) sees
- * the last two `collapsed` into one summary line until `expand`.
+ * The add panel's form: one field that takes a git url or a local folder
+ * path (the source is read from the value), a `local folder` button that
+ * fills it from the folder picker, and the working copy a url is cloned to.
  *
- * `request()` is what the launch sends: the repository, its source, the
- * standard ids and, only when the user picked a root, `cloneDest`.
+ * `request()` is what the add sends: the repository, its source and, only
+ * when the user picked a root, `cloneDest`.
  *
- * @param {{ wizard: object, standards: object[], detect?: () => Promise<object[]> }} args
+ * @param {{ wizard: object }} args
  */
-export function useAnalyzeForm({ wizard, standards, detect }) {
-  const { source, value: repo } = wizard.state.repo;
-  const [expanded, setExpanded] = useState(false);
+export function useAnalyzeForm({ wizard }) {
+  const { value: repo } = wizard.state.repo;
   const { browseFolder, picker: repoPicker } = useFolderPicker({ title: t('onboarding.repoFolderPickerTitle') });
-  const workingCopy = useWorkingCopy(source === REPO_SOURCE.URL ? repo : '');
-  const provider = useReviewer({ detect });
-  const standard = useStandardPick({ wizard, standards });
-  useSyncProvider(wizard, provider);
-
   const trimmed = repo.trim();
-  // A model is required for every provider: a detection without one is not ready.
-  const reviewerReady = provider.configured || Boolean(provider.selection?.model);
+  const source = inferRepoSource(trimmed);
+  const workingCopy = useWorkingCopy(source === REPO_SOURCE.URL ? trimmed : '');
+
   const request = () => ({
     repo: trimmed,
     source,
-    standardIds: standard.ids,
     ...(source === REPO_SOURCE.URL && workingCopy.cloneDest ? { cloneDest: workingCopy.cloneDest } : {}),
   });
 
   return {
     source,
-    setSource: (next) => { if (next !== source) wizard.setRepo({ source: next, value: '' }); },
     repo,
-    setRepo: (value) => wizard.setRepo({ value }),
+    setRepo: (value) => wizard.setRepo({ source: inferRepoSource(value), value }),
     browseRepoFolder: async () => {
       const path = await browseFolder();
-      if (path) wizard.setRepo({ value: path });
+      if (path) wizard.setRepo({ source: REPO_SOURCE.FOLDER, value: path });
     },
     workingCopy,
-    provider,
-    standard,
-    collapsed: provider.configured && !expanded,
-    expand: () => setExpanded(true),
-    canSubmit: Boolean(trimmed) && standard.ids.length > 0 && reviewerReady,
+    canSubmit: Boolean(trimmed),
     request,
     // The folder browsers' modals (null while closed): render both.
     pickers: { repo: repoPicker, workingCopy: workingCopy.picker },
