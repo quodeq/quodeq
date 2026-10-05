@@ -167,7 +167,8 @@ function makeHandleImportProject({ importProject, refreshProjects, fail }) {
       return fail('projects.importProjectFailed', { error: attempt.err.message || t('common.unknownError') });
     }
     refreshProjects();
-    return { ok: true };
+    // The imported project's id, so the caller can land on it.
+    return { ok: true, projectId: attempt.result?.projectId ?? null };
   };
 }
 

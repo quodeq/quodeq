@@ -2,6 +2,7 @@ import { t } from '../strings/index.js';
 import { STEP_WELCOME, STEP_ANALYZE, STEP_PROVIDER, STEP_CONNECT } from '../features/onboarding/wizardSteps.js';
 import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 import { NAV_TAB } from '../vocab/navTab.js';
+import { selectLandedProject } from '../hooks/selectLandedProject.js';
 
 // Every navigation action is blocked while an evaluation runs: the guard
 // toasts the action's own "busy" message and swallows the click. Written once
@@ -26,10 +27,18 @@ function makeOnStartAnalyze({ isEvaluating, showToast, setWizardEntry, projects 
   );
 }
 
-function makeOnImportProject({ isEvaluating, showToast, handleImportProject }) {
+// An import that lands ends like an add: on the Repositories tab, with the
+// imported project selected there (or when nothing was selected yet).
+function makeOnImportProject({ isEvaluating, showToast, handleImportProject, navTab, state }) {
   return guardedWhileEvaluating(
     { isEvaluating, showToast, busyKey: 'evaluate.busyImportProject' },
-    () => handleImportProject(),
+    async () => {
+      const outcome = await handleImportProject();
+      if (!outcome?.ok) return outcome;
+      navTab(NAV_TAB.PROJECTS);
+      selectLandedProject({ ...state, activeTab: NAV_TAB.PROJECTS }, outcome.projectId);
+      return outcome;
+    },
   );
 }
 
@@ -96,7 +105,7 @@ function makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }) {
  */
 export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
   const projects = state.projects ?? [];
-  const onImportProject = makeOnImportProject({ isEvaluating, showToast, handleImportProject: state.handleImportProject });
+  const onImportProject = makeOnImportProject({ isEvaluating, showToast, handleImportProject: state.handleImportProject, navTab, state });
   const onStartAnalyze = makeOnStartAnalyze({ isEvaluating, showToast, setWizardEntry, projects });
   return {
     ...state,

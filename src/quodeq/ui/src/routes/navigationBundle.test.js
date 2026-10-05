@@ -126,6 +126,28 @@ test('buildNavigationBundle opens the welcome as a first project when there are 
   assert.equal(entries[0].isFirstProject, true);
 });
 
+test('an import that lands goes to the repositories tab and selects the imported project', async () => {
+  const navs = [];
+  const picks = [];
+  const bundle = buildNavigationBundle(args({
+    projects: [{ id: 'a' }], selectedProject: 'a', activeTab: 'overview',
+    handleImportProject: async () => ({ ok: true, projectId: 'p-imp' }),
+    handleProjectChange: (...call) => picks.push(call),
+  }, { navTab: (tab) => navs.push(tab) }));
+  await bundle.onImportProject();
+  assert.deepEqual(navs, ['projects']);
+  assert.deepEqual(picks, [['p-imp', 'local']]);
+});
+
+test('a cancelled or failed import stays where it was', async () => {
+  const navs = [];
+  const bundle = buildNavigationBundle(args({
+    projects: [{ id: 'a' }], handleImportProject: async () => ({ ok: false, cancelled: true }),
+  }, { navTab: (tab) => navs.push(tab) }));
+  await bundle.onImportProject();
+  assert.deepEqual(navs, []);
+});
+
 test('onConnectEvaluations opens the wizard on the connect step', () => {
   const entries = [];
   const bundle = buildNavigationBundle(args({ projects: [{ id: 'a' }], handleImportProject: () => {} }, {
