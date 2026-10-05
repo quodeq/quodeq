@@ -17,6 +17,7 @@ from quodeq.api.app import create_app
 from quodeq.assistant.tools import build_registry
 from quodeq.services.score_cache import get_score_cache_path, score_cache_path_override
 from quodeq.data.fs.shared_repo import shared_evaluations_root, shared_score_cache_path
+from tests.api._routes_shared_read_fixtures import get_shared_settled
 
 
 @pytest.fixture()
@@ -91,8 +92,9 @@ def test_shared_get_scores_matches_shared_route(client, app, shared_clone_fixtur
     registry = build_registry(ctx)
     with score_cache_path_override(ctx.score_cache_path):
         tool_result = registry.dispatch("get_scores", {})
-    route = client.get(
-        "/api/shared/projects/proj-a/scores?refresh=1").get_json()
+    # A cold shared project answers pending until the clone's worker has
+    # warmed it; the comparison reads the settled payload.
+    route = get_shared_settled(client, "/api/shared/projects/proj-a/scores?refresh=1").get_json()
     assert tool_result.get("ok") is True
     # Shape adaptation (brief's LOCK: dispatch succeeds AND the dimension set
     # equals the shared route's -- only the key paths below were adjusted):

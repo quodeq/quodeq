@@ -36,10 +36,10 @@
     "score_cache_opens": 12
   },
   "project_warm_10": {
-    "eval_report_reads": 60,
+    "eval_report_reads": 70,
     "evaluation_db_opens": 390,
     "response_bytes": 0,
-    "score_cache_opens": 110
+    "score_cache_opens": 120
   },
   "run_page_findings_warm": {
     "evaluation_db_opens": 5,

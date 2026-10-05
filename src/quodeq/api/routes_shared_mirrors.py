@@ -37,6 +37,7 @@ from quodeq.services.github_access import refresh_access_env
 from quodeq.services.run_constants import LATEST_RUN
 from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
+from quodeq.services import shared_listing
 from quodeq.services.shared_listing import enrich_shared_info, list_shared_projects
 from quodeq.services.shared_repo import (
     refresh_shared_clone,
@@ -122,12 +123,25 @@ def shared_runs(project: str, eval_root: Path, url: str):
     return jsonify({"runs": runs})
 
 
+def _pending_response(eval_root: Path, url: str, project: str) -> tuple[Response, int] | None:
+    """202 with the pending body while the shared warm-up still owes *project*, else None.
+
+    The three Overview mirrors answer this way so a cold shared project is
+    warmed by the clone's worker and opened once, instead of being built
+    inline on every retry until the client gives up.
+    """
+    deferred = shared_listing.shared_warmup.defer(eval_root, url, project)
+    if deferred is None:
+        return None
+    return jsonify(deferred), HTTPStatus.ACCEPTED
+
+
 @with_shared_root
-def shared_dashboard(project: str, eval_root: Path):
+def shared_dashboard(project: str, eval_root: Path, url: str):
     """Return one run's dashboard payload from the shared clone. ``?run=`` defaults to latest."""
-    err = validate_segment(project)
-    if err:
-        return err
+    early = validate_segment(project) or _pending_response(eval_root, url, project)
+    if early:
+        return early
     run = request.args.get("run", LATEST_RUN)
     try:
         payload = fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
@@ -137,11 +151,11 @@ def shared_dashboard(project: str, eval_root: Path):
 
 
 @with_shared_root
-def shared_accumulated(project: str, eval_root: Path):
+def shared_accumulated(project: str, eval_root: Path, url: str):
     """Return the shared clone's accumulated-score history, optionally cut at ``?asOf=``."""
-    err = validate_segment(project)
-    if err:
-        return err
+    early = validate_segment(project) or _pending_response(eval_root, url, project)
+    if early:
+        return early
     as_of = request.args.get("asOf")
     payload = fs_reports.get_accumulated(str(eval_root), project, as_of, log=SHARED_LOG)
     if payload is None:
@@ -150,11 +164,11 @@ def shared_accumulated(project: str, eval_root: Path):
 
 
 @with_shared_root
-def shared_scores(project: str, eval_root: Path):
+def shared_scores(project: str, eval_root: Path, url: str):
     """Return the shared clone's per-dimension scores, optionally cut at ``?asOf=``."""
-    err = validate_segment(project)
-    if err:
-        return err
+    early = validate_segment(project) or _pending_response(eval_root, url, project)
+    if early:
+        return early
     result, err = _load_shared_scores(eval_root, project)
     if err:
         return err

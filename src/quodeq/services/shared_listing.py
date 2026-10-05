@@ -22,6 +22,7 @@ from quodeq.services import fs_projects
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import last_synced_at, published_meta, shared_score_cache_path
 from quodeq.services.warmup import WarmupEngine, warm_project
+from quodeq.services.warmup_defer import defer_to_warmup, summary_is_pending
 
 
 def _warm_under_clone_cache(url: str) -> Callable[[str, str], None]:
@@ -76,6 +77,28 @@ class SharedWarmup:
             engine = self._engine
         return engine.snapshot() if engine is not None else None
 
+    def defer(
+        self, eval_root: Path, url: str, project_id: str, *,
+        summary_pending: Callable[[str, str], bool] | None = None,
+    ) -> dict | None:
+        """The pending body a shared Overview mirror answers with, or None to build inline.
+
+        A cold project the engine does not know yet (a stored selection
+        opened before any listing) is queued here, so the mirror never
+        builds it inline. Runs under the route's cache override, so the
+        probe reads the clone's own cache. *summary_pending* is a test seam.
+        """
+        self.bind(eval_root, url)
+        with self._lock:
+            engine = self._engine
+        if engine is None:
+            return None
+        probe = summary_pending if summary_pending is not None else summary_is_pending
+        pending = probe(str(eval_root), project_id)
+        if pending and not engine.owes(project_id):
+            engine.enqueue(project_id)
+        return defer_to_warmup(str(eval_root), project_id, engine=engine, summary_pending=lambda *_: pending)
+
     def reset_for_tests(self) -> None:
         """Stop the worker and forget the bound clone (test seam)."""
         with self._lock:
@@ -117,12 +140,13 @@ def _hydrate(eval_root: Path, url: str) -> tuple[list[ProjectEntry], dict[str, d
     publish's `pull --rebase` refuse (confusing wedge) the next time someone
     publishes into this clone.
 
-    A missing project-card summary is reported pending and queued on
-    ``shared_warmup``, never computed inline here: on a fresh clone or after
-    an upgrade that would mean every project's summary inside one request,
-    which outlasted the UI's timeout and hid every card until the last one
-    was scored. The cards land one by one as the worker fills the clone's
-    score cache and the UI re-lists while any is pending.
+    A missing project-card summary is queued on ``shared_warmup``, never
+    computed inline here: on a fresh clone or after an upgrade that would
+    mean every project's summary inside one request, which outlasted the
+    UI's timeout and hid every card until the last one was scored. The entry
+    is still returned marked pending; ``list_shared_projects`` keeps such a
+    card off the listing until the worker has warmed it, so a team's results
+    land one by one, each one ready to open.
     """
     projects = fs_projects.build_project_list(eval_root, backfill=False, inline_summaries=False)
     shared_warmup.bind(eval_root, url)
@@ -175,7 +199,11 @@ def list_shared_projects(
         else:
             stale = True
     projects, meta = _hydrate(eval_root, url)
-    listing = {"projects": [serialize(p) for p in projects]}
+    # A card still being warmed stays off the listing (the payload's
+    # ``warmup`` counts it): Victor's ruling is that a shared card appears
+    # only once it is fully readable, never as a placeholder whose Overview
+    # then loads again and again.
+    listing = {"projects": [serialize(p) for p in projects if not getattr(p, "summary_pending", False)]}
     for project in listing["projects"]:
         key = project.get("id") or project.get("name")
         _merge_published_meta(project, key, meta)

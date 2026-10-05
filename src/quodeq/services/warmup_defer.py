@@ -16,7 +16,7 @@ from quodeq.services import warmup as _warmup
 from quodeq.services.warmup import WarmupEngine
 
 
-def _summary_is_pending(reports_dir: str, project_id: str) -> bool:
+def summary_is_pending(reports_dir: str, project_id: str) -> bool:
     """True when the project's card summary is a cache miss the engine has yet to fill."""
     from quodeq.services.wiring import list_runs  # noqa: PLC0415
     from quodeq.services._fs_metadata import read_accumulated_summary  # noqa: PLC0415
@@ -50,7 +50,7 @@ def defer_to_warmup(
     target.prioritise(project_id)
     if not target.owes(project_id):
         return None
-    probe = summary_pending if summary_pending is not None else _summary_is_pending
+    probe = summary_pending if summary_pending is not None else summary_is_pending
     if not probe(reports_dir, project_id):
         return None
     return {"pending": True, "warmup": target.snapshot()}
