@@ -6,14 +6,19 @@ import StandardLaunchStep from './steps/StandardLaunchStep.jsx';
 import { STEP_WELCOME, STEP_CONNECT, STEP_ANALYZE, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
 import { WIZARD_SOURCE } from '../onboardingVocab.js';
 import { useSharedConnection } from '../../dashboard/hooks/useSharedProjects.js';
+import { useSharedDisconnect } from '../../dashboard/hooks/useSharedDisconnect.js';
 
 /**
  * The welcome, fed what already exists: the connected evaluations repository
  * (a passive read of the shared status, no poll), whether local projects
  * exist (an entry with isFirstProject=false) and whether Settings opened it.
+ * The connected card's `disconnect` runs the same confirmed disconnect as
+ * the strip and Settings; the card then reads the new status and flips back
+ * to `connect` in place.
  */
-function WelcomeRoute({ wizard, entry, handleSkipWelcome, handleImport, onGoToRepositories }) {
+function WelcomeRoute({ wizard, entry, handleSkipWelcome, handleImport }) {
   const { configured, host } = useSharedConnection();
+  const disconnect = useSharedDisconnect({ onDisconnected: entry.onSharedDisconnected });
   const adaptation = {
     connected: configured,
     host,
@@ -24,9 +29,9 @@ function WelcomeRoute({ wizard, entry, handleSkipWelcome, handleImport, onGoToRe
     <WelcomeStep
       onStart={() => wizard.goToStep(STEP_ANALYZE)}
       onConnect={() => wizard.goToStep(STEP_CONNECT)}
+      onDisconnect={disconnect}
       onImport={entry.onImportProject ? () => handleImport(entry.onImportProject) : undefined}
       onSkip={handleSkipWelcome}
-      onGoToRepositories={onGoToRepositories}
       adaptation={adaptation}
     />
   );
@@ -67,7 +72,6 @@ export function OnboardingStepSwitch({
           entry={entry}
           handleSkipWelcome={handleSkipWelcome}
           handleImport={handleImport}
-          onGoToRepositories={onGoToRepositories}
         />
       )}
 

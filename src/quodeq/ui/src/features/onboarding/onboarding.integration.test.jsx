@@ -43,6 +43,9 @@ vi.mock('./hooks/useProviderDetection.js', () => ({
 vi.mock('../settings/components/ProviderTabs.jsx', () => ({
   default: () => <div data-testid="provider-tabs-stub" />,
 }));
+// The welcome's connected card runs the app's confirmed disconnect, which
+// needs the side pane (toasts); this walk never mounts it.
+vi.mock('../dashboard/hooks/useSharedDisconnect.js', () => ({ useSharedDisconnect: () => vi.fn() }));
 
 import OnboardingWizard from './components/OnboardingWizard.jsx';
 import { withQueryClient } from '../../test-utils/withQueryClient.jsx';

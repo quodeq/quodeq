@@ -18,31 +18,46 @@ vi.mock('../../../utils/clipboard.js', () => ({ copyToClipboard: vi.fn(async () 
 afterEach(() => { vi.clearAllMocks(); });
 
 describe('ProjectsPage — header actions', () => {
-  it('shows connect evaluations repository and add project while nothing is connected, and no import', async () => {
+  it('shows add project and a more menu with add evaluations repository and import project while nothing is connected', async () => {
+    const user = userEvent.setup();
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(api.getSyncStatus).toHaveBeenCalled());
-    expect(screen.getByRole('button', { name: 'connect evaluations repository' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add project' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /import evaluations/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'connect evaluations repository' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'more ways to add' }));
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['add evaluations repository', 'import project']);
   });
 
-  it('drops "connect evaluations repository" once a repository is configured, and counts both sides', async () => {
+  it('once a repository is configured the menu reads change repository, and the header counts both sides', async () => {
+    const user = userEvent.setup();
     const { api } = makeApi({ configured: true });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(screen.getByText('1 local · 1 published')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'connect evaluations repository' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add project' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'more ways to add' }));
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['change repository', 'import project']);
   });
 
-  it('"connect evaluations repository" opens the connect step, not an inline card', async () => {
+  it('"add evaluations repository" opens the connect step, not an inline card', async () => {
     const user = userEvent.setup();
     const onConnectEvaluations = vi.fn();
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={LOCAL} actions={{ ...pageActions, onConnectEvaluations }} />);
-    await user.click(await screen.findByRole('button', { name: 'connect evaluations repository' }));
+    await user.click(await screen.findByRole('button', { name: 'more ways to add' }));
+    await user.click(screen.getByRole('menuitem', { name: 'add evaluations repository' }));
     expect(onConnectEvaluations).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('textbox', { name: /evaluations repository url/i })).not.toBeInTheDocument();
+  });
+
+  it('"import project" in the menu runs the import, connected or not', async () => {
+    const user = userEvent.setup();
+    const onImportProject = vi.fn();
+    const { api } = makeApi();
+    renderPage(api, <ProjectsPage projects={LOCAL} actions={{ ...pageActions, onImportProject }} />);
+    await user.click(await screen.findByRole('button', { name: 'more ways to add' }));
+    await user.click(screen.getByRole('menuitem', { name: 'import project' }));
+    expect(onImportProject).toHaveBeenCalledTimes(1);
   });
 
   it('a running first connect shows its progress in the strip, with no form', async () => {
@@ -56,23 +71,24 @@ describe('ProjectsPage — header actions', () => {
 });
 
 describe('ProjectsPage — the empty page', () => {
-  it('shows the two paths instead of an add-first call to action, and no inline connect form', async () => {
+  it('shows the three paths instead of an add-first call to action, and no inline connect form', async () => {
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
     await waitFor(() => expect(screen.getByText('A repository')).toBeInTheDocument());
     expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
+    expect(screen.getByText('An exported archive')).toBeInTheDocument();
     expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /evaluations repository url/i })).not.toBeInTheDocument();
   });
 
-  it('start opens the analyze screen (not the welcome), connect opens the connect step and the link imports an archive', async () => {
+  it('start opens the add panel (not the welcome), connect opens the connect step and import imports an archive', async () => {
     const user = userEvent.setup();
     const actions = { onAddProject: vi.fn(), onStartAnalyze: vi.fn(), onImportProject: vi.fn(), onConnectEvaluations: vi.fn() };
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={[]} actions={actions} />);
     await user.click(await screen.findByRole('button', { name: 'start' }));
     await user.click(screen.getByRole('button', { name: 'connect' }));
-    await user.click(screen.getByRole('button', { name: 'or import an exported archive' }));
+    await user.click(screen.getByRole('button', { name: 'import' }));
     expect(actions.onStartAnalyze).toHaveBeenCalledTimes(1);
     expect(actions.onAddProject).not.toHaveBeenCalled();
     expect(actions.onConnectEvaluations).toHaveBeenCalledTimes(1);
@@ -129,7 +145,7 @@ describe('ProjectsPage — sync strip actions', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await user.click(await screen.findByRole('button', { name: 'copy invite' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'copied' })).toBeInTheDocument());
-    expect(copyToClipboard).toHaveBeenCalledWith(`Open quodeq, choose Connect evaluations repository, paste ${URL}`);
+    expect(copyToClipboard).toHaveBeenCalledWith(`Open quodeq, on Repositories choose more › add evaluations repository, paste ${URL}`);
   });
 
   it('without a clipboard the invite text shows inline, read-only', async () => {
@@ -139,7 +155,7 @@ describe('ProjectsPage — sync strip actions', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await user.click(await screen.findByRole('button', { name: 'copy invite' }));
     const field = await screen.findByRole('textbox', { name: 'invite text for others' });
-    expect(field).toHaveValue(`Open quodeq, choose Connect evaluations repository, paste ${URL}`);
+    expect(field).toHaveValue(`Open quodeq, on Repositories choose more › add evaluations repository, paste ${URL}`);
     expect(field).toHaveAttribute('readonly');
   });
 
@@ -152,16 +168,6 @@ describe('ProjectsPage — sync strip actions', () => {
     await user.click(screen.getByRole('menuitem', { name: 'change repository' }));
     expect(onConnectEvaluations).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('textbox', { name: /evaluations repository url/i })).not.toBeInTheDocument();
-  });
-
-  it('the ⋯ menu imports an evaluations archive', async () => {
-    const user = userEvent.setup();
-    const onImportProject = vi.fn();
-    const { api } = makeApi({ configured: true });
-    renderPage(api, <ProjectsPage projects={LOCAL} actions={{ ...pageActions, onImportProject }} />);
-    await user.click(await screen.findByRole('button', { name: 'more repository actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'import evaluations archive' }));
-    expect(onImportProject).toHaveBeenCalledTimes(1);
   });
 
   it('disconnect confirms, calls the API and hands the selection back to the app', async () => {

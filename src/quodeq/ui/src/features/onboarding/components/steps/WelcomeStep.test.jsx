@@ -7,7 +7,7 @@ const FRESH = { connected: false, host: null, hasLocalProjects: false, fromSetti
 
 function renderWelcome(adaptation = {}, handlers = {}) {
   const props = {
-    onStart: vi.fn(), onConnect: vi.fn(), onImport: vi.fn(), onSkip: vi.fn(), onGoToRepositories: vi.fn(),
+    onStart: vi.fn(), onConnect: vi.fn(), onDisconnect: vi.fn(), onImport: vi.fn(), onSkip: vi.fn(),
     ...handlers,
   };
   render(<WelcomeStep {...props} adaptation={{ ...FRESH, ...adaptation }} />);
@@ -15,23 +15,30 @@ function renderWelcome(adaptation = {}, handlers = {}) {
 }
 
 describe('WelcomeStep', () => {
-  it('shows how it works and the two paths, start opens analyze, connect opens connect', () => {
-    const onStart = vi.fn(); const onConnect = vi.fn();
-    render(<WelcomeStep onStart={onStart} onConnect={onConnect} onSkip={() => {}} onGoToRepositories={() => {}} adaptation={FRESH} />);
+  it('shows how it works and the three paths: start opens analyze, connect opens connect, import imports', () => {
+    const { onStart, onConnect, onImport } = renderWelcome();
     expect(screen.getByText('how quodeq works')).toBeInTheDocument();
     expect(screen.getByText('scan')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'start' })); expect(onStart).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'connect' })); expect(onConnect).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'import' })); expect(onImport).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'skip for now' })).toBeInTheDocument();
   });
 
-  it('numbers the three rows and titles both paths', () => {
+  it('numbers the three rows and titles the three paths', () => {
     renderWelcome();
     expect(screen.getAllByText(/^0[123]$/).map((n) => n.textContent)).toEqual(['01', '02', '03']);
     expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       expect.stringContaining('scan'), expect.stringContaining('review'), expect.stringContaining('score'),
     ]);
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['A repository', 'An evaluations repository']);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'A repository', 'An evaluations repository', 'An exported archive',
+    ]);
+  });
+
+  it('the repository card names the code to evaluate, not a score', () => {
+    renderWelcome();
+    expect(screen.getByText('the code you want to evaluate, a local folder or a git url.')).toBeInTheDocument();
   });
 
   it('skip for now calls onSkip', () => {
@@ -40,12 +47,12 @@ describe('WelcomeStep', () => {
     expect(onSkip).toHaveBeenCalledTimes(1);
   });
 
-  it('adapts: connected shows the host and go to repositories instead of connect', () => {
-    const { onGoToRepositories } = renderWelcome({ connected: true, host: 'github.com/quodeq/evaluations' });
+  it('adapts: connected names the host and offers disconnect instead of connect', () => {
+    const { onDisconnect } = renderWelcome({ connected: true, host: 'github.com/quodeq/evaluations' });
     expect(screen.getByText('your evaluations repository is connected · github.com/quodeq/evaluations')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'connect' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'go to repositories' }));
-    expect(onGoToRepositories).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'disconnect' }));
+    expect(onDisconnect).toHaveBeenCalledTimes(1);
   });
 
   it('connected without a host never renders a null host', () => {
@@ -66,14 +73,9 @@ describe('WelcomeStep', () => {
     expect(screen.queryByRole('button', { name: 'skip for now' })).not.toBeInTheDocument();
   });
 
-  it('the evaluations card offers importing an exported archive', () => {
-    const { onImport } = renderWelcome();
-    fireEvent.click(screen.getByRole('button', { name: 'or import an exported archive' }));
-    expect(onImport).toHaveBeenCalledTimes(1);
-  });
-
-  it('hides the import link when no import action is wired', () => {
+  it('hides the archive card when no import action is wired', () => {
     renderWelcome({}, { onImport: undefined });
-    expect(screen.queryByRole('button', { name: 'or import an exported archive' })).not.toBeInTheDocument();
+    expect(screen.queryByText('An exported archive')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'import' })).not.toBeInTheDocument();
   });
 });

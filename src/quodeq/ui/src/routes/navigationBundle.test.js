@@ -78,16 +78,16 @@ test('buildNavigationBundle action handlers short-circuit while evaluating', () 
   assert.equal(toasts.length, 4);
 });
 
-test('add project opens the welcome, where the first card reads add another', () => {
+test('add project opens the add panel directly, never the welcome', () => {
   const entries = [];
   const bundle = buildNavigationBundle(args({ projects: [{ id: 'a' }], handleImportProject: () => {} }, {
     setWizardEntry: (e) => entries.push(e),
   }));
   bundle.onAddProject();
-  assert.equal(entries[0].startStep, STEP_WELCOME);
+  assert.equal(entries[0].startStep, STEP_ANALYZE);
   assert.equal(entries[0].source, WIZARD_SOURCE.ADD);
   assert.equal(entries[0].isFirstProject, false);
-  assert.equal(entries[0].onImportProject, bundle.onImportProject);
+  assert.equal(bundle.onAddProject, bundle.onStartAnalyze);
 });
 
 test('onStartAnalyze opens the analyze screen directly, never the welcome again', () => {
@@ -104,16 +104,19 @@ test('buildNavigationBundle entries carry where the wizard was opened from', () 
   const bundle = buildNavigationBundle(args({ projects: [{ id: 'a' }], handleImportProject: () => {} }, {
     setWizardEntry: (e) => entries.push(e),
   }));
+  const reselect = () => {};
   bundle.onAddProject();
   bundle.onTakeTour();
-  bundle.onTakeTour(WIZARD_SOURCE.SETTINGS);
+  bundle.onTakeTour(WIZARD_SOURCE.SETTINGS, reselect);
   assert.deepEqual(entries.map((e) => [e.startStep, e.source, e.isFirstProject]), [
-    [STEP_WELCOME, WIZARD_SOURCE.ADD, false],
+    [STEP_ANALYZE, WIZARD_SOURCE.ADD, false],
     [STEP_WELCOME, WIZARD_SOURCE.ADD, false],
     [STEP_WELCOME, WIZARD_SOURCE.SETTINGS, false],
   ]);
-  // The welcome's "or import an exported archive" runs the bundle's guarded import.
+  // The welcome's archive card runs the bundle's guarded import; its
+  // connected card's disconnect hands the app's reselect along.
   assert.equal(entries[1].onImportProject, bundle.onImportProject);
+  assert.equal(entries[2].onSharedDisconnected, reselect);
 });
 
 test('buildNavigationBundle opens the welcome as a first project when there are none', () => {

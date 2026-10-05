@@ -11,18 +11,20 @@ import { ProjectsPageHeader } from './ProjectsPageHeader.jsx';
 import { TeamResultsArea } from './TeamResultsArea.jsx';
 import WelcomePaths from '../../onboarding/components/WelcomePaths.jsx';
 import { useSharedConnection } from '../hooks/useSharedProjects.js';
+import { useSharedDisconnect } from '../hooks/useSharedDisconnect.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
 import { isSlotActive } from '../../../api/syncStatus.js';
 import { useCloneGhost } from '../hooks/useCloneGhost.js';
 import CloningTile from './CloningTile.jsx';
 
-// The empty page: the welcome's two paths side by side. With an evaluations
-// repository connected (but nothing published yet) its card names it; there
-// is no "go to repositories" here, this is the Repositories tab. Start opens
-// the analyze screen directly (the welcome would show these cards again).
-function EmptyProjectsPaths({ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }) {
+// The empty page: the welcome's three paths side by side. With an evaluations
+// repository connected (but nothing published yet) its card names it and
+// offers disconnect. Start opens the add panel directly (the welcome would
+// show these cards again).
+function EmptyProjectsPaths({ onStartAnalyze, onConnectEvaluations, onImportProject, onSharedDisconnected, isEvaluating }) {
   const { configured, host } = useSharedConnection();
+  const disconnect = useSharedDisconnect({ onDisconnected: onSharedDisconnected });
   return (
     <div className="projects-empty projects-empty--paths">
       <WelcomePaths
@@ -30,6 +32,7 @@ function EmptyProjectsPaths({ onStartAnalyze, onConnectEvaluations, onImportProj
         isEvaluating={isEvaluating}
         onStart={onStartAnalyze}
         onConnect={onConnectEvaluations}
+        onDisconnect={disconnect}
         onImport={onImportProject}
         adaptation={{ connected: configured, host, hasLocalProjects: false }}
       />
@@ -187,13 +190,13 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
         isEmpty={isEmpty}
         configured={shared.configured}
         onConnectEvaluations={onConnectEvaluations}
+        onImportProject={onImportProject}
         onAddProject={onAddProject}
         isEvaluating={isEvaluating}
       />
       <TeamResultsArea
         shared={shared}
         onConnectEvaluations={onConnectEvaluations}
-        onImportProject={onImportProject}
         onSharedDisconnected={onSharedDisconnected}
       />
       <ProjectsPageContent
@@ -201,7 +204,7 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
         isEmpty={isEmpty}
         status={{ connectActive: isSlotActive(shared.status?.connect), cloneActive }}
         ghost={ghost}
-        emptyProps={{ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }}
+        emptyProps={{ onStartAnalyze, onConnectEvaluations, onImportProject, onSharedDisconnected, isEvaluating }}
         bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }}
       />
     </section>

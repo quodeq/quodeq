@@ -42,7 +42,7 @@ describe('ProjectsPage — closing a failed connect', () => {
     view.unmount();
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(2));
-    await screen.findByRole('button', { name: 'connect evaluations repository' });
+    await screen.findByRole('button', { name: 'more ways to add' });
     expect(urlField()).not.toBeInTheDocument();
     expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
   });

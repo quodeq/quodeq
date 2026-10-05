@@ -12,7 +12,7 @@ def test_invite_carries_the_url(client, tmp_path):
     (tmp_path / "shared.json").write_text(json.dumps({"url": URL}))
     resp = client.get("/api/shared/invite")
     assert resp.status_code == 200
-    assert resp.get_json() == {"text": f"Open quodeq, choose Connect evaluations repository, paste {URL}"}
+    assert resp.get_json() == {"text": f"Open quodeq, on Repositories choose more › add evaluations repository, paste {URL}"}
 
 
 def test_invite_unconfigured_is_400(client):

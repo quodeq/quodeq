@@ -2960,6 +2960,18 @@
   flex-wrap: wrap;
 }
 
+/* The header's `more ▾`: the pill menu anchored to the button's right edge,
+   wide enough for "add evaluations repository" on one line. */
+.projects-page__more {
+  position: relative;
+  display: inline-flex;
+}
+.projects-page__more-list {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+}
+
 /* Disabled (evaluation in progress) — `aria-disabled` keeps the click
    firing so a snackbar can explain the block, so we can't rely on
    the native :disabled selector. */
