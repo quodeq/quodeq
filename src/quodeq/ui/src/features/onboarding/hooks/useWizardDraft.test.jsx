@@ -63,7 +63,7 @@ describe('useWizardDraft', () => {
     }
   });
 
-  it('markWelcomeSkipped writes the literal "true" under SKIPPED_KEY', () => {
+  it('markWelcomeSkipped without an instance id writes the literal "true" under SKIPPED_KEY', () => {
     markWelcomeSkipped();
     expect(localStorage.getItem(SKIPPED_KEY)).toBe('true');
     expect(SKIPPED_KEY).toBe('quodeq_onboarding_skipped');
@@ -73,6 +73,28 @@ describe('useWizardDraft', () => {
     expect(wasWelcomeSkipped()).toBe(false);
     markWelcomeSkipped();
     expect(wasWelcomeSkipped()).toBe(true);
+  });
+
+  // The skip is the state folder's: a wiped or replaced ~/.quodeq gets a new
+  // instance id, and a flag written for the old one (or the plain legacy
+  // flag) must not keep the welcome away. The browser storage holding the
+  // flag lives outside the folder, so it outlives a wipe.
+  it('markWelcomeSkipped records the instance id, and only that id counts as skipped', () => {
+    markWelcomeSkipped(undefined, 'inst-1');
+    expect(localStorage.getItem(SKIPPED_KEY)).toBe('inst-1');
+    expect(wasWelcomeSkipped(undefined, 'inst-1')).toBe(true);
+    expect(wasWelcomeSkipped(undefined, 'inst-2')).toBe(false);
+  });
+
+  it('the legacy "true" flag does not count once the server reports an instance id', () => {
+    markWelcomeSkipped();
+    expect(wasWelcomeSkipped(undefined, 'inst-1')).toBe(false);
+    expect(wasWelcomeSkipped(undefined, null)).toBe(true);
+  });
+
+  it('a flag for some instance id is not a legacy skip for a server without one', () => {
+    markWelcomeSkipped(undefined, 'inst-1');
+    expect(wasWelcomeSkipped(undefined, null)).toBe(false);
   });
 
   it('saveDraft/loadDraft/clearDraft thread an injected storage backend, leaving localStorage untouched', () => {

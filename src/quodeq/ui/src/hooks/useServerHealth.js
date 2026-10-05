@@ -70,7 +70,9 @@ async function tryFindPort(candidates, baseUrl) {
  * restarted on a different port. The setter lets the reconnect overlay clear
  * the disconnected state optimistically until the next poll settles it.
  *
- * @returns {[boolean, (next: boolean) => void, string|null]} connected, setter, server version
+ * @returns {[boolean, (next: boolean) => void, string|null, string|null|undefined]} connected, setter,
+ *   server version, and the state folder's instance id (per-install choices such as the welcome's
+ *   skip are keyed on it): undefined until the first poll answers, null for a server without one.
  */
 export function useServerHealth({ altPorts, baseUrl = SERVER_BASE_URL } = {}) {
   // Local state is the source of truth for callers. The query side-effects
@@ -78,6 +80,7 @@ export function useServerHealth({ altPorts, baseUrl = SERVER_BASE_URL } = {}) {
   // overlay optimistically clear the disconnected state until the next poll.
   const [connected, setConnected] = useState(true);
   const [version, setVersion] = useState(null);
+  const [instanceId, setInstanceId] = useState(undefined);
 
   useQuery({
     queryKey: systemKeys.health(),
@@ -86,6 +89,7 @@ export function useServerHealth({ altPorts, baseUrl = SERVER_BASE_URL } = {}) {
         const data = await getHealth();
         setConnected(true);
         if (data?.version) setVersion(data.version);
+        setInstanceId(data?.instanceId ?? null);
         return true;
       } catch (err) {
         console.warn('[useServerHealth] health check failed:', err);
@@ -114,5 +118,5 @@ export function useServerHealth({ altPorts, baseUrl = SERVER_BASE_URL } = {}) {
     setConnected(Boolean(next));
   }, []);
 
-  return [connected, setServerConnected, version];
+  return [connected, setServerConnected, version, instanceId];
 }

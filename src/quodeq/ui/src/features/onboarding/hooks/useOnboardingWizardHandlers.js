@@ -39,11 +39,12 @@ function resumeWalk({ wizard, onLaunch }) {
  * closing (a scanned project counts as saved), the add panel's hand-over,
  * and the resume-setup walk (resumeWalk). Each exit clears the draft.
  */
-export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToRepositories, fromSettings = false }) {
+export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToRepositories, fromSettings = false, instanceId = null }) {
   // A welcome opened from Settings offers no skip; even if one fires, a user
-  // who went looking for the welcome has not opted out. Skip lands on Repositories.
+  // who went looking for the welcome has not opted out. Skip lands on
+  // Repositories and is remembered for this state folder (instanceId).
   function handleSkipWelcome() {
-    if (!fromSettings) markWelcomeSkipped();
+    if (!fromSettings) markWelcomeSkipped(undefined, instanceId);
     clearDraft();
     onGoToRepositories();
   }

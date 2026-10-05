@@ -17,9 +17,20 @@ const NOTHING = { settled: true, hasContent: false };
 const UNSETTLED = { settled: false, hasContent: false };
 const SHARED_CONTENT = { settled: true, hasContent: true };
 
-function props({ projects = [], projectsLoaded = true, sharedSignal = NOTHING, isEvaluating = false }) {
+// The server's instance id (the state folder's identity) as the health poll
+// reports it: the skip flag is keyed on it.
+const INSTANCE = 'inst-1';
+
+function props(opts) {
+  const { projects = [], projectsLoaded = true, sharedSignal = NOTHING, isEvaluating = false } = opts;
+  // An explicit undefined means "the poll has not answered yet", so the
+  // default is applied by key presence, not by a destructuring default.
+  const serverInstanceId = Object.hasOwn(opts, 'serverInstanceId') ? opts.serverInstanceId : INSTANCE;
   return {
-    state: { projectsLoaded, projects, selectedSource: PROJECT_SOURCE.LOCAL, liveEvaluation: { actions: { startEvaluation: vi.fn() } } },
+    state: {
+      projectsLoaded, projects, selectedSource: PROJECT_SOURCE.LOCAL, serverInstanceId,
+      liveEvaluation: { actions: { startEvaluation: vi.fn() } },
+    },
     navTab: vi.fn(),
     isEvaluating,
     sharedSignal,
@@ -37,7 +48,14 @@ beforeEach(() => { localStorage.clear(); });
 describe('useWizardLifecycle auto-open (derived)', () => {
   it('opens on the welcome step for a fresh install with nothing to show', () => {
     const { result } = renderLifecycle();
-    expect(result.current.wizardEntry).toEqual({ startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN });
+    expect(result.current.wizardEntry).toEqual({ startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN, instanceId: INSTANCE });
+  });
+
+  it('waits for the health poll to report the instance id before deciding', () => {
+    const { result, update } = renderLifecycle({ serverInstanceId: undefined });
+    expect(result.current.wizardEntry).toBeNull();
+    update({ serverInstanceId: INSTANCE });
+    expect(result.current.wizardEntry).not.toBeNull();
   });
 
   it('does not open while the project list or the shared signal is still resolving', () => {
@@ -55,9 +73,31 @@ describe('useWizardLifecycle auto-open (derived)', () => {
     expect(result.current.wizardEntry).toBeNull();
   });
 
-  it('never opens when the user opted out', () => {
+  it('never opens when the user opted out on this state folder', () => {
+    localStorage.setItem(SKIPPED_KEY, INSTANCE);
+    const { result } = renderLifecycle();
+    expect(result.current.wizardEntry).toBeNull();
+  });
+
+  // The browser storage outlives a wiped ~/.quodeq (macOS keeps the
+  // webview's storage under ~/Library/WebKit): a skip recorded for the old
+  // folder, or the plain flag older builds wrote, must not hide the welcome
+  // from the new one.
+  it('opens again when the skip was recorded for another state folder', () => {
+    localStorage.setItem(SKIPPED_KEY, 'inst-0');
+    const { result } = renderLifecycle();
+    expect(result.current.wizardEntry).not.toBeNull();
+  });
+
+  it('opens when only the legacy flag is set and the server reports an instance id', () => {
     localStorage.setItem(SKIPPED_KEY, SKIPPED_VALUE);
     const { result } = renderLifecycle();
+    expect(result.current.wizardEntry).not.toBeNull();
+  });
+
+  it('honours the legacy flag for a server that reports no instance id', () => {
+    localStorage.setItem(SKIPPED_KEY, SKIPPED_VALUE);
+    const { result } = renderLifecycle({ serverInstanceId: null });
     expect(result.current.wizardEntry).toBeNull();
   });
 
