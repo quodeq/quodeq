@@ -4,7 +4,7 @@ import { relativeTimeFine } from '../../../utils/relativeTime.js';
 import { pluralKey } from '../../../utils/plural.js';
 import { useDismissOnOutside } from '../../../hooks/useDismissOnOutside.js';
 import { SyncBar } from './SyncBar.jsx';
-import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel } from './syncStripState.js';
+import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel, barPercent } from './syncStripState.js';
 
 function StripButton({ onClick, label, children }) {
   return (
@@ -134,7 +134,7 @@ export default function SyncStrip({
         <StripLabel state={state} status={status} when={when} projectsCount={projectsCount} onUpdate={onUpdate} />
       </StripAnnouncement>
       <span className="sync-strip__grow" />
-      {working ? <SyncBar percent={state.slot.percent} label={t('sync.progressAria')} /> : (
+      {working ? <SyncBar percent={barPercent(state.slot)} label={t('sync.progressAria')} /> : (
         <span className="sync-strip__actions">
           {state.kind === STRIP_STATE.SYNCED && onUpdate && (
             <StripButton onClick={onUpdate} label={t('sync.updateAria')}><span aria-hidden="true">⟳</span> {t('sync.update')}</StripButton>

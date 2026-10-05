@@ -1,6 +1,6 @@
 // A vitest file (not node:test): syncStripState imports the api module, which reads import.meta.env.
 import { describe, it, expect } from 'vitest';
-import { STRIP_STATE, pickStripState } from './syncStripState.js';
+import { STRIP_STATE, pickStripState, progressLabel, barPercent } from './syncStripState.js';
 import { SYNC_KIND, SYNC_PHASE } from '../../../vocab/syncPhase.js';
 
 const idle = { phase: null };
@@ -37,5 +37,30 @@ describe('pickStripState', () => {
   it('hands the running slot and its kind to the progress row', () => {
     const refresh = running(SYNC_PHASE.DOWNLOADING);
     expect(pickStripState({ status: status({ refresh }) })).toEqual({ kind: STRIP_STATE.PROGRESS, slot: refresh, slotKind: SYNC_KIND.REFRESH });
+  });
+
+  it("git's resolving and checkout phases are still progress", () => {
+    expect(pickStripState({ status: status({ connect: running(SYNC_PHASE.RESOLVING) }) }).kind).toBe(STRIP_STATE.PROGRESS);
+    expect(pickStripState({ status: status({ refresh: running(SYNC_PHASE.CHECKOUT) }) }).kind).toBe(STRIP_STATE.PROGRESS);
+  });
+});
+
+describe('progressLabel and barPercent', () => {
+  const url = 'https://github.com/team/evaluations.git';
+
+  it('names each phase of a connect, with a percent where git reports one', () => {
+    expect(progressLabel({ phase: SYNC_PHASE.CONNECTING }, SYNC_KIND.CONNECT, url)).toBe('connecting to github.com/team/evaluations…');
+    expect(progressLabel({ phase: SYNC_PHASE.DOWNLOADING, percent: 38, bytes: 43_201_536 }, SYNC_KIND.CONNECT, url)).toBe('downloading evaluations · 38% · 41.2 MB');
+    expect(progressLabel({ phase: SYNC_PHASE.RESOLVING, percent: 60 }, SYNC_KIND.CONNECT, url)).toBe('resolving · 60%');
+    expect(progressLabel({ phase: SYNC_PHASE.CHECKOUT, percent: 7 }, SYNC_KIND.CONNECT, url)).toBe('checking out · 7%');
+    expect(progressLabel({ phase: SYNC_PHASE.READING, projectsFound: 3 }, SYNC_KIND.CONNECT, url)).toBe('reading projects · 3 found…');
+  });
+
+  it('the bar is determinate only in the phases that carry a percent', () => {
+    expect(barPercent({ phase: SYNC_PHASE.DOWNLOADING, percent: 38 })).toBe(38);
+    expect(barPercent({ phase: SYNC_PHASE.RESOLVING, percent: 60 })).toBe(60);
+    expect(barPercent({ phase: SYNC_PHASE.CHECKOUT, percent: 7 })).toBe(7);
+    expect(barPercent({ phase: SYNC_PHASE.CONNECTING, percent: null })).toBeNull();
+    expect(barPercent({ phase: SYNC_PHASE.READING, percent: 100 })).toBeNull();
   });
 });

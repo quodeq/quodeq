@@ -17,7 +17,7 @@ from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.services.base import PhaseCallback, ProgressCallback
 from quodeq.services.clone_codes import CODE_CLONE_UNKNOWN
 from quodeq.services.job_spawn import spawn_daemon, start_claimed_job
-from quodeq.services.job_status import JobSlotStatus
+from quodeq.services.job_status import JobSlotStatus, phase_durations
 from quodeq.services.sync_progress import SYNC_IDLE_FIELDS
 from quodeq.services.wiring_sync import ProgressUpdate
 from quodeq.shared.fault_isolation import run_isolated
@@ -91,7 +91,11 @@ def _fail(status: CloneStatus, message: str, code: str, detail: str = "") -> Non
 
 def _progress_writer(status: CloneStatus) -> ProgressCallback:
     def write(update: ProgressUpdate) -> None:
-        status.set(phase=SyncPhase.DOWNLOADING, percent=update.percent, bytes=update.bytes)
+        fields: dict[str, object] = {"phase": update.phase, "percent": update.percent}
+        # A resolving or checkout update carries no size: keep the download's.
+        if update.bytes is not None:
+            fields["bytes"] = update.bytes
+        status.set(**fields)
     return write
 
 
@@ -113,11 +117,15 @@ def _do_clone(
     if not outcome.ok:
         _fail(status, outcome.error or MESSAGE_CLONE_DEFAULT, outcome.code or CODE_CLONE_UNKNOWN, outcome.detail)
         return
+    finished_at = time.time()
     status.set(
         state=CloneState.DONE, phase=SyncPhase.DONE, percent=_PERCENT_DONE,
         project_id=outcome.project_id, project_name=outcome.project_name, scan_data=outcome.scan_data,
-        code=None, error=None, finished_at=time.time(),
+        code=None, error=None, finished_at=finished_at,
     )
+    # Where the seconds went, phase by phase: the one place to read when an add felt slow.
+    snap = status.copy()
+    log.info(f"add project {outcome.project_name or snap.get('repo')}: {phase_durations(snap, finished_at)}")
     if on_done is not None:
         _notify_done(on_done, log)  # the project exists; a failing hook must not downgrade the slot
 

@@ -27,6 +27,22 @@ def test_start_clone_reports_phases_percent_and_the_created_project():
     assert snap["state"] == CloneState.DONE and snap["phase"] == SyncPhase.DONE
     assert snap["project_id"] == "p1" and snap["scan_data"] == {"files": 3} and snap["kind"] == SyncKind.CLONE
     assert snap["finished_at"] is not None
+    assert list(snap["phase_times"]) == ["connecting", "downloading", "reading", "done"]
+
+
+def test_progress_carries_git_phases_and_keeps_the_download_size():
+    status = CloneStatus()
+    seen = []
+
+    def create(progress, on_phase):
+        progress(ProgressUpdate(percent=100, bytes=9_000))
+        progress(ProgressUpdate(percent=40, bytes=None, phase=SyncPhase.RESOLVING))
+        seen.append((get_clone_status(status)["phase"], get_clone_status(status)["percent"], get_clone_status(status)["bytes"]))
+        progress(ProgressUpdate(percent=7, bytes=None, phase=SyncPhase.CHECKOUT))
+        seen.append(get_clone_status(status)["phase"])
+        return CloneOutcome(True, project_id="p1", project_name="repo")
+    start_clone("u", "d", hooks=CloneHooks(create, spawn=inline), status=status)
+    assert seen == [(SyncPhase.RESOLVING, 40, 9_000), SyncPhase.CHECKOUT]
 
 
 def test_failed_outcome_lands_as_error_with_code_and_detail():

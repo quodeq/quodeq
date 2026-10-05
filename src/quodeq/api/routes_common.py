@@ -47,6 +47,7 @@ def sync_block(snapshot: dict) -> dict:
     out = dict(snapshot)
     out["finishedAt"] = out.pop("finished_at", None)
     out["projectsFound"] = out.pop("projects_found", None)
+    out["phaseTimes"] = out.pop("phase_times", None)
     if "project_id" in out:
         out["projectId"] = out.pop("project_id")
         out["projectName"] = out.pop("project_name", None)
