@@ -14,6 +14,7 @@ import { useSharedConnection } from '../hooks/useSharedProjects.js';
 import { useSharedDisconnect } from '../hooks/useSharedDisconnect.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
+import { isCloningProject } from '../../../utils/cloningProject.js';
 import { isSlotActive } from '../../../api/syncStatus.js';
 import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { useCloneGhost } from '../hooks/useCloneGhost.js';
@@ -146,30 +147,11 @@ function ReadingPlaceholders({ count }) {
   );
 }
 
-// A url as a key: scheme and case aside, with no trailing slash or .git.
-function repoKey(url) {
-  return (url || '').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/\/+$/, '').replace(/\.git$/i, '').toLowerCase();
-}
-
-function baseName(path) {
-  return (path || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
-}
-
-// A local card whose clone is still running: the record is written while
-// git works and the list may refetch before the scan lands, so without this
-// the tile and a "Path not found" card would both show for the same
-// repository. The record's path is resolved and the slot's is not, so a
-// symlinked root defeats a plain path match: the origin url and the
-// folder name are compared too.
-function isCloningEntry(entry, slot) {
-  const local = entry.local;
-  if (!local || !slot) return false;
-  if (slot.repo && local.originUrl && repoKey(local.originUrl) === repoKey(slot.repo)) return true;
-  return Boolean(slot.dest) && (local.path === slot.dest || baseName(local.path) === baseName(slot.dest));
-}
-
+// A local card whose clone is still running stays behind the tile: without
+// this the tile and a "Path not found" card would both show for the same
+// repository (see utils/cloningProject.js).
 function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx, ghost, cloneSlot, readingCount }) {
-  const entries = cloneSlot ? visibleEntries.filter((entry) => !isCloningEntry(entry, cloneSlot)) : visibleEntries;
+  const entries = cloneSlot ? visibleEntries.filter((entry) => !isCloningProject(entry.local, cloneSlot)) : visibleEntries;
   return (
     <>
       <ProjectsToolbar filters={filters} onFiltersChange={onFiltersChange} configured={shared.configured} />
