@@ -20,7 +20,7 @@ from quodeq.core.types import ProjectEntry
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.services import fs_projects
 from quodeq.services.score_cache import score_cache_path_override
-from quodeq.services.shared_repo import last_synced_at, published_meta, shared_score_cache_path
+from quodeq.services.shared_repo import clone_lock, last_synced_at, published_meta, shared_score_cache_path
 from quodeq.services.warmup import WarmupEngine, warm_project
 from quodeq.services.warmup_defer import defer_to_warmup, summary_is_pending
 
@@ -30,9 +30,15 @@ def _warm_under_clone_cache(url: str) -> Callable[[str, str], None]:
     score cache scoped to the clone's own DB. The worker thread never inherits
     a route's contextvar override, so the step scopes its own; without it the
     warm-up would fill the LOCAL cache (a miss for the route, and shared rows
-    mixed into local ones)."""
+    mixed into local ones).
+
+    The step holds the clone lock, like every other reader-writer of the
+    clone: a disconnect or refresh then waits for the project in flight
+    instead of deleting or resetting the clone under the worker (a removal
+    raced that way left a write-only directory the next connect could not
+    clone into)."""
     def warm(reports_dir: str, project_id: str) -> None:
-        with score_cache_path_override(shared_score_cache_path(url)):
+        with clone_lock(url), score_cache_path_override(shared_score_cache_path(url)):
             warm_project(reports_dir, project_id)
     return warm
 
@@ -99,12 +105,20 @@ class SharedWarmup:
             engine.enqueue(project_id)
         return defer_to_warmup(str(eval_root), project_id, engine=engine, summary_pending=lambda *_: pending)
 
-    def reset_for_tests(self) -> None:
-        """Stop the worker and forget the bound clone (test seam)."""
+    def stop(self) -> None:
+        """Stop the worker and forget the bound clone.
+
+        A disconnect calls this before removing the clone; the next connect
+        (to the same url or another) binds a fresh engine.
+        """
         with self._lock:
             engine, self._engine, self._url = self._engine, None, None
         if engine is not None:
             engine.stop()
+
+    def reset_for_tests(self) -> None:
+        """Stop the worker and forget the bound clone (test seam)."""
+        self.stop()
 
 
 shared_warmup = SharedWarmup()

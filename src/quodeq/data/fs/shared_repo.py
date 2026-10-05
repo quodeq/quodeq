@@ -83,9 +83,15 @@ def _clear_readonly_and_retry(func, path, exc):  # noqa: ARG001
     """rmtree onexc callback for git trees. Git marks object files read-only,
     and on Windows deleting a read-only file raises PermissionError (POSIX
     deletion only checks the parent dir). Clear the bit and retry once; if
-    that also fails, log instead of raising so cleanup stays best-effort."""
+    that also fails, log instead of raising so cleanup stays best-effort.
+
+    A directory keeps read and search: ``chmod(S_IWRITE)`` alone would strip
+    both, and when the retry fails too (a worker still writing into it) the
+    directory would be left write-only, so the next clone into it fails.
+    """
     try:
-        os.chmod(path, stat.S_IWRITE)
+        mode = os.lstat(path).st_mode
+        os.chmod(path, mode | (stat.S_IRWXU if stat.S_ISDIR(mode) else stat.S_IWRITE))
         func(path)
     except OSError as retry_exc:
         logger.warning("failed to remove %s: %s", path, retry_exc)

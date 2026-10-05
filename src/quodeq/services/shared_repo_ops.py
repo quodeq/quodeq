@@ -33,6 +33,8 @@ class SharedRepoOps:
     clone_lock: Callable[[str], "AbstractContextManager"] | None = None
     remove_clone_dir: Callable[["Path"], None] | None = None
     shared_cache_dir: Callable[[str], "Path"] | None = None
+    # Stops the shared warm-up worker before the clone it reads is removed.
+    stop_shared_warmup: Callable[[], None] | None = None
 
 
 NO_OPS = SharedRepoOps()
