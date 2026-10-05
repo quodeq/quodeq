@@ -16,7 +16,7 @@ import { useAssistantProvider } from '../features/settings/hooks/useAssistantPro
 import { deriveAssistantContext } from '../features/assistant/useAssistantContext.js';
 import { buildAssistantSessionPayload } from '../features/assistant/assistantAppBridge.js';
 import {
-  useGradeFormulaBootSyncEffect,
+  useGradeFormulaBootSyncEffect, useEvaluateHiddenEffect,
   useInitialLandingEffect, useProjectScrollResetEffect, useVisibleStandardsHydrationEffect,
 } from './useAppEffects.js';
 import { buildBreadcrumbSiblingsFor } from '../features/side-pane/breadcrumbSiblings.js';
@@ -126,9 +126,10 @@ export function useAppStartupGate({ state, activeTab }) {
   return { showStartupLoader };
 }
 
-/** The derived no-projects landing redirect and the native macOS Help-menu nav bridge. */
-export function useAppNavigationEffects({ state, activeTab, navTab, sharedSignal }) {
-  useInitialLandingEffect({ state, sharedSignal, activeTab, navTab });
+/** The derived no-projects landing redirect, the Evaluate-hidden redirect and the native macOS Help-menu nav bridge. */
+export function useAppNavigationEffects({ state, activeTab, navTab, showEvaluate }) {
+  useInitialLandingEffect({ state, activeTab, navTab });
+  useEvaluateHiddenEffect({ state, activeTab, navTab, showEvaluate });
   useNativeNavBridge(navTab);
 }
 

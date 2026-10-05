@@ -8,6 +8,8 @@ import {
 import { useAssistantActionAppliedEffect } from './useAppEffects.js';
 import { findProject } from '../utils/projectIdentity.js';
 import { selectLandedProject } from './selectLandedProject.js';
+import { shouldShowEvaluate } from '../appGating.js';
+import { useCloneStatus } from './useCloneStatus.js';
 
 /**
  * Boot-time extras plus the dismiss-delta bridge shared by the manual dismiss
@@ -39,13 +41,19 @@ export function useAppDismissBridge(state) {
 export function useAppChrome({ state, sharedSignal }) {
   const selectedProjectInfo = findProject(state.projects, state.selectedProject);
   const isEvaluating = computeIsEvaluating(state);
+  // Evaluate exists only for a selected local project that has landed; a
+  // project whose clone is still running has no folder to evaluate yet.
+  const clone = useCloneStatus();
+  const showEvaluate = shouldShowEvaluate({
+    selectedSource: state.selectedSource, selectedProjectInfo, cloneSlot: clone.active ? clone.slot : null,
+  });
   const wizard = useAppWizardBounce({ state, isEvaluating, sharedSignal });
   const { activePage, navSwapAt, navTab, activeTab } = state;
   const sidebar = useSidebarProviderSelection();
   const startup = useAppStartupGate({ state, activeTab });
-  useAppNavigationEffects({ state, activeTab, navTab, sharedSignal });
+  useAppNavigationEffects({ state, activeTab, navTab, showEvaluate });
   useSelectedProjectSyncEffects(state.selectedProject);
   const { filteredTrend, filteredAccumulated } = useVisibleStandardsFiltered(state);
   const derived = useAppDerived({ state, navTab, navSwapAt, activePage, filteredTrend, filteredAccumulated });
-  return { selectedProjectInfo, isEvaluating, ...wizard, ...sidebar, ...startup, ...derived };
+  return { selectedProjectInfo, showEvaluate, isEvaluating, ...wizard, ...sidebar, ...startup, ...derived };
 }

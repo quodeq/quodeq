@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { getGradeFormula } from '../api/index.js';
 import { setGradeThresholds } from '../utils/gradeThresholds.js';
 import { hydrateVisibleStandardIds } from '../utils/visibleStandards.js';
-import { shouldRedirectToRemoteRepositories } from '../appGating.js';
+import { shouldRedirectToRepositories } from '../appGating.js';
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
 import { ASSISTANT_ACTION_APPLIED_EVENT } from '../constants.js';
 import { NAV_TAB } from '../vocab/navTab.js';
@@ -62,30 +62,42 @@ function isOnNoProjectLanding(activeTab, activePage) {
 
 /**
  * The landing redirect, derived instead of decided once: it re-runs whenever
- * the local project list or the shared signal changes (load settling, a team
- * repo connected mid-session, a first sync landing), so shared content that
- * arrives after boot moves the empty "no projects" Overview to the projects
- * list without a reload. It only ever moves a user who is still on that
- * landing; a tab change alone does not re-run it, so a page the user chose,
- * Overview included, is never yanked away.
+ * the local project list changes (load settling, the last project deleted),
+ * so an empty "no projects" Overview moves to the Repositories tab, the
+ * only tab that does anything without a project. It only ever moves a user
+ * who is still on that landing; a tab change alone does not re-run it, so a
+ * page the user chose, Overview included, is never yanked away.
  */
-export function useInitialLandingEffect({ state, sharedSignal, activeTab, navTab }) {
+export function useInitialLandingEffect({ state, activeTab, navTab }) {
   const latest = useRef(null);
   latest.current = { selectedSource: state.selectedSource, activePage: state.activePage, activeTab, navTab };
   useEffect(() => {
     const { selectedSource, activePage, activeTab: tab, navTab: go } = latest.current;
     if (!isOnNoProjectLanding(tab, activePage)) return;
-    if (shouldRedirectToRemoteRepositories({
+    if (shouldRedirectToRepositories({
       projectsLoaded: state.projectsLoaded,
       projectsCount: state.projects.length,
       selectedSource,
-      sharedSettled: sharedSignal.settled,
-      sharedHasContent: sharedSignal.hasContent,
       activeTab: tab,
     })) {
       go(NAV_TAB.PROJECTS);
     }
-  }, [state.projectsLoaded, sharedSignal.settled, state.projects.length, sharedSignal.hasContent]);
+  }, [state.projectsLoaded, state.projects.length]);
+}
+
+/**
+ * Evaluate can disappear under the user: the selected project's clone is
+ * still running, or the selection went away (a delete, a disconnect). A
+ * cached or stale nav entry on Evaluate would then show a dead-end screen,
+ * so it moves to the Repositories tab, where the tile or the cards are.
+ * Only once the project list has loaded: on first paint the selection is
+ * still resolving and Evaluate reads as hidden for a moment.
+ */
+export function useEvaluateHiddenEffect({ state, activeTab, navTab, showEvaluate }) {
+  useEffect(() => {
+    if (!state.projectsLoaded || showEvaluate || activeTab !== NAV_TAB.EVALUATE) return;
+    navTab(NAV_TAB.PROJECTS);
+  }, [state.projectsLoaded, showEvaluate, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps -- navTab is stable
 }
 
 /**

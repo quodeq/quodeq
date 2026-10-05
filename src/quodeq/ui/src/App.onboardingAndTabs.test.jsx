@@ -3,14 +3,14 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {
   shouldAutoOpenOnboardingWizard,
-  shouldRedirectToRemoteRepositories,
+  shouldRedirectToRepositories,
   shouldShowProjectTabs,
   selectSidebarCounts,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
 // Split from App.test.jsx: shouldAutoOpenOnboardingWizard,
-// shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
+// shouldRedirectToRepositories, shouldShowProjectTabs,
 // selectSidebarCounts, and the Sidebar shared-selection tabs component test.
 
 // Important 3: the onboarding wizard must not auto-open over a teammate's
@@ -55,42 +55,31 @@ describe('shouldAutoOpenOnboardingWizard', () => {
   });
 });
 
-// One-shot landing decision: a fresh start with zero local projects but
-// remote content lands on the repositories tab instead of the dead-end
-// 'overview' empty state. Latched in App once inputs settle — these tests
-// pin the pure decision only.
-describe('shouldRedirectToRemoteRepositories', () => {
-  const base = {
-    projectsLoaded: true, projectsCount: 0, selectedSource: 'local',
-    sharedSettled: true, sharedHasContent: true, activeTab: 'overview',
-  };
+// The landing decision: a start with zero local projects lands on the
+// repositories tab, the only tab that does anything without a project,
+// instead of the dead-end 'overview' empty state. These tests pin the pure
+// decision only.
+describe('shouldRedirectToRepositories', () => {
+  const base = { projectsLoaded: true, projectsCount: 0, selectedSource: 'local', activeTab: 'overview' };
 
-  it('redirects a fresh start: zero local projects, remote content, default overview landing', () => {
-    expect(shouldRedirectToRemoteRepositories(base)).toBe(true);
+  it('redirects a fresh start: zero local projects, default overview landing', () => {
+    expect(shouldRedirectToRepositories(base)).toBe(true);
   });
 
   it('does not redirect before local projects load', () => {
-    expect(shouldRedirectToRemoteRepositories({ ...base, projectsLoaded: false })).toBe(false);
-  });
-
-  it('does not redirect before the shared signal settles', () => {
-    expect(shouldRedirectToRemoteRepositories({ ...base, sharedSettled: false })).toBe(false);
+    expect(shouldRedirectToRepositories({ ...base, projectsLoaded: false })).toBe(false);
   });
 
   it('does not redirect when local projects exist', () => {
-    expect(shouldRedirectToRemoteRepositories({ ...base, projectsCount: 2 })).toBe(false);
+    expect(shouldRedirectToRepositories({ ...base, projectsCount: 2 })).toBe(false);
   });
 
   it('does not redirect over a restored shared selection (already a working view)', () => {
-    expect(shouldRedirectToRemoteRepositories({ ...base, selectedSource: 'shared' })).toBe(false);
-  });
-
-  it('does not redirect without remote content', () => {
-    expect(shouldRedirectToRemoteRepositories({ ...base, sharedHasContent: false })).toBe(false);
+    expect(shouldRedirectToRepositories({ ...base, selectedSource: 'shared' })).toBe(false);
   });
 
   it('does not redirect off a non-default tab the user already navigated to', () => {
-    expect(shouldRedirectToRemoteRepositories({ ...base, activeTab: 'settings' })).toBe(false);
+    expect(shouldRedirectToRepositories({ ...base, activeTab: 'settings' })).toBe(false);
   });
 });
 

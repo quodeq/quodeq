@@ -1,5 +1,5 @@
 import {
-  shouldShowEvaluateButton, shouldShowProjectTabs, shouldShowCompareTab,
+  shouldShowProjectTabs, shouldShowCompareTab,
   resolveProjectDisplayName, selectSidebarCounts,
 } from './appGating.js';
 import { buildDashboardDataBundle, buildNavigationBundle } from './routes/renderers.jsx';
@@ -12,7 +12,7 @@ import { NAV_TAB } from './vocab/navTab.js';
 // element.
 
 export function buildSidebarProps({
-  activeTab, navTab, selectedSource, selectedProjectInfo, sharedProjectInfo,
+  activeTab, navTab, selectedSource, selectedProjectInfo, sharedProjectInfo, showEvaluate,
   projects, sharedHasContent, sharedPublishedCount, resolvedDisplayName, headerMeta, version, sidebarCounts,
   lastEvalAt, isPinned, onPinChange,
 }) {
@@ -20,6 +20,7 @@ export function buildSidebarProps({
     activeTab,
     onNavTab: navTab,
     showProjectTabs: shouldShowProjectTabs({ selectedSource, selectedProjectInfo, sharedProjectInfo }),
+    showEvaluate,
     showCompareTab: shouldShowCompareTab({ projects, sharedHasContent, sharedPublishedCount }),
     selectedSource,
     projectInfo: { displayName: resolvedDisplayName, meta: headerMeta },
@@ -34,7 +35,7 @@ export function buildSidebarProps({
 
 export function buildTopBarProps({
   resolvedDisplayName, serverConnected, sidebarProvider, sidebarModel, selectedSource,
-  projectsCount, onEvaluateClick, evaluating, pending, navTab, setSidebarPinned,
+  showEvaluate, onEvaluateClick, evaluating, pending, navTab, setSidebarPinned,
   breadcrumb, mobileTitle, navStackLength, navPop, effectiveDark, toggleTheme, serverUrl,
 }) {
   return {
@@ -44,7 +45,8 @@ export function buildTopBarProps({
     provider: sidebarProvider,
     model: sidebarModel,
     selectedSource,
-    onEvaluate: shouldShowEvaluateButton(projectsCount, selectedSource) ? onEvaluateClick : null,
+    // Evaluate exists only for a selected local project that has landed (shouldShowEvaluate).
+    onEvaluate: showEvaluate ? onEvaluateClick : null,
     evaluating,
     pending,
     onProviderClick: () => navTab(NAV_TAB.SETTINGS),
@@ -105,7 +107,7 @@ export function buildContentProps({
 // without touching hook order.
 export function buildAppShell({
   state, sharedSignal, navTab, navStack, activeTab, activePage, isEvaluating, showToast, setWizardEntry,
-  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo,
+  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo, showEvaluate,
   assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel,
   navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, wizardEntry, wizardHandlers,
   filteredAccumulated, filteredTrend,
@@ -132,7 +134,7 @@ export function buildAppShell({
   });
 
   return {
-    state, navTab, activeTab, activePage, selectedProjectInfo, sharedSignal, assistantCtx, isEvaluating,
+    state, navTab, activeTab, activePage, selectedProjectInfo, showEvaluate, sharedSignal, assistantCtx, isEvaluating,
     resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned,
     sidebarProvider, sidebarModel, navStack, navGoTo, navPop,
     breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, contentProps,

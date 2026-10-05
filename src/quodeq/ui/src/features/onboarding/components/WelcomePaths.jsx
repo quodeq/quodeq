@@ -1,15 +1,11 @@
 import { t } from '../../../strings/index.js';
-import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
-// The cards' styles; imported here too because the empty Repositories page
-// renders the cards without the welcome step.
 import '../../../styles/onboarding-welcome.css';
 
 /**
  * The three ways in: add a repository to evaluate, connect an evaluations
  * repository (where evaluations are published, yours or your team's), or
  * import an archive another machine exported. The welcome panel stacks them
- * in its right column; the empty Repositories page lays them out side by
- * side with `compact`.
+ * in its right column.
  *
  * Adapts to what already exists: with local projects the first card's action
  * reads "add another"; with an evaluations repository connected the second
@@ -18,37 +14,30 @@ import '../../../styles/onboarding-welcome.css';
  * third card renders only when `onImport` is wired.
  *
  * @param {object} props
- * @param {boolean} [props.compact]
- * @param {boolean} [props.isEvaluating] - marks start as blocked (aria-disabled + why); the handler swallows the click
  * @param {Function} props.onStart
  * @param {Function} props.onConnect
  * @param {Function} [props.onDisconnect]
  * @param {Function} [props.onImport]
  * @param {{ connected: boolean, host: string|null, hasLocalProjects: boolean }} props.adaptation
  */
-export default function WelcomePaths({ compact = false, isEvaluating = false, onStart, onConnect, onDisconnect, onImport, adaptation }) {
+export default function WelcomePaths({ onStart, onConnect, onDisconnect, onImport, adaptation }) {
   const { connected = false, host = null, hasLocalProjects = false } = adaptation ?? {};
   return (
-    <div className={`onboarding-paths__cards${compact ? ' onboarding-paths__cards--compact' : ''}`}>
-      <RepoPathCard hasLocalProjects={hasLocalProjects} onStart={onStart} isEvaluating={isEvaluating} />
+    <div className="onboarding-paths__cards">
+      <RepoPathCard hasLocalProjects={hasLocalProjects} onStart={onStart} />
       <EvalsPathCard connected={connected} host={host} onConnect={onConnect} onDisconnect={onDisconnect} />
       {onImport && <ArchivePathCard onImport={onImport} />}
     </div>
   );
 }
 
-function RepoPathCard({ hasLocalProjects, onStart, isEvaluating }) {
+function RepoPathCard({ hasLocalProjects, onStart }) {
   return (
     <article className="onboarding-path-card onboarding-path-card--primary">
       <h3 className="onboarding-path-card__title">{t('onboarding.pathRepoTitle')}</h3>
       <p className="onboarding-path-card__desc">{t('onboarding.pathRepoDesc')}</p>
       <div className="onboarding-path-card__actions">
-        <button
-          type="button"
-          className={`term-btn term-btn--primary term-btn--filled${evalBlockedClass(isEvaluating)}`}
-          onClick={onStart}
-          {...evalBlockedProps(isEvaluating, t('onboarding.cannotAddWhileRunning'))}
-        >
+        <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onStart}>
           {hasLocalProjects ? t('onboarding.pathRepoAddAnother') : t('onboarding.pathRepoStart')}
         </button>
       </div>

@@ -6,6 +6,7 @@
  */
 import { PROJECT_SOURCE } from './vocab/projectSource.js';
 import { NAV_TAB } from './vocab/navTab.js';
+import { isCloningProject } from './utils/cloningProject.js';
 
 /**
  * Whether a selected source has an Evaluate flow at all. Evaluation is
@@ -18,12 +19,18 @@ export function isEvaluatableSource(selectedSource) {
 }
 
 /**
- * Whether the TopBar's Evaluate button should be wired up. Shared projects
- * have no Evaluate flow (evaluation is local-only), so the button is omitted
- * outright regardless of project count.
+ * Whether Evaluate (the TopBar button and the sidebar tab) is there at all.
+ * It needs a selected LOCAL project that exists in the list, and one whose
+ * clone is not still running: until then there is nothing to evaluate, and
+ * the screen would open on a folder that does not exist yet. Shared
+ * projects have no Evaluate flow (evaluation is local-only).
+ * @param {{ selectedSource?: string, selectedProjectInfo?: Object|null, cloneSlot?: Object|null }} args
+ *   cloneSlot: the clone job's slot while it is ACTIVE, else null
  */
-export function shouldShowEvaluateButton(projectsCount, selectedSource) {
-  return (projectsCount ?? 0) > 0 && isEvaluatableSource(selectedSource);
+export function shouldShowEvaluate({ selectedSource, selectedProjectInfo, cloneSlot = null }) {
+  if (!isEvaluatableSource(selectedSource)) return false;
+  if (!selectedProjectInfo) return false;
+  return !isCloningProject(selectedProjectInfo, cloneSlot);
 }
 
 /**
@@ -58,7 +65,7 @@ export function resolveProjectDisplayName({
  * For 'shared', gate on the resolved sharedProjectInfo instead: the shared
  * info payload carries no runsCount at all, and a project only appears in
  * the shared repo once published with runs, so its info resolving is the
- * "has data to show" signal. Exported (like shouldShowEvaluateButton) so the
+ * "has data to show" signal. Exported (like shouldShowEvaluate) so the
  * source-gating contract is testable without mounting the whole App.
  */
 export function shouldShowProjectTabs({ selectedSource, selectedProjectInfo, sharedProjectInfo }) {
@@ -113,21 +120,19 @@ export function shouldShowCompareTab({ projects, sharedHasContent, sharedPublish
 }
 
 /**
- * The landing decision. With zero local projects the default
- * 'overview' landing is a dead-end empty state; when a configured shared
- * repo has published content, land on the repositories tab instead so the
- * remote projects are visible without scanning anything locally. Only the
- * default 'overview' landing redirects: a user who already navigated
- * elsewhere (settings, help) before the signals settled keeps their page,
- * and a restored 'shared' selection is already a working view. The caller
- * (useInitialLandingEffect) re-runs it when the project list or the shared
- * signal changes, never on a tab change, and only while the user is still on
- * the landing. Exported for unit tests.
+ * The landing decision. With zero local projects the default 'overview'
+ * landing is a dead end: the Repositories tab is the only one that does
+ * anything (the three ways in, or the team's projects once a repository is
+ * connected), so that is where the app lands. Only the default 'overview'
+ * landing redirects: a user who already navigated elsewhere (settings,
+ * help) before the list settled keeps their page, and a restored 'shared'
+ * selection is already a working view. The caller (useInitialLandingEffect)
+ * re-runs it when the project list changes, never on a tab change, and only
+ * while the user is still on the landing. Exported for unit tests.
  */
-export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCount, selectedSource, sharedSettled, sharedHasContent, activeTab }) {
-  if (!projectsLoaded || !sharedSettled) return false;
+export function shouldRedirectToRepositories({ projectsLoaded, projectsCount, selectedSource, activeTab }) {
+  if (!projectsLoaded) return false;
   if ((projectsCount ?? 0) > 0) return false;
   if (selectedSource === PROJECT_SOURCE.SHARED) return false;
-  if (!sharedHasContent) return false;
   return activeTab === NAV_TAB.OVERVIEW;
 }

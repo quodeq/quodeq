@@ -182,8 +182,10 @@ function SidebarScrim({ isPinned, onClose }) {
   );
 }
 
-function EvaluateNav({ selectedSource, activeTab, handleNav }) {
-  if (!isEvaluatableSource(selectedSource)) return null;
+// Evaluate needs a selected local project that has landed (the parent's
+// shouldShowEvaluate); a shared selection never has it.
+function EvaluateNav({ selectedSource, showEvaluate, activeTab, handleNav }) {
+  if (!showEvaluate || !isEvaluatableSource(selectedSource)) return null;
   return (
     <nav className="sidebar-nav sidebar-block">
       <NavButton id={NAV_TAB.EVALUATE} label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
@@ -218,6 +220,9 @@ function ProjectsNav({ repoName, activeTab, handleNav }) {
  *   item is hidden outright for a shared selection. Without this, a shared
  *   project's id (which can collide with a local one by design) could start
  *   a real evaluation run whose output writes into the LOCAL project's store.
+ * @param {boolean} [props.showEvaluate] - When false, the Evaluate nav item
+ *   is hidden: nothing is selected yet, or the selected project's clone is
+ *   still running (the parent's shouldShowEvaluate decides).
  * @param {boolean} [props.showCompareTab] - Compare ranks projects against
  *   each other, so it needs at least two analyzed projects to say anything —
  *   below that the tab is hidden as redundant. The parent computes this from
@@ -237,6 +242,7 @@ export default function Sidebar({
   onPinChange,
   selectedSource = PROJECT_SOURCE.LOCAL,
   showCompareTab = false,
+  showEvaluate = true,
   inert = undefined,
 }) {
   const { isPinned, setPinned, handleTogglePin, handleNav } = useSidebarPin({ controlledPinned, onPinChange, onNavTab });
@@ -258,7 +264,7 @@ export default function Sidebar({
           historyCount={historyCount}
         />
 
-        <EvaluateNav selectedSource={selectedSource} activeTab={activeTab} handleNav={handleNav} />
+        <EvaluateNav selectedSource={selectedSource} showEvaluate={showEvaluate} activeTab={activeTab} handleNav={handleNav} />
         <ProjectsNav repoName={repoName} activeTab={activeTab} handleNav={handleNav} />
 
         <div className="sidebar-spacer" />

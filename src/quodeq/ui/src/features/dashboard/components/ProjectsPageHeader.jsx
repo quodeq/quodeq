@@ -48,36 +48,34 @@ function MoreMenu({ configured, onConnectEvaluations, onImportProject }) {
 }
 
 /**
- * The Repositories header: title, counts, and two controls. The primary
- * `add project` opens the add panel directly (never the welcome). `more ▾`
- * holds the two rare actions: `add evaluations repository` (or `change
- * repository` once one is configured, the strip's ⋯ keeps disconnect) and
- * `import project` for an exported archive. The controls are hidden on an
- * empty page, whose cards carry the same three ways in.
+ * The Repositories header: title, counts, and two controls, on the empty
+ * page too (they are the ways in). The primary `add project` opens the add
+ * panel directly (never the welcome). `more ▾` holds the two rare actions:
+ * `add evaluations repository` (or `change repository` once one is
+ * configured, the strip's ⋯ keeps disconnect) and `import project` for an
+ * exported archive.
  */
-export function ProjectsPageHeader({ counts, isEmpty, configured, onConnectEvaluations, onImportProject, onAddProject, isEvaluating }) {
+export function ProjectsPageHeader({ counts, configured, onConnectEvaluations, onImportProject, onAddProject, isEvaluating }) {
   const showMore = Boolean(onConnectEvaluations || onImportProject);
   return (
     <div className="projects-page__header">
       <TermHeader name={t('projects.termName')} sub={headerSub({ ...counts, configured })} />
-      {!isEmpty && (
-        <div className="projects-page__header-actions">
-          {showMore && (
-            <MoreMenu configured={configured} onConnectEvaluations={onConnectEvaluations} onImportProject={onImportProject} />
-          )}
-          {onAddProject && (
-            <button
-              type="button"
-              className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${evalBlockedClass(isEvaluating)}`}
-              onClick={onAddProject}
-              aria-label={t('projects.addAria')}
-              {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE)}
-            >
-              {t('projects.addProject')}
-            </button>
-          )}
-        </div>
-      )}
+      <div className="projects-page__header-actions">
+        {showMore && (
+          <MoreMenu configured={configured} onConnectEvaluations={onConnectEvaluations} onImportProject={onImportProject} />
+        )}
+        {onAddProject && (
+          <button
+            type="button"
+            className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${evalBlockedClass(isEvaluating)}`}
+            onClick={onAddProject}
+            aria-label={t('projects.addAria')}
+            {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE)}
+          >
+            {t('projects.addProject')}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

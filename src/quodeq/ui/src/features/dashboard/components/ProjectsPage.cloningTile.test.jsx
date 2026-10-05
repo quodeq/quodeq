@@ -72,7 +72,7 @@ describe('ProjectsPage ghost tile', () => {
     expect(tile.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('a failed clone on an empty page shows the error row above the compact cards, retry re-posts to the default root', async () => {
+  it('a failed clone on an empty page shows the error row above the empty line, retry re-posts to the default root', async () => {
     const user = userEvent.setup();
     const { api } = setup(failed, []);
     expect(await screen.findByText(/download failed · /)).toBeInTheDocument();

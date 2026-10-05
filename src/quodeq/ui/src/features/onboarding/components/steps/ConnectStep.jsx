@@ -33,6 +33,11 @@ export default function ConnectStep({ onBack, onCancel, onConnectStarted }) {
     onConnectStarted?.();
   };
 
+  // The way out sits at the left of the form's connect: back to the welcome
+  // when it was reached from there, cancel when opened on its own.
+  const secondaryAction = onBack
+    ? <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>{t('common.back')}</button>
+    : <button type="button" className="term-btn term-btn--secondary" onClick={onCancel}>{t('onboarding.cancel')}</button>;
   return (
     <div className="onboarding-step onboarding-step--connect">
       <TermHeader name={t('onboarding.termConnect')} />
@@ -43,12 +48,8 @@ export default function ConnectStep({ onBack, onCancel, onConnectStarted }) {
         error={connectError}
         accessFailure={accessFailure}
         browseFolder={browseFolder}
+        secondaryAction={secondaryAction}
       />
-      <div className="onboarding-step__actions">
-        {onBack
-          ? <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>{t('common.back')}</button>
-          : <button type="button" className="term-btn term-btn--secondary" onClick={onCancel}>{t('onboarding.cancel')}</button>}
-      </div>
       {picker}
     </div>
   );
