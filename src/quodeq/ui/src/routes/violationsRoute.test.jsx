@@ -47,6 +47,26 @@ describe('ViolationsRoute', () => {
     }));
   });
 
+  // The nav params carry a selector next to the snapshot, so the page can
+  // rebuild its findings from the live payload (routes/liveSelectors.js).
+  it('a dimension cell click carries a dimension selector', () => {
+    const props = routeProps({ dimensions: dims() });
+    const el = ViolationsRoute({ params: {}, props });
+    el.props.callbacks.onCellClick({ row: { type: 'dimension', dimension: 'security' }, severity: 'major' });
+    expect(props.navigation.handleNavigate).toHaveBeenCalledWith('file', expect.objectContaining({
+      fileSelector: { kind: 'dimension', dimension: 'security' }, severityFilter: 'major',
+    }));
+  });
+
+  it('a principle click carries a principle selector', () => {
+    const props = routeProps({ dimensions: dims() });
+    const el = ViolationsRoute({ params: {}, props });
+    el.props.callbacks.onPrincipleClick({ dimension: 'security', principle: 'P1' });
+    expect(props.navigation.handleNavigate).toHaveBeenCalledWith('evalprinciple', expect.objectContaining({
+      principleSelector: { dimension: 'security', principle: 'P1' },
+    }));
+  });
+
   it('renders with no accumulated payload', () => {
     const el = ViolationsRoute({ params: {}, props: routeProps(null) });
     expect(el.props.data.accumulatedDimensions).toEqual([]);
@@ -60,6 +80,7 @@ describe('ViolationsRoute', () => {
     el.props.callbacks.onTypeClick({ req: 'S-1', text: 'Hash it', dimension: 'security', runId: 'run-1', dateLabel: '26 Sep', violations: d[0].violations.slice(0, 2) });
     expect(props.navigation.handleNavigate).toHaveBeenCalledWith('file', expect.objectContaining({
       file: expect.objectContaining({ file: 'S-1 · Hash it', total: 2 }),
+      fileSelector: { kind: 'type', dimension: 'security', req: 'S-1', text: 'Hash it' },
       runId: 'run-1', dateLabel: '26 Sep', sourceTab: 'violations',
     }));
   });

@@ -7,6 +7,7 @@
  */
 import { lazy } from 'react';
 import { makeDismissHandler } from './dismissWiring.js';
+import { liveAccumulated, liveEvalPrincipalFor } from './liveSelectors.js';
 import {
   useLiveJob, useLiveJobError, useLiveFindings, useLiveStartedProject, useEvaluationActions,
 } from '../features/evaluation/EvaluationLiveContext.jsx';
@@ -100,10 +101,14 @@ export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects
  */
 export function renderEvalPrincipleDetail(params, props) {
   const { selectedProject, selectedRun, selectedSource } = props.navigation;
+  // Rebuilt from the live payload when the navigation left a selector, so a
+  // refreshed /scores reaches the page instead of the click-time snapshot
+  // (routes/liveSelectors.js); the snapshot otherwise.
+  const base = liveEvalPrincipalFor(params, liveAccumulated(props)) ?? params.evalPrincipal;
   const evalPrincipal = {
-    ...params.evalPrincipal,
-    project: params.evalPrincipal?.project || selectedProject || '',
-    runId: params.evalPrincipal?.runId || selectedRun || '',
+    ...base,
+    project: base?.project || selectedProject || '',
+    runId: base?.runId || selectedRun || '',
   };
   return (
     <PrincipleDetailPage
