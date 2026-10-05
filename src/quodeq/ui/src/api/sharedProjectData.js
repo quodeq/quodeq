@@ -10,7 +10,7 @@ import { createDashboard } from '../models/dashboard.js';
 import { createDimensionEval } from '../models/dimension.js';
 import { epochSecondsToMs } from './sharedStatus.js';
 import { LATEST_RUN_ID } from '../constants.js';
-import { asOfQuery, findingDetailQuery, parseAccumulated, parseFleetCompare, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
+import { asOfQuery, findingDetailQuery, isPendingPayload, parseAccumulated, parseFleetCompare, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
 import { attachEvalFindingDetailRefs, attachRunFindingDetailRefs } from './complianceDetail.js';
 import { createViolations } from '../models/violation.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
@@ -95,7 +95,9 @@ export function sharedGetRuns(projectId) {
  */
 export async function sharedGetDashboard(projectId, run = LATEST_RUN_ID) {
   const data = await request(`${sharedProjectPath(projectId)}/dashboard${runQuery(run)}`);
-  return createDashboard(data);
+  // A pending body (the server's warm-up still owes the project) is handed
+  // through untouched so the hooks poll on it; same for the two below.
+  return isPendingPayload(data) ? data : createDashboard(data);
 }
 
 /**
@@ -128,7 +130,7 @@ export async function sharedGetFleetCompare(projectIds) {
  */
 export async function sharedGetAccumulated(projectId, asOfRun = null) {
   const data = await request(`${sharedProjectPath(projectId)}/accumulated${asOfQuery(asOfRun)}`);
-  return parseAccumulated(data);
+  return isPendingPayload(data) ? data : parseAccumulated(data);
 }
 
 /**
@@ -139,7 +141,7 @@ export async function sharedGetAccumulated(projectId, asOfRun = null) {
  */
 export async function sharedGetProjectScores(projectId, asOfRun = null) {
   const data = await request(`${sharedProjectPath(projectId)}/scores${asOfQuery(asOfRun)}`);
-  return parseUnifiedScores(data);
+  return isPendingPayload(data) ? data : parseUnifiedScores(data);
 }
 
 /**

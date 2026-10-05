@@ -9,7 +9,7 @@ import { request } from './request.js';
 import { attachEvalFindingDetailRefs, attachFindingDetailRefs, attachRunFindingDetailRefs } from './complianceDetail.js';
 import { FINDING_TYPE } from '../vocab/findingType.js';
 import { createViolations } from '../models/violation.js';
-import { asOfQuery, findingDetailQuery, parseAccumulated, parseFleetCompare, parseSlimDimensions, parseUnifiedScores } from './scoresShape.js';
+import { asOfQuery, findingDetailQuery, isPendingPayload, parseAccumulated, parseFleetCompare, parseSlimDimensions, parseUnifiedScores } from './scoresShape.js';
 import { LATEST_RUN_ID } from '../constants.js';
 import { DASHBOARD_VIEW } from '../vocab/dashboardView.js';
 import { fleetQuery, projectPath } from './paths.js';
@@ -23,6 +23,9 @@ let scoresGeneration = 0;
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
 export async function getProjectScores(projectId, asOfRun = null) {
   const data = await request(`${projectPath(projectId)}/scores${asOfQuery(asOfRun)}`);
+  // The server's warm-up still owes the project: hand the pending body
+  // through untouched so the hooks poll on it (see scoresShape.isPendingPayload).
+  if (isPendingPayload(data)) return data;
   scoresGeneration += 1;
   return attachFindingDetailRefs(parseUnifiedScores(data), projectId, asOfRun, scoresGeneration);
 }
@@ -95,13 +98,13 @@ export async function getDashboard(projectId, run = LATEST_RUN_ID) {
   if (run) query.set('run', run);
   query.set('view', DASHBOARD_VIEW.OVERVIEW);
   const data = await request(`${projectPath(projectId)}/dashboard?${query}`);
-  return createDashboard(data);
+  return isPendingPayload(data) ? data : createDashboard(data);
 }
 
 /** @returns {Promise<Object>} */
 export async function getAccumulated(projectId, asOfRun = null) {
   const data = await request(`${projectPath(projectId)}/accumulated${asOfQuery(asOfRun)}`);
-  return parseAccumulated(data);
+  return isPendingPayload(data) ? data : parseAccumulated(data);
 }
 
 // ── Dimension Eval ──────────────────────────────────────────────────────

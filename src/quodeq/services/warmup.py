@@ -4,7 +4,10 @@ After an upgrade invalidates the score caches, recomputing them takes minutes
 per project. This engine runs that work on one daemon thread, newest project
 activity first, through the single-flight ``cached_*`` helpers, so on-demand
 requests dedupe against it and effectively jump the queue. The projects route
-stays a pure read and re-enqueues anything still pending (self-healing).
+stays a pure read and re-enqueues anything still pending (self-healing), and
+the Overview routes answer pending while the engine still owes their project
+(``warmup_defer.defer_to_warmup``) instead of building it inline beside the
+worker.
 """
 from __future__ import annotations
 
@@ -147,6 +150,11 @@ class WarmupEngine:
             if getattr(entry, "summary_pending", False):
                 self.enqueue(entry.id)
 
+    def owes(self, project_id: str) -> bool:
+        """True while *project_id* is queued or being warmed, so its caches may still be cold."""
+        with self._cond:
+            return project_id == self._current or project_id in self._queued
+
     def generation(self) -> int:
         """How many projects the worker has finished; moves on every completion."""
         with self._cond:
@@ -165,8 +173,12 @@ class WarmupEngine:
                 "currentProjectName": self._current_name,
             }
 
-    def reset_for_tests(self) -> None:
-        """Stop the worker and clear all queued state (test seam)."""
+    def stop(self) -> None:
+        """Stop the worker and clear all queued state.
+
+        The shared listing retires its engine this way when another clone is
+        connected; tests use it through ``reset_for_tests``.
+        """
         # Signal worker to shut down and wait for it to exit
         self._shutdown.set()
         thread_to_join = None
@@ -185,6 +197,10 @@ class WarmupEngine:
             self._current = None
             self._current_name = None
             self._done = 0
+
+    def reset_for_tests(self) -> None:
+        """Stop the worker and clear all queued state (test seam)."""
+        self.stop()
 
     def _process_queued_item(self, project_id: str, reports_dir: str) -> None:
         """Resolve one queued project's display name and warm its caches.
