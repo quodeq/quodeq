@@ -33,18 +33,18 @@ describe('useSharedProjects warming', () => {
     });
     const { result } = renderHook(() => useSharedProjects(), { wrapper: ({ children }) => wrap(fakeApi, children) });
     await waitFor(() => expect(result.current.projects).toHaveLength(1));
-    expect(result.current.warming).toEqual({ active: true, remaining: 3 });
+    expect(result.current.warming).toEqual({ active: true, done: 1, total: 4, remaining: 3 });
   });
 
   it('is idle when the listing carries no warm-up or a finished one', async () => {
     const fakeApi = makeFakeApi({ projects: [{ id: 'p1', name: 'demo' }], warmup: { active: false, projectsDone: 2, projectsTotal: 2 } });
     const { result } = renderHook(() => useSharedProjects(), { wrapper: ({ children }) => wrap(fakeApi, children) });
     await waitFor(() => expect(result.current.projects).toHaveLength(1));
-    expect(result.current.warming).toEqual({ active: false, remaining: 0 });
+    expect(result.current.warming).toEqual({ active: false, done: 2, total: 2, remaining: 0 });
 
     const bare = makeFakeApi({ projects: [] });
     const { result: bareResult } = renderHook(() => useSharedProjects(), { wrapper: ({ children }) => wrap(bare, children) });
     await waitFor(() => expect(bareResult.current.loading).toBe(false));
-    expect(bareResult.current.warming).toEqual({ active: false, remaining: 0 });
+    expect(bareResult.current.warming).toEqual({ active: false, done: 0, total: 0, remaining: 0 });
   });
 });

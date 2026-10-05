@@ -78,6 +78,29 @@ def test_connect_default_ops_still_resolve_to_the_patched_module_globals():
     assert outcome.status == ConnectStatus.CLONE_FAILED
 
 
+def test_disconnect_stops_the_shared_warmup_before_removing_the_clone():
+    """The worker must not be writing into the clone while the clone is deleted."""
+    order: list[str] = []
+    ops = SharedRepoOps(
+        read_settings=lambda: SharedSettings(url="https://example.invalid/x.git"),
+        write_settings=lambda settings, *, log=None: order.append("settings"),
+        clone_lock=lambda url: _NoopLock(),
+        remove_clone_dir=lambda path: order.append("remove"),
+        shared_cache_dir=lambda url: "/cache/x",
+        stop_shared_warmup=lambda: order.append("stop"),
+    )
+    disconnect_shared_repo(ops=ops)
+    assert order == ["settings", "stop", "remove"]
+
+
+class _NoopLock:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
 def test_disconnect_uses_injected_ops():
     calls = {}
 

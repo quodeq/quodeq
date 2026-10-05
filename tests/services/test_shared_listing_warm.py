@@ -130,6 +130,39 @@ def test_defer_is_none_for_a_warm_project(tmp_path, monkeypatch, fresh_shared_wa
     assert fresh_shared_warmup.defer(tmp_path, _URL, "warm", summary_pending=lambda *_: False) is None
 
 
+def test_the_shared_worker_holds_the_clone_lock_while_it_warms(tmp_path, monkeypatch, fresh_shared_warmup):
+    """A disconnect or refresh takes the clone lock, so it waits for the project in flight
+    instead of deleting or resetting the clone under the worker."""
+    from quodeq.services.shared_repo import clone_lock
+
+    started, release = threading.Event(), threading.Event()
+
+    def warm(reports_dir, pid):
+        started.set()
+        assert release.wait(5)
+    monkeypatch.setattr(shared_listing, "warm_project", warm)
+    _fake_hydration(monkeypatch, [], entries=[_entry("a", True)])
+    shared_listing.warm_shared_listing(tmp_path, _URL)
+    assert started.wait(5)
+    try:
+        assert clone_lock(_URL).acquire(blocking=False) is False
+    finally:
+        release.set()
+    assert _wait_until(lambda: fresh_shared_warmup.snapshot()["active"] is False)
+    lock = clone_lock(_URL)
+    assert lock.acquire(blocking=False) is True
+    lock.release()
+
+
+def test_stop_forgets_the_bound_clone(tmp_path, monkeypatch, fresh_shared_warmup):
+    """Disconnect stops the worker; a later connect to the same url starts a fresh engine."""
+    _fake_hydration(monkeypatch, [], entries=[])
+    shared_listing.warm_shared_listing(tmp_path, _URL)
+    assert fresh_shared_warmup.snapshot() is not None
+    fresh_shared_warmup.stop()
+    assert fresh_shared_warmup.snapshot() is None
+
+
 def _active_cache_db() -> Path:
     """The score cache DB file open_score_cache resolves to right now."""
     with open_score_cache() as conn:

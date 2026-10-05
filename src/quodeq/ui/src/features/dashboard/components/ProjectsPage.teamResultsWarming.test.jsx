@@ -21,6 +21,8 @@ describe('ProjectsPage — shared cards still being warmed', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
     expect(placeholders()).toHaveLength(2);
+    // The strip says so too, so nobody wonders whether the rest are coming.
+    expect(screen.getByText('loading results · 1 of 3 ready…')).toBeInTheDocument();
   });
 
   it('on an empty page the placeholders stand in until the first card lands', async () => {

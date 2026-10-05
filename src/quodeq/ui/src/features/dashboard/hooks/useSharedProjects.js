@@ -80,8 +80,9 @@ function deriveSharedFreshness({ sync, listQuery, configured, startFailed }) {
  */
 function deriveWarming(listQuery, configured) {
   const warmup = configured ? listQuery.data?.warmup : null;
-  if (!warmup?.active) return { active: false, remaining: 0 };
-  return { active: true, remaining: Math.max(0, (warmup.projectsTotal ?? 0) - (warmup.projectsDone ?? 0)) };
+  const done = warmup?.projectsDone ?? 0;
+  const total = warmup?.projectsTotal ?? 0;
+  return { active: warmup?.active === true, done, total, remaining: warmup?.active ? Math.max(0, total - done) : 0 };
 }
 
 function deriveSharedProjectsState({ sync, listQuery, configured, startFailed }) {

@@ -3,7 +3,7 @@ import { relativeTimeFine } from '../../../utils/relativeTime.js';
 import { pluralKey } from '../../../utils/plural.js';
 import { useMenuToggle } from '../hooks/useMenuToggle.js';
 import { SyncBar } from './SyncBar.jsx';
-import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel, barPercent } from './syncStripState.js';
+import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel, barPercent, warmingLabel } from './syncStripState.js';
 
 function StripButton({ onClick, label, children }) {
   return (
@@ -77,6 +77,8 @@ function StripLabel({ state, status, when, projectsCount, onUpdate }) {
   switch (state.kind) {
     case STRIP_STATE.PROGRESS:
       return <span className="sync-strip__meta">{progressLabel(state.slot, state.slotKind, state.slot.url ?? status.url)}</span>;
+    case STRIP_STATE.WARMING:
+      return <span className="sync-strip__meta">{warmingLabel(state.warming)}</span>;
     case STRIP_STATE.OFFLINE:
       return <span className="sync-strip__meta">{t('sync.offline', { when })}</span>;
     case STRIP_STATE.UPDATE_FAILED:
@@ -94,10 +96,19 @@ function StripLabel({ state, status, when, projectsCount, onUpdate }) {
   }
 }
 
-// The live region. While a job runs it carries the phase only (the visible
-// label's percent and counts change on every 1 s poll and would be re-read
-// each time); otherwise it is the visible row's text.
+// The live region. While a job runs, or the server is still warming cards,
+// it carries the phase only (the visible label's percent and counts change
+// on every poll and would be re-read each time); otherwise it is the visible
+// row's text.
 function StripAnnouncement({ state, status, children }) {
+  if (state.kind === STRIP_STATE.WARMING) {
+    return (
+      <span className="sync-strip__status">
+        {children}
+        <span role="status" className="sr-only">{t('sync.warmingAnnounce')}</span>
+      </span>
+    );
+  }
   if (state.kind !== STRIP_STATE.PROGRESS) return <span role="status" className="sync-strip__status">{children}</span>;
   return (
     <span className="sync-strip__status">
@@ -112,14 +123,31 @@ function StripAnnouncement({ state, status, children }) {
  * (spec 4.2): exactly one state at a time, picked by pickStripState from the
  * connect and refresh slots. A pure component; the page owns the actions.
  */
+// The row's tail: the working bar while a job runs or the server is still
+// warming cards (only a job carries a percent), else the actions.
+function StripTail({ state, working, invite, onUpdate, onCopyInvite, onChange, onDisconnect }) {
+  if (working) return <SyncBar percent={state.slot ? barPercent(state.slot) : null} label={t('sync.progressAria')} />;
+  return (
+    <span className="sync-strip__actions">
+      {state.kind === STRIP_STATE.SYNCED && onUpdate && (
+        <StripButton onClick={onUpdate} label={t('sync.updateAria')}><span aria-hidden="true">⟳</span> {t('sync.update')}</StripButton>
+      )}
+      <InviteControl invite={invite} onCopyInvite={onCopyInvite} />
+      <StripMenu onChange={onChange} onDisconnect={onDisconnect} />
+    </span>
+  );
+}
+
 export default function SyncStrip({
-  status, offline = false, updateFailed = false, loadFailed = false, lastSynced, projectsCount = 0, invite,
+  status, offline = false, updateFailed = false, loadFailed = false, lastSynced, projectsCount = 0, invite, warming = null,
   onUpdate, onCopyInvite, onChange, onDisconnect,
 }) {
-  const state = pickStripState({ status, offline, updateFailed, loadFailed });
+  const state = pickStripState({ status, offline, updateFailed, loadFailed, warming });
   if (state.kind === STRIP_STATE.HIDDEN) return null;
-  const working = state.kind === STRIP_STATE.PROGRESS;
-  const url = working ? (state.slot.url ?? status.url) : status.url;
+  // A running job and a warm-up both show the working bar; only the job
+  // carries its own url.
+  const working = state.kind === STRIP_STATE.PROGRESS || state.kind === STRIP_STATE.WARMING;
+  const url = state.slot?.url ?? status.url;
   const when = relativeTimeFine(lastSynced ?? status.lastSynced);
   return (
     <div className={`sync-strip${working ? ' sync-strip--working' : ''}`}>
@@ -129,15 +157,7 @@ export default function SyncStrip({
         <StripLabel state={state} status={status} when={when} projectsCount={projectsCount} onUpdate={onUpdate} />
       </StripAnnouncement>
       <span className="sync-strip__grow" />
-      {working ? <SyncBar percent={barPercent(state.slot)} label={t('sync.progressAria')} /> : (
-        <span className="sync-strip__actions">
-          {state.kind === STRIP_STATE.SYNCED && onUpdate && (
-            <StripButton onClick={onUpdate} label={t('sync.updateAria')}><span aria-hidden="true">⟳</span> {t('sync.update')}</StripButton>
-          )}
-          <InviteControl invite={invite} onCopyInvite={onCopyInvite} />
-          <StripMenu onChange={onChange} onDisconnect={onDisconnect} />
-        </span>
-      )}
+      <StripTail state={state} working={working} invite={invite} onUpdate={onUpdate} onCopyInvite={onCopyInvite} onChange={onChange} onDisconnect={onDisconnect} />
     </div>
   );
 }

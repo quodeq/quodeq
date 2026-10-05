@@ -55,6 +55,10 @@ export async function sharedListProjects({ refresh = false } = {}) {
     projects,
     lastSynced: epochSecondsToMs(data?.lastSynced),
     stale: data?.stale ?? false,
+    // The server keeps a card off the listing until its worker has warmed
+    // it and counts the rest here; the page shows a placeholder per card
+    // still to come and re-lists while this is active.
+    warmup: data?.warmup ?? null,
   };
 }
 
