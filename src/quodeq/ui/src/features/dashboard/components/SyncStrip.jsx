@@ -16,7 +16,7 @@ function StripButton({ onClick, label, children }) {
 // The `⋯` menu: change repository and disconnect (both also in Settings).
 // Importing an exported archive lives in the header's `more ▾`, which is
 // there whether or not a repository is connected.
-function StripMenu({ onChange, onDisconnect }) {
+function StripMenu({ onChange, onDisconnect, disconnecting = false }) {
   const { open, rootRef, toggle, pick } = useMenuToggle();
   return (
     <span className="sync-strip__menu" ref={rootRef}>
@@ -33,7 +33,7 @@ function StripMenu({ onChange, onDisconnect }) {
       {open && (
         <div className="projects-filter-pill-menu sync-strip__menu-list" role="menu" aria-label={t('sync.moreAria')}>
           <button type="button" role="menuitem" onClick={pick(onChange)}>{t('sync.changeRepo')}</button>
-          <button type="button" role="menuitem" onClick={pick(onDisconnect)}>{t('sync.disconnect')}</button>
+          <button type="button" role="menuitem" onClick={pick(onDisconnect)} disabled={disconnecting}>{t('sync.disconnect')}</button>
         </div>
       )}
     </span>
@@ -125,7 +125,7 @@ function StripAnnouncement({ state, status, children }) {
  */
 // The row's tail: the working bar while a job runs or the server is still
 // warming cards (only a job carries a percent), else the actions.
-function StripTail({ state, working, invite, onUpdate, onCopyInvite, onChange, onDisconnect }) {
+function StripTail({ state, working, invite, onUpdate, onCopyInvite, onChange, onDisconnect, disconnecting }) {
   if (working) return <SyncBar percent={state.slot ? barPercent(state.slot) : null} label={t('sync.progressAria')} />;
   return (
     <span className="sync-strip__actions">
@@ -133,14 +133,14 @@ function StripTail({ state, working, invite, onUpdate, onCopyInvite, onChange, o
         <StripButton onClick={onUpdate} label={t('sync.updateAria')}><span aria-hidden="true">⟳</span> {t('sync.update')}</StripButton>
       )}
       <InviteControl invite={invite} onCopyInvite={onCopyInvite} />
-      <StripMenu onChange={onChange} onDisconnect={onDisconnect} />
+      <StripMenu onChange={onChange} onDisconnect={onDisconnect} disconnecting={disconnecting} />
     </span>
   );
 }
 
 export default function SyncStrip({
   status, offline = false, updateFailed = false, loadFailed = false, lastSynced, projectsCount = 0, invite, warming = null,
-  onUpdate, onCopyInvite, onChange, onDisconnect,
+  onUpdate, onCopyInvite, onChange, onDisconnect, disconnecting = false,
 }) {
   const state = pickStripState({ status, offline, updateFailed, loadFailed, warming });
   if (state.kind === STRIP_STATE.HIDDEN) return null;
@@ -157,7 +157,7 @@ export default function SyncStrip({
         <StripLabel state={state} status={status} when={when} projectsCount={projectsCount} onUpdate={onUpdate} />
       </StripAnnouncement>
       <span className="sync-strip__grow" />
-      <StripTail state={state} working={working} invite={invite} onUpdate={onUpdate} onCopyInvite={onCopyInvite} onChange={onChange} onDisconnect={onDisconnect} />
+      <StripTail state={state} working={working} invite={invite} onUpdate={onUpdate} onCopyInvite={onCopyInvite} onChange={onChange} onDisconnect={onDisconnect} disconnecting={disconnecting} />
     </div>
   );
 }

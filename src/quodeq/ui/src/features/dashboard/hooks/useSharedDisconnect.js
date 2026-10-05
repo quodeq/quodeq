@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
@@ -15,22 +15,20 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
  * repository lingers while the status catches up (same order as
  * Settings' SharedRepoSection). `onDisconnected` lets the app move a team
  * project selection back to a local one.
+ *
+ * The server waits for the shared warm-up's project in flight before it
+ * removes the clone, so a disconnect can take a while: `disconnecting` is
+ * true meanwhile, and a second call does nothing until the first is done.
  * @param {{onDisconnected?: () => void}} options
- * @returns {() => Promise<void>}
+ * @returns {{disconnect: () => Promise<void>, disconnecting: boolean}}
  */
 export function useSharedDisconnect({ onDisconnected } = {}) {
   const { disconnectShared } = useApi();
   const queryClient = useQueryClient();
   const { showToast } = useSidePane();
-  return useCallback(async () => {
-    const ok = await confirmDialog({
-      title: t('sync.disconnectConfirmTitle'),
-      message: t('sync.disconnectConfirmMsg'),
-      confirmLabel: t('sync.disconnectConfirm'),
-      cancelLabel: t('common.cancel'),
-      variant: DIALOG_VARIANT.DANGER,
-    });
-    if (!ok) return;
+  const [disconnecting, setDisconnecting] = useState(false);
+  const inFlight = useRef(false);
+  const remove = useCallback(async () => {
     try {
       await disconnectShared();
     } catch (err) {
@@ -41,4 +39,24 @@ export function useSharedDisconnect({ onDisconnected } = {}) {
     await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     onDisconnected?.();
   }, [disconnectShared, queryClient, showToast, onDisconnected]);
+  const disconnect = useCallback(async () => {
+    if (inFlight.current) return;
+    const ok = await confirmDialog({
+      title: t('sync.disconnectConfirmTitle'),
+      message: t('sync.disconnectConfirmMsg'),
+      confirmLabel: t('sync.disconnectConfirm'),
+      cancelLabel: t('common.cancel'),
+      variant: DIALOG_VARIANT.DANGER,
+    });
+    if (!ok || inFlight.current) return;
+    inFlight.current = true;
+    setDisconnecting(true);
+    try {
+      await remove();
+    } finally {
+      inFlight.current = false;
+      setDisconnecting(false);
+    }
+  }, [remove]);
+  return { disconnect, disconnecting };
 }

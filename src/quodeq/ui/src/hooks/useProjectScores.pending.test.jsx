@@ -29,6 +29,7 @@ describe('useProjectScores with a pending payload', () => {
     expect(result.current.scores).toBeNull();
     expect(result.current.latestScores).toBeNull();
     expect(result.current.availableRuns).toEqual([]);
+    expect(result.current.pending).toBe(true);
     expect(result.current.error).toBeNull();
   });
 });

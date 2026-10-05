@@ -82,11 +82,14 @@ function settledData(query) {
 }
 
 function buildProjectScoresResult({ scoresQuery, latestQuery, availableRuns, refreshScores }) {
+  const pending = isPendingPayload(scoresQuery.data) || isPendingPayload(latestQuery.data);
   return {
     scores: settledData(scoresQuery),
     latestScores: settledData(latestQuery),
-    loading: scoresQuery.isLoading || latestQuery.isLoading
-      || isPendingPayload(scoresQuery.data) || isPendingPayload(latestQuery.data),
+    loading: scoresQuery.isLoading || latestQuery.isLoading || pending,
+    // The server's warm-up still owes the project: loading, but for as long
+    // as the warm takes, so the boot loader must not wait on it.
+    pending,
     // True while the panel is rendering the PREVIOUS selection's scores because
     // the newly-picked run is still in flight. placeholderData keeps those old
     // numbers on screen, so without this the dimension cards look settled while

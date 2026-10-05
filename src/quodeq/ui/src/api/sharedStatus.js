@@ -71,6 +71,14 @@ export function connectShared(url) {
 }
 
 /**
+ * How long a disconnect may take. The server stops the shared warm-up and
+ * waits for the project in flight before it removes the clone, which on a
+ * large project outlasts the default 30 s; the UI must not report a failure
+ * for a disconnect that then succeeds.
+ */
+export const SHARED_DISCONNECT_TIMEOUT_MS = 120000;
+
+/**
  * Disconnect from the shared repository. The server deletes the local clone
  * and requires ?confirm=true; callers show their own confirm step first.
  * @returns {Promise<{configured: boolean}>}
@@ -78,5 +86,6 @@ export function connectShared(url) {
 export function disconnectShared() {
   return request('/shared/config?confirm=true', {
     method: 'DELETE',
+    timeout: SHARED_DISCONNECT_TIMEOUT_MS,
   });
 }

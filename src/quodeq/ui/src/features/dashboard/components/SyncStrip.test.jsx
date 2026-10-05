@@ -131,6 +131,11 @@ describe('SyncStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: /more repository actions/i }));
     expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['change repository', 'disconnect']);
   });
+  it('disables disconnect while one is in flight', () => {
+    render(<SyncStrip status={base} projectsCount={5} onChange={() => {}} onDisconnect={() => {}} disconnecting />);
+    fireEvent.click(screen.getByRole('button', { name: /more repository actions/i }));
+    expect(screen.getByRole('menuitem', { name: 'disconnect' })).toBeDisabled();
+  });
   it('shows the repository as host/path', () => {
     render(<SyncStrip status={base} projectsCount={5} />);
     expect(screen.getByText('github.com/quodeq/evaluations')).toBeInTheDocument();

@@ -12,6 +12,7 @@ route supplies its own serializer instead of this module reaching for it.
 """
 from __future__ import annotations
 
+import dataclasses
 import threading
 from pathlib import Path
 from typing import Any, Callable
@@ -26,8 +27,8 @@ from quodeq.services.warmup_defer import defer_to_warmup, summary_is_pending
 
 
 def _warm_under_clone_cache(url: str) -> Callable[[str, str], None]:
-    """The engine's warm step for *url*'s clone: ``warm_project`` with the
-    score cache scoped to the clone's own DB. The worker thread never inherits
+    """The engine's warm step for *url*'s clone: ``warm_project``, Overview
+    included, with the score cache scoped to the clone's own DB. The worker thread never inherits
     a route's contextvar override, so the step scopes its own; without it the
     warm-up would fill the LOCAL cache (a miss for the route, and shared rows
     mixed into local ones).
@@ -39,7 +40,7 @@ def _warm_under_clone_cache(url: str) -> Callable[[str, str], None]:
     clone into)."""
     def warm(reports_dir: str, project_id: str) -> None:
         with clone_lock(url), score_cache_path_override(shared_score_cache_path(url)):
-            warm_project(reports_dir, project_id)
+            warm_project(reports_dir, project_id, overview=True)
     return warm
 
 
@@ -76,6 +77,12 @@ class SharedWarmup:
             engine = self._engine
         if engine is not None:
             engine.enqueue_pending(entries)
+
+    def failed(self, project_id: str) -> bool:
+        """True when the worker's last warm of *project_id* raised (False before ``bind``)."""
+        with self._lock:
+            engine = self._engine
+        return engine is not None and engine.failed(project_id)
 
     def snapshot(self) -> dict | None:
         """Warm-up progress for the listing payload, or None before ``bind``."""
@@ -187,6 +194,26 @@ def warm_shared_listing(eval_root: Path, url: str) -> int:
     return len(projects)
 
 
+def _listed(projects: list[ProjectEntry]) -> list[ProjectEntry]:
+    """The entries the listing shows: warm ones, and settled failures.
+
+    A card still being warmed stays off the listing (the payload's
+    ``warmup`` counts it): Victor's ruling is that a shared card appears
+    only once it is fully readable, never as a placeholder whose Overview
+    then loads again and again. A card whose warm raised is shown anyway,
+    settled and without a grade: otherwise it would vanish with no signal
+    once the worker went idle. ``_hydrate`` still re-queues it, so the
+    engine retries after its failure backoff.
+    """
+    listed = []
+    for project in projects:
+        if not getattr(project, "summary_pending", False):
+            listed.append(project)
+        elif shared_warmup.failed(project.id):
+            listed.append(dataclasses.replace(project, summary_pending=False))
+    return listed
+
+
 def list_shared_projects(
     eval_root: Path, url: str,
     *, refresh: bool, refresh_clone: Callable[[str], tuple[bool, object]],
@@ -213,11 +240,7 @@ def list_shared_projects(
         else:
             stale = True
     projects, meta = _hydrate(eval_root, url)
-    # A card still being warmed stays off the listing (the payload's
-    # ``warmup`` counts it): Victor's ruling is that a shared card appears
-    # only once it is fully readable, never as a placeholder whose Overview
-    # then loads again and again.
-    listing = {"projects": [serialize(p) for p in projects if not getattr(p, "summary_pending", False)]}
+    listing = {"projects": [serialize(p) for p in _listed(projects)]}
     for project in listing["projects"]:
         key = project.get("id") or project.get("name")
         _merge_published_meta(project, key, meta)

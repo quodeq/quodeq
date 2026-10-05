@@ -147,10 +147,11 @@ def build_project_list(
     never dirties its git worktree (see routes_shared.py shared_projects).
 
     *inline_summaries* is forwarded to ``build_project_entry`` (as
-    ``compute_on_miss``): the shared-repo route has no warm-up engine to fill
-    a missing project-card summary, so it passes True to keep computing one
-    inline on a miss. Local callers keep the default (False) -- a miss is
-    reported pending and left for the warm-up engine.
+    ``compute_on_miss``). Local callers and the shared-repo route both keep
+    the default (False): a miss is reported pending and left for a warm-up
+    engine, ``warmup.engine`` for the local list and
+    ``shared_listing.shared_warmup`` for the shared one, which also keeps a
+    cold shared card off the listing until it is warmed.
     """
     dir_names = collect_candidate_dirs(reports_root, max_projects_listed())
     known, info_by_name = _classify_known_ids(reports_root, dir_names, backfill=backfill)

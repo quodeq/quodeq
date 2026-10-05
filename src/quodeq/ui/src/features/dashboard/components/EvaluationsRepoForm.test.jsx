@@ -29,6 +29,16 @@ describe('EvaluationsRepoForm', () => {
     expect(onConnect).toHaveBeenCalledWith('file:///Users/me/evals.git');
   });
 
+  it('a host without a scheme is a remote, sent as https', async () => {
+    const user = userEvent.setup();
+    const onConnect = vi.fn();
+    render(<EvaluationsRepoForm onConnect={onConnect} browseFolder={async () => null} />);
+    await user.type(screen.getByRole('textbox', { name: /evaluations repository url/i }), 'github.com/team/evals');
+    expect(screen.queryByText(BARE_HINT)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'connect' }));
+    expect(onConnect).toHaveBeenCalledWith('https://github.com/team/evals');
+  });
+
   it('a typed path is a local folder too, sent as a file url', async () => {
     const user = userEvent.setup();
     const onConnect = vi.fn();

@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from quodeq.core.types import ProjectEntry
 from quodeq.services import shared_connect_job, shared_listing
 from quodeq.services.shared_connect import ConnectOutcome
 from quodeq.services.shared_connect_job import ConnectJobStatus, ConnectState, get_connect_status, start_connect
@@ -90,8 +91,10 @@ def test_listing_serves_warm_cards_without_computing_them(tmp_path, monkeypatch)
 
 def test_listing_hides_a_cold_card_until_the_shared_warmup_has_it(tmp_path, monkeypatch, fresh_shared_warmup):
     """A shared card appears only once the project is fully warmed; the payload still counts it."""
-    warmed: list[tuple[str, str]] = []
-    monkeypatch.setattr(shared_listing, "warm_project", lambda reports_dir, pid: warmed.append((reports_dir, pid)))
+    warmed: list[tuple[str, str, dict]] = []
+    monkeypatch.setattr(
+        shared_listing, "warm_project", lambda reports_dir, pid, **kw: warmed.append((reports_dir, pid, kw)),
+    )
     _fake_hydration(monkeypatch, [], entries=[_entry("cold", True), _entry("warm", False)])
     monkeypatch.setattr(shared_listing, "last_synced_at", lambda url: None)
 
@@ -101,15 +104,35 @@ def test_listing_hides_a_cold_card_until_the_shared_warmup_has_it(tmp_path, monk
 
     assert [p["id"] for p in listing["projects"]] == ["warm"]
     assert listing["warmup"]["projectsTotal"] == 1
-    assert _wait_until(lambda: warmed == [(str(tmp_path), "cold")])
+    # The Overview is pre-built too, so the card opens without another loading screen.
+    assert _wait_until(lambda: warmed == [(str(tmp_path), "cold", {"overview": True})])
     assert _wait_until(lambda: fresh_shared_warmup.snapshot()["active"] is False)
+
+
+def test_a_card_whose_warm_up_failed_is_listed_without_a_grade(tmp_path, monkeypatch, fresh_shared_warmup):
+    """A failed warm never hides the card for good: it is listed as settled, with no grade."""
+    def fail(*_a, **_k):
+        raise RuntimeError("corrupt run")
+    monkeypatch.setattr(shared_listing, "warm_project", fail)
+    _fake_hydration(monkeypatch, [], entries=[ProjectEntry(id="bad", name="bad", summary_pending=True)])
+    monkeypatch.setattr(shared_listing, "last_synced_at", lambda url: None)
+
+    def listing():
+        return shared_listing.list_shared_projects(
+            tmp_path, _URL, refresh=False, refresh_clone=None, sync_index=None,
+            serialize=lambda p: {"id": p.id, "summaryPending": p.summary_pending},
+        )["projects"]
+
+    assert listing() == []
+    assert _wait_until(lambda: fresh_shared_warmup.snapshot()["active"] is False)
+    assert [(p["id"], p["summaryPending"]) for p in listing()] == [("bad", False)]
 
 
 def test_defer_queues_a_cold_project_and_reports_pending(tmp_path, monkeypatch, fresh_shared_warmup):
     """Opening a cold shared project queues it and answers pending instead of building inline."""
     started, release = threading.Event(), threading.Event()
 
-    def warm(reports_dir, pid):
+    def warm(reports_dir, pid, **_kw):
         started.set()
         assert release.wait(5)
     monkeypatch.setattr(shared_listing, "warm_project", warm)
@@ -126,7 +149,7 @@ def test_defer_queues_a_cold_project_and_reports_pending(tmp_path, monkeypatch, 
 
 
 def test_defer_is_none_for_a_warm_project(tmp_path, monkeypatch, fresh_shared_warmup):
-    monkeypatch.setattr(shared_listing, "warm_project", lambda *_: pytest.fail("nothing to warm"))
+    monkeypatch.setattr(shared_listing, "warm_project", lambda *_a, **_k: pytest.fail("nothing to warm"))
     assert fresh_shared_warmup.defer(tmp_path, _URL, "warm", summary_pending=lambda *_: False) is None
 
 
@@ -137,7 +160,7 @@ def test_the_shared_worker_holds_the_clone_lock_while_it_warms(tmp_path, monkeyp
 
     started, release = threading.Event(), threading.Event()
 
-    def warm(reports_dir, pid):
+    def warm(reports_dir, pid, **_kw):
         started.set()
         assert release.wait(5)
     monkeypatch.setattr(shared_listing, "warm_project", warm)
@@ -180,7 +203,7 @@ def clone_cache(tmp_path, monkeypatch):
 
 def test_the_shared_worker_warms_under_the_clone_score_cache(tmp_path, monkeypatch, clone_cache, fresh_shared_warmup):
     seen: list[Path] = []
-    monkeypatch.setattr(shared_listing, "warm_project", lambda reports_dir, pid: seen.append(_active_cache_db()))
+    monkeypatch.setattr(shared_listing, "warm_project", lambda reports_dir, pid, **_kw: seen.append(_active_cache_db()))
     _fake_hydration(monkeypatch, [], entries=[_entry("a", True)])
 
     shared_listing.warm_shared_listing(tmp_path, _URL)
@@ -191,7 +214,7 @@ def test_the_shared_worker_warms_under_the_clone_score_cache(tmp_path, monkeypat
 
 def test_a_new_url_gets_its_own_engine(tmp_path, monkeypatch, fresh_shared_warmup):
     warmed: list[tuple[str, str]] = []
-    monkeypatch.setattr(shared_listing, "warm_project", lambda reports_dir, pid: warmed.append((reports_dir, pid)))
+    monkeypatch.setattr(shared_listing, "warm_project", lambda reports_dir, pid, **_kw: warmed.append((reports_dir, pid)))
     first, second = tmp_path / "first", tmp_path / "second"
     first.mkdir()
     second.mkdir()
@@ -208,7 +231,7 @@ def test_connect_job_queues_the_clone_for_the_shared_warmup(tmp_path, monkeypatc
     root = tmp_path / "evaluations"
     (root / "a").mkdir(parents=True)
     seen: list[Path] = []
-    monkeypatch.setattr(shared_listing, "warm_project", lambda reports_dir, pid: seen.append(_active_cache_db()))
+    monkeypatch.setattr(shared_listing, "warm_project", lambda reports_dir, pid, **_kw: seen.append(_active_cache_db()))
     _fake_hydration(monkeypatch, [], entries=[_entry("a", True)])
     monkeypatch.setattr(shared_connect_job, "shared_evaluations_root", lambda url, env=None: root)
     monkeypatch.setattr(

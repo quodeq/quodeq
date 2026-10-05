@@ -4,6 +4,7 @@ import { cloneNameFromUrl } from '../../../api/projectClone.js';
 import { formatSize } from '../../../utils/formatSize.js';
 import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { SyncBar } from './SyncBar.jsx';
+import { barPercent } from './syncStripState.js';
 
 // What the clone is doing, in the tile's words: the download with percent and
 // size once both are known, git's delta resolution and checkout with their
@@ -16,12 +17,6 @@ function cloneLabel(slot) {
   const size = formatSize(slot.bytes);
   if (percent === null || !size) return t('projects.cloningTileBare');
   return t('projects.cloningTile', { percent, size });
-}
-
-// The bar is determinate in every phase that reports a percent.
-function barPercent(slot) {
-  const withPercent = slot.phase === SYNC_PHASE.DOWNLOADING || slot.phase === SYNC_PHASE.RESOLVING || slot.phase === SYNC_PHASE.CHECKOUT;
-  return withPercent && typeof slot.percent === 'number' ? slot.percent : null;
 }
 
 function FailedRow({ slot, onRetry, onClose }) {

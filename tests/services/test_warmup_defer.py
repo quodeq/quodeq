@@ -108,3 +108,23 @@ def test_defer_moves_an_owed_cold_project_to_the_front_and_reports_pending(tmp_p
     release.set()
     assert all_done.wait(5)
     assert order == ["a", "selected", "b"]
+
+
+def test_the_project_being_warmed_is_deferred_even_when_its_summary_is_cached(tmp_path, engines):
+    """The worker fills the summary first and the scores and Overview after, so a cache
+    hit on the summary does not mean the project is warm: building inline beside the
+    worker is the contention this module exists to avoid."""
+    eng, _order, first_started, release, _all_done = _blocked_engine(engines, _LISTING)
+    eng.start(str(tmp_path))
+    assert first_started.wait(5)
+    probes: list[str] = []
+
+    def summary_pending(_reports_dir, project_id):
+        probes.append(project_id)
+        return False
+    try:
+        body = defer_to_warmup(str(tmp_path), "a", engine=eng, summary_pending=summary_pending)
+        assert body is not None and body["pending"] is True
+        assert probes == []
+    finally:
+        release.set()

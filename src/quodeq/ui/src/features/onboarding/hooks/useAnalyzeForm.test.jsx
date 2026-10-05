@@ -27,6 +27,10 @@ describe('inferRepoSource', () => {
     expect(inferRepoSource('C:\\code\\app')).toBe('folder');
     expect(inferRepoSource('')).toBe('folder');
   });
+
+  it('reads a host typed without a scheme as a url', () => {
+    expect(inferRepoSource('github.com/acme/billing')).toBe('url');
+  });
 });
 
 describe('useAnalyzeForm', () => {
@@ -48,6 +52,14 @@ describe('useAnalyzeForm', () => {
     expect(result.current.form.canSubmit).toBe(true);
     expect(result.current.wizard.state.repo).toMatchObject({ source: 'url', value: 'git@github.com:acme/billing.git' });
     expect(result.current.form.request()).toEqual({ repo: 'git@github.com:acme/billing.git', source: 'url' });
+  });
+
+  it('a host without a scheme is a url source, sent as https', () => {
+    const { result } = setup();
+    act(() => result.current.form.setRepo('github.com/acme/billing'));
+    expect(result.current.form.source).toBe('url');
+    expect(result.current.form.workingCopy.name).toBe('billing');
+    expect(result.current.form.request()).toEqual({ repo: 'https://github.com/acme/billing', source: 'url' });
   });
 
   it('a typed path is a folder source with no working copy', () => {

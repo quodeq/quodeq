@@ -47,3 +47,21 @@ def test_an_unwritable_folder_still_yields_an_id(tmp_path):
         folder.chmod(stat.S_IRWXU)
     assert len(got) == 32
     assert not (folder / INSTANCE_ID_FILE).exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="needs a folder the process cannot write")
+def test_an_unwritable_folder_yields_the_same_id_for_the_process(tmp_path):
+    """/api/health is polled; an id minted per read would never match the UI's stored one."""
+    first, second = tmp_path / "ro1", tmp_path / "ro2"
+    for folder in (first, second):
+        folder.mkdir()
+        folder.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        a = read_instance_id({"QUODEQ_DIR": str(first)})
+        again = read_instance_id({"QUODEQ_DIR": str(first)})
+        other = read_instance_id({"QUODEQ_DIR": str(second)})
+    finally:
+        for folder in (first, second):
+            folder.chmod(stat.S_IRWXU)
+    assert a == again
+    assert other != a
