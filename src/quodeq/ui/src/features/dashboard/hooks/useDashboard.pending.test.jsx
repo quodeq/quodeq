@@ -6,8 +6,8 @@ import { ApiProvider } from '../../../api/ApiContext.jsx';
 
 // While the server's warm-up still owes the project, the Overview routes
 // answer a pending body. The hook must read that as "still loading", never
-// as an empty project or an error: the boot loader stays up and the query
-// polls until the real payload lands.
+// as an empty project or an error, and say it is pending so the boot loader
+// drops into the Overview's own loading state while the query polls.
 const PENDING = { pending: true, warmup: { active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'quodeq' } };
 
 function makeFakeApi({ dashboard = PENDING, scores = { accumulated: { score: 90 }, trend: [], availableRuns: [] } } = {}) {
@@ -40,6 +40,7 @@ describe('useDashboard with a pending Overview', () => {
     await waitFor(() => expect(result.current.accumulated?.score).toBe(90));
     expect(result.current.dashboard).toBeNull();
     expect(result.current.loading).toBe(true);
+    expect(result.current.pending).toBe(true);
     expect(result.current.error).toBeNull();
   });
 
@@ -56,6 +57,7 @@ describe('useDashboard with a pending Overview', () => {
     await waitFor(() => expect(fakeApi.getProjectScores).toHaveBeenCalled());
     expect(result.current.accumulated).toBeNull();
     expect(result.current.loading).toBe(true);
+    expect(result.current.pending).toBe(true);
     expect(result.current.error).toBeNull();
   });
 });

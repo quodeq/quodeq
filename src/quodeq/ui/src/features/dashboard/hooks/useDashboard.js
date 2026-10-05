@@ -84,7 +84,7 @@ function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fe
 }
 
 function buildDashboardResult({
-  dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresError,
+  dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresPendingBody, scoresError,
   availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, dropRunFromCache, sharedProjectInfoQuery,
 }) {
   return {
@@ -98,8 +98,12 @@ function buildDashboardResult({
     customFormula: Boolean(scores?.scoring?.customFormula),
     rescoreLookup: {},
     // A pending body is "not yet", never an empty project: it keeps the
-    // loading state (and the boot loader) up until the real payload lands.
+    // loading state up until the real payload lands.
     loading: dashboardQuery.isLoading || scoresLoading || isPendingPayload(dashboardQuery.data),
+    // The server's warm-up still owes the project, which can take as long as
+    // the warm of a large project: the boot loader drops into the Overview's
+    // own loading state instead of walling off the app for that long.
+    pending: isPendingPayload(dashboardQuery.data) || scoresPendingBody,
     // True during background refetch when we already have placeholder data
     // (e.g. user switched to a different run). Page shows a subtle
     // shimmer/dim instead of the full loading screen.
@@ -171,6 +175,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = PR
     loading: scoresLoading,
     error: scoresError,
     scoresPending,
+    pending: scoresPendingBody,
     availableRuns,
   } = useProjectScores({ selectedProject, selectedRun, selectedSource, keepPlaceholder });
 
@@ -188,7 +193,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = PR
   const { refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, dropRunFromCache } = useDashboardInvalidation({ queryClient, selectedProject, selectedSource });
 
   return buildDashboardResult({
-    dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresError,
+    dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresPendingBody, scoresError,
     availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, dropRunFromCache, sharedProjectInfoQuery,
   });
 }

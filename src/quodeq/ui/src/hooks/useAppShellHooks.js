@@ -122,6 +122,7 @@ export function useAppStartupGate({ state, activeTab }) {
     accumulated: state.accumulated,
     error: state.error,
     loading: state.loading,
+    pending: state.pending,
   });
   return { showStartupLoader };
 }
