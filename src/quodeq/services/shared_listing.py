@@ -27,8 +27,8 @@ from quodeq.services.warmup_defer import defer_to_warmup, summary_is_pending
 
 
 def _warm_under_clone_cache(url: str) -> Callable[[str, str], None]:
-    """The engine's warm step for *url*'s clone: ``warm_project`` with the
-    score cache scoped to the clone's own DB. The worker thread never inherits
+    """The engine's warm step for *url*'s clone: ``warm_project``, Overview
+    included, with the score cache scoped to the clone's own DB. The worker thread never inherits
     a route's contextvar override, so the step scopes its own; without it the
     warm-up would fill the LOCAL cache (a miss for the route, and shared rows
     mixed into local ones).
@@ -40,7 +40,7 @@ def _warm_under_clone_cache(url: str) -> Callable[[str, str], None]:
     clone into)."""
     def warm(reports_dir: str, project_id: str) -> None:
         with clone_lock(url), score_cache_path_override(shared_score_cache_path(url)):
-            warm_project(reports_dir, project_id)
+            warm_project(reports_dir, project_id, overview=True)
     return warm
 
 

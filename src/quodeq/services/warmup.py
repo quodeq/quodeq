@@ -47,13 +47,18 @@ def _project_display_name(reports_dir: str, project_id: str) -> str:
     return info.get("displayName") or info.get("name") or project_id
 
 
-def warm_project(reports_dir: str, project_id: str) -> None:
+def warm_project(reports_dir: str, project_id: str, *, overview: bool = False) -> None:
     """Compute-and-cache one project's card summary and dashboard payload.
 
     What the engine does per queued project; callable inline for tests and
     budgets. The card goes through the single-flight read-through helper and
     the payload through the stamp memo, so this is a version-check no-op on
     a warm process and dedupes with on-demand requests.
+
+    *overview* also pre-builds the latest Overview. Only the shared warm-up
+    asks for it (a shared card appears once it is fully readable): the
+    Overview lives in the per-process memo alone, so for local projects it
+    would be rebuilt on every boot for projects nobody opens.
     """
     from quodeq.services.wiring import find_children  # noqa: PLC0415
     from quodeq.services._fs_metadata import warm_project_summary  # noqa: PLC0415
@@ -68,9 +73,10 @@ def warm_project(reports_dir: str, project_id: str) -> None:
     if find_children(reports_root, project_id):
         return
     get_project_scores(reports_root, project_id)
-    # The Overview's own payload too, so a warmed project opens without a
-    # second loading screen. A run that vanished underneath is not a failure
-    # of the project: its card and scores are cached by now.
+    if not overview:
+        return
+    # A run that vanished underneath is not a failure of the project: its
+    # card and scores are cached by now.
     try:
         fs_reports.get_dashboard_overview(reports_dir, project_id, LATEST_RUN)
     except FileNotFoundError as exc:
