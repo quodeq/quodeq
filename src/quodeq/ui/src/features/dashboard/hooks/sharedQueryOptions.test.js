@@ -21,11 +21,13 @@ test('list query: enabled only when configured and the caller gate allows it', (
   );
 });
 
-test('list query: re-lists while any shared card is still pending its summary', () => {
+test('list query: re-lists while the server is still warming cards it has not shown yet', () => {
   const on = sharedListQueryOptions({ sharedListProjects: () => 'list', configured: true });
-  const query = (projects) => ({ state: { data: projects ? { projects } : undefined, error: null } });
-  assert.equal(on.refetchInterval(query([{ id: 'a', summaryPending: true }, { id: 'b' }])), SUMMARY_POLL_MS);
-  assert.equal(on.refetchInterval(query([{ id: 'a', summaryPending: false }])), false);
+  const query = (data) => ({ state: { data, error: null } });
+  assert.equal(on.refetchInterval(query({ projects: [], warmup: { active: true, projectsDone: 0, projectsTotal: 3 } })), SUMMARY_POLL_MS);
+  assert.equal(on.refetchInterval(query({ projects: [{ id: 'a' }], warmup: { active: false, projectsDone: 3, projectsTotal: 3 } })), false);
+  assert.equal(on.refetchInterval(query({ projects: [{ id: 'a', summaryPending: true }] })), SUMMARY_POLL_MS);
+  assert.equal(on.refetchInterval(query({ projects: [{ id: 'a' }] })), false);
   assert.equal(on.refetchInterval(query(undefined)), false);
 });
 

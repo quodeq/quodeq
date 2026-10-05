@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import time
 from pathlib import Path
 
 from quodeq.data.fs.shared_repo import (
@@ -26,6 +25,8 @@ from tests.api._routes_shared_read_fixtures import (  # noqa: F401 -- pytest fix
     app,
     client,
     empty_shared_clone_fixture,
+    list_shared_settled,
+    wait_shared_warmup_idle,
 )
 
 
@@ -119,9 +120,7 @@ def test_no_mutating_routes_under_shared(app):
 # --- GET /api/shared/projects -------------------------------------------------
 
 def test_shared_projects_lists_published(client, shared_clone_fixture):
-    resp = client.get("/api/shared/projects")
-    assert resp.status_code == 200
-    body = resp.get_json()
+    body = list_shared_settled(client)
     ids = [p.get("id") or p.get("name") for p in body["projects"]]
     assert "proj-a" in ids
     proj = next(p for p in body["projects"] if (p.get("id") or p.get("name")) == "proj-a")
@@ -187,25 +186,10 @@ def test_shared_projects_refresh_stale_when_origin_unreachable(
     origin_path = Path(shared_clone_fixture.removeprefix("file://"))
     origin_path.rename(tmp_path / "origin-moved.git")
 
-    resp = client.get("/api/shared/projects?refresh=1")
-    assert resp.status_code == 200
-    body = resp.get_json()
+    body = list_shared_settled(client, "/api/shared/projects?refresh=1")
     assert body["stale"] is True
     ids = [p.get("id") or p.get("name") for p in body["projects"]]
     assert "proj-a" in ids
-
-
-def _wait_shared_warmup_idle(timeout_s: float = 10.0) -> None:
-    """Block until the shared warm-up has no project queued or in flight."""
-    from quodeq.services.shared_listing import shared_warmup
-
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        snapshot = shared_warmup.snapshot()
-        if snapshot is None or not snapshot["active"]:
-            return
-        time.sleep(0.02)
-    raise AssertionError("shared warm-up did not settle in time")
 
 
 def _git_porcelain(repo: Path) -> str:
@@ -241,7 +225,7 @@ def test_shared_projects_listing_does_not_dirty_clone_worktree(client, shared_cl
     # The listing queues cold cards on the shared warm-up, whose worker holds
     # a run's evaluation.db open (transient -wal/-shm files) while it scores.
     # Let it settle so the status compares what the request itself wrote.
-    _wait_shared_warmup_idle()
+    wait_shared_warmup_idle()
 
     status_after = _git_porcelain(repo)
     assert status_after == status_before
@@ -271,7 +255,7 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
     assert resp.status_code == 200
     # The summaries themselves are computed by the shared warm-up's worker
     # thread, which must scope the same override the route did.
-    _wait_shared_warmup_idle()
+    wait_shared_warmup_idle()
 
     assert clone_cache_path.exists()
     assert not local_cache_path.exists()
@@ -280,20 +264,18 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
 def test_shared_projects_expose_origin_url_and_score_fields(client, shared_clone_fixture):
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200
-    proj = next(
-        p for p in resp.get_json()["projects"]
-        if (p.get("id") or p.get("name")) == "proj-a"
-    )
-    assert proj.get("originUrl") == "https://github.com/example/proj-a.git"
+    first = resp.get_json()
     # Regression lock: shared listings carry scores from the clone-scoped
-    # score cache; the merge UI sorts on this field. A cold card is reported
-    # pending (no score yet) and queued, and lands scored on the next listing.
-    assert proj["summaryPending"] is True
-    assert "latestScore" not in proj
-    _wait_shared_warmup_idle()
-    warmed = next(
+    # score cache; the merge UI sorts on this field. A cold card stays off
+    # the listing (the payload counts it) until the warm-up has scored it,
+    # then it lands with its score, ready to open.
+    assert [p.get("id") or p.get("name") for p in first["projects"]] == []
+    assert first["warmup"]["active"] is True
+    wait_shared_warmup_idle()
+    proj = next(
         p for p in client.get("/api/shared/projects").get_json()["projects"]
         if (p.get("id") or p.get("name")) == "proj-a"
     )
-    assert warmed["summaryPending"] is False
-    assert "latestScore" in warmed
+    assert proj.get("originUrl") == "https://github.com/example/proj-a.git"
+    assert proj["summaryPending"] is False
+    assert "latestScore" in proj

@@ -25,6 +25,7 @@ from quodeq.services.shared_publish import publish_project
 from quodeq.data.fs.shared_repo import sync_shared_index
 from quodeq.services.shared_settings import SharedSettings, write_settings
 from quodeq.services.scoring.compliance_detail import DETAIL_FIELDS
+from tests.api._routes_shared_read_fixtures import get_shared_settled
 
 _PROJECT = "proj-a"
 _RUN = "run-1"
@@ -168,7 +169,9 @@ def test_dashboard_parity_local_vs_shared(client, real_project_fixture, shared_c
     real assertion, not a stand-in for one that had to be loosened.
     """
     local = client.get(f"/api/projects/{_PROJECT}/dashboard?run={_RUN}").get_json()
-    shared = client.get(f"/api/shared/projects/{_PROJECT}/dashboard?run={_RUN}").get_json()
+    # A cold shared project answers pending until the clone's worker has
+    # warmed it; parity is checked on the settled payload.
+    shared = get_shared_settled(client, f"/api/shared/projects/{_PROJECT}/dashboard?run={_RUN}").get_json()
     assert shared == local
 
     # Finding 3: the published clone must carry the project-level scan.json
@@ -208,7 +211,7 @@ def test_scores_parity_local_vs_shared(client, real_project_fixture, shared_clon
     no detail route and ships the bodies whole, so the comparison strips
     what the deferral touches."""
     local_scores = client.get(f"/api/projects/{_PROJECT}/scores").get_json()
-    shared_scores = client.get(f"/api/shared/projects/{_PROJECT}/scores").get_json()
+    shared_scores = get_shared_settled(client, f"/api/shared/projects/{_PROJECT}/scores").get_json()
     assert _without_deferred_detail(shared_scores) == _without_deferred_detail(local_scores)
     local_items = [v for d in local_scores["accumulated"]["dimensions"] for v in d["violations"]]
     assert local_items and all(v["detailDeferred"] for v in local_items)

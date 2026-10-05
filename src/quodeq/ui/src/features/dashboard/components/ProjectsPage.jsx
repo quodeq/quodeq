@@ -169,7 +169,7 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
 function ProjectsPageContent({ projectsLoaded, isEmpty, status, ghost, bodyProps }) {
   if (!projectsLoaded) return <LoadingScreen variant="inline" />;
   if (isEmpty && status.cloneActive) return <>{ghost}<p className="projects-empty">{t('projects.projectArriving')}</p></>;
-  if (isEmpty && status.connectActive) {
+  if (isEmpty && (status.connectActive || status.warmingActive)) {
     return <>{ghost}<ReadingPlaceholders count={status.readingCount} /><p className="projects-empty">{t('projects.teamResultsArriving')}</p></>;
   }
   if (isEmpty) return <>{ghost}<p className="projects-empty">{t('projects.noReposYet')}</p></>;
@@ -182,10 +182,13 @@ function useGhostTile() {
   return { ghost, cloneActive: active, cloneSlot: active ? slot : null };
 }
 
-// How many of the team's projects the running connect has found so far.
+// How many of the team's projects are still to come: the ones a running
+// connect has found so far, then the ones the server is still warming and
+// has not listed yet (its cards land one by one, each ready to open).
 function readingCount(shared) {
   const connect = shared.status?.connect;
-  return connect?.phase === SYNC_PHASE.READING ? (connect.projectsFound ?? 0) : 0;
+  if (connect?.phase === SYNC_PHASE.READING) return connect.projectsFound ?? 0;
+  return shared.warming?.remaining ?? 0;
 }
 
 export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
@@ -211,7 +214,10 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
       <ProjectsPageContent
         projectsLoaded={projectsLoaded}
         isEmpty={isEmpty}
-        status={{ connectActive: isSlotActive(shared.status?.connect), cloneActive, readingCount: readingCount(shared) }}
+        status={{
+          connectActive: isSlotActive(shared.status?.connect), cloneActive,
+          warmingActive: !!shared.warming?.active, readingCount: readingCount(shared),
+        }}
         ghost={ghost}
         bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx, cloneSlot }}
       />
