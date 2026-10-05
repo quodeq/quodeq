@@ -199,8 +199,13 @@ export function useSharedContentSignal() {
   const settled = statusSettled && (!configured || listSettled);
   const publishedCount = configured ? (listQuery.data?.projects?.length ?? 0) : 0;
   const hasContent = publishedCount > 0;
+  // What the server itself said about the repository: true or false once
+  // the status loaded, null while unknown or when the fetch failed. A failed
+  // fetch must never read as "nothing connected": a restored shared
+  // selection is dropped on that answer (useDeadSharedSelectionEffect).
+  const connected = statusQuery.isSuccess ? configured : null;
 
-  return { settled, hasContent, publishedCount };
+  return { settled, hasContent, publishedCount, connected };
 }
 
 /**

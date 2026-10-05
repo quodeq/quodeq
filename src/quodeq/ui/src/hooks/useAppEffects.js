@@ -6,9 +6,32 @@ import { shouldRedirectToRepositories } from '../appGating.js';
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
 import { ASSISTANT_ACTION_APPLIED_EVENT } from '../constants.js';
 import { NAV_TAB } from '../vocab/navTab.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 // App.jsx's boot-time and navigation-guard effects. Each hook carries the
 // rationale for its own effect.
+
+/**
+ * A restored shared selection is exempt from every "no projects" rule (the
+ * landing redirect, the wizard auto-open, the stale-selection drop): a
+ * teammate viewing a shared project has a working view that the local list
+ * knows nothing about. That exemption needs a repository behind it. When
+ * the server reports that none is connected (a wiped or replaced state
+ * folder, while the browser storage elsewhere kept the selection), the
+ * selection is dropped, and the local rules take over: Repositories, and
+ * the welcome on a first run. Only the server's own answer counts; a failed
+ * status fetch (connected=null) keeps the selection.
+ */
+export function useDeadSharedSelectionEffect({ state, sharedSignal }) {
+  const latest = useRef(null);
+  latest.current = { selectedSource: state.selectedSource, handleProjectChange: state.handleProjectChange };
+  useEffect(() => {
+    const { selectedSource, handleProjectChange } = latest.current;
+    if (sharedSignal.connected !== false) return;
+    if (selectedSource !== PROJECT_SOURCE.SHARED) return;
+    handleProjectChange?.('');
+  }, [sharedSignal.connected, state.selectedSource]);
+}
 
 /**
  * Bridges ASSISTANT_ACTION_APPLIED_EVENT window events into the
