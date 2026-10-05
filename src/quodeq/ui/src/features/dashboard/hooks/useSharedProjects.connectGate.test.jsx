@@ -50,7 +50,8 @@ describe('the shared list waits for a connect to finish reading', () => {
     const { result } = render(() => useSharedContentSignal(), api);
     await waitFor(() => expect(api.getSharedStatus).toHaveBeenCalled());
     await new Promise((resolve) => { setTimeout(resolve, 50); });
-    expect(result.current).toEqual({ settled: false, hasContent: false, publishedCount: 0 });
+    // connected reads the status itself (configured, even mid-connect), not the settle.
+    expect(result.current).toEqual({ settled: false, hasContent: false, publishedCount: 0, connected: true });
     expect(api.sharedListProjects).not.toHaveBeenCalled();
   });
 });

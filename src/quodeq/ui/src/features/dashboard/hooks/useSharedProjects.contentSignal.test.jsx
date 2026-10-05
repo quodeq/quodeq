@@ -59,6 +59,8 @@ describe('useSharedContentSignal', () => {
     await waitFor(() => expect(result.current.settled).toBe(true));
     expect(result.current.hasContent).toBe(false);
     expect(result.current.publishedCount).toBe(0);
+    // The server's own answer: a restored shared selection is dropped on it.
+    expect(result.current.connected).toBe(false);
     expect(fakeApi.sharedListProjects).not.toHaveBeenCalled();
   });
 
@@ -67,7 +69,9 @@ describe('useSharedContentSignal', () => {
     const { result } = renderHook(() => useSharedContentSignal(), {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
+    expect(result.current.connected).toBeNull(); // unknown until the status loads
     await waitFor(() => expect(result.current.settled).toBe(true));
+    expect(result.current.connected).toBe(true);
     expect(result.current.hasContent).toBe(true);
     // The Compare gate counts published projects, so the signal carries the number.
     expect(result.current.publishedCount).toBeGreaterThan(0);
@@ -93,6 +97,8 @@ describe('useSharedContentSignal', () => {
     });
     await waitFor(() => expect(result.current.settled).toBe(true));
     expect(result.current.hasContent).toBe(false);
+    // A failed fetch is not "nothing connected": the selection must stay.
+    expect(result.current.connected).toBeNull();
   });
 
   it('is not settled while the status fetch is in flight', async () => {

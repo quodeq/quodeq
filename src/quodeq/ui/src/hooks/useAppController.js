@@ -51,7 +51,7 @@ export function useAppChrome({ state, sharedSignal }) {
   const { activePage, navSwapAt, navTab, activeTab } = state;
   const sidebar = useSidebarProviderSelection();
   const startup = useAppStartupGate({ state, activeTab });
-  useAppNavigationEffects({ state, activeTab, navTab, showEvaluate });
+  useAppNavigationEffects({ state, activeTab, navTab, showEvaluate, sharedSignal });
   useSelectedProjectSyncEffects(state.selectedProject);
   const { filteredTrend, filteredAccumulated } = useVisibleStandardsFiltered(state);
   const derived = useAppDerived({ state, navTab, navSwapAt, activePage, filteredTrend, filteredAccumulated });
