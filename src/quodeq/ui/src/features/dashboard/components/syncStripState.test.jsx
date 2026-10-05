@@ -27,11 +27,22 @@ const CASES = [
   ['configured + connect ERROR (a failed change of repository): synced for the working repository', { status: status({ connect: failed(5) }) }, STRIP_STATE.SYNCED],
   ['unconfigured + connect ERROR (a failed first connect): hidden, the card shows the error', { status: status({ configured: false, connect: failed(5) }) }, STRIP_STATE.HIDDEN],
   ['configured, nothing to report: synced', { status: status() }, STRIP_STATE.SYNCED],
+  // The server is still warming cards it has not listed yet: the strip says
+  // how many are ready, so the team's results are visibly still arriving.
+  ['cards still warming: warming', { status: status(), warming: { active: true, done: 1, total: 4, remaining: 3 } }, STRIP_STATE.WARMING],
+  ['a running refresh outranks warming', { status: status({ refresh: running(SYNC_PHASE.DOWNLOADING) }), warming: { active: true, done: 1, total: 4, remaining: 3 } }, STRIP_STATE.PROGRESS],
+  ['warming outranks offline', { status: status(), offline: true, warming: { active: true, done: 0, total: 2, remaining: 2 } }, STRIP_STATE.WARMING],
+  ['a finished warm-up is nothing to report: synced', { status: status(), warming: { active: false, done: 4, total: 4, remaining: 0 } }, STRIP_STATE.SYNCED],
 ];
 
 describe('pickStripState', () => {
   it.each(CASES)('%s', (_name, input, expected) => {
     expect(pickStripState(input).kind).toBe(expected);
+  });
+
+  it('hands the warm-up counts to the warming row', () => {
+    const warming = { active: true, done: 1, total: 4, remaining: 3 };
+    expect(pickStripState({ status: status(), warming })).toEqual({ kind: STRIP_STATE.WARMING, warming });
   });
 
   it('hands the running slot and its kind to the progress row', () => {

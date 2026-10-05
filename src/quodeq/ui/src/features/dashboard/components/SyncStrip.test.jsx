@@ -17,6 +17,14 @@ describe('SyncStrip', () => {
     render(<SyncStrip status={{ ...base, connect: { state: 'running', phase: SYNC_PHASE.READING, projectsFound: 3 } }} projectsCount={0} />);
     expect(screen.getByText(/reading projects · 3 found/)).toBeInTheDocument();
   });
+  it('shows how many cards are ready while the server is still warming the rest, with an indeterminate bar', () => {
+    render(<SyncStrip status={base} projectsCount={1} warming={{ active: true, done: 1, total: 4, remaining: 3 }} />);
+    expect(screen.getByText('loading results · 1 of 4 ready…', { selector: '.sync-strip__meta' })).toBeInTheDocument();
+    const bar = screen.getByRole('progressbar');
+    expect(bar).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('loading results…');
+    expect(screen.queryByRole('button', { name: /update/i })).not.toBeInTheDocument();
+  });
   it('shows synced with count and when, plus the actions', () => {
     const onUpdate = vi.fn(); const onCopyInvite = vi.fn();
     render(<SyncStrip status={base} projectsCount={5} onUpdate={onUpdate} onCopyInvite={onCopyInvite} />);

@@ -1519,6 +1519,8 @@
   "sync.updateAria": "update evaluations repository",
   "sync.updateFailed": "update failed · showing results from {when}",
   "sync.updating": "updating…",
+  "sync.warming": "loading results · {done} of {total} ready…",
+  "sync.warmingAnnounce": "loading results…",
   "terminal.closeSession": "Close session",
   "terminal.closeSessionNamed": "Close {name}",
   "terminal.copyOutput": "Copy terminal output",
