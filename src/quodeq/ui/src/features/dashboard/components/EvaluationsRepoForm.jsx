@@ -4,19 +4,18 @@ import { TermInput } from '../../../components/terminal/index.js';
 import AccessPanel from '../../github-access/components/AccessPanel.jsx';
 import { FILE_URL_PREFIX } from '../../onboarding/onboardingVocab.js';
 import { fileUrlFromPath } from '../../../utils/fileUrl.js';
-
-// A scheme (https://, ssh://, file://), an scp-style git@host:path, or a
-// user@host:path reads as a url; anything else typed is a path on this machine.
-const URL_SHAPE = /^(?:[a-z][a-z0-9+.-]*:\/\/|git@|[\w.-]+@[\w.-]+:)/i;
+import { isUrlAddress, normalizeUrlAddress } from '../../../utils/repoAddress.js';
 
 // A local repository: a file url, or a path the user typed or picked.
 function isLocal(value) {
-  return value.startsWith(FILE_URL_PREFIX) || !URL_SHAPE.test(value);
+  return value.startsWith(FILE_URL_PREFIX) || !isUrlAddress(value);
 }
 
-// What goes to the server: a typed path travels as the file url it stands for.
+// What goes to the server: a typed path travels as the file url it stands for,
+// a host typed without a scheme as https.
 function addressToSend(value) {
-  return isLocal(value) && !value.startsWith(FILE_URL_PREFIX) ? fileUrlFromPath(value) : value;
+  if (value.startsWith(FILE_URL_PREFIX)) return value;
+  return isLocal(value) ? fileUrlFromPath(value) : normalizeUrlAddress(value);
 }
 
 // Under the field: the access panel when the probe refused the URL, else the

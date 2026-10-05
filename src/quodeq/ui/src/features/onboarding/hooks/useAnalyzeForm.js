@@ -2,18 +2,16 @@ import { REPO_SOURCE } from '../onboardingVocab.js';
 import { useFolderPicker } from '../../dashboard/hooks/useFolderPicker.jsx';
 import { useWorkingCopy } from './useWorkingCopy.js';
 import { t } from '../../../strings/index.js';
-
-// A scheme (https://, ssh://, file://), an scp-style git@host:path, or a
-// user@host:path reads as a url; anything else is a path on this machine.
-const URL_SHAPE = /^(?:[a-z][a-z0-9+.-]*:\/\/|git@|[\w.-]+@[\w.-]+:)/i;
+import { isUrlAddress, normalizeUrlAddress } from '../../../utils/repoAddress.js';
 
 /**
- * Which source a typed value is: a git url or a local folder.
+ * Which source a typed value is: a git url (see utils/repoAddress.js) or a
+ * local folder.
  * @param {string} value
  * @returns {string} REPO_SOURCE.URL or REPO_SOURCE.FOLDER
  */
 export function inferRepoSource(value) {
-  return URL_SHAPE.test((value || '').trim()) ? REPO_SOURCE.URL : REPO_SOURCE.FOLDER;
+  return isUrlAddress(value) ? REPO_SOURCE.URL : REPO_SOURCE.FOLDER;
 }
 
 /**
@@ -31,10 +29,12 @@ export function useAnalyzeForm({ wizard }) {
   const { browseFolder, picker: repoPicker } = useFolderPicker({ title: t('onboarding.repoFolderPickerTitle') });
   const trimmed = repo.trim();
   const source = inferRepoSource(trimmed);
-  const workingCopy = useWorkingCopy(source === REPO_SOURCE.URL ? trimmed : '');
+  // A host typed without a scheme is sent as https; a folder goes as typed.
+  const address = source === REPO_SOURCE.URL ? normalizeUrlAddress(trimmed) : trimmed;
+  const workingCopy = useWorkingCopy(source === REPO_SOURCE.URL ? address : '');
 
   const request = () => ({
-    repo: trimmed,
+    repo: address,
     source,
     ...(source === REPO_SOURCE.URL && workingCopy.cloneDest ? { cloneDest: workingCopy.cloneDest } : {}),
   });
