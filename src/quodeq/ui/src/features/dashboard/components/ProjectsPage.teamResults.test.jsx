@@ -82,36 +82,38 @@ describe('ProjectsPage — header actions', () => {
 });
 
 describe('ProjectsPage — the empty page', () => {
-  it('shows the three paths instead of an add-first call to action, and no inline connect form', async () => {
+  it('keeps the header actions and says there is nothing yet; no cards, no inline connect form', async () => {
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
-    await waitFor(() => expect(screen.getByText('A repository')).toBeInTheDocument());
-    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
-    expect(screen.getByText('An exported archive')).toBeInTheDocument();
-    expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/No repositories yet\./)).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Add project' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'more ways to add' })).toBeInTheDocument();
+    expect(screen.queryByText('A repository')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'start' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /evaluations repository url/i })).not.toBeInTheDocument();
   });
 
-  it('start opens the add panel (not the welcome), connect opens the connect step and import imports an archive', async () => {
+  it('add project opens the add panel, and the menu connects or imports', async () => {
     const user = userEvent.setup();
-    const actions = { onAddProject: vi.fn(), onStartAnalyze: vi.fn(), onImportProject: vi.fn(), onConnectEvaluations: vi.fn() };
+    const actions = { onAddProject: vi.fn(), onImportProject: vi.fn(), onConnectEvaluations: vi.fn() };
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={[]} actions={actions} />);
-    await user.click(await screen.findByRole('button', { name: 'start' }));
-    await user.click(screen.getByRole('button', { name: 'connect' }));
-    await user.click(screen.getByRole('button', { name: 'import' }));
-    expect(actions.onStartAnalyze).toHaveBeenCalledTimes(1);
-    expect(actions.onAddProject).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole('button', { name: 'Add project' }));
+    await user.click(screen.getByRole('button', { name: 'more ways to add' }));
+    await user.click(screen.getByRole('menuitem', { name: 'add evaluations repository' }));
+    await user.click(screen.getByRole('button', { name: 'more ways to add' }));
+    await user.click(screen.getByRole('menuitem', { name: 'import project' }));
+    expect(actions.onAddProject).toHaveBeenCalledTimes(1);
     expect(actions.onConnectEvaluations).toHaveBeenCalledTimes(1);
     expect(actions.onImportProject).toHaveBeenCalledTimes(1);
   });
 
-  it('while an evaluation runs, start reads as blocked and says why', async () => {
+  it('while an evaluation runs, add project reads as blocked and says why', async () => {
     const { api } = makeApi();
-    renderPage(api, <ProjectsPage projects={[]} isEvaluating actions={{ ...pageActions, onStartAnalyze: vi.fn() }} />);
-    const start = await screen.findByRole('button', { name: 'start' });
-    expect(start).toHaveAttribute('aria-disabled', 'true');
-    expect(start).toHaveAttribute('title', 'Cannot add a project while an evaluation is running');
+    renderPage(api, <ProjectsPage projects={[]} isEvaluating actions={pageActions} />);
+    const add = await screen.findByRole('button', { name: 'Add project' });
+    expect(add).toHaveAttribute('aria-disabled', 'true');
+    expect(add).toHaveAttribute('title', 'Cannot add a project while an evaluation is running');
   });
 });
 

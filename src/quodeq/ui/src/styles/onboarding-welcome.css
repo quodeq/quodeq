@@ -104,12 +104,6 @@
   flex-direction: column;
   gap: var(--term-space-3);
 }
-.onboarding-paths__cards--compact {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  /* The panel's .onboarding-step sets mono; the empty page has no such parent. */
-  font-family: var(--term-font-mono);
-}
 
 .onboarding-path-card {
   border: var(--term-border);

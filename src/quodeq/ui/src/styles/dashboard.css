@@ -2997,12 +2997,6 @@
   }
 }
 
-/* ── Empty Repositories page: the welcome's two paths, side by side ── */
-
-.projects-empty--paths {
-  padding: var(--space-6) 0;
-}
-
 /* ── Evaluations repository form (url or folder) ──
    Shared by the welcome's connect step and the failure card below. */
 
