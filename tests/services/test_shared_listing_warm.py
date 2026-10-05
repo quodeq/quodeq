@@ -76,7 +76,7 @@ def test_warm_skips_a_missing_root(tmp_path, monkeypatch):
     assert calls == []
 
 
-def test_listing_reports_pending_cards_instead_of_computing_them(tmp_path, monkeypatch):
+def test_listing_serves_warm_cards_without_computing_them(tmp_path, monkeypatch):
     calls = []
     _fake_hydration(monkeypatch, calls)
     monkeypatch.setattr(shared_listing, "last_synced_at", lambda url: None)
@@ -88,7 +88,8 @@ def test_listing_reports_pending_cards_instead_of_computing_them(tmp_path, monke
     assert calls == [("build", tmp_path, False, False), ("meta", _URL)]
 
 
-def test_listing_queues_the_pending_cards_on_the_shared_warmup(tmp_path, monkeypatch, fresh_shared_warmup):
+def test_listing_hides_a_cold_card_until_the_shared_warmup_has_it(tmp_path, monkeypatch, fresh_shared_warmup):
+    """A shared card appears only once the project is fully warmed; the payload still counts it."""
     warmed: list[tuple[str, str]] = []
     monkeypatch.setattr(shared_listing, "warm_project", lambda reports_dir, pid: warmed.append((reports_dir, pid)))
     _fake_hydration(monkeypatch, [], entries=[_entry("cold", True), _entry("warm", False)])
@@ -98,9 +99,35 @@ def test_listing_queues_the_pending_cards_on_the_shared_warmup(tmp_path, monkeyp
         tmp_path, _URL, refresh=False, refresh_clone=None, sync_index=None, serialize=lambda p: {"id": p.id},
     )
 
-    assert listing["warmup"]["projectsTotal"] >= 1
+    assert [p["id"] for p in listing["projects"]] == ["warm"]
+    assert listing["warmup"]["projectsTotal"] == 1
     assert _wait_until(lambda: warmed == [(str(tmp_path), "cold")])
     assert _wait_until(lambda: fresh_shared_warmup.snapshot()["active"] is False)
+
+
+def test_defer_queues_a_cold_project_and_reports_pending(tmp_path, monkeypatch, fresh_shared_warmup):
+    """Opening a cold shared project queues it and answers pending instead of building inline."""
+    started, release = threading.Event(), threading.Event()
+
+    def warm(reports_dir, pid):
+        started.set()
+        assert release.wait(5)
+    monkeypatch.setattr(shared_listing, "warm_project", warm)
+    try:
+        body = fresh_shared_warmup.defer(tmp_path, _URL, "cold", summary_pending=lambda *_: True)
+        assert body["pending"] is True
+        assert body["warmup"]["projectsTotal"] == 1
+        assert started.wait(5)
+        # Still owed while the worker holds it: the next poll is pending too.
+        assert fresh_shared_warmup.defer(tmp_path, _URL, "cold", summary_pending=lambda *_: True)["pending"] is True
+    finally:
+        release.set()
+    assert _wait_until(lambda: fresh_shared_warmup.snapshot()["active"] is False)
+
+
+def test_defer_is_none_for_a_warm_project(tmp_path, monkeypatch, fresh_shared_warmup):
+    monkeypatch.setattr(shared_listing, "warm_project", lambda *_: pytest.fail("nothing to warm"))
+    assert fresh_shared_warmup.defer(tmp_path, _URL, "warm", summary_pending=lambda *_: False) is None
 
 
 def _active_cache_db() -> Path:

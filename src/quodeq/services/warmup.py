@@ -58,13 +58,23 @@ def warm_project(reports_dir: str, project_id: str) -> None:
     from quodeq.services.wiring import find_children  # noqa: PLC0415
     from quodeq.services._fs_metadata import warm_project_summary  # noqa: PLC0415
     from quodeq.services.scoring import get_project_scores  # noqa: PLC0415
+    from quodeq.services import fs_reports  # noqa: PLC0415
+    from quodeq.services.run_constants import LATEST_RUN  # noqa: PLC0415
 
     reports_root = Path(reports_dir)
     warm_project_summary(reports_root, project_id)
     # A parent's payload is never memoized (its stamp cannot see children),
     # so warming it would recompute on every boot for nothing. Skip.
-    if not find_children(reports_root, project_id):
-        get_project_scores(reports_root, project_id)
+    if find_children(reports_root, project_id):
+        return
+    get_project_scores(reports_root, project_id)
+    # The Overview's own payload too, so a warmed project opens without a
+    # second loading screen. A run that vanished underneath is not a failure
+    # of the project: its card and scores are cached by now.
+    try:
+        fs_reports.get_dashboard_overview(reports_dir, project_id, LATEST_RUN)
+    except FileNotFoundError as exc:
+        _logger.info("overview warm-up skipped for %s: %s", project_id, exc)
 
 
 class WarmupEngine:
