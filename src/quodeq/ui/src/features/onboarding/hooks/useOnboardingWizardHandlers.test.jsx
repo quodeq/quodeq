@@ -50,13 +50,13 @@ describe('useOnboardingWizardHandlers handleAdded', () => {
   it('a registered project closes the panel as saved with its id', () => {
     const { result, opts } = setup();
     result.current.handleAdded({ projectId: 'p-new', cloning: false });
-    expect(opts.onClose).toHaveBeenCalledWith({ saved: true, projectId: 'p-new', cloning: false });
+    expect(opts.onClose).toHaveBeenCalledWith({ saved: true, projectId: 'p-new', cloning: false, landed: true });
   });
 
   it('a clone that started closes the panel as cloning, with no project yet', () => {
     const { result, opts } = setup();
     result.current.handleAdded({ projectId: null, cloning: true });
-    expect(opts.onClose).toHaveBeenCalledWith({ saved: true, projectId: null, cloning: true });
+    expect(opts.onClose).toHaveBeenCalledWith({ saved: true, projectId: null, cloning: true, landed: true });
     expect(localStorage.getItem(SKIP_FLAG)).toBeNull();
   });
 });

@@ -51,15 +51,19 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab, queryClient
   };
   return {
     // `cloning`: the add panel closed on a 202, the project arrives through
-    // the clone slot (the app re-lists and selects it on the DONE edge). An
-    // add ends on the Repositories tab, where the tile or the new card is:
-    // from the header that is where the user already stands, from the
-    // welcome it is where the job can be watched.
-    onClose: ({ saved, projectId, cloning = false }) => {
+    // the clone slot (the app re-lists and selects it on the DONE edge).
+    // `landed`: the add panel handed a project over (or started its clone);
+    // an add ends on the Repositories tab, where the tile or the new card
+    // is: from the header that is where the user already stands, from the
+    // welcome it is where the job can be watched. A saved exit without
+    // `landed` (the X on a resume-setup walk) only refetches.
+    onClose: ({ saved, projectId, cloning = false, landed = false }) => {
       setWizardEntry(null);
       if (saved && (projectId || cloning)) {
         refreshProjects();
         state.refreshDashboard?.();
+      }
+      if (landed) {
         navTab(NAV_TAB.PROJECTS);
         selectLandedProject({ ...state, activeTab: NAV_TAB.PROJECTS }, projectId);
       }

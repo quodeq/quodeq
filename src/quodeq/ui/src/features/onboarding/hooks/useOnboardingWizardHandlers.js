@@ -66,7 +66,9 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToR
   // selects the project when it lands). Either way the panel closes.
   function handleAdded({ projectId = null, cloning = false }) {
     clearDraft();
-    onClose({ saved: true, projectId, cloning });
+    // `landed` is what moves the app to Repositories and selects the project;
+    // a saved exit (the X on a resume-setup walk) only refetches.
+    onClose({ saved: true, projectId, cloning, landed: true });
   }
 
   function handleClose() {

@@ -146,13 +146,26 @@ function ReadingPlaceholders({ count }) {
   );
 }
 
-// A local card whose clone is still running: the project is registered
-// before its folder exists, so without this the tile and a "Path not
-// found" card would both show for the same repository.
+// A url as a key: scheme and case aside, with no trailing slash or .git.
+function repoKey(url) {
+  return (url || '').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/\/+$/, '').replace(/\.git$/i, '').toLowerCase();
+}
+
+function baseName(path) {
+  return (path || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
+}
+
+// A local card whose clone is still running: the record is written while
+// git works and the list may refetch before the scan lands, so without this
+// the tile and a "Path not found" card would both show for the same
+// repository. The record's path is resolved and the slot's is not, so a
+// symlinked root defeats a plain path match: the origin url and the
+// folder name are compared too.
 function isCloningEntry(entry, slot) {
   const local = entry.local;
   if (!local || !slot) return false;
-  return (slot.projectId && local.id === slot.projectId) || (slot.dest && local.path === slot.dest);
+  if (slot.repo && local.originUrl && repoKey(local.originUrl) === repoKey(slot.repo)) return true;
+  return Boolean(slot.dest) && (local.path === slot.dest || baseName(local.path) === baseName(slot.dest));
 }
 
 function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx, ghost, cloneSlot, readingCount }) {

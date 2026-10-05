@@ -80,7 +80,7 @@ describe('Onboarding integration — happy path', () => {
 
     // The clone job is posted and the panel hands over; the evaluation is
     // started from the Evaluate tab later, never from here.
-    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ saved: true, projectId: null, cloning: true }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ saved: true, projectId: null, cloning: true, landed: true }));
     expect(clone.posted).toBe(true);
     expect(onLaunch).not.toHaveBeenCalled();
   });

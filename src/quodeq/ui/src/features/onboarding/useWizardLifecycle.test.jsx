@@ -144,9 +144,20 @@ describe('useWizardLifecycle welcome exits', () => {
     const p = props({});
     p.state.handleProjectChange = vi.fn();
     const { result } = renderHook((q) => useWizardLifecycle(q), { initialProps: p, wrapper: withQueryClient() });
-    act(() => { result.current.wizardHandlers.onClose({ saved: true, projectId: null, cloning: true }); });
+    act(() => { result.current.wizardHandlers.onClose({ saved: true, projectId: null, cloning: true, landed: true }); });
     expect(result.current.wizardEntry).toBeNull();
     expect(p.navTab).toHaveBeenCalledWith(NAV_TAB.PROJECTS);
+    expect(p.state.handleProjectChange).not.toHaveBeenCalled();
+  });
+
+  it('a saved exit that did not land (the X on a resume-setup walk) refetches but stays put', () => {
+    const p = props({ projects: [{ id: 'a' }, { id: 'b' }] });
+    p.state.handleProjectChange = vi.fn();
+    p.state.selectedProject = 'a';
+    const { result } = renderHook((q) => useWizardLifecycle(q), { initialProps: p, wrapper: withQueryClient() });
+    act(() => { result.current.wizardHandlers.onClose({ saved: true, projectId: 'b' }); });
+    expect(result.current.wizardEntry).toBeNull();
+    expect(p.navTab).not.toHaveBeenCalled();
     expect(p.state.handleProjectChange).not.toHaveBeenCalled();
   });
 
@@ -156,7 +167,7 @@ describe('useWizardLifecycle welcome exits', () => {
     p.state.selectedProject = 'a';
     const { result } = renderHook((q) => useWizardLifecycle(q), { initialProps: p, wrapper: withQueryClient() });
     act(() => { result.current.setWizardEntry({ startStep: STEP_ANALYZE, isFirstProject: false, source: WIZARD_SOURCE.ADD }); });
-    act(() => { result.current.wizardHandlers.onClose({ saved: true, projectId: 'p-new', cloning: false }); });
+    act(() => { result.current.wizardHandlers.onClose({ saved: true, projectId: 'p-new', cloning: false, landed: true }); });
     expect(p.navTab).toHaveBeenCalledWith(NAV_TAB.PROJECTS);
     expect(p.state.handleProjectChange).toHaveBeenCalledWith('p-new', PROJECT_SOURCE.LOCAL);
   });
