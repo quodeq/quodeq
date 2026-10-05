@@ -1,9 +1,8 @@
-import { useCallback, useRef, useState } from 'react';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
 import { pluralKey } from '../../../utils/plural.js';
-import { useDismissOnOutside } from '../../../hooks/useDismissOnOutside.js';
+import { useMenuToggle } from '../hooks/useMenuToggle.js';
 
 export const EVAL_BLOCKED_TITLE = t('projects.evalBlockedTitle');
 
@@ -19,11 +18,7 @@ function headerSub({ projectsLoaded, localCount, teamCount, configured }) {
 // The `more ▾` menu beside the primary button: the two rare actions, adding
 // (or changing) the evaluations repository and importing an exported archive.
 function MoreMenu({ configured, onConnectEvaluations, onImportProject }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismissOnOutside(open, rootRef, close);
-  const pick = (fn) => () => { close(); fn?.(); };
+  const { open, rootRef, toggle, pick } = useMenuToggle();
   return (
     <span className="projects-page__more" ref={rootRef}>
       <button
@@ -32,7 +27,7 @@ function MoreMenu({ configured, onConnectEvaluations, onImportProject }) {
         aria-label={t('projects.moreActionsAria')}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         {t('projects.moreActions')} <span aria-hidden="true">▾</span>
       </button>

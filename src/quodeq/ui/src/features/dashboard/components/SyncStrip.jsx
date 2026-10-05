@@ -1,8 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
 import { t } from '../../../strings/index.js';
 import { relativeTimeFine } from '../../../utils/relativeTime.js';
 import { pluralKey } from '../../../utils/plural.js';
-import { useDismissOnOutside } from '../../../hooks/useDismissOnOutside.js';
+import { useMenuToggle } from '../hooks/useMenuToggle.js';
 import { SyncBar } from './SyncBar.jsx';
 import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel, barPercent } from './syncStripState.js';
 
@@ -18,11 +17,7 @@ function StripButton({ onClick, label, children }) {
 // Importing an exported archive lives in the header's `more ▾`, which is
 // there whether or not a repository is connected.
 function StripMenu({ onChange, onDisconnect }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismissOnOutside(open, rootRef, close);
-  const pick = (fn) => () => { close(); fn?.(); };
+  const { open, rootRef, toggle, pick } = useMenuToggle();
   return (
     <span className="sync-strip__menu" ref={rootRef}>
       <button
@@ -31,7 +26,7 @@ function StripMenu({ onChange, onDisconnect }) {
         aria-label={t('sync.moreAria')}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         <span aria-hidden="true">⋯</span>
       </button>
