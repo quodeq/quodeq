@@ -89,6 +89,21 @@ export function useInitialLandingEffect({ state, sharedSignal, activeTab, navTab
 }
 
 /**
+ * Evaluate can disappear under the user: the selected project's clone is
+ * still running, or the selection went away (a delete, a disconnect). A
+ * cached or stale nav entry on Evaluate would then show a dead-end screen,
+ * so it moves to the Repositories tab, where the tile or the cards are.
+ * Only once the project list has loaded: on first paint the selection is
+ * still resolving and Evaluate reads as hidden for a moment.
+ */
+export function useEvaluateHiddenEffect({ state, activeTab, navTab, showEvaluate }) {
+  useEffect(() => {
+    if (!state.projectsLoaded || showEvaluate || activeTab !== NAV_TAB.EVALUATE) return;
+    navTab(NAV_TAB.PROJECTS);
+  }, [state.projectsLoaded, showEvaluate, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps -- navTab is stable
+}
+
+/**
  * Reset scroll on project switch — useNavStack handles the same for
  * tab/page changes, but selectedProject lives outside the nav stack.
  * Without this, switching from a project scrolled deep into Projects

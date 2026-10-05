@@ -6,6 +6,7 @@
  */
 import { PROJECT_SOURCE } from './vocab/projectSource.js';
 import { NAV_TAB } from './vocab/navTab.js';
+import { isCloningProject } from './utils/cloningProject.js';
 
 /**
  * Whether a selected source has an Evaluate flow at all. Evaluation is
@@ -18,12 +19,18 @@ export function isEvaluatableSource(selectedSource) {
 }
 
 /**
- * Whether the TopBar's Evaluate button should be wired up. Shared projects
- * have no Evaluate flow (evaluation is local-only), so the button is omitted
- * outright regardless of project count.
+ * Whether Evaluate (the TopBar button and the sidebar tab) is there at all.
+ * It needs a selected LOCAL project that exists in the list, and one whose
+ * clone is not still running: until then there is nothing to evaluate, and
+ * the screen would open on a folder that does not exist yet. Shared
+ * projects have no Evaluate flow (evaluation is local-only).
+ * @param {{ selectedSource?: string, selectedProjectInfo?: Object|null, cloneSlot?: Object|null }} args
+ *   cloneSlot: the clone job's slot while it is ACTIVE, else null
  */
-export function shouldShowEvaluateButton(projectsCount, selectedSource) {
-  return (projectsCount ?? 0) > 0 && isEvaluatableSource(selectedSource);
+export function shouldShowEvaluate({ selectedSource, selectedProjectInfo, cloneSlot = null }) {
+  if (!isEvaluatableSource(selectedSource)) return false;
+  if (!selectedProjectInfo) return false;
+  return !isCloningProject(selectedProjectInfo, cloneSlot);
 }
 
 /**
@@ -58,7 +65,7 @@ export function resolveProjectDisplayName({
  * For 'shared', gate on the resolved sharedProjectInfo instead: the shared
  * info payload carries no runsCount at all, and a project only appears in
  * the shared repo once published with runs, so its info resolving is the
- * "has data to show" signal. Exported (like shouldShowEvaluateButton) so the
+ * "has data to show" signal. Exported (like shouldShowEvaluate) so the
  * source-gating contract is testable without mounting the whole App.
  */
 export function shouldShowProjectTabs({ selectedSource, selectedProjectInfo, sharedProjectInfo }) {

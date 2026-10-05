@@ -18,7 +18,7 @@ export {
   buildDashboardDataBundle, buildNavigationBundle,
 } from './routes/renderers.jsx';
 export {
-  shouldShowEvaluateButton, resolveProjectDisplayName,
+  shouldShowEvaluate, resolveProjectDisplayName,
   shouldShowProjectTabs, selectSidebarCounts, shouldRedirectToRemoteRepositories,
 } from './appGating.js';
 export {
@@ -37,7 +37,7 @@ export default function App() {
   const { showToast, assistantCtx } = useAppAssistant(state);
 
   const {
-    selectedProjectInfo, isEvaluating, wizardEntry, setWizardEntry, wizardHandlers,
+    selectedProjectInfo, showEvaluate, isEvaluating, wizardEntry, setWizardEntry, wizardHandlers,
     sidebarProvider, sidebarModel, showStartupLoader,
     effectiveDark, toggleTheme, filteredTrend, filteredAccumulated, breadcrumbSiblingsFor,
   } = useAppChrome({ state, sharedSignal });
@@ -46,7 +46,7 @@ export default function App() {
 
   const shell = buildAppShell({
     state, sharedSignal, navTab, navStack, activeTab, activePage, isEvaluating, showToast, setWizardEntry,
-    dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo,
+    dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo, showEvaluate,
     assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel,
     navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, wizardEntry, wizardHandlers,
     filteredAccumulated, filteredTrend,

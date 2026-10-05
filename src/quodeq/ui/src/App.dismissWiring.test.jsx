@@ -4,11 +4,11 @@ import {
   buildEvalPrincipal,
   ROUTE_RENDERERS,
   isSharedSource,
-  shouldShowEvaluateButton,
+  shouldShowEvaluate,
 } from './App.jsx';
 
 // Split from App.test.jsx: buildEvalPrincipal, source-gating helpers
-// (isSharedSource/shouldShowEvaluateButton), and
+// (isSharedSource/shouldShowEvaluate), and
 // the dismiss route-renderer wiring (ROUTE_RENDERERS onDismiss +
 // ViolationsRoute onRefresh/onReconcile).
 
@@ -58,15 +58,19 @@ describe('isSharedSource', () => {
   it('is false for undefined', () => expect(isSharedSource(undefined)).toBe(false));
 });
 
-describe('shouldShowEvaluateButton', () => {
-  it('shows Evaluate when projects exist and source is local', () => {
-    expect(shouldShowEvaluateButton(3, 'local')).toBe(true);
+describe('shouldShowEvaluate', () => {
+  const info = { id: 'p1', path: '/u/repos/app' };
+  it('shows Evaluate for a selected local project', () => {
+    expect(shouldShowEvaluate({ selectedSource: 'local', selectedProjectInfo: info })).toBe(true);
   });
-  it('hides Evaluate for a shared selection even with projects present', () => {
-    expect(shouldShowEvaluateButton(3, 'shared')).toBe(false);
+  it('hides Evaluate for a shared selection even with a project resolved', () => {
+    expect(shouldShowEvaluate({ selectedSource: 'shared', selectedProjectInfo: info })).toBe(false);
   });
-  it('hides Evaluate when there are no projects at all', () => {
-    expect(shouldShowEvaluateButton(0, 'local')).toBe(false);
+  it('hides Evaluate while nothing is selected', () => {
+    expect(shouldShowEvaluate({ selectedSource: 'local', selectedProjectInfo: null })).toBe(false);
+  });
+  it('hides Evaluate while the selected project is still cloning', () => {
+    expect(shouldShowEvaluate({ selectedSource: 'local', selectedProjectInfo: info, cloneSlot: { dest: '/u/repos/app' } })).toBe(false);
   });
 });
 

@@ -134,7 +134,7 @@ export const ROUTE_RENDERERS = {
   ),
   evaluate: (params, props) => {
     // Shared projects have no Evaluate flow (evaluation is local-only) --
-    // shouldShowEvaluateButton already keeps the TopBar's Evaluate button
+    // shouldShowEvaluate already keeps the TopBar's Evaluate button
     // from ever linking here for a shared selection, but a stale nav-stack
     // entry (e.g. the user was sitting on Evaluate and switched to a shared
     // project) could still land the router on this route. Belt-and-braces:
