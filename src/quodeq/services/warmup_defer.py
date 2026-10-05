@@ -42,12 +42,19 @@ def defer_to_warmup(
     project is moved to the head of the queue either way, so the warm-up of
     the project on screen never waits for the rest.
 
+    The project the worker is on right now is always deferred, without the
+    probe: the worker fills the card summary first and the scores and
+    Overview after, so a summary hit there says nothing about the rest, and
+    building inline beside the worker is the contention this avoids.
+
     *engine* defaults to the process-wide one, resolved at call time so a
     swapped one is honoured; *summary_pending* is the cache probe. Both are
     injection seams for tests.
     """
     target = engine if engine is not None else _warmup.engine
     target.prioritise(project_id)
+    if target.current() == project_id:
+        return {"pending": True, "warmup": target.snapshot()}
     if not target.owes(project_id):
         return None
     probe = summary_pending if summary_pending is not None else summary_is_pending

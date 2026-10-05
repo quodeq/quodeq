@@ -165,6 +165,11 @@ class WarmupEngine:
         with self._cond:
             return project_id == self._current or project_id in self._queued
 
+    def current(self) -> str | None:
+        """The project the worker is warming right now, or None while idle."""
+        with self._cond:
+            return self._current
+
     def failed(self, project_id: str) -> bool:
         """True when the last warm of *project_id* raised and no later warm succeeded."""
         with self._cond:
