@@ -12,14 +12,14 @@ import { NAV_TAB } from './vocab/navTab.js';
 // element.
 
 export function buildSidebarProps({
-  activeTab, navTab, selectedSource, hasCurrentProjectRuns, sharedProjectInfo,
+  activeTab, navTab, selectedSource, selectedProjectInfo, sharedProjectInfo,
   projects, sharedHasContent, sharedPublishedCount, resolvedDisplayName, headerMeta, version, sidebarCounts,
   lastEvalAt, isPinned, onPinChange,
 }) {
   return {
     activeTab,
     onNavTab: navTab,
-    showProjectTabs: shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, sharedProjectInfo }),
+    showProjectTabs: shouldShowProjectTabs({ selectedSource, selectedProjectInfo, sharedProjectInfo }),
     showCompareTab: shouldShowCompareTab({ projects, sharedHasContent, sharedPublishedCount }),
     selectedSource,
     projectInfo: { displayName: resolvedDisplayName, meta: headerMeta },
@@ -105,7 +105,7 @@ export function buildContentProps({
 // without touching hook order.
 export function buildAppShell({
   state, sharedSignal, navTab, navStack, activeTab, activePage, isEvaluating, showToast, setWizardEntry,
-  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo, hasCurrentProjectRuns,
+  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo,
   assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel,
   navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, wizardEntry, wizardHandlers,
   filteredAccumulated, filteredTrend,
@@ -132,7 +132,7 @@ export function buildAppShell({
   });
 
   return {
-    state, navTab, activeTab, activePage, hasCurrentProjectRuns, sharedSignal, assistantCtx, isEvaluating,
+    state, navTab, activeTab, activePage, selectedProjectInfo, sharedSignal, assistantCtx, isEvaluating,
     resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned,
     sidebarProvider, sidebarModel, navStack, navGoTo, navPop,
     breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, contentProps,

@@ -58,7 +58,7 @@ function makeShell(overrides = {}) {
     navTab: () => {},
     activeTab: 'overview',
     activePage: { page: '__smoke_test_unmatched_page__' },
-    hasCurrentProjectRuns: false,
+    selectedProjectInfo: null,
     sharedSignal: { hasContent: false },
     assistantCtx: { uiState: {} },
     resolvedDisplayName: 'Smoke Test Project',

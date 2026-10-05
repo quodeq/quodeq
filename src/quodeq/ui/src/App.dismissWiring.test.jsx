@@ -4,12 +4,11 @@ import {
   buildEvalPrincipal,
   ROUTE_RENDERERS,
   isSharedSource,
-  shouldBounceToEvaluate,
   shouldShowEvaluateButton,
 } from './App.jsx';
 
 // Split from App.test.jsx: buildEvalPrincipal, source-gating helpers
-// (isSharedSource/shouldShowEvaluateButton/shouldBounceToEvaluate), and
+// (isSharedSource/shouldShowEvaluateButton), and
 // the dismiss route-renderer wiring (ROUTE_RENDERERS onDismiss +
 // ViolationsRoute onRefresh/onReconcile).
 
@@ -68,50 +67,6 @@ describe('shouldShowEvaluateButton', () => {
   });
   it('hides Evaluate when there are no projects at all', () => {
     expect(shouldShowEvaluateButton(0, 'local')).toBe(false);
-  });
-});
-
-describe('shouldBounceToEvaluate', () => {
-  const base = {
-    projectsLoaded: true,
-    projectsCount: 2,
-    selectedProjectInfo: { runsCount: 0 },
-    hasCurrentProjectRuns: false,
-    activeTab: 'overview',
-    selectedSource: 'local',
-  };
-
-  it('bounces a local project with zero runs on a project-data tab', () => {
-    expect(shouldBounceToEvaluate(base)).toBe(true);
-  });
-
-  it('never bounces a shared selection, even when hasCurrentProjectRuns is false', () => {
-    // The regression this guards: selectedProjectInfo is looked up in the
-    // LOCAL project list, so a shared project whose id collides with a local
-    // one could read a misleading (local) runsCount of 0 while the shared
-    // source has real data. There is no Evaluate flow for shared projects at
-    // all, so source must gate independent of hasCurrentProjectRuns.
-    expect(shouldBounceToEvaluate({ ...base, selectedSource: 'shared' })).toBe(false);
-  });
-
-  it('does not bounce before projects have loaded', () => {
-    expect(shouldBounceToEvaluate({ ...base, projectsLoaded: false })).toBe(false);
-  });
-
-  it('does not bounce when there are no projects', () => {
-    expect(shouldBounceToEvaluate({ ...base, projectsCount: 0 })).toBe(false);
-  });
-
-  it('does not bounce while selectedProjectInfo has not resolved yet', () => {
-    expect(shouldBounceToEvaluate({ ...base, selectedProjectInfo: null })).toBe(false);
-  });
-
-  it('does not bounce on a tab that is not overview/violations/map/history', () => {
-    expect(shouldBounceToEvaluate({ ...base, activeTab: 'settings' })).toBe(false);
-  });
-
-  it('does not bounce once the project already has runs', () => {
-    expect(shouldBounceToEvaluate({ ...base, hasCurrentProjectRuns: true })).toBe(false);
   });
 });
 

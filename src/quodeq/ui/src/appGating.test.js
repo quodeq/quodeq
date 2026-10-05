@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  isEvaluatableSource, shouldShowEvaluateButton, shouldBounceToEvaluate,
+  isEvaluatableSource, shouldShowEvaluateButton,
   resolveProjectDisplayName, shouldShowProjectTabs, selectSidebarCounts,
   shouldRedirectToRemoteRepositories, shouldShowCompareTab,
 } from './appGating.js';
@@ -42,22 +42,6 @@ test('shouldShowEvaluateButton: a nullish projectsCount is treated as zero', () 
 });
 
 // ---------------------------------------------------------------------------
-// shouldBounceToEvaluate — untouched by this change; a couple of smoke
-// cases so a future edit to appGating.js can't silently break it here too.
-// ---------------------------------------------------------------------------
-
-test('shouldBounceToEvaluate: fires only for a local project-data tab with no runs yet', () => {
-  const base = {
-    projectsLoaded: true, projectsCount: 1, selectedProjectInfo: { id: 'p1' },
-    hasCurrentProjectRuns: false, activeTab: 'overview', selectedSource: 'local',
-  };
-  assert.equal(shouldBounceToEvaluate(base), true);
-  assert.equal(shouldBounceToEvaluate({ ...base, selectedSource: 'shared' }), false);
-  assert.equal(shouldBounceToEvaluate({ ...base, hasCurrentProjectRuns: true }), false);
-  assert.equal(shouldBounceToEvaluate({ ...base, projectsLoaded: false }), false);
-});
-
-// ---------------------------------------------------------------------------
 // resolveProjectDisplayName
 // ---------------------------------------------------------------------------
 
@@ -88,9 +72,10 @@ test('resolveProjectDisplayName: guards against a raw UUID flashing as the name'
 // shouldShowProjectTabs
 // ---------------------------------------------------------------------------
 
-test('shouldShowProjectTabs: local gates on hasCurrentProjectRuns', () => {
-  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', hasCurrentProjectRuns: true }), true);
-  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', hasCurrentProjectRuns: false }), false);
+test('shouldShowProjectTabs: local gates on a selected project existing, runs or not', () => {
+  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', selectedProjectInfo: { id: 'p1', runsCount: 3 } }), true);
+  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', selectedProjectInfo: { id: 'p1', runsCount: 0 } }), true);
+  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', selectedProjectInfo: null }), false);
 });
 
 test('shouldShowProjectTabs: shared gates on sharedProjectInfo resolving', () => {

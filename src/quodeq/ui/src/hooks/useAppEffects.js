@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { getGradeFormula } from '../api/index.js';
 import { setGradeThresholds } from '../utils/gradeThresholds.js';
 import { hydrateVisibleStandardIds } from '../utils/visibleStandards.js';
-import { shouldBounceToEvaluate, shouldRedirectToRemoteRepositories } from '../appGating.js';
+import { shouldRedirectToRemoteRepositories } from '../appGating.js';
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
 import { ASSISTANT_ACTION_APPLIED_EVENT } from '../constants.js';
 import { NAV_TAB } from '../vocab/navTab.js';
@@ -52,39 +52,6 @@ export function useGradeFormulaBootSyncEffect() {
         console.warn('[useAppEffects] grade formula boot fetch failed:', err);
       });
   }, []);
-}
-
-/**
- * Project-data tabs (overview/violations/map/history) only make sense once
- * the selected project has at least one completed evaluation run. Until
- * then, hide them from the sidebar and bounce the user to Evaluate if a
- * cached activeTab lands them on a now-hidden tab. The guards below wait
- * for /api/projects to resolve and for selectedProjectInfo to populate so
- * the bouncer doesn't fire against the transient "no projects loaded yet"
- * state on first paint and strand the user on Evaluate.
- *
- * selectedProjectInfo is always looked up in the LOCAL project list (see
- * useProjectState — the list `state.projects` holds only ever comes from
- * the local listProjects API). A shared project's id can collide with a
- * local one by design (e.g. after a clone-on-add pull); if the local copy
- * happens to have zero runs while the shared source has plenty, this
- * bounce would incorrectly fire for a shared selection that has real data
- * to show. There is no Evaluate for shared projects at all, so it must
- * never fire outside 'local' — shouldBounceToEvaluate encodes that.
- */
-export function useEvaluateBounceEffect({ state, selectedProjectInfo, hasCurrentProjectRuns }) {
-  useEffect(() => {
-    if (shouldBounceToEvaluate({
-      projectsLoaded: state.projectsLoaded,
-      projectsCount: state.projects.length,
-      selectedProjectInfo,
-      hasCurrentProjectRuns,
-      activeTab: state.activeTab,
-      selectedSource: state.selectedSource,
-    })) {
-      state.navTab(NAV_TAB.EVALUATE);
-    }
-  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab, state.selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 // The no-project landing is the default Overview tab itself, not a page

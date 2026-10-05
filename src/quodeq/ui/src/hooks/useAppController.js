@@ -36,7 +36,7 @@ export function useAppDismissBridge(state) {
 export function useAppChrome({ state, sharedSignal }) {
   const selectedProjectInfo = findProject(state.projects, state.selectedProject);
   const isEvaluating = computeIsEvaluating(state);
-  const wizard = useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, sharedSignal });
+  const wizard = useAppWizardBounce({ state, isEvaluating, sharedSignal });
   const { activePage, navSwapAt, navTab, activeTab } = state;
   const sidebar = useSidebarProviderSelection();
   const startup = useAppStartupGate({ state, activeTab });
