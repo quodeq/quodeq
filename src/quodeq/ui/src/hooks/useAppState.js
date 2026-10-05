@@ -50,9 +50,17 @@ function useProjects({ onNoProjects }) {
 }
 
 function useAppNavigation() {
-  const [serverConnected, setServerConnected, serverVersion] = useServerHealth();
+  const [serverConnected, setServerConnected, serverVersion, serverInstanceId] = useServerHealth();
   const { navStack, activePage, navPending, navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab } = useNavStack();
-  const projectBundle = useProjects({ onNoProjects: () => { /* wizard handles fresh-user UX in App.jsx */ } });
+  // A stored selection that no project backs (the state folder was wiped or
+  // replaced while the browser storage, which lives elsewhere, kept the old
+  // id) is dropped, or the app would ask for a project the server does not
+  // have. The wizard handles the fresh-user UX itself.
+  const dropStaleSelection = useRef(null);
+  const projectBundle = useProjects({ onNoProjects: () => dropStaleSelection.current?.() });
+  dropStaleSelection.current = () => {
+    if (projectBundle.selectedProject) projectBundle.handleProjectChange('');
+  };
   // Re-arm a failed projects load when connectivity returns. Without this the
   // manual Retry button is the only way out of the startup failure state after
   // the backend comes back (the health poll recovers on its own; the projects
@@ -78,7 +86,7 @@ function useAppNavigation() {
     navReplace({ page, ...params });
   }
   return {
-    serverConnected, setServerConnected, serverVersion, navStack, activePage,
+    serverConnected, setServerConnected, serverVersion, serverInstanceId, navStack, activePage,
     navPending, navPush, navPop, navGoTo, navSwapAt, navReset, navTab,
     projectBundle, handleNavigate, handleNavigateReplace, handleRunChange,
     historySelectedRun, setHistorySelectedRun,
@@ -216,7 +224,7 @@ function useAppChrome({ activePage, navStack, projectBundle, visibleDailyRuns })
 export function useAppState() {
   const nav = useAppNavigation();
   const {
-    serverConnected, setServerConnected, serverVersion, navStack, activePage,
+    serverConnected, setServerConnected, serverVersion, serverInstanceId, navStack, activePage,
     navPending, navPop, navGoTo, navSwapAt, navTab, projectBundle,
     handleNavigate, handleNavigateReplace, historySelectedRun, setHistorySelectedRun,
   } = nav;
@@ -236,7 +244,7 @@ export function useAppState() {
   // a run switch. The top bar shows it as the app's one sweeping line.
   const isDataPending = isFetching || isRunSwitchPending;
   return {
-    serverConnected, setServerConnected, serverVersion, navStack, activePage, navPending, navPop, navGoTo, navSwapAt, navTab,
+    serverConnected, setServerConnected, serverVersion, serverInstanceId, navStack, activePage, navPending, navPop, navGoTo, navSwapAt, navTab,
     projects, projectsLoaded, projectsLoadFailed, retryLoadProjects, selectedProject, selectedSource, selectedRun, loadProjects, handleProjectChange, handleNavigate, handleNavigateReplace,
     handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
     dashboard, accumulated, latestAccumulated, rescoreLookup, loading, isFetching, isDataPending, scoresPending, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex, sharedProjectInfo,

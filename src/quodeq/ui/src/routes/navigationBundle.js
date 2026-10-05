@@ -47,11 +47,11 @@ function makeOnImportProject({ isEvaluating, showToast, handleImportProject, nav
 // welcome there are local projects already; onImportProject backs its
 // archive card, and the caller's onSharedDisconnected (the app's reselect
 // after a disconnect) backs the connected card's disconnect.
-function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }) {
+function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject, instanceId }) {
   return guardedWhileEvaluating(
     { isEvaluating, showToast, busyKey: 'evaluate.busyStartTour' },
     (source = WIZARD_SOURCE.ADD, onSharedDisconnected = undefined) => setWizardEntry({
-      startStep: STEP_WELCOME, isFirstProject: projects.length === 0, source, onImportProject, onSharedDisconnected,
+      startStep: STEP_WELCOME, isFirstProject: projects.length === 0, source, onImportProject, onSharedDisconnected, instanceId,
     }),
   );
 }
@@ -114,7 +114,7 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     onAddProject: onStartAnalyze,
     onStartAnalyze,
     onImportProject,
-    onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }),
+    onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject, instanceId: state.serverInstanceId ?? null }),
     onConnectEvaluations: makeOnConnectEvaluations({ setWizardEntry, onImportProject }),
     onResumeSetup: makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }),
     // null when the shared repo has no content — consumers use the nullness

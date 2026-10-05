@@ -49,11 +49,17 @@ describe('OnboardingWizard', () => {
     expect(screen.getByText('how quodeq works')).toBeInTheDocument();
   });
 
-  it('skip for now sets the skip flag and lands on the repositories tab', () => {
-    const { onGoToRepositories } = renderWizard({ isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN });
+  it('skip for now records the skip for this state folder and lands on the repositories tab', () => {
+    const { onGoToRepositories } = renderWizard({ isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN, instanceId: 'inst-1' });
+    fireEvent.click(screen.getByRole('button', { name: 'skip for now' }));
+    expect(localStorage.getItem(SKIP_FLAG)).toBe('inst-1');
+    expect(onGoToRepositories).toHaveBeenCalledTimes(1);
+  });
+
+  it('skip for now without an instance id (an older server) writes the plain flag', () => {
+    renderWizard({ isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN });
     fireEvent.click(screen.getByRole('button', { name: 'skip for now' }));
     expect(localStorage.getItem(SKIP_FLAG)).toBe('true');
-    expect(onGoToRepositories).toHaveBeenCalledTimes(1);
   });
 
   it('opened from Settings: no skip for now, and closing never writes the skip flag', () => {
