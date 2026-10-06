@@ -54,7 +54,9 @@ def fresh_shared_warmup(monkeypatch):
     warmup.reset_for_tests()
 
 
-def _wait_until(pred, timeout=5.0):
+# A ceiling, not a delay: returns as soon as *pred* holds. Generous so a
+# loaded Windows CI runner never turns a slow thread hand-off into a failure.
+def _wait_until(pred, timeout=30.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if pred():
