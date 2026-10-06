@@ -68,6 +68,9 @@
     },
     "eslint-plugin-jsx-a11y": {
       "eslint": "$eslint"
-    }
+    },
+    "seroval": "1.6.8",
+    "seroval-plugins": "1.6.8",
+    "source-map-js": "1.2.2"
   }
 }

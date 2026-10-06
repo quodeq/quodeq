@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.12.2] - 2026-10-06
+
+1.12.1 never reached PyPI: its publish stopped at the security audit. 1.12.2 is the same release with the fix below, and carries everything listed under 1.12.1.
+
+### Fixes
+- **Build dependencies**: patched `seroval` (critical advisory, pulled in by the React Query developer tools) and `source-map-js` (high, pulled in by the CSS and test tooling). Neither ships in the app's interface; the release audit now reports no vulnerabilities.
+
+## [1.12.1] - 2026-10-06
+
+### Features
+- **Adding a project is one field**: `add project` on the Repositories tab opens a panel with one field that takes a git url or a local folder (`local folder` fills it from the picker) and nothing else; the reviewer and the standard live on Evaluate. A `more` menu holds the evaluations repository and import. The welcome is three cards, one per way in, and opens on first run and from Settings only. A project that lands, by an add or by a clone that finishes, becomes the selected card on Repositories; nothing moves you to another tab. Overview, Violations, Map and History show from the first project on, and Evaluate exists only for a selected project that has landed. (#1394, #1395)
+- **The team's results arrive one by one, ready to open**: a shared project's card appears once its scores are fully computed, a placeholder stands in for each card still to come, and the strip says how many are ready ("loading results · 1 of 4 ready"). Opening a card lands on a ready Overview instead of a loading screen that could fail. (#1399, #1400)
+
+### Improvements
+- **The Overview no longer blocks at start**: after an update, or when a state folder was restored, the Overview of a large project was built on the request while the background warm-up rebuilt the same project; the request outlived the client's timeout and every retry started the work again, so the app looked stuck. The Overview and the shared list now answer at once with a pending state and fill in when the warm-up has the project. Measured on a 369-run project: 36 seconds and a timeout became three seconds to a loading state and 26 seconds until every project was warm. Every project still recomputes its score cache once after this update. (#1398, #1401)
+- **Finding cards say when a finding changed**: on the File and Principle pages a card whose finding was re-reported by a newer run (a new title, moved lines) used to show only its title. It now says the finding changed and the page refreshes with the latest results. (#1402)
+
+### Fixes
+- **Reconnecting an evaluations repository** no longer fails with "Couldn't clone the shared repository" after a disconnect: the disconnect waits for the warm-up before removing the clone, and a removal that cannot finish never leaves the folder unreadable. (#1400, #1401)
+- **A wiped or replaced state folder starts over**: the welcome's "skip for now" and a selected shared repository belong to the state folder, not the browser, so a fresh `~/.quodeq` shows the welcome instead of an Overview asking for a project the server does not have. (#1396, #1397)
+- **Repositories**: an existing project is no longer hidden as "cloning" because its folder shares a name with a running clone, a project still cloning no longer opens "Couldn't load this project", and an address without a scheme such as `github.com/org/repo` is treated as a remote. (#1395, #1401)
+
 ## [1.12.0] - 2026-10-03
 
 ### Security
