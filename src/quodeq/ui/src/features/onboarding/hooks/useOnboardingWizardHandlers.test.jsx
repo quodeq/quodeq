@@ -37,9 +37,32 @@ describe('useOnboardingWizardHandlers handleSkipWelcome', () => {
     expect(opts.onGoToRepositories).toHaveBeenCalledTimes(1);
   });
 
+  it('records the instance id as the skip when the server reports one', () => {
+    const { result } = setup({ instanceId: 'inst-1' });
+    result.current.handleSkipWelcome();
+    expect(localStorage.getItem(SKIP_FLAG)).toBe('inst-1');
+  });
+
   it('from Settings never writes the skip flag', () => {
     const { result } = setup({ fromSettings: true });
     result.current.handleSkipWelcome();
+    expect(localStorage.getItem(SKIP_FLAG)).toBeNull();
+  });
+});
+
+describe('useOnboardingWizardHandlers handleAdded', () => {
+  afterEach(() => localStorage.clear());
+
+  it('a registered project closes the panel as saved with its id', () => {
+    const { result, opts } = setup();
+    result.current.handleAdded({ projectId: 'p-new', cloning: false });
+    expect(opts.onClose).toHaveBeenCalledWith({ saved: true, projectId: 'p-new', cloning: false, landed: true });
+  });
+
+  it('a clone that started closes the panel as cloning, with no project yet', () => {
+    const { result, opts } = setup();
+    result.current.handleAdded({ projectId: null, cloning: true });
+    expect(opts.onClose).toHaveBeenCalledWith({ saved: true, projectId: null, cloning: true, landed: true });
     expect(localStorage.getItem(SKIP_FLAG)).toBeNull();
   });
 });

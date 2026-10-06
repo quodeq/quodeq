@@ -80,6 +80,11 @@
   margin-top: var(--term-space-3);
   flex-wrap: wrap;
 }
+/* The add panel's one button sits at the bottom right, where a dialog's
+   confirming action is expected. */
+.onboarding-step__actions--end {
+  justify-content: flex-end;
+}
 /* Wizard CTA rows: on narrow viewports the buttons grow to fill the
    row so longer labels (e.g. "scan and run", "start evaluation")
    stay legible and the primary action is comfortably tappable. */
@@ -187,8 +192,17 @@
 .analyze-working-copy > .onboarding-edit-link,
 .analyze-summary > .onboarding-edit-link { align-self: baseline; }
 
-/* The clone as it happens (CloneProgress): the bar and its words, the
-   "already running" note, or the error row with retry. */
+/* The add panel's one field with `local folder` at its right: the field
+   takes the room, the button keeps its width. */
+.analyze-repo-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--term-space-2);
+}
+.analyze-repo-row__field { flex: 1 1 auto; min-width: 0; }
+.analyze-repo-row > .term-btn { flex: none; white-space: nowrap; }
+
+/* What stopped an add (AddProblem): the access panel, or the error row with retry. */
 .analyze-clone,
 .analyze-clone__error {
   display: flex;

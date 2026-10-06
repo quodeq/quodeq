@@ -143,4 +143,11 @@ describe('shouldShowStartupLoader', () => {
   it('keeps holding while either query is still in flight even with partial data', () => {
     expect(shouldShowStartupLoader({ ...base, dashboard: { runs: [] }, loading: true })).toBe(true);
   });
+
+  it('drops while the server is still warming the selected project (the Overview shows its own loading state)', () => {
+    // A pending body can last the whole warm of a large project; holding the
+    // fullscreen loader (sidebar inert) for that long walls off the app.
+    expect(shouldShowStartupLoader({ ...base, loading: true, pending: true })).toBe(false);
+    expect(shouldShowStartupLoader({ ...base, loading: true, pending: false })).toBe(true);
+  });
 });

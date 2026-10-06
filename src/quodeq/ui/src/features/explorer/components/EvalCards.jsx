@@ -72,6 +72,9 @@ function ViolationDetail({ item }) {
       {item.detailUnavailable && (
         <p className="vlive-detail-reason vlive-detail-reason--unavailable">{t('explorer.detailUnavailable')}</p>
       )}
+      {item.detailOutdated && (
+        <p className="vlive-detail-reason vlive-detail-reason--unavailable">{t('explorer.detailOutdated')}</p>
+      )}
       <ContextBlock context={item.context} snippet={item.snippet} scope={item.scope} line={item.line} />
     </div>
   );

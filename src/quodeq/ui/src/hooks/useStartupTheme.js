@@ -75,7 +75,9 @@ export function useStartupTheme(settings) {
  * default Overview landing it holds until the Overview's data is actually
  * in. It must drop the moment we know no data is coming: load failure,
  * zero local projects, nothing selected, a query error, a restored
- * non-overview tab, or the queries settling empty (`loading` false covers
+ * non-overview tab, the server still warming the project (`pending`: that
+ * can take the whole warm of a large project, so the Overview shows its own
+ * loading state instead), or the queries settling empty (`loading` false covers
  * a project with no completed evaluations, whose `accumulated` stays null
  * forever) — every one of those renders its own state and an overlay
  * would wall it off forever. This describes a STATE, not "booting": the
@@ -84,7 +86,7 @@ export function useStartupTheme(settings) {
  */
 export function shouldShowStartupLoader({
   projectsLoaded, projectsLoadFailed, projectsCount, selectedProject,
-  selectedSource, activeTab, dashboard, accumulated, error, loading,
+  selectedSource, activeTab, dashboard, accumulated, error, loading, pending,
 }) {
   if (projectsLoadFailed) return false;
   if (!projectsLoaded) return true;
@@ -92,6 +94,7 @@ export function shouldShowStartupLoader({
   if ((projectsCount ?? 0) === 0 && selectedSource !== PROJECT_SOURCE.SHARED) return false;
   if (!selectedProject) return false;
   if (error) return false;
+  if (pending) return false;
   if (dashboard && accumulated) return false;
   return !!loading;
 }

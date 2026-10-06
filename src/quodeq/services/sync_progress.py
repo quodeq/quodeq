@@ -18,7 +18,7 @@ from quodeq.services.wiring import ProgressUpdate
 from quodeq.shared.fault_isolation import run_isolated
 
 SYNC_IDLE_FIELDS: dict[str, object] = {
-    "kind": None, "phase": None, "percent": None, "bytes": None, "projects_found": None,
+    "kind": None, "phase": None, "percent": None, "bytes": None, "projects_found": None, "phase_times": None,
 }
 _COUNT_EVERY = 10
 
@@ -27,9 +27,13 @@ WarmListing = Callable[[Path, str], int]
 
 
 def progress_writer(status: JobSlotStatus) -> Callable[[ProgressUpdate], None]:
-    """A callback that writes git progress into *status*, keeping the last known byte count."""
+    """A callback that writes git progress into *status*, keeping the last known byte count.
+
+    The phase is the update's own (downloading, resolving, checkout), so the
+    strip follows git through the whole clone instead of a frozen 100 percent.
+    """
     def write(update: ProgressUpdate) -> None:
-        fields: dict[str, object] = {"phase": SyncPhase.DOWNLOADING, "percent": update.percent}
+        fields: dict[str, object] = {"phase": update.phase, "percent": update.percent}
         if update.bytes is not None:
             fields["bytes"] = update.bytes
         status.set(**fields)
@@ -56,12 +60,12 @@ def _warm_isolated(eval_root: Path, url: str, warm: WarmListing, log: LogSink) -
 def read_projects(
     eval_root: Path, url: str, status: JobSlotStatus, *, warm: WarmListing, log: LogSink,
 ) -> int:
-    """The READING phase: count the projects, then hydrate the listing *warm* builds.
+    """The READING phase: count the projects, then list them once through *warm*.
 
-    The count lands first so the strip shows "N found" while the slow part
-    runs (the hydration is one threaded pass, not per project, so the count
-    cannot advance during it). A failed warm-up is logged and swallowed: the
-    job still reaches DONE and the list route hydrates on demand, as before.
+    The count lands first so the strip shows "N found"; *warm* lists the
+    clone so its cold cards are queued on the shared warm-up, which scores
+    them after DONE. A failed warm-up is logged and swallowed: the job still
+    reaches DONE and the list route queues the cards itself, as before.
     """
     found = count_projects(eval_root, status)
     _warm_isolated(eval_root, url, warm, log)

@@ -2,6 +2,7 @@ import { t } from '../strings/index.js';
 import { STEP_WELCOME, STEP_ANALYZE, STEP_PROVIDER, STEP_CONNECT } from '../features/onboarding/wizardSteps.js';
 import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 import { NAV_TAB } from '../vocab/navTab.js';
+import { selectLandedProject } from '../hooks/selectLandedProject.js';
 
 // Every navigation action is blocked while an evaluation runs: the guard
 // toasts the action's own "busy" message and swallows the click. Written once
@@ -16,20 +17,9 @@ function guardedWhileEvaluating({ isEvaluating, showToast, busyKey }, action) {
   };
 }
 
-// The Repositories header's "add project": the welcome, where the first card
-// reads "add another" once there are projects (its start opens the analyze screen).
-function makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }) {
-  return guardedWhileEvaluating(
-    { isEvaluating, showToast, busyKey: 'evaluate.busyAddProject' },
-    () => setWizardEntry({
-      startStep: STEP_WELCOME, isFirstProject: projects.length === 0, source: WIZARD_SOURCE.ADD, onImportProject,
-    }),
-  );
-}
-
-// A card's "start" outside the wizard (the empty Repositories page, the
-// empty dashboard): straight to the analyze screen, never a welcome that
-// shows the same card again.
+// The Repositories header's "add project" and a card's "start" outside the
+// wizard (the empty Repositories page, the empty dashboard): straight to the
+// add panel. The welcome opens on first run and from Settings only.
 function makeOnStartAnalyze({ isEvaluating, showToast, setWizardEntry, projects }) {
   return guardedWhileEvaluating(
     { isEvaluating, showToast, busyKey: 'evaluate.busyAddProject' },
@@ -37,28 +27,37 @@ function makeOnStartAnalyze({ isEvaluating, showToast, setWizardEntry, projects 
   );
 }
 
-function makeOnImportProject({ isEvaluating, showToast, handleImportProject }) {
+// An import that lands ends like an add: on the Repositories tab, with the
+// imported project selected there (or when nothing was selected yet).
+function makeOnImportProject({ isEvaluating, showToast, handleImportProject, navTab, state }) {
   return guardedWhileEvaluating(
     { isEvaluating, showToast, busyKey: 'evaluate.busyImportProject' },
-    () => handleImportProject(),
+    async () => {
+      const outcome = await handleImportProject();
+      if (!outcome?.ok) return outcome;
+      navTab(NAV_TAB.PROJECTS);
+      selectLandedProject({ ...state, activeTab: NAV_TAB.PROJECTS }, outcome.projectId);
+      return outcome;
+    },
   );
 }
 
 // The welcome, opened by hand: "take the tour" (source ADD, the default) or
 // Settings' "show welcome" (source SETTINGS). isFirstProject=false tells the
 // welcome there are local projects already; onImportProject backs its
-// "or import an exported archive" link.
-function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }) {
+// archive card, and the caller's onSharedDisconnected (the app's reselect
+// after a disconnect) backs the connected card's disconnect.
+function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject, instanceId }) {
   return guardedWhileEvaluating(
     { isEvaluating, showToast, busyKey: 'evaluate.busyStartTour' },
-    (source = WIZARD_SOURCE.ADD) => setWizardEntry({
-      startStep: STEP_WELCOME, isFirstProject: projects.length === 0, source, onImportProject,
+    (source = WIZARD_SOURCE.ADD, onSharedDisconnected = undefined) => setWizardEntry({
+      startStep: STEP_WELCOME, isFirstProject: projects.length === 0, source, onImportProject, onSharedDisconnected, instanceId,
     }),
   );
 }
 
-// The Repositories tab's "connect evaluations repository" and the strip's
-// "change repository": the wizard opened on its connect step alone. Not
+// The Repositories header's "add evaluations repository" (its menu) and the
+// strip's "change repository": the wizard opened on its connect step alone. Not
 // guarded: connecting an evaluations repository never touches a running
 // evaluation. onImportProject rides along like the welcome's entries.
 function makeOnConnectEvaluations({ setWizardEntry, onImportProject }) {
@@ -106,14 +105,16 @@ function makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }) {
  */
 export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
   const projects = state.projects ?? [];
-  const onImportProject = makeOnImportProject({ isEvaluating, showToast, handleImportProject: state.handleImportProject });
+  const onImportProject = makeOnImportProject({ isEvaluating, showToast, handleImportProject: state.handleImportProject, navTab, state });
+  const onStartAnalyze = makeOnStartAnalyze({ isEvaluating, showToast, setWizardEntry, projects });
   return {
     ...state,
     navTab, navStackLength,
-    onAddProject: makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }),
-    onStartAnalyze: makeOnStartAnalyze({ isEvaluating, showToast, setWizardEntry, projects }),
+    // One action under two names: the header button and the cards' start.
+    onAddProject: onStartAnalyze,
+    onStartAnalyze,
     onImportProject,
-    onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }),
+    onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject, instanceId: state.serverInstanceId ?? null }),
     onConnectEvaluations: makeOnConnectEvaluations({ setWizardEntry, onImportProject }),
     onResumeSetup: makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }),
     // null when the shared repo has no content — consumers use the nullness

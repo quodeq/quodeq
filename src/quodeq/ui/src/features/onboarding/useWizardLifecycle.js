@@ -7,8 +7,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateProjects } from '../../hooks/invalidateProjects.js';
-import { readString } from '../../adapters/storage.js';
-import { STEP_WELCOME, SKIPPED_KEY, SKIPPED_VALUE } from './wizardSteps.js';
+import { selectLandedProject } from '../../hooks/selectLandedProject.js';
+import { STEP_WELCOME } from './wizardSteps.js';
+import { wasWelcomeSkipped } from './hooks/useWizardDraft.js';
 import { WIZARD_SOURCE } from './onboardingVocab.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 import { NAV_TAB } from '../../vocab/navTab.js';
@@ -49,11 +50,22 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab, queryClient
     invalidateProjects(queryClient).catch((err) => console.warn('[wizard] project list refetch failed:', err));
   };
   return {
-    onClose: ({ saved, projectId }) => {
+    // `cloning`: the add panel closed on a 202, the project arrives through
+    // the clone slot (the app re-lists and selects it on the DONE edge).
+    // `landed`: the add panel handed a project over (or started its clone);
+    // an add ends on the Repositories tab, where the tile or the new card
+    // is: from the header that is where the user already stands, from the
+    // welcome it is where the job can be watched. A saved exit without
+    // `landed` (the X on a resume-setup walk) only refetches.
+    onClose: ({ saved, projectId, cloning = false, landed = false }) => {
       setWizardEntry(null);
-      if (saved && projectId) {
+      if (saved && (projectId || cloning)) {
         refreshProjects();
         state.refreshDashboard?.();
+      }
+      if (landed) {
+        navTab(NAV_TAB.PROJECTS);
+        selectLandedProject({ ...state, activeTab: NAV_TAB.PROJECTS }, projectId);
       }
     },
     onLaunch: ({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
@@ -126,13 +138,18 @@ function useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, set
       sharedSettled: sharedSignal.settled,
       sharedHasContent: sharedSignal.hasContent,
     })) return;
-    if (readString(SKIPPED_KEY, null) === SKIPPED_VALUE) return;
+    // The skip is keyed on the server's instance id (undefined until the
+    // health poll answers; null for a server without one): deciding before
+    // the answer would let a flag from a wiped state folder still count.
+    if (state.serverInstanceId === undefined) return;
+    if (wasWelcomeSkipped(undefined, state.serverInstanceId)) return;
     const entry = {
-      startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN, onImportProject: state.handleImportProject,
+      startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN,
+      onImportProject: state.handleImportProject, instanceId: state.serverInstanceId,
     };
     Object.assign(seen, { spent: true, autoEntry: entry, step: STEP_WELCOME });
     setWizardEntry(entry);
-  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps -- re-evaluates on input changes only; wizardEntry and the setter are read current
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, state.serverInstanceId]); // eslint-disable-line react-hooks/exhaustive-deps -- re-evaluates on input changes only; wizardEntry and the setter are read current
 }
 
 /**

@@ -16,7 +16,7 @@ import { useAssistantProvider } from '../features/settings/hooks/useAssistantPro
 import { deriveAssistantContext } from '../features/assistant/useAssistantContext.js';
 import { buildAssistantSessionPayload } from '../features/assistant/assistantAppBridge.js';
 import {
-  useGradeFormulaBootSyncEffect, useEvaluateBounceEffect,
+  useGradeFormulaBootSyncEffect, useEvaluateHiddenEffect, useDeadSharedSelectionEffect,
   useInitialLandingEffect, useProjectScrollResetEffect, useVisibleStandardsHydrationEffect,
 } from './useAppEffects.js';
 import { buildBreadcrumbSiblingsFor } from '../features/side-pane/breadcrumbSiblings.js';
@@ -41,10 +41,10 @@ export function computeIsEvaluating(state) {
  * ProjectsPage/Settings, no extra fetching) and the two pieces of App-local
  * UI state that don't depend on anything else.
  */
-export function useAppBootExtras() {
+export function useAppBootExtras({ onCloneLanded } = {}) {
   useEffect(() => { warmOverviewChunks(); }, []);
   const sharedSignal = useSharedContentSignal();
-  useCloneTransitions();
+  useCloneTransitions({ onLanded: onCloneLanded });
   const [sidebarPinned, setSidebarPinned] = useState(false);
   // Incremented after every successful dismiss POST so the violations
   // page's dismissed sub-tab knows to refetch its list. Without this, a
@@ -87,18 +87,17 @@ export function useAppAssistant(state) {
 }
 
 /**
- * Grade-formula boot sync, wizard entry/auto-open lifecycle, and the
- * Evaluate-tab bounce guard — see useAppEffects.js and
- * features/onboarding/useWizardLifecycle.js for the individual rationales.
+ * Grade-formula boot sync and the wizard entry/auto-open lifecycle. See
+ * useAppEffects.js and features/onboarding/useWizardLifecycle.js for the
+ * individual rationales. A project without runs is no longer bounced to
+ * Evaluate: every project tab carries its own "No evaluations yet" state.
  */
-export function useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, sharedSignal }) {
+export function useAppWizardBounce({ state, isEvaluating, sharedSignal }) {
   useGradeFormulaBootSyncEffect();
   const { wizardEntry, setWizardEntry, wizardHandlers } = useWizardLifecycle({
     state, navTab: state.navTab, isEvaluating, sharedSignal,
   });
-  const hasCurrentProjectRuns = (selectedProjectInfo?.runsCount ?? 0) > 0;
-  useEvaluateBounceEffect({ state, selectedProjectInfo, hasCurrentProjectRuns });
-  return { wizardEntry, setWizardEntry, wizardHandlers, hasCurrentProjectRuns };
+  return { wizardEntry, setWizardEntry, wizardHandlers };
 }
 
 /** The sidebar's active provider/model, read fresh on every render. */
@@ -123,13 +122,16 @@ export function useAppStartupGate({ state, activeTab }) {
     accumulated: state.accumulated,
     error: state.error,
     loading: state.loading,
+    pending: state.pending,
   });
   return { showStartupLoader };
 }
 
-/** The derived no-projects landing redirect and the native macOS Help-menu nav bridge. */
-export function useAppNavigationEffects({ state, activeTab, navTab, sharedSignal }) {
-  useInitialLandingEffect({ state, sharedSignal, activeTab, navTab });
+/** The dead-shared-selection drop, the derived no-projects landing redirect, the Evaluate-hidden redirect and the native macOS Help-menu nav bridge. */
+export function useAppNavigationEffects({ state, activeTab, navTab, showEvaluate, sharedSignal }) {
+  useDeadSharedSelectionEffect({ state, sharedSignal });
+  useInitialLandingEffect({ state, activeTab, navTab });
+  useEvaluateHiddenEffect({ state, activeTab, navTab, showEvaluate });
   useNativeNavBridge(navTab);
 }
 

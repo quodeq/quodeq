@@ -7,7 +7,8 @@ import { ApiProvider } from '../api/ApiContext.jsx';
 import { SidePaneProvider } from '../features/side-pane/SidePaneProvider.jsx';
 
 // Split from useAppState.test.jsx: useAppState's eval-completion single-
-// refetch path and the projects-load re-arm-on-reconnect behavior.
+// refetch path, the projects-load re-arm-on-reconnect behavior, and the
+// pending flag reaching the app state.
 
 // useAppState composes useEvaluationLifecycle (-> useEvaluation) and
 // useServerHealth. Mocked the same way useEvaluationLifecycle.test.jsx mocks
@@ -218,5 +219,29 @@ describe('useAppState projects-load re-arm on server reconnect', () => {
     await waitFor(() => expect(result.current.projectsLoaded).toBe(true), { timeout: 5000 });
     expect(fakeApi.listProjects.mock.calls.length).toBeGreaterThan(callsWhileDown);
     expect(result.current.projectsLoadFailed).toBe(false);
+  });
+});
+
+// The boot loader reads `pending` off the app state; useAppState picks the
+// dashboard fields by name, so a field the hook returns can still be lost
+// on the way up. A pending Overview must reach the gate as pending.
+describe('useAppState with a pending Overview', () => {
+  beforeEach(() => {
+    localStorage.setItem('quodeq_selected_project', 'project-a');
+    localStorage.setItem('quodeq_selected_source', 'local');
+  });
+  afterEach(() => {
+    localStorage.removeItem('quodeq_selected_project');
+    localStorage.removeItem('quodeq_selected_source');
+  });
+
+  it('exposes pending while the server is still warming the selected project', async () => {
+    const fakeApi = makeAppStateFakeApi();
+    fakeApi.getDashboard = vi.fn(async () => ({ pending: true, warmup: { active: true } }));
+    const { result } = renderAppState(fakeApi, makeTestClient());
+
+    await waitFor(() => expect(fakeApi.getDashboard).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.pending).toBe(true));
+    expect(result.current.loading).toBe(true);
   });
 });

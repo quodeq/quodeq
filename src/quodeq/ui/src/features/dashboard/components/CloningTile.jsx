@@ -4,14 +4,19 @@ import { cloneNameFromUrl } from '../../../api/projectClone.js';
 import { formatSize } from '../../../utils/formatSize.js';
 import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { SyncBar } from './SyncBar.jsx';
+import { barPercent } from './syncStripState.js';
 
 // What the clone is doing, in the tile's words: the download with percent and
-// size once both are known, then the walk over the files.
+// size once both are known, git's delta resolution and checkout with their
+// own percent, then the walk over the files.
 function cloneLabel(slot) {
   if (slot.phase === SYNC_PHASE.READING) return t('projects.readingTile');
+  const percent = typeof slot.percent === 'number' ? Math.round(slot.percent) : null;
+  if (slot.phase === SYNC_PHASE.RESOLVING) return t('projects.resolvingTile', { percent: percent ?? 0 });
+  if (slot.phase === SYNC_PHASE.CHECKOUT) return t('projects.checkoutTile', { percent: percent ?? 0 });
   const size = formatSize(slot.bytes);
-  if (typeof slot.percent !== 'number' || !size) return t('projects.cloningTileBare');
-  return t('projects.cloningTile', { percent: Math.round(slot.percent), size });
+  if (percent === null || !size) return t('projects.cloningTileBare');
+  return t('projects.cloningTile', { percent, size });
 }
 
 function FailedRow({ slot, onRetry, onClose }) {
@@ -37,7 +42,7 @@ function FailedRow({ slot, onRetry, onClose }) {
 export default function CloningTile({ slot, onRetry, onClose }) {
   const name = slot.projectName ?? cloneNameFromUrl(slot.repo);
   const failed = slot.phase === SYNC_PHASE.ERROR;
-  const percent = slot.phase === SYNC_PHASE.DOWNLOADING ? slot.percent : null;
+  const percent = barPercent(slot);
   return (
     <article className="project-card project-card--ghost">
       <header className="project-card--ghost__head">

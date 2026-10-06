@@ -2960,6 +2960,18 @@
   flex-wrap: wrap;
 }
 
+/* The header's `more ▾`: the pill menu anchored to the button's right edge,
+   wide enough for "add evaluations repository" on one line. */
+.projects-page__more {
+  position: relative;
+  display: inline-flex;
+}
+.projects-page__more-list {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+}
+
 /* Disabled (evaluation in progress) — `aria-disabled` keeps the click
    firing so a snackbar can explain the block, so we can't rely on
    the native :disabled selector. */
@@ -2978,66 +2990,44 @@
     flex: 1 1 auto;
     justify-content: center;
   }
-}
-
-/* ── Empty Repositories page: the welcome's two paths, side by side ── */
-
-.projects-empty--paths {
-  padding: var(--space-6) 0;
+  /* The menu's wrapper stretches too, so `more` and `add project` share the row as equals. */
+  .projects-page__more {
+    flex: 1 1 auto;
+    display: flex;
+  }
 }
 
 /* ── Evaluations repository form (url or folder) ──
    Shared by the welcome's connect step and the failure card below. */
 
-.repo-source-switch {
-  display: inline-flex;
-  margin-bottom: var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--term-radius);
-  overflow: hidden;
-}
-
-.repo-source-switch__option {
-  appearance: none;
-  padding: 6px 12px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  font-family: var(--term-font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.2;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.repo-source-switch__option + .repo-source-switch__option {
-  border-left: 1px solid var(--color-border);
-}
-.repo-source-switch__option:hover {
-  color: var(--color-text);
-  background: var(--color-surface-alt);
-}
-.repo-source-switch__option--active,
-.repo-source-switch__option--active:hover {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-.repo-source-switch__option:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
-}
-
+/* One field with `local folder` at its right, the add panel's row; connect
+   sits in the actions row below, at the right, with the caller's way out at
+   the left. */
 .evals-repo-form__row {
   display: flex;
-  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.evals-repo-form__row > .term-btn {
+  flex: none;
+  white-space: nowrap;
+}
+.evals-repo-form__actions {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.evals-repo-form__actions > .evals-repo-form__submit {
+  margin-left: auto;
 }
 
 .repo-form__field {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex: 1 1 300px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -3048,20 +3038,6 @@
 .repo-form__field .term-input__field {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.repo-form__path {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--term-font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-text);
-}
-.repo-form__path--empty {
-  color: var(--color-text-muted);
 }
 
 .evals-repo-form__submit:disabled {
@@ -3603,6 +3579,26 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
+/* The strip's bar sizes itself along a row (flex-basis 180px); inside the
+   tile's column that basis became its height. Here it is a 6 px line
+   across the tile. */
+.project-card--ghost .sync-strip__bar {
+  flex: none;
+  width: 100%;
+}
+/* Placeholder cards while a connect reads the team's projects: the tile's
+   dashed look with two faint lines where the name and the path will be. */
+.project-card--placeholder {
+  min-height: 72px;
+  justify-content: center;
+}
+.project-card--placeholder__line {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--color-surface-alt);
+}
+.project-card--placeholder__line--name { width: 38%; }
+.project-card--placeholder__line--meta { width: 24%; }
 .project-card--ghost__error {
   display: flex;
   align-items: center;

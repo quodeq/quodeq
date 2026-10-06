@@ -41,9 +41,9 @@ function useConnectCard(shared) {
  * connect step (`onConnectEvaluations`). Everything reads `shared`
  * (useSharedProjects), the screen's one status poll.
  */
-export function TeamResultsArea({ shared, onConnectEvaluations, onImportProject, onSharedDisconnected }) {
+export function TeamResultsArea({ shared, onConnectEvaluations, onSharedDisconnected }) {
   const { invite, copyInvite } = useCopyInvite();
-  const disconnect = useSharedDisconnect({ onDisconnected: onSharedDisconnected });
+  const { disconnect, disconnecting } = useSharedDisconnect({ onDisconnected: onSharedDisconnected });
   const card = useConnectCard(shared);
   return (
     <>
@@ -54,12 +54,13 @@ export function TeamResultsArea({ shared, onConnectEvaluations, onImportProject,
         loadFailed={Boolean(shared.error)}
         lastSynced={shared.lastSynced}
         projectsCount={shared.projects.length}
+        warming={shared.warming}
         invite={invite}
         onUpdate={shared.refresh}
         onCopyInvite={copyInvite}
         onChange={onConnectEvaluations}
-        onImport={onImportProject}
         onDisconnect={disconnect}
+        disconnecting={disconnecting}
       />
       {card.showCard && (
         <ConnectTeamCard

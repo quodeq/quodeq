@@ -63,9 +63,23 @@ def disconnect_shared_repo(*, log: LogSink = NULL_LOG, ops: SharedRepoOps | None
     clone_lock_fn = o.clone_lock if o.clone_lock is not None else clone_lock
     remove_clone_dir_fn = o.remove_clone_dir if o.remove_clone_dir is not None else remove_clone_dir
     shared_cache_dir_fn = o.shared_cache_dir if o.shared_cache_dir is not None else shared_cache_dir
+    stop_warmup_fn = o.stop_shared_warmup if o.stop_shared_warmup is not None else _stop_shared_warmup
 
     settings = read_settings_fn()
     write_settings_fn(SharedSettings(url=None), log=log)
     if settings.url is not None:
+        # The shared warm-up worker reads and writes inside the clone; stop
+        # its queue first, and the project it is on finishes under the clone
+        # lock below before the directory goes. Otherwise rmtree raced the
+        # worker and left a half-removed, write-only directory the next
+        # connect could not clone into.
+        stop_warmup_fn()
         with clone_lock_fn(settings.url):
             remove_clone_dir_fn(shared_cache_dir_fn(settings.url))
+
+
+def _stop_shared_warmup() -> None:
+    """Stop the shared listing's warm-up worker (resolved lazily: shared_listing imports this module)."""
+    from quodeq.services.shared_listing import shared_warmup  # noqa: PLC0415
+
+    shared_warmup.stop()

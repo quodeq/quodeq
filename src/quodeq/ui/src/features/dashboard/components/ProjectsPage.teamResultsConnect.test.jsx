@@ -42,7 +42,7 @@ describe('ProjectsPage — closing a failed connect', () => {
     view.unmount();
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(2));
-    await screen.findByRole('button', { name: 'connect evaluations repository' });
+    await screen.findByRole('button', { name: 'more ways to add' });
     expect(urlField()).not.toBeInTheDocument();
     expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
   });
@@ -61,17 +61,17 @@ describe('ProjectsPage — closing a failed connect', () => {
     expect(urlField()).toHaveValue(foreign.url);
   });
 
-  it('on an empty page the failure shows above the two paths, and close leaves just the paths', async () => {
+  it('on an empty page the failure shows above the empty line, and close leaves just the line', async () => {
     const user = userEvent.setup();
     const { api } = makeApi({ slots: { connect: foreign } });
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
     expect(await screen.findByText(FOREIGN_COPY)).toBeInTheDocument();
-    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
+    expect(screen.getByText(/No repositories yet\./)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'close' }));
     expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
     expect(urlField()).not.toBeInTheDocument();
-    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
+    expect(screen.getByText(/No repositories yet\./)).toBeInTheDocument();
   });
 });
 

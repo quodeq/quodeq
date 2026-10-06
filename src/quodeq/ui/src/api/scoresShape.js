@@ -43,6 +43,18 @@ export function findingDetailQuery({ kind, dimension, run, asOf, principle, path
 }
 
 /**
+ * True for the body the Overview routes answer 202 with while the server's
+ * warm-up still owes the project its caches: `{ pending: true, warmup }`.
+ * Fetchers hand it through untouched (a model built from it would read as an
+ * empty project) and the hooks poll on it; see hooks/queryDefaults.js.
+ * @param {Object|null|undefined} data
+ * @returns {boolean}
+ */
+export function isPendingPayload(data) {
+  return data?.pending === true;
+}
+
+/**
  * Map the `dimensions` array of an accumulated payload to Dimension models.
  * @param {Object} data Raw accumulated payload; left untouched when it has no dimensions array.
  * @returns {Object} The same payload object.

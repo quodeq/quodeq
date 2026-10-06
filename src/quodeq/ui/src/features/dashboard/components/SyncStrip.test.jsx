@@ -17,6 +17,14 @@ describe('SyncStrip', () => {
     render(<SyncStrip status={{ ...base, connect: { state: 'running', phase: SYNC_PHASE.READING, projectsFound: 3 } }} projectsCount={0} />);
     expect(screen.getByText(/reading projects · 3 found/)).toBeInTheDocument();
   });
+  it('shows how many cards are ready while the server is still warming the rest, with an indeterminate bar', () => {
+    render(<SyncStrip status={base} projectsCount={1} warming={{ active: true, done: 1, total: 4, remaining: 3 }} />);
+    expect(screen.getByText('loading results · 1 of 4 ready…', { selector: '.sync-strip__meta' })).toBeInTheDocument();
+    const bar = screen.getByRole('progressbar');
+    expect(bar).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('loading results…');
+    expect(screen.queryByRole('button', { name: /update/i })).not.toBeInTheDocument();
+  });
   it('shows synced with count and when, plus the actions', () => {
     const onUpdate = vi.fn(); const onCopyInvite = vi.fn();
     render(<SyncStrip status={base} projectsCount={5} onUpdate={onUpdate} onCopyInvite={onCopyInvite} />);
@@ -118,14 +126,15 @@ describe('SyncStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: /more repository actions/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'disconnect' })); expect(onDisconnect).toHaveBeenCalled();
   });
-  it('the ⋯ menu imports an evaluations archive only when wired', () => {
-    const onImport = vi.fn();
-    const { rerender } = render(<SyncStrip status={base} projectsCount={5} />);
+  it('the ⋯ menu holds exactly change repository and disconnect (import lives in the header)', () => {
+    render(<SyncStrip status={base} projectsCount={5} onChange={() => {}} onDisconnect={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /more repository actions/i }));
-    expect(screen.queryByRole('menuitem', { name: 'import evaluations archive' })).not.toBeInTheDocument();
-    rerender(<SyncStrip status={base} projectsCount={5} onImport={onImport} />);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'import evaluations archive' }));
-    expect(onImport).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['change repository', 'disconnect']);
+  });
+  it('disables disconnect while one is in flight', () => {
+    render(<SyncStrip status={base} projectsCount={5} onChange={() => {}} onDisconnect={() => {}} disconnecting />);
+    fireEvent.click(screen.getByRole('button', { name: /more repository actions/i }));
+    expect(screen.getByRole('menuitem', { name: 'disconnect' })).toBeDisabled();
   });
   it('shows the repository as host/path', () => {
     render(<SyncStrip status={base} projectsCount={5} />);

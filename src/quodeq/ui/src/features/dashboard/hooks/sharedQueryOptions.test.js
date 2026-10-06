@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sharedListQueryOptions } from './sharedQueryOptions.js';
+import { SUMMARY_POLL_MS, sharedListQueryOptions } from './sharedQueryOptions.js';
 import { sharedKeys } from '../../../api/queryKeys.js';
 
 test('list query: enabled only when configured and the caller gate allows it', () => {
@@ -19,6 +19,16 @@ test('list query: enabled only when configured and the caller gate allows it', (
     sharedListQueryOptions({ sharedListProjects, configured: true, observerOptions: { refetchOnWindowFocus: false } }).refetchOnWindowFocus,
     false,
   );
+});
+
+test('list query: re-lists while the server is still warming cards it has not shown yet', () => {
+  const on = sharedListQueryOptions({ sharedListProjects: () => 'list', configured: true });
+  const query = (data) => ({ state: { data, error: null } });
+  assert.equal(on.refetchInterval(query({ projects: [], warmup: { active: true, projectsDone: 0, projectsTotal: 3 } })), SUMMARY_POLL_MS);
+  assert.equal(on.refetchInterval(query({ projects: [{ id: 'a' }], warmup: { active: false, projectsDone: 3, projectsTotal: 3 } })), false);
+  assert.equal(on.refetchInterval(query({ projects: [{ id: 'a', summaryPending: true }] })), SUMMARY_POLL_MS);
+  assert.equal(on.refetchInterval(query({ projects: [{ id: 'a' }] })), false);
+  assert.equal(on.refetchInterval(query(undefined)), false);
 });
 
 test('list query: waits while a connect is active, never for a refresh or pull', () => {

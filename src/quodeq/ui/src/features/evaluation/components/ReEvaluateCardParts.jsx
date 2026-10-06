@@ -115,7 +115,16 @@ function runBarLine1({ picked, scanFiles, isClean, budgetPart }) {
   ].filter(Boolean).join(' · ');
 }
 
-export function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, cleanScan, timeLimitS }) {
+// The second line of the run bar: what still stands between the user and a
+// scan. A missing model comes first (the strip's model cell is marked for
+// it), then the dimensions, then the queued file count.
+function runBarLine2({ hasModel, picked, pickedSum }) {
+  if (!hasModel) return t('evaluate.noModelHint');
+  if (picked === 0) return t('evaluate.pickOneDim');
+  return pickedSum != null ? t('evaluate.fileAnalysesQueued', { count: formatCount(pickedSum) }) : t('evaluate.durationDepends');
+}
+
+export function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, cleanScan, timeLimitS, hasModel = true }) {
   const picked = selectedDims.size;
   const isClean = cleanScan !== CLEAN_PERSIST.OFF;
   const scanFiles = estimates ? (isClean ? estimates.projectFiles : estimates.changedFiles) : null;
@@ -123,11 +132,7 @@ export function RunBar({ disabled, canStart, handleScan, selectedDims, estimates
 
   const budgetPart = timeLimitS > 0 ? t('evaluate.totalBudget', { label: formatBudgetLabel(timeLimitS) }) : t('evaluate.noTimeLimit');
   const line1 = runBarLine1({ picked, scanFiles, isClean, budgetPart });
-  const line2 = picked > 0
-    ? (pickedSum != null
-        ? t('evaluate.fileAnalysesQueued', { count: formatCount(pickedSum) })
-        : t('evaluate.durationDepends'))
-    : t('evaluate.pickOneDim');
+  const line2 = runBarLine2({ hasModel, picked, pickedSum });
 
   return (
     <div className="eval-run-bar">
@@ -175,6 +180,7 @@ export function IdentityHeader({ info, project, scope, branchLabel, scopeValue, 
         label={t('evaluate.idModel')}
         title={t('evaluate.openProviderSettingsTitle')}
         onClick={onGoToSettings}
+        attention={!activeModel}
       >
         {activeModel ? (
           <>

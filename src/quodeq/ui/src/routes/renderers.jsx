@@ -11,6 +11,7 @@ import EmptyStateWithTour from '../features/onboarding/components/EmptyStateWith
 import { isSharedSource, makeDismissHandler } from './dismissWiring.js';
 import { t } from '../strings/index.js';
 import { buildEvalPrincipal, ViolationsRoute } from './violationsRoute.jsx';
+import { liveAccumulated, liveFileFor } from './liveSelectors.js';
 import { mapRoute } from './mapRoute.jsx';
 import { historyRoute } from './historyRoute.jsx';
 import { compareRoute } from './compareRoute.jsx';
@@ -134,7 +135,7 @@ export const ROUTE_RENDERERS = {
   ),
   evaluate: (params, props) => {
     // Shared projects have no Evaluate flow (evaluation is local-only) --
-    // shouldShowEvaluateButton already keeps the TopBar's Evaluate button
+    // shouldShowEvaluate already keeps the TopBar's Evaluate button
     // from ever linking here for a shared selection, but a stale nav-stack
     // entry (e.g. the user was sitting on Evaluate and switched to a shared
     // project) could still land the router on this route. Belt-and-braces:
@@ -156,7 +157,10 @@ export const ROUTE_RENDERERS = {
   },
   file: (params, props) => (
     <FileDetailPage
-      file={params.file}
+      // Rebuilt from the live payload when the navigation left a selector,
+      // so a refreshed /scores reaches the page instead of the click-time
+      // snapshot (routes/liveSelectors.js); the snapshot otherwise.
+      file={liveFileFor(params, liveAccumulated(props)) ?? params.file}
       runId={params.runId}
       dateLabel={params.dateLabel}
       severityFilter={params.severityFilter || params.severity || null}
@@ -195,7 +199,7 @@ export const ROUTE_RENDERERS = {
     settings={props.settings}
     onOpenGradeFormula={() => props.navigation.handleNavigate(NAV_TAB.GRADE_FORMULA)}
     onSharedDisconnected={() => reselectAfterSharedDisconnect(props.navigation)}
-    onShowWelcome={() => props.navigation.onTakeTour(WIZARD_SOURCE.SETTINGS)}
+    onShowWelcome={() => props.navigation.onTakeTour(WIZARD_SOURCE.SETTINGS, () => reselectAfterSharedDisconnect(props.navigation))}
   />,
   [NAV_TAB.GRADE_FORMULA]: (params, props) => (
     <GradeFormulaPage

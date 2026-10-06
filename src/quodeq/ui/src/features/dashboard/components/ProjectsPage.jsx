@@ -9,33 +9,13 @@ import { OnlineCardFooter } from './projectCards/OnlineCardFooter.jsx';
 import { ProjectsToolbar } from './ProjectsToolbar.jsx';
 import { ProjectsPageHeader } from './ProjectsPageHeader.jsx';
 import { TeamResultsArea } from './TeamResultsArea.jsx';
-import WelcomePaths from '../../onboarding/components/WelcomePaths.jsx';
-import { useSharedConnection } from '../hooks/useSharedProjects.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
+import { isCloningProject } from '../../../utils/cloningProject.js';
 import { isSlotActive } from '../../../api/syncStatus.js';
+import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { useCloneGhost } from '../hooks/useCloneGhost.js';
 import CloningTile from './CloningTile.jsx';
-
-// The empty page: the welcome's two paths side by side. With an evaluations
-// repository connected (but nothing published yet) its card names it; there
-// is no "go to repositories" here, this is the Repositories tab. Start opens
-// the analyze screen directly (the welcome would show these cards again).
-function EmptyProjectsPaths({ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }) {
-  const { configured, host } = useSharedConnection();
-  return (
-    <div className="projects-empty projects-empty--paths">
-      <WelcomePaths
-        compact
-        isEvaluating={isEvaluating}
-        onStart={onStartAnalyze}
-        onConnect={onConnectEvaluations}
-        onImport={onImportProject}
-        adaptation={{ connected: configured, host, hasLocalProjects: false }}
-      />
-    </div>
-  );
-}
 
 // The three bundles a local card needs: what the project is, whether it is
 // the selected one, and what can be done to it.
@@ -124,12 +104,35 @@ function ProjectsCardsList({ visibleEntries, ctx }) {
   );
 }
 
-function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx, ghost }) {
+// While a connect reads the team's projects, one dashed placeholder per
+// project found so far heads the list; they become the real cards when
+// reading finishes. Hidden from assistive tech: the strip's live region
+// already says "reading projects · N found", one announcement, not N.
+function ReadingPlaceholders({ count }) {
+  if (!count) return null;
+  return (
+    <div className="projects-cards projects-cards--placeholders" aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <article key={i} className="project-card project-card--ghost project-card--placeholder">
+          <span className="project-card--placeholder__line project-card--placeholder__line--name" />
+          <span className="project-card--placeholder__line project-card--placeholder__line--meta" />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+// A local card whose clone is still running stays behind the tile: without
+// this the tile and a "Path not found" card would both show for the same
+// repository (see utils/cloningProject.js).
+function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx, ghost, cloneSlot, readingCount }) {
+  const entries = cloneSlot ? visibleEntries.filter((entry) => !isCloningProject(entry.local, cloneSlot)) : visibleEntries;
   return (
     <>
       <ProjectsToolbar filters={filters} onFiltersChange={onFiltersChange} configured={shared.configured} />
       {ghost}
-      <ProjectsCardsList visibleEntries={visibleEntries} ctx={cardsListCtx} />
+      <ReadingPlaceholders count={readingCount} />
+      <ProjectsCardsList visibleEntries={entries} ctx={cardsListCtx} />
     </>
   );
 }
@@ -156,53 +159,67 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
 }
 
 // The page has four mutually exclusive bodies. A function rather than a
-// ternary chain in the JSX, so each branch reads on its own line. While a
-// connect is still reading the team's projects, an empty page is not "add
-// your first project": the strip above says what is happening, so one quiet
-// line says where the results will land. The same goes for a clone that is
-// running: the ghost tile heads the page and one line says what comes next.
-function ProjectsPageContent({ projectsLoaded, isEmpty, status, ghost, emptyProps, bodyProps }) {
+// ternary chain in the JSX, so each branch reads on its own line. The empty
+// page keeps the header's actions and says there is nothing yet; the ways
+// in are the header's buttons (and the welcome, on a first start). While a
+// connect is still reading the team's projects, the strip above says what
+// is happening, so one quiet line says where the results will land. The
+// same goes for a clone that is running: the ghost tile heads the page and
+// one line says what comes next.
+function ProjectsPageContent({ projectsLoaded, isEmpty, status, ghost, bodyProps }) {
   if (!projectsLoaded) return <LoadingScreen variant="inline" />;
   if (isEmpty && status.cloneActive) return <>{ghost}<p className="projects-empty">{t('projects.projectArriving')}</p></>;
-  if (isEmpty && status.connectActive) return <>{ghost}<p className="projects-empty">{t('projects.teamResultsArriving')}</p></>;
-  if (isEmpty) return <>{ghost}<EmptyProjectsPaths {...emptyProps} /></>;
-  return <ProjectsPageBody {...bodyProps} ghost={ghost} />;
+  if (isEmpty && (status.connectActive || status.warmingActive)) {
+    return <>{ghost}<ReadingPlaceholders count={status.readingCount} /><p className="projects-empty">{t('projects.teamResultsArriving')}</p></>;
+  }
+  if (isEmpty) return <>{ghost}<p className="projects-empty">{t('projects.noReposYet')}</p></>;
+  return <ProjectsPageBody {...bodyProps} ghost={ghost} readingCount={status.readingCount} />;
 }
 
 function useGhostTile() {
   const { slot, active, onRetry, onClose } = useCloneGhost();
   const ghost = slot ? <CloningTile slot={slot} onRetry={onRetry} onClose={onClose} /> : null;
-  return { ghost, cloneActive: active };
+  return { ghost, cloneActive: active, cloneSlot: active ? slot : null };
+}
+
+// How many of the team's projects are still to come: the ones a running
+// connect has found so far, then the ones the server is still warming and
+// has not listed yet (its cards land one by one, each ready to open).
+function readingCount(shared) {
+  const connect = shared.status?.connect;
+  if (connect?.phase === SYNC_PHASE.READING) return connect.projectsFound ?? 0;
+  return shared.warming?.remaining ?? 0;
 }
 
 export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
-  const { onAddProject, onStartAnalyze, onImportProject, onConnectEvaluations, onFiltersChange, onSharedDisconnected } = actions;
+  const { onAddProject, onImportProject, onConnectEvaluations, onFiltersChange, onSharedDisconnected } = actions;
   const { shared, isEmpty, visibleEntries, cardsListCtx } = useProjectsCardsCtx({ projects, filters, selectedProject, actions });
-  const { ghost, cloneActive } = useGhostTile();
+  const { ghost, cloneActive, cloneSlot } = useGhostTile();
 
   return (
     <section className="projects-page projects-page--terminal">
       <ProjectsPageHeader
         counts={{ projectsLoaded, localCount: projects.length, teamCount: shared.projects.length }}
-        isEmpty={isEmpty}
         configured={shared.configured}
         onConnectEvaluations={onConnectEvaluations}
+        onImportProject={onImportProject}
         onAddProject={onAddProject}
         isEvaluating={isEvaluating}
       />
       <TeamResultsArea
         shared={shared}
         onConnectEvaluations={onConnectEvaluations}
-        onImportProject={onImportProject}
         onSharedDisconnected={onSharedDisconnected}
       />
       <ProjectsPageContent
         projectsLoaded={projectsLoaded}
         isEmpty={isEmpty}
-        status={{ connectActive: isSlotActive(shared.status?.connect), cloneActive }}
+        status={{
+          connectActive: isSlotActive(shared.status?.connect), cloneActive,
+          warmingActive: !!shared.warming?.active, readingCount: readingCount(shared),
+        }}
         ghost={ghost}
-        emptyProps={{ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }}
-        bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }}
+        bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx, cloneSlot }}
       />
     </section>
   );

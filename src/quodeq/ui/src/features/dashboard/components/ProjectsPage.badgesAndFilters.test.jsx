@@ -91,11 +91,11 @@ describe('ProjectsPage — initial loading gate (P4)', () => {
     expect(screen.getByText('loading…')).toBeInTheDocument();
   });
 
-  it('renders the empty paths once projectsLoaded is true and there are still no projects', async () => {
+  it('renders the empty line once projectsLoaded is true and there are still no projects', async () => {
     const fakeApi = makeFakeApi();
     const { container } = renderWithApi(<ProjectsPage projects={[]} projectsLoaded actions={{}} />, fakeApi);
     await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
-    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
+    expect(screen.getByText(/No repositories yet\./)).toBeInTheDocument();
     expect(container.querySelector('.loading-screen--inline')).not.toBeInTheDocument();
   });
 });

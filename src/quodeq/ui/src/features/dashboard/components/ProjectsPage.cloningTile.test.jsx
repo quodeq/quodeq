@@ -50,6 +50,21 @@ describe('ProjectsPage ghost tile', () => {
     await waitFor(() => expect(screen.queryByText('billing')).not.toBeInTheDocument());
   });
 
+  it('the card of the project being cloned stays hidden until the clone lands', async () => {
+    const registered = { id: 'p-billing', name: 'billing', path: '/u/quodeq/repos/billing', latestDate: '2026-07-19T00:00:00Z' };
+    const { server, client } = setup(running, [...LOCAL, registered]);
+    expect(await screen.findByText('cloning · 45% · 12.0 MB')).toBeInTheDocument();
+    // One "billing": the tile. The registered card (its folder does not exist yet) waits.
+    expect(screen.getAllByText('billing')).toHaveLength(1);
+    expect(screen.getByText('app')).toBeInTheDocument();
+
+    server.slot = { ...done, projectId: 'p-billing' };
+    await client.invalidateQueries({ queryKey: projectsKeys.clone() });
+    await waitFor(() => expect(screen.queryByText(/cloning · /)).not.toBeInTheDocument());
+    // Still one "billing": now the card.
+    expect(screen.getAllByText('billing')).toHaveLength(1);
+  });
+
   it('the tile heads the list of existing projects', async () => {
     setup(running);
     const tile = (await screen.findByText('billing')).closest('article');
@@ -57,7 +72,7 @@ describe('ProjectsPage ghost tile', () => {
     expect(tile.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('a failed clone on an empty page shows the error row above the compact cards, retry re-posts to the default root', async () => {
+  it('a failed clone on an empty page shows the error row above the empty line, retry re-posts to the default root', async () => {
     const user = userEvent.setup();
     const { api } = setup(failed, []);
     expect(await screen.findByText(/download failed · /)).toBeInTheDocument();

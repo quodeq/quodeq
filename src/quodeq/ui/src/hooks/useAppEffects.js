@@ -2,13 +2,36 @@ import { useEffect, useRef } from 'react';
 import { getGradeFormula } from '../api/index.js';
 import { setGradeThresholds } from '../utils/gradeThresholds.js';
 import { hydrateVisibleStandardIds } from '../utils/visibleStandards.js';
-import { shouldBounceToEvaluate, shouldRedirectToRemoteRepositories } from '../appGating.js';
+import { shouldRedirectToRepositories } from '../appGating.js';
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
 import { ASSISTANT_ACTION_APPLIED_EVENT } from '../constants.js';
 import { NAV_TAB } from '../vocab/navTab.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 // App.jsx's boot-time and navigation-guard effects. Each hook carries the
 // rationale for its own effect.
+
+/**
+ * A restored shared selection is exempt from every "no projects" rule (the
+ * landing redirect, the wizard auto-open, the stale-selection drop): a
+ * teammate viewing a shared project has a working view that the local list
+ * knows nothing about. That exemption needs a repository behind it. When
+ * the server reports that none is connected (a wiped or replaced state
+ * folder, while the browser storage elsewhere kept the selection), the
+ * selection is dropped, and the local rules take over: Repositories, and
+ * the welcome on a first run. Only the server's own answer counts; a failed
+ * status fetch (connected=null) keeps the selection.
+ */
+export function useDeadSharedSelectionEffect({ state, sharedSignal }) {
+  const latest = useRef(null);
+  latest.current = { selectedSource: state.selectedSource, handleProjectChange: state.handleProjectChange };
+  useEffect(() => {
+    const { selectedSource, handleProjectChange } = latest.current;
+    if (sharedSignal.connected !== false) return;
+    if (selectedSource !== PROJECT_SOURCE.SHARED) return;
+    handleProjectChange?.('');
+  }, [sharedSignal.connected, state.selectedSource]);
+}
 
 /**
  * Bridges ASSISTANT_ACTION_APPLIED_EVENT window events into the
@@ -54,39 +77,6 @@ export function useGradeFormulaBootSyncEffect() {
   }, []);
 }
 
-/**
- * Project-data tabs (overview/violations/map/history) only make sense once
- * the selected project has at least one completed evaluation run. Until
- * then, hide them from the sidebar and bounce the user to Evaluate if a
- * cached activeTab lands them on a now-hidden tab. The guards below wait
- * for /api/projects to resolve and for selectedProjectInfo to populate so
- * the bouncer doesn't fire against the transient "no projects loaded yet"
- * state on first paint and strand the user on Evaluate.
- *
- * selectedProjectInfo is always looked up in the LOCAL project list (see
- * useProjectState — the list `state.projects` holds only ever comes from
- * the local listProjects API). A shared project's id can collide with a
- * local one by design (e.g. after a clone-on-add pull); if the local copy
- * happens to have zero runs while the shared source has plenty, this
- * bounce would incorrectly fire for a shared selection that has real data
- * to show. There is no Evaluate for shared projects at all, so it must
- * never fire outside 'local' — shouldBounceToEvaluate encodes that.
- */
-export function useEvaluateBounceEffect({ state, selectedProjectInfo, hasCurrentProjectRuns }) {
-  useEffect(() => {
-    if (shouldBounceToEvaluate({
-      projectsLoaded: state.projectsLoaded,
-      projectsCount: state.projects.length,
-      selectedProjectInfo,
-      hasCurrentProjectRuns,
-      activeTab: state.activeTab,
-      selectedSource: state.selectedSource,
-    })) {
-      state.navTab(NAV_TAB.EVALUATE);
-    }
-  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab, state.selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
-}
-
 // The no-project landing is the default Overview tab itself, not a page
 // pushed on top of it.
 function isOnNoProjectLanding(activeTab, activePage) {
@@ -95,30 +85,42 @@ function isOnNoProjectLanding(activeTab, activePage) {
 
 /**
  * The landing redirect, derived instead of decided once: it re-runs whenever
- * the local project list or the shared signal changes (load settling, a team
- * repo connected mid-session, a first sync landing), so shared content that
- * arrives after boot moves the empty "no projects" Overview to the projects
- * list without a reload. It only ever moves a user who is still on that
- * landing; a tab change alone does not re-run it, so a page the user chose,
- * Overview included, is never yanked away.
+ * the local project list changes (load settling, the last project deleted),
+ * so an empty "no projects" Overview moves to the Repositories tab, the
+ * only tab that does anything without a project. It only ever moves a user
+ * who is still on that landing; a tab change alone does not re-run it, so a
+ * page the user chose, Overview included, is never yanked away.
  */
-export function useInitialLandingEffect({ state, sharedSignal, activeTab, navTab }) {
+export function useInitialLandingEffect({ state, activeTab, navTab }) {
   const latest = useRef(null);
   latest.current = { selectedSource: state.selectedSource, activePage: state.activePage, activeTab, navTab };
   useEffect(() => {
     const { selectedSource, activePage, activeTab: tab, navTab: go } = latest.current;
     if (!isOnNoProjectLanding(tab, activePage)) return;
-    if (shouldRedirectToRemoteRepositories({
+    if (shouldRedirectToRepositories({
       projectsLoaded: state.projectsLoaded,
       projectsCount: state.projects.length,
       selectedSource,
-      sharedSettled: sharedSignal.settled,
-      sharedHasContent: sharedSignal.hasContent,
       activeTab: tab,
     })) {
       go(NAV_TAB.PROJECTS);
     }
-  }, [state.projectsLoaded, sharedSignal.settled, state.projects.length, sharedSignal.hasContent]);
+  }, [state.projectsLoaded, state.projects.length]);
+}
+
+/**
+ * Evaluate can disappear under the user: the selected project's clone is
+ * still running, or the selection went away (a delete, a disconnect). A
+ * cached or stale nav entry on Evaluate would then show a dead-end screen,
+ * so it moves to the Repositories tab, where the tile or the cards are.
+ * Only once the project list has loaded: on first paint the selection is
+ * still resolving and Evaluate reads as hidden for a moment.
+ */
+export function useEvaluateHiddenEffect({ state, activeTab, navTab, showEvaluate }) {
+  useEffect(() => {
+    if (!state.projectsLoaded || showEvaluate || activeTab !== NAV_TAB.EVALUATE) return;
+    navTab(NAV_TAB.PROJECTS);
+  }, [state.projectsLoaded, showEvaluate, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps -- navTab is stable
 }
 
 /**

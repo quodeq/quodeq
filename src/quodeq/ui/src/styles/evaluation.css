@@ -3079,6 +3079,17 @@ button.eval-provider-badge--clickable:focus-visible {
   outline: 1px solid var(--color-accent);
   outline-offset: -1px;
 }
+/* A cell the user must act on before a scan can start (no model chosen):
+   the label in the danger colour and a wavy underline under the words, the
+   way a spell checker marks one. The cell stays the same click target. */
+.eval-identity__cell--attention .eval-identity__label {
+  color: var(--color-danger);
+}
+.eval-identity__cell--attention .eval-identity__value--action {
+  text-decoration: underline wavy var(--color-danger);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 5px;
+}
 .eval-identity__clear {
   position: relative;
   z-index: 1;

@@ -136,7 +136,8 @@ describe('useProjectActions', () => {
       let outcome;
       await act(async () => { outcome = await result.current.handleImportProject(); });
 
-      expect(outcome).toEqual({ ok: true });
+      // The imported project's id comes back so the caller can land on it.
+      expect(outcome).toEqual({ ok: true, projectId: 'c' });
       expect(fakeApi.importProject).toHaveBeenCalledTimes(1);
       expect(projectsInvalidations()).toBe(1);
     });

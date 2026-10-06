@@ -72,6 +72,19 @@ function deriveSharedFreshness({ sync, listQuery, configured, startFailed }) {
   };
 }
 
+/**
+ * The cards the server is still warming and has not listed yet: `active`
+ * while its worker runs, `remaining` how many cards are still to come. The
+ * page shows one placeholder per remaining card so a team's results arrive
+ * one by one. Idle when the listing carries no warm-up.
+ */
+function deriveWarming(listQuery, configured) {
+  const warmup = configured ? listQuery.data?.warmup : null;
+  const done = warmup?.projectsDone ?? 0;
+  const total = warmup?.projectsTotal ?? 0;
+  return { active: warmup?.active === true, done, total, remaining: warmup?.active ? Math.max(0, total - done) : 0 };
+}
+
 function deriveSharedProjectsState({ sync, listQuery, configured, startFailed }) {
   // Gated on `configured`, not just read off listQuery.data: the list query
   // is disabled (not removed) when unconfigured, so a lingering cache entry
@@ -83,6 +96,7 @@ function deriveSharedProjectsState({ sync, listQuery, configured, startFailed })
   return {
     url: sync.url,
     projects,
+    warming: deriveWarming(listQuery, configured),
     lastSynced: listQuery.data?.lastSynced ?? sync.lastSynced,
     ...deriveSharedFreshness({ sync, listQuery, configured, startFailed }),
     error: deriveSharedError({ sync, listQuery, configured }),
@@ -141,12 +155,12 @@ export function useSharedProjects() {
   }, [actions.connect, sync.refetch]);
   const { startFailed, refresh } = useRefreshStart({ startRefresh, refetchStatus: sync.refetch, listQuery });
 
-  const { url, projects, lastSynced, stale, loading, error } = deriveSharedProjectsState({
+  const { url, projects, warming, lastSynced, stale, loading, error } = deriveSharedProjectsState({
     sync, listQuery, configured, startFailed,
   });
 
   return {
-    configured, url, projects, lastSynced, stale,
+    configured, url, projects, warming, lastSynced, stale,
     loading, error,
     // The raw status for the sync strip; `offline` is a failed poll over a
     // status that last said a repository is configured (the strip keeps
@@ -199,8 +213,13 @@ export function useSharedContentSignal() {
   const settled = statusSettled && (!configured || listSettled);
   const publishedCount = configured ? (listQuery.data?.projects?.length ?? 0) : 0;
   const hasContent = publishedCount > 0;
+  // What the server itself said about the repository: true or false once
+  // the status loaded, null while unknown or when the fetch failed. A failed
+  // fetch must never read as "nothing connected": a restored shared
+  // selection is dropped on that answer (useDeadSharedSelectionEffect).
+  const connected = statusQuery.isSuccess ? configured : null;
 
-  return { settled, hasContent, publishedCount };
+  return { settled, hasContent, publishedCount, connected };
 }
 
 /**

@@ -25,6 +25,8 @@ from tests.api._routes_shared_read_fixtures import (  # noqa: F401 -- pytest fix
     app,
     client,
     empty_shared_clone_fixture,
+    list_shared_settled,
+    wait_shared_warmup_idle,
 )
 
 
@@ -118,9 +120,7 @@ def test_no_mutating_routes_under_shared(app):
 # --- GET /api/shared/projects -------------------------------------------------
 
 def test_shared_projects_lists_published(client, shared_clone_fixture):
-    resp = client.get("/api/shared/projects")
-    assert resp.status_code == 200
-    body = resp.get_json()
+    body = list_shared_settled(client)
     ids = [p.get("id") or p.get("name") for p in body["projects"]]
     assert "proj-a" in ids
     proj = next(p for p in body["projects"] if (p.get("id") or p.get("name")) == "proj-a")
@@ -186,9 +186,7 @@ def test_shared_projects_refresh_stale_when_origin_unreachable(
     origin_path = Path(shared_clone_fixture.removeprefix("file://"))
     origin_path.rename(tmp_path / "origin-moved.git")
 
-    resp = client.get("/api/shared/projects?refresh=1")
-    assert resp.status_code == 200
-    body = resp.get_json()
+    body = list_shared_settled(client, "/api/shared/projects?refresh=1")
     assert body["stale"] is True
     ids = [p.get("id") or p.get("name") for p in body["projects"]]
     assert "proj-a" in ids
@@ -224,6 +222,10 @@ def test_shared_projects_listing_does_not_dirty_clone_worktree(client, shared_cl
 
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200
+    # The listing queues cold cards on the shared warm-up, whose worker holds
+    # a run's evaluation.db open (transient -wal/-shm files) while it scores.
+    # Let it settle so the status compares what the request itself wrote.
+    wait_shared_warmup_idle()
 
     status_after = _git_porcelain(repo)
     assert status_after == status_before
@@ -251,6 +253,9 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
 
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200
+    # The summaries themselves are computed by the shared warm-up's worker
+    # thread, which must scope the same override the route did.
+    wait_shared_warmup_idle()
 
     assert clone_cache_path.exists()
     assert not local_cache_path.exists()
@@ -259,11 +264,18 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
 def test_shared_projects_expose_origin_url_and_score_fields(client, shared_clone_fixture):
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200
+    first = resp.get_json()
+    # Regression lock: shared listings carry scores from the clone-scoped
+    # score cache; the merge UI sorts on this field. A cold card stays off
+    # the listing (the payload counts it) until the warm-up has scored it,
+    # then it lands with its score, ready to open.
+    assert [p.get("id") or p.get("name") for p in first["projects"]] == []
+    assert first["warmup"]["active"] is True
+    wait_shared_warmup_idle()
     proj = next(
-        p for p in resp.get_json()["projects"]
+        p for p in client.get("/api/shared/projects").get_json()["projects"]
         if (p.get("id") or p.get("name")) == "proj-a"
     )
     assert proj.get("originUrl") == "https://github.com/example/proj-a.git"
-    # Regression lock: shared listings compute scores from the clone-scoped
-    # score cache; the merge UI sorts on this field.
+    assert proj["summaryPending"] is False
     assert "latestScore" in proj

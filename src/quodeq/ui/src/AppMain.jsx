@@ -55,7 +55,7 @@ function AppShell({ sidebar, header, content, drawer, startupLoader, booting }) 
 }
 
 function AppSidebar({ shell }) {
-  const { state, activeTab, navTab, hasCurrentProjectRuns, sharedSignal, resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned, showStartupLoader } = shell;
+  const { state, activeTab, navTab, selectedProjectInfo, showEvaluate, sharedSignal, resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned, showStartupLoader } = shell;
   return (
     <Sidebar
       inert={showStartupLoader || undefined}
@@ -63,7 +63,8 @@ function AppSidebar({ shell }) {
         activeTab,
         navTab,
         selectedSource: state.selectedSource,
-        hasCurrentProjectRuns,
+        selectedProjectInfo,
+        showEvaluate,
         sharedProjectInfo: state.sharedProjectInfo,
         projects: state.projects,
         sharedHasContent: sharedSignal.hasContent,
@@ -82,7 +83,7 @@ function AppSidebar({ shell }) {
 
 function AppTopBar({ shell }) {
   const {
-    state, activeTab, navTab, resolvedDisplayName, sidebarProvider, sidebarModel, isEvaluating,
+    state, activeTab, navTab, resolvedDisplayName, sidebarProvider, sidebarModel, isEvaluating, showEvaluate,
     activePage, navStack, navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, setSidebarPinned,
   } = shell;
   // A running team-results job (connect, refresh, pull) sweeps the same
@@ -98,7 +99,7 @@ function AppTopBar({ shell }) {
         sidebarProvider,
         sidebarModel,
         selectedSource: state.selectedSource,
-        projectsCount: state.projects?.length,
+        showEvaluate,
         onEvaluateClick: () => navTab(NAV_TAB.EVALUATE, { preselectDims: deriveEvaluatePreselect(activePage) }),
         evaluating: !!isEvaluating,
         pending: state.navPending || state.isDataPending || syncActive,

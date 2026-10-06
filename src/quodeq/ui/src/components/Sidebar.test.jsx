@@ -24,6 +24,13 @@ describe('Sidebar evaluate nav item — source gating', () => {
     render(<Sidebar activeTab="overview" onNavTab={vi.fn()} />);
     expect(screen.getByTitle('evaluate')).toBeInTheDocument();
   });
+
+  it('hides the evaluate nav item when the parent says there is nothing to evaluate yet', () => {
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} selectedSource="local" showEvaluate={false} />);
+    expect(screen.queryByTitle('evaluate')).toBeNull();
+    // The Repositories tab stays, titled with the project name or its fallback.
+    expect(screen.getByTitle('project')).toBeInTheDocument();
+  });
 });
 
 // Compare ranks projects against each other, so the tab only exists once at

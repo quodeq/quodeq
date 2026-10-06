@@ -170,5 +170,25 @@ export function markDetailUnavailable(items, failedRefs) {
   ));
 }
 
+/**
+ * Flag deferred items whose group LOADED without a row for them. Their
+ * identity (file, line, principle, title) no longer exists on the server:
+ * the client is rendering a snapshot older than the server's state, for
+ * example after a run re-reported the finding under a new title or at a
+ * shifted line. They leave the deferred state and carry `detailOutdated`,
+ * which the cards turn into a note and the hydration hook into a refresh.
+ * @param {Array} items
+ * @param {Array<Object>} loadedRefs the refs whose detail fetch succeeded
+ * @returns {Array}
+ */
+export function markDetailOutdated(items, loadedRefs) {
+  if (!loadedRefs.length) return items;
+  return items.map((item) => (
+    item?.detailDeferred && loadedRefs.includes(item.detailRef)
+      ? { ...item, detailDeferred: false, detailOutdated: true }
+      : item
+  ));
+}
+
 /** `mergeFindingDetail` under its pre-kind name. */
 export const mergeComplianceDetail = mergeFindingDetail;

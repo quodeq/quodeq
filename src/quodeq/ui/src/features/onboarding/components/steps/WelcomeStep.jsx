@@ -37,11 +37,11 @@ function HowItWorks() {
 
 /**
  * The welcome panel: how quodeq works on the left (scan, review, score), the
- * two ways in on the right (WelcomePaths). `adaptation` says what already
+ * three ways in on the right (WelcomePaths). `adaptation` says what already
  * exists: a connected evaluations repository and its host, local projects,
  * and whether Settings opened it (then there is no "skip for now").
  */
-export default function WelcomeStep({ onStart, onConnect, onImport, onSkip, onGoToRepositories, adaptation }) {
+export default function WelcomeStep({ onStart, onConnect, onDisconnect, onImport, onSkip, adaptation }) {
   const pathsTitleId = useId();
   const fromSettings = Boolean(adaptation?.fromSettings);
   return (
@@ -52,8 +52,8 @@ export default function WelcomeStep({ onStart, onConnect, onImport, onSkip, onGo
         <WelcomePaths
           onStart={onStart}
           onConnect={onConnect}
+          onDisconnect={onDisconnect}
           onImport={onImport}
-          onGoToRepositories={onGoToRepositories}
           adaptation={adaptation}
         />
         {!fromSettings && (

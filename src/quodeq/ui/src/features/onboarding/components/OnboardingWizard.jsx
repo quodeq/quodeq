@@ -23,9 +23,9 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepos
   const currentIndex = SETUP_ORDER.indexOf(wizard.state.step) + 1;
 
   const {
-    handleSkipWelcome, handleImport, handleClose, handleLaunch, nextStep, prevStep,
+    handleSkipWelcome, handleImport, handleClose, handleAdded, handleLaunch, nextStep, prevStep,
   } = useOnboardingWizardHandlers({
-    wizard, onClose, onLaunch, onGoToRepositories, fromSettings: entry.source === WIZARD_SOURCE.SETTINGS,
+    wizard, onClose, onLaunch, onGoToRepositories, fromSettings: entry.source === WIZARD_SOURCE.SETTINGS, instanceId: entry.instanceId ?? null,
   });
   // The welcome's two columns need a wider frame than the single-column steps.
   const frameClass = wizard.state.step === STEP_WELCOME
@@ -52,6 +52,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepos
           prevStep={prevStep}
           handleSkipWelcome={handleSkipWelcome}
           handleImport={handleImport}
+          handleAdded={handleAdded}
           handleLaunch={handleLaunch}
           handleClose={handleClose}
           onGoToRepositories={onGoToRepositories}

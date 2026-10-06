@@ -4,7 +4,10 @@ After an upgrade invalidates the score caches, recomputing them takes minutes
 per project. This engine runs that work on one daemon thread, newest project
 activity first, through the single-flight ``cached_*`` helpers, so on-demand
 requests dedupe against it and effectively jump the queue. The projects route
-stays a pure read and re-enqueues anything still pending (self-healing).
+stays a pure read and re-enqueues anything still pending (self-healing), and
+the Overview routes answer pending while the engine still owes their project
+(``warmup_defer.defer_to_warmup``) instead of building it inline beside the
+worker.
 """
 from __future__ import annotations
 
@@ -44,24 +47,40 @@ def _project_display_name(reports_dir: str, project_id: str) -> str:
     return info.get("displayName") or info.get("name") or project_id
 
 
-def warm_project(reports_dir: str, project_id: str) -> None:
+def warm_project(reports_dir: str, project_id: str, *, overview: bool = False) -> None:
     """Compute-and-cache one project's card summary and dashboard payload.
 
     What the engine does per queued project; callable inline for tests and
     budgets. The card goes through the single-flight read-through helper and
     the payload through the stamp memo, so this is a version-check no-op on
     a warm process and dedupes with on-demand requests.
+
+    *overview* also pre-builds the latest Overview. Only the shared warm-up
+    asks for it (a shared card appears once it is fully readable): the
+    Overview lives in the per-process memo alone, so for local projects it
+    would be rebuilt on every boot for projects nobody opens.
     """
     from quodeq.services.wiring import find_children  # noqa: PLC0415
     from quodeq.services._fs_metadata import warm_project_summary  # noqa: PLC0415
     from quodeq.services.scoring import get_project_scores  # noqa: PLC0415
+    from quodeq.services import fs_reports  # noqa: PLC0415
+    from quodeq.services.run_constants import LATEST_RUN  # noqa: PLC0415
 
     reports_root = Path(reports_dir)
     warm_project_summary(reports_root, project_id)
     # A parent's payload is never memoized (its stamp cannot see children),
     # so warming it would recompute on every boot for nothing. Skip.
-    if not find_children(reports_root, project_id):
-        get_project_scores(reports_root, project_id)
+    if find_children(reports_root, project_id):
+        return
+    get_project_scores(reports_root, project_id)
+    if not overview:
+        return
+    # A run that vanished underneath is not a failure of the project: its
+    # card and scores are cached by now.
+    try:
+        fs_reports.get_dashboard_overview(reports_dir, project_id, LATEST_RUN)
+    except FileNotFoundError as exc:
+        _logger.info("overview warm-up skipped for %s: %s", project_id, exc)
 
 
 class WarmupEngine:
@@ -147,6 +166,21 @@ class WarmupEngine:
             if getattr(entry, "summary_pending", False):
                 self.enqueue(entry.id)
 
+    def owes(self, project_id: str) -> bool:
+        """True while *project_id* is queued or being warmed, so its caches may still be cold."""
+        with self._cond:
+            return project_id == self._current or project_id in self._queued
+
+    def current(self) -> str | None:
+        """The project the worker is warming right now, or None while idle."""
+        with self._cond:
+            return self._current
+
+    def failed(self, project_id: str) -> bool:
+        """True when the last warm of *project_id* raised and no later warm succeeded."""
+        with self._cond:
+            return project_id in self._failed_at
+
     def generation(self) -> int:
         """How many projects the worker has finished; moves on every completion."""
         with self._cond:
@@ -165,8 +199,12 @@ class WarmupEngine:
                 "currentProjectName": self._current_name,
             }
 
-    def reset_for_tests(self) -> None:
-        """Stop the worker and clear all queued state (test seam)."""
+    def stop(self) -> None:
+        """Stop the worker and clear all queued state.
+
+        The shared listing retires its engine this way when another clone is
+        connected; tests use it through ``reset_for_tests``.
+        """
         # Signal worker to shut down and wait for it to exit
         self._shutdown.set()
         thread_to_join = None
@@ -185,6 +223,10 @@ class WarmupEngine:
             self._current = None
             self._current_name = None
             self._done = 0
+
+    def reset_for_tests(self) -> None:
+        """Stop the worker and clear all queued state (test seam)."""
+        self.stop()
 
     def _process_queued_item(self, project_id: str, reports_dir: str) -> None:
         """Resolve one queued project's display name and warm its caches.
@@ -206,6 +248,8 @@ class WarmupEngine:
             with self._cond:
                 self._current_name = current_name
             self._warm_fn(reports_dir, project_id)
+            with self._cond:
+                self._failed_at.pop(project_id, None)
         except Exception:
             with self._cond:
                 self._failed_at[project_id] = time.monotonic()

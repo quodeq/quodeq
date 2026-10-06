@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  isEvaluatableSource, shouldShowEvaluateButton, shouldBounceToEvaluate,
+  isEvaluatableSource, shouldShowEvaluate,
   resolveProjectDisplayName, shouldShowProjectTabs, selectSidebarCounts,
-  shouldRedirectToRemoteRepositories, shouldShowCompareTab,
+  shouldRedirectToRepositories, shouldShowCompareTab,
 } from './appGating.js';
 
 // ---------------------------------------------------------------------------
@@ -23,38 +23,24 @@ test('isEvaluatableSource: an unset source defaults to evaluatable (Sidebar rece
 });
 
 // ---------------------------------------------------------------------------
-// shouldShowEvaluateButton — composed from isEvaluatableSource; identical
-// truth table to before the recompose (TopBar's projectsCount gate PLUS the
-// source gate; Sidebar deliberately has no projectsCount gate of its own —
-// see Sidebar.test.jsx and the isEvaluatableSource case above).
+// shouldShowEvaluate: a selected local project that has landed. Both the
+// TopBar button and the sidebar tab read it.
 // ---------------------------------------------------------------------------
 
-test('shouldShowEvaluateButton: true only with projects AND a local-ish source', () => {
-  assert.equal(shouldShowEvaluateButton(3, 'local'), true);
-  assert.equal(shouldShowEvaluateButton(0, 'local'), false);
-  assert.equal(shouldShowEvaluateButton(3, 'shared'), false);
-  assert.equal(shouldShowEvaluateButton(0, 'shared'), false);
+test('shouldShowEvaluate: a selected local project, and only then', () => {
+  const info = { id: 'p1', path: '/u/repos/app', originUrl: 'https://github.com/acme/app.git' };
+  assert.equal(shouldShowEvaluate({ selectedSource: 'local', selectedProjectInfo: info }), true);
+  assert.equal(shouldShowEvaluate({ selectedSource: 'local', selectedProjectInfo: null }), false);
+  assert.equal(shouldShowEvaluate({ selectedSource: 'shared', selectedProjectInfo: info }), false);
+  assert.equal(shouldShowEvaluate({ selectedSource: undefined, selectedProjectInfo: info }), true);
 });
 
-test('shouldShowEvaluateButton: a nullish projectsCount is treated as zero', () => {
-  assert.equal(shouldShowEvaluateButton(null, 'local'), false);
-  assert.equal(shouldShowEvaluateButton(undefined, 'local'), false);
-});
-
-// ---------------------------------------------------------------------------
-// shouldBounceToEvaluate — untouched by this change; a couple of smoke
-// cases so a future edit to appGating.js can't silently break it here too.
-// ---------------------------------------------------------------------------
-
-test('shouldBounceToEvaluate: fires only for a local project-data tab with no runs yet', () => {
-  const base = {
-    projectsLoaded: true, projectsCount: 1, selectedProjectInfo: { id: 'p1' },
-    hasCurrentProjectRuns: false, activeTab: 'overview', selectedSource: 'local',
-  };
-  assert.equal(shouldBounceToEvaluate(base), true);
-  assert.equal(shouldBounceToEvaluate({ ...base, selectedSource: 'shared' }), false);
-  assert.equal(shouldBounceToEvaluate({ ...base, hasCurrentProjectRuns: true }), false);
-  assert.equal(shouldBounceToEvaluate({ ...base, projectsLoaded: false }), false);
+test('shouldShowEvaluate: hidden while the selected project is the one still cloning', () => {
+  const info = { id: 'p1', path: '/u/repos/app', originUrl: 'https://github.com/acme/app.git' };
+  const cloning = { repo: 'https://github.com/acme/app', dest: '/tmp/repos/app' };
+  assert.equal(shouldShowEvaluate({ selectedSource: 'local', selectedProjectInfo: info, cloneSlot: cloning }), false);
+  const other = { repo: 'https://github.com/acme/other.git', dest: '/u/repos/other' };
+  assert.equal(shouldShowEvaluate({ selectedSource: 'local', selectedProjectInfo: info, cloneSlot: other }), true);
 });
 
 // ---------------------------------------------------------------------------
@@ -88,9 +74,10 @@ test('resolveProjectDisplayName: guards against a raw UUID flashing as the name'
 // shouldShowProjectTabs
 // ---------------------------------------------------------------------------
 
-test('shouldShowProjectTabs: local gates on hasCurrentProjectRuns', () => {
-  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', hasCurrentProjectRuns: true }), true);
-  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', hasCurrentProjectRuns: false }), false);
+test('shouldShowProjectTabs: local gates on a selected project existing, runs or not', () => {
+  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', selectedProjectInfo: { id: 'p1', runsCount: 3 } }), true);
+  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', selectedProjectInfo: { id: 'p1', runsCount: 0 } }), true);
+  assert.equal(shouldShowProjectTabs({ selectedSource: 'local', selectedProjectInfo: null }), false);
 });
 
 test('shouldShowProjectTabs: shared gates on sharedProjectInfo resolving', () => {
@@ -171,17 +158,14 @@ test('shouldShowCompareTab: a missing/undefined projects list is treated as empt
 });
 
 // ---------------------------------------------------------------------------
-// shouldRedirectToRemoteRepositories
+// shouldRedirectToRepositories
 // ---------------------------------------------------------------------------
 
-test('shouldRedirectToRemoteRepositories: redirects only from the default overview landing with zero local projects', () => {
-  const base = {
-    projectsLoaded: true, projectsCount: 0, selectedSource: 'local',
-    sharedSettled: true, sharedHasContent: true, activeTab: 'overview',
-  };
-  assert.equal(shouldRedirectToRemoteRepositories(base), true);
-  assert.equal(shouldRedirectToRemoteRepositories({ ...base, activeTab: 'settings' }), false);
-  assert.equal(shouldRedirectToRemoteRepositories({ ...base, projectsCount: 2 }), false);
-  assert.equal(shouldRedirectToRemoteRepositories({ ...base, selectedSource: 'shared' }), false);
-  assert.equal(shouldRedirectToRemoteRepositories({ ...base, sharedHasContent: false }), false);
+test('shouldRedirectToRepositories: redirects only from the default overview landing with zero local projects', () => {
+  const base = { projectsLoaded: true, projectsCount: 0, selectedSource: 'local', activeTab: 'overview' };
+  assert.equal(shouldRedirectToRepositories(base), true);
+  assert.equal(shouldRedirectToRepositories({ ...base, activeTab: 'settings' }), false);
+  assert.equal(shouldRedirectToRepositories({ ...base, projectsCount: 2 }), false);
+  assert.equal(shouldRedirectToRepositories({ ...base, selectedSource: 'shared' }), false);
+  assert.equal(shouldRedirectToRepositories({ ...base, projectsLoaded: false }), false);
 });

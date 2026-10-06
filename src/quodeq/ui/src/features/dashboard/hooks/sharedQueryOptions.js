@@ -35,6 +35,21 @@ export function sharedListQueryOptions({ sharedListProjects, configured, status,
     queryKey: sharedKeys.list(),
     queryFn: () => sharedListProjects({ refresh: false }),
     enabled: enabled && configured && !connectActive(status),
+    refetchInterval: summaryRefetchInterval,
     ...observerOptions,
   };
+}
+
+/** How often the list re-asks while a card's summary is still being computed. */
+export const SUMMARY_POLL_MS = 3000;
+
+// The server keeps a cold card off the listing until its worker has warmed
+// it, and counts the rest in `warmup`; the list re-asks every few seconds
+// while that warm-up is active (or any listed card still says pending, the
+// local list's contract) so the cards land one by one; otherwise it does
+// not poll.
+function summaryRefetchInterval(query) {
+  const data = query.state.data;
+  const warming = data?.warmup?.active === true || !!data?.projects?.some((p) => p.summaryPending);
+  return warming ? SUMMARY_POLL_MS : false;
 }

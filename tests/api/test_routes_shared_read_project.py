@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 from quodeq.services.scoring.compliance_detail import DETAIL_FIELDS
-from tests.api._routes_shared_read_fixtures import app, client  # noqa: F401 -- pytest fixtures
+from tests.api._routes_shared_read_fixtures import (  # noqa: F401 -- pytest fixtures
+    app,
+    client,
+    get_shared_settled,
+    wait_shared_warmup_idle,
+)
 
 
 # --- GET /api/shared/projects/<project>/info ----------------------------------
@@ -96,7 +101,7 @@ def test_shared_runs(client, shared_clone_fixture):
 # --- GET /api/shared/projects/<project>/dashboard -----------------------------
 
 def test_shared_dashboard(client, shared_clone_fixture):
-    resp = client.get("/api/shared/projects/proj-a/dashboard")
+    resp = get_shared_settled(client, "/api/shared/projects/proj-a/dashboard")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body.get("project") == "proj-a"
@@ -105,7 +110,7 @@ def test_shared_dashboard(client, shared_clone_fixture):
 
 
 def test_shared_dashboard_with_run_param(client, shared_clone_fixture):
-    resp = client.get("/api/shared/projects/proj-a/dashboard?run=run-1")
+    resp = get_shared_settled(client, "/api/shared/projects/proj-a/dashboard?run=run-1")
     assert resp.status_code == 200
 
 
@@ -117,7 +122,7 @@ def test_shared_dashboard_invalid_segment(client, shared_clone_fixture):
 # --- GET /api/shared/projects/<project>/accumulated ---------------------------
 
 def test_shared_accumulated(client, shared_clone_fixture):
-    resp = client.get("/api/shared/projects/proj-a/accumulated")
+    resp = get_shared_settled(client, "/api/shared/projects/proj-a/accumulated")
     assert resp.status_code == 200
     body = resp.get_json()
     assert "dimensions" in body
@@ -131,6 +136,12 @@ def test_shared_accumulated_not_found(client, shared_clone_fixture):
 # --- GET /api/shared/projects/<project>/scores --------------------------------
 
 def test_shared_scores(client, shared_clone_fixture):
+    # A cold shared project answers pending while the clone's worker warms
+    # it (never built inline on the request), then serves the payload.
+    resp = client.get("/api/shared/projects/proj-a/scores")
+    assert resp.status_code == 202
+    assert resp.get_json()["pending"] is True
+    wait_shared_warmup_idle()
     resp = client.get("/api/shared/projects/proj-a/scores")
     assert resp.status_code == 200
     body = resp.get_json()
@@ -152,8 +163,10 @@ def test_shared_scores_uses_isolated_score_cache(client, shared_clone_fixture):
     cache_path = shared_score_cache_path(shared_clone_fixture)
     assert not cache_path.exists()
     resp = client.get("/api/shared/projects/proj-a/scores")
-    assert resp.status_code == 200
+    assert resp.status_code == 202
+    wait_shared_warmup_idle()
     assert cache_path.exists()
+    assert client.get("/api/shared/projects/proj-a/scores").status_code == 200
 
 
 # --- GET /api/shared/projects/<project>/compare-summary -----------------------

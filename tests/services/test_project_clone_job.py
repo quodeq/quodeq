@@ -27,6 +27,53 @@ def test_start_clone_reports_phases_percent_and_the_created_project():
     assert snap["state"] == CloneState.DONE and snap["phase"] == SyncPhase.DONE
     assert snap["project_id"] == "p1" and snap["scan_data"] == {"files": 3} and snap["kind"] == SyncKind.CLONE
     assert snap["finished_at"] is not None
+    assert [phase for phase, _ in snap["phase_times"]] == ["connecting", "downloading", "reading", "done"]
+
+
+def test_done_logs_the_phase_durations_without_a_done_entry():
+    class Spy:
+        lines: list[str] = []
+
+        def info(self, message: str) -> None:
+            self.lines.append(message)
+
+        def warning(self, message: str) -> None:
+            self.lines.append(message)
+
+        def error(self, message: str) -> None:
+            self.lines.append(message)
+
+        def debug(self, message: str) -> None:
+            self.lines.append(message)
+
+        def success(self, message: str) -> None:
+            self.lines.append(message)
+    log = Spy()
+    status = CloneStatus()
+
+    def create(progress, on_phase):
+        progress(ProgressUpdate(percent=40, bytes=10))
+        on_phase(SyncPhase.READING)
+        return CloneOutcome(True, project_id="p1", project_name="repo")
+    start_clone("https://github.com/o/repo.git", "/tmp/x/repo", hooks=CloneHooks(create, spawn=inline), status=status, log=log)
+    line = next(line for line in log.lines if line.startswith("add project repo: "))
+    assert "connecting " in line and "downloading " in line and line.rstrip().split(" · ")[-1].startswith("reading ")
+    assert "done" not in line
+
+
+def test_progress_carries_git_phases_and_keeps_the_download_size():
+    status = CloneStatus()
+    seen = []
+
+    def create(progress, on_phase):
+        progress(ProgressUpdate(percent=100, bytes=9_000))
+        progress(ProgressUpdate(percent=40, bytes=None, phase=SyncPhase.RESOLVING))
+        seen.append((get_clone_status(status)["phase"], get_clone_status(status)["percent"], get_clone_status(status)["bytes"]))
+        progress(ProgressUpdate(percent=7, bytes=None, phase=SyncPhase.CHECKOUT))
+        seen.append(get_clone_status(status)["phase"])
+        return CloneOutcome(True, project_id="p1", project_name="repo")
+    start_clone("u", "d", hooks=CloneHooks(create, spawn=inline), status=status)
+    assert seen == [(SyncPhase.RESOLVING, 40, 9_000), SyncPhase.CHECKOUT]
 
 
 def test_failed_outcome_lands_as_error_with_code_and_detail():
