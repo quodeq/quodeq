@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.2] - 2026-10-06
+
+1.12.1 never reached PyPI: its publish stopped at the security audit. 1.12.2 is the same release with the fix below, and carries everything listed under 1.12.1.
+
+### Fixes
+- **Build dependencies**: patched `seroval` (critical advisory, pulled in by the React Query developer tools) and `source-map-js` (high, pulled in by the CSS and test tooling). Neither ships in the app's interface; the release audit now reports no vulnerabilities.
+
 ## [1.12.1] - 2026-10-06
 
 ### Features
