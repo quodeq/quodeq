@@ -2455,54 +2455,10 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 
 /* Head: section label left, "% analyzed" right. */
-.scan-progress__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-}
-.scan-progress__head-pct {
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
+
 
 /* Legend under the coverage bar. */
-.scan-progress__legend {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  margin-top: 11px;
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.scan-progress__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-.scan-progress__legend-swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-.scan-progress__legend-swatch--cached {
-  background: var(--color-accent);
-  opacity: 0.35;
-}
-.scan-progress__legend-swatch--run {
-  background: var(--color-accent);
-}
-.scan-progress__legend-swatch--track {
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
-}
+
 
 /* Footer: run summary left, detail/console toggles right. */
 .scan-progress__foot {
@@ -2537,58 +2493,11 @@ button.eval-provider-badge--clickable:focus-visible {
 /* Detail toggle: a real button next to the console toggle. Same visual
    language as .console-button (ghost border, accent on hover, accent fill
    when open) so the two read as a paired cluster. */
-.scan-progress__detail-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-  user-select: none;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.scan-progress__detail-toggle:hover {
-  color: var(--color-accent);
-  background: var(--color-surface-alt);
-  border-color: var(--color-border);
-}
-.scan-progress__detail-toggle:focus-visible {
-  outline: 1px solid var(--color-accent);
-  outline-offset: 1px;
-}
-.scan-progress__detail-toggle--open {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-}
-.scan-progress__detail-toggle--open:hover {
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-}
+
 /* Stack the active label on top of an invisible ghost label sized to the
    longest possible text ("details") so the button — and therefore the
    1fr progress bar to its left — does not reflow when toggling. */
-.scan-progress__detail-label {
-  display: inline-grid;
-  line-height: 1;
-}
-.scan-progress__detail-label-ghost,
-.scan-progress__detail-label-active {
-  grid-area: 1 / 1;
-}
-.scan-progress__detail-label-ghost {
-  visibility: hidden;
-  pointer-events: none;
-}
-.scan-progress__detail-label-active {
-  text-align: center;
-}
+
 
 .scan-progress__error {
   padding: 8px 10px;
@@ -2626,7 +2535,6 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .scan-progress__bar-fill--done    { background: var(--color-success, #56d364); }
 .scan-progress__bar-fill--partial { background: var(--color-warning); }
-.scan-progress__bar-fill--cached  { background: var(--color-accent); opacity: 0.35; }
 /* The in-run segment: accent gradient + a moving shimmer while live. */
 .scan-progress__bar-fill--live {
   position: relative;
@@ -2655,11 +2563,6 @@ button.eval-provider-badge--clickable:focus-visible {
   height: 4px;
   border-radius: 2px;
   margin-top: 0;
-}
-
-.scan-progress__dim-active {
-  color: var(--color-accent);
-  text-transform: lowercase;
 }
 
 .scan-progress__caret {
@@ -2774,8 +2677,6 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .scan-progress__v        { color: var(--color-sev-critical-text, #f85149); }
 .scan-progress__c        { color: var(--color-success, #56d364); }
-.scan-progress__budget   { color: var(--color-warning); }
-.scan-progress__budget--overrun { color: var(--color-sev-critical-text, #f85149); }
 .scan-progress__partial  { color: var(--color-warning); text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
 .scan-progress__dim-reason { color: var(--color-warning); font-style: italic; }
 
@@ -3820,3 +3721,26 @@ button.eval-provider-badge--clickable:focus-visible {
   .vlive-dimension-count,
   .vlive-dimension-scanning::before { animation: none; }
 }
+
+/* ── Run progress: one bar for this run, its actions on the same row ── */
+.scan-progress__row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.scan-progress__row > .scan-progress__bar { flex: 1; margin: 0; }
+.scan-progress__actions { display: flex; align-items: center; gap: 8px; }
+.scan-progress__actions .console-button.eval-pill-btn { padding: 0 12px; }
+.scan-progress__actions .console-button__icon { width: 13px; height: 13px; }
+/* Details: the run and the repository as label/value pairs. */
+.scan-progress__pairs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 2px 0 14px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  color: var(--color-text);
+}
+.scan-progress__pair { display: inline-flex; align-items: center; gap: 8px; }
+.scan-progress__pair-label { color: var(--color-text-subtle); }
