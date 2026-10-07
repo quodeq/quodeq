@@ -9,8 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.run.state import RunState
-from quodeq.data.fs.run_status_store import read_status
-from quodeq.services.wiring import list_runs
+from quodeq.services.wiring import list_runs, read_status
 
 # How many recent runs to look through: the newest finished one is almost
 # always among the first few.
