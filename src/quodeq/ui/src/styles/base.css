@@ -2091,6 +2091,19 @@ textarea:focus {
   overflow: visible;
 }
 
+/* Every loader except the boot screen sits on a page, so it stays quiet: a
+   smaller logo at low opacity, slowly breathing, with the needle still
+   swaying. The boot screen keeps the full-strength logo beside its tips. */
+.loading-screen:not(.loading-screen--tips) .loading-logo {
+  width: 88px;
+  animation: loading-logo-breathe 2s ease-in-out infinite;
+}
+
+@keyframes loading-logo-breathe {
+  0%, 100% { opacity: 0.14; }
+  50%      { opacity: 0.34; }
+}
+
 .loader-logo__chevron { fill: var(--logo-chevron); }
 .loader-logo__q { fill: var(--logo-q); }
 .loader-logo__needle-light { fill: var(--logo-needle); }
@@ -2109,6 +2122,7 @@ textarea:focus {
 
 @media (prefers-reduced-motion: reduce) {
   .loader-logo__needle { animation: none; }
+  .loading-screen:not(.loading-screen--tips) .loading-logo { animation: none; opacity: 0.24; }
 }
 
 @keyframes loading-fadein {
