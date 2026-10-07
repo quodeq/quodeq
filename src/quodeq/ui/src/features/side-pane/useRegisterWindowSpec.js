@@ -28,18 +28,19 @@ export function useRegisterWindowSpec(type, spec) {
   const store = useRef(null);
   if (store.current === null) store.current = createSpecStore(spec);
   useEffect(() => { store.current.set(spec); }, [spec]);
-  // One live spec per page spec. The effect below also re-runs when the dock
-  // changes (hasWindow), and replaceWindow short-circuits only on the same
-  // object: a fresh wrapper per run would re-set the windows, change
-  // hasWindow, and loop.
-  const wrappers = useRef(new WeakMap());
+  // One live spec per visible identity (id + title). The effect below also
+  // re-runs when the dock changes (hasWindow), and replaceWindow
+  // short-circuits only on the same object: a fresh wrapper per run, or per
+  // page spec object (a consumer's spec is often fresh every render), would
+  // re-set the windows, change hasWindow, and loop. Data updates reach the
+  // wrapper through the store, so it only needs rebuilding when the identity
+  // it shows changes.
+  const wrapper = useRef(null);
   const liveFor = useCallback((pageSpec) => {
-    let live = wrappers.current.get(pageSpec);
-    if (!live) {
-      live = liveSpec(store.current, pageSpec);
-      wrappers.current.set(pageSpec, live);
-    }
-    return live;
+    const cached = wrapper.current;
+    if (cached && cached.id === pageSpec.id && cached.title === pageSpec.title) return cached;
+    wrapper.current = liveSpec(store.current, pageSpec);
+    return wrapper.current;
   }, []);
   const specId = spec?.id ?? null;
   const specTitle = spec?.title ?? null;
