@@ -106,6 +106,30 @@ describe('LoadingScreen tips', () => {
     }
   });
 
+  it('shows one progress segment per tip and advances the current one each swap', async () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<LoadingScreen tips />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      const segs = () => [...container.querySelectorAll('.loading-tip-progress__seg')];
+      const current = () => segs().findIndex((s) => s.classList.contains('loading-tip-progress__seg--current'));
+      expect(segs()).toHaveLength(19);
+      expect(current()).toBe(0);
+      await act(async () => { await vi.advanceTimersByTimeAsync(8700); });
+      expect(current()).toBe(1);
+      expect(segs()[0].classList.contains('loading-tip-progress__seg--done')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the logo alone, with no tip layout, outside the boot screen', () => {
+    const { container } = render(<LoadingScreen variant="inline" />);
+    expect(container.querySelector('.loader-logo')).toBeTruthy();
+    expect(container.querySelector('.loading-tips-layout')).toBeNull();
+    expect(container.querySelector('.loading-tip-progress')).toBeNull();
+  });
+
   it('marks the boot variant so it covers the shell body and swallows clicks', () => {
     const { container } = render(<LoadingScreen variant="shell" />);
     const el = container.querySelector('.loading-screen');
