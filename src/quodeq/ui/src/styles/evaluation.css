@@ -3447,7 +3447,42 @@ button.eval-provider-badge--clickable:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 .eval-run-bar__summary-sub { color: var(--color-text-subtle, var(--color-text-muted)); }
-.eval-run-bar__scan { flex-shrink: 0; }
+/* Scan: the screen's one filled pill, with what it will analyze inside. */
+.eval-scan-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 32px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+.eval-scan-pill:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+.eval-scan-pill:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.eval-scan-pill:disabled { opacity: 0.35; cursor: not-allowed; }
+.eval-scan-pill__glyph { font-size: 10px; }
+.eval-scan-pill__count {
+  padding-left: 9px;
+  border-left: 1px solid color-mix(in srgb, var(--color-on-accent) 35%, transparent);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  opacity: 0.75;
+}
 
 /* ── Live violations card ── */
 .vlive-feed {
