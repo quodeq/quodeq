@@ -38,12 +38,6 @@ const baseJob = {
 };
 
 describe('JobIdentityStrip', () => {
-  it('renders the job ID with a copy button', () => {
-    renderWithClient(<EvaluationStatus job={{ ...baseJob, jobId: 'job-123' }} />);
-    expect(screen.getByText('job-123')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /copy job id/i })).toBeInTheDocument();
-  });
-
   it('renders job-runtime-chip when both aiProvider and aiModel are present', () => {
     renderWithClient(
       <EvaluationStatus

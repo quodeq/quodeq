@@ -34,4 +34,17 @@ describe('the run header', () => {
     expect(screen.queryByRole('button', { name: /stop/i })).toBeNull();
     expect(screen.getByRole('button', { name: /view results/i })).toBeInTheDocument();
   });
+
+  it('the identity strip has no job id and the repository cell opens Repositories', () => {
+    const onGoToProjects = vi.fn();
+    renderWithClient(<EvaluationStatus job={{ ...baseJob, jobId: 'job-123' }} jobProjectInfo={{ name: 'quodeq' }} onGoToProjects={onGoToProjects} />);
+    expect(document.querySelector('.eval-identity').textContent).not.toMatch('job-123');
+    fireEvent.click(screen.getByRole('button', { name: 'quodeq' }));
+    expect(onGoToProjects).toHaveBeenCalledTimes(1);
+  });
+
+  it('an unknown repository stays a plain dash', () => {
+    renderWithClient(<EvaluationStatus job={baseJob} onGoToProjects={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: '—' })).toBeNull();
+  });
 });

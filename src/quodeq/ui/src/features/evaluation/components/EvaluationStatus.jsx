@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import ScanProgress from './ScanProgress.jsx';
-import CopyButton from '../../../components/CopyButton.jsx';
-import { copyToClipboard } from '../../../utils/clipboard.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import JobStatStrip from './JobStatStrip.jsx';
 import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
@@ -78,7 +76,7 @@ function JobHeader({ job, onDismiss, onCancel }) {
   );
 }
 
-function JobIdentityStrip({ job, projectLabel }) {
+function JobIdentityStrip({ job, projectLabel, onGoToProjects }) {
   const isTerminal = JOB_TERMINAL.has(job.status);
   // Shares the strip/progress query cache entry — no extra polling.
   const { data: progress } = useEvaluationProgress(job.jobId, isTerminal);
@@ -86,10 +84,15 @@ function JobIdentityStrip({ job, projectLabel }) {
   return (
     <IdentityStrip>
       {/* "Unknown beats wrong": a dash, never the global selection. */}
-      <IdentityCell label={t('evaluate.idRepository')}>{projectLabel ?? '—'}</IdentityCell>
-      <IdentityCell label={t('evaluate.idJobId')} grow title={job.jobId}>
-        <code className="eval-identity__code">{job.jobId}</code>
-        <CopyButton aria-label={t('evaluate.copyJobIdAria')} onClick={() => copyToClipboard(job.jobId)} />
+      {/* The job id lives in the progress details; the repository opens
+          Repositories, like the setup card's repository cell. */}
+      <IdentityCell
+        label={t('evaluate.idRepository')}
+        grow
+        title={projectLabel ? t('evaluate.openProjectsTitle') : undefined}
+        onClick={projectLabel ? onGoToProjects : undefined}
+      >
+        {projectLabel ?? '—'}
       </IdentityCell>
       {job.aiProvider && job.aiModel && (
         <IdentityCell label={t('evaluate.idModel')}>
@@ -105,7 +108,7 @@ function JobIdentityStrip({ job, projectLabel }) {
   );
 }
 
-export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel }) {
+export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel, onGoToProjects }) {
   const { newOnly } = useLiveFeedSettings();
   // Filter ONCE, above both consumers. JobStatStrip derives its violations
   // cell from the same object the feed lists, so filtering in each child
@@ -140,7 +143,7 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
   return (
     <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
-      <JobIdentityStrip job={job} projectLabel={projectLabel} />
+      <JobIdentityStrip job={job} projectLabel={projectLabel} onGoToProjects={onGoToProjects} />
       <JobStatStrip job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
       <ScanProgress job={job} />
       <LiveViolationsFeed job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
