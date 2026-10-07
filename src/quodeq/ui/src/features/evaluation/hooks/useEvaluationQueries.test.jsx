@@ -55,6 +55,19 @@ describe("useEvaluationQueries", () => {
     expect(result.current.liveViolations.security[0].principle).toBe("Authenticity");
   });
 
+  // The feed memoises each dimension on its array: a finding in one
+  // dimension must not hand every other dimension a new one.
+  it("keeps the array of a dimension that got no new rows", async () => {
+    const { result, stream } = renderQueries(makeApi());
+    await stream(ROW, { ...ROW, dimension: "usability", file: "src/b.py" });
+    await waitFor(() => expect(result.current.liveViolations.usability).toHaveLength(1));
+    const before = result.current.liveViolations;
+    await stream({ ...ROW, line: 300 });
+    await waitFor(() => expect(result.current.liveViolations.security).toHaveLength(2));
+    expect(result.current.liveViolations.usability).toBe(before.usability);
+    expect(result.current.liveViolations.security).not.toBe(before.security);
+  });
+
   it("files a row without a dimension under the placeholder group", async () => {
     const { result, stream } = renderQueries(makeApi());
     const { dimension: unused, ...bare } = ROW;

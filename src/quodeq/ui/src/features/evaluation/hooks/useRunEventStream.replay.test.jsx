@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useRunEventStream } from "./useRunEventStream";
+import { useRunEventStream, FINDINGS_FLUSH_MS } from "./useRunEventStream";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import { MockEventSource } from "../../../test-utils/MockEventSource.js";
 
@@ -16,6 +16,14 @@ describe("useRunEventStream (replayed runs and run-page freshness)", () => {
     vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.last = null;
     MockEventSource.instances = [];
+    vi.useFakeTimers();
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  // Findings reach the cache in batches; this lands the pending one.
+  const emitFinding = (finding) => act(() => {
+    MockEventSource.last.emit("finding", finding);
+    vi.advanceTimersByTime(FINDINGS_FLUSH_MS);
   });
 
   it("does not duplicate findings when the run's stream is reopened", () => {
@@ -27,6 +35,7 @@ describe("useRunEventStream (replayed runs and run-page freshness)", () => {
     const replay = () => act(() => {
       MockEventSource.last.emit("finding", { id: 1, practice_id: "P1" });
       MockEventSource.last.emit("finding", { id: 2, practice_id: "P2" });
+      vi.advanceTimersByTime(FINDINGS_FLUSH_MS);
     });
     const first = renderHook(() => useRunEventStream("job-1"), { wrapper });
     replay();
@@ -44,27 +53,52 @@ describe("useRunEventStream (replayed runs and run-page freshness)", () => {
     const client = new QueryClient();
     renderHook(() => useRunEventStream("job-1"), { wrapper: wrapperFor(client) });
     const key = evaluationKeys.findings("job-1");
-    act(() => MockEventSource.last.emit("finding", { id: 0, practice_id: "P" }));
+    emitFinding({ id: 0, practice_id: "P" });
     client.setQueryData(key, (prev) => [
       ...prev, ...Array.from({ length: 4999 }, (_, i) => ({ id: i + 1, practice_id: "P" })),
     ]);
     const before = client.getQueryData(key);
-    act(() => MockEventSource.last.emit("finding", { id: 5000, practice_id: "P" }));
+    emitFinding({ id: 5000, practice_id: "P" });
     const after = client.getQueryData(key);
     expect(after[0]).toBe(before[0]);
     expect(after[4999]).toBe(before[4999]);
     expect(after.at(-1).id).toBe(5000);
   });
 
+  it("writes a burst of findings to the cache once, in arrival order", () => {
+    const client = new QueryClient();
+    renderHook(() => useRunEventStream("job-1"), { wrapper: wrapperFor(client) });
+    const key = evaluationKeys.findings("job-1");
+    const writes = vi.fn();
+    client.getQueryCache().subscribe((event) => { if (event.type === "updated" && event.query.queryHash === JSON.stringify(key)) writes(); });
+    act(() => {
+      for (let id = 1; id <= 50; id += 1) MockEventSource.last.emit("finding", { id, practice_id: "P" });
+    });
+    expect(client.getQueryData(key)).toBeUndefined();
+    act(() => vi.advanceTimersByTime(FINDINGS_FLUSH_MS));
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(key).map((f) => f.arrivalSeq)).toEqual(Array.from({ length: 50 }, (_, i) => i + 1));
+  });
+
+  it("lands pending findings before the stream reports done", () => {
+    const client = new QueryClient();
+    renderHook(() => useRunEventStream("job-1"), { wrapper: wrapperFor(client) });
+    act(() => {
+      MockEventSource.last.emit("finding", { id: 1, practice_id: "P" });
+      MockEventSource.last.emit("done", {});
+    });
+    expect(client.getQueryData(evaluationKeys.findings("job-1")).map((f) => f.id)).toEqual([1]);
+  });
+
   it("trims the oldest findings in one block once the cache overshoots its cap", () => {
     const client = new QueryClient();
     renderHook(() => useRunEventStream("job-1"), { wrapper: wrapperFor(client) });
     const key = evaluationKeys.findings("job-1");
-    act(() => MockEventSource.last.emit("finding", { id: 0, practice_id: "P" }));
+    emitFinding({ id: 0, practice_id: "P" });
     client.setQueryData(key, (prev) => [
       ...prev, ...Array.from({ length: 5999 }, (_, i) => ({ id: i + 1, practice_id: "P" })),
     ]);
-    act(() => MockEventSource.last.emit("finding", { id: 6000, practice_id: "P" }));
+    emitFinding({ id: 6000, practice_id: "P" });
     const after = client.getQueryData(key);
     expect(after).toHaveLength(5000);
     expect(after.at(-1).id).toBe(6000);
