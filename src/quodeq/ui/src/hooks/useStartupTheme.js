@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { syncNativeTitlebar } from '../utils/nativeTitlebar.js';
 import { useOneShotGate } from './useOneShotGate.js';
 import { useLinger } from './useLinger.js';
+import { useMinimumHold } from './useMinimumHold.js';
 import { PREFERS_DARK_QUERY, PYWEBVIEW_READY_EVENT } from '../constants.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 import { THEME_MODE } from '../vocab/theme.js';
@@ -15,6 +16,9 @@ import { NAV_TAB } from '../vocab/navTab.js';
 // How long the startup loader stays opaque after its data-hold releases,
 // covering the overview's final commit (lazy chart first render).
 export const STARTUP_LOADER_LINGER_MS = 250;
+// Shortest time the startup loader stays up from mount, so a warm boot shows
+// the first tip long enough to read instead of flashing it for a frame.
+export const STARTUP_LOADER_MIN_MS = 4000;
 
 /**
  * Returns whether the app is currently rendering dark, taking the saved
@@ -109,11 +113,14 @@ export function shouldShowStartupLoader({
  * linger a beat after the hold drops so the overview's final commit (the
  * lazy chart's first render, ~200ms) happens under a still-opaque loader;
  * the fade then reveals a finished page instead of a chart placeholder.
+ * Finally hold it for STARTUP_LOADER_MIN_MS from mount, so a fast boot
+ * still leaves the first tip on screen long enough to read.
  *
  * @param {Parameters<typeof shouldShowStartupLoader>[0]} inputs
  * @returns {boolean} whether the fullscreen startup loader should show
  */
 export function useStartupLoader(inputs) {
   const startupHoldActive = useOneShotGate(shouldShowStartupLoader(inputs));
-  return useLinger(startupHoldActive, STARTUP_LOADER_LINGER_MS);
+  const lingered = useLinger(startupHoldActive, STARTUP_LOADER_LINGER_MS);
+  return useMinimumHold(lingered, STARTUP_LOADER_MIN_MS);
 }

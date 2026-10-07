@@ -739,7 +739,7 @@
   "history.selectedSuffix": "(selected)",
   "history.termName": "history",
   "history.unknownError": "unknown error",
-  "loading.tipLabel": "Tip",
+  "loading.tipLabel": "Did you know",
   "loading.tips.architecture": "Want architecture checks too? Turn on **Clean Architecture** and **DDD** with the eye icon in Standards.",
   "loading.tips.assistant": "Press **Ctrl+`** to open the assistant, then ask it why a score is low.",
   "loading.tips.cleanScan": "Changed your standards or refactored a lot? Turn on **Clean scan** to re\u2011check every file.",
