@@ -33,27 +33,39 @@ export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanS
   return payload;
 }
 
-// Seed the selection once from the navigation context (e.g. arriving from a
-// dimension or principle detail). Runs in an effect rather than the useState
-// initializer because the chips (allDimensions) load asynchronously. The ref
-// guards it to a single seed per mount so later re-renders never clobber the
-// user's own toggles. Ids are matched case-insensitively and only kept when
-// they map to a real (visible) chip.
-function useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims) {
+// The ids of *wanted* that map to a real (visible) chip, matched
+// case-insensitively.
+function matchVisible(allDimensions, wanted) {
+  const byLowerId = new Map(allDimensions.map((d) => [String(d.id).toLowerCase(), d.id]));
+  const seed = new Set();
+  for (const id of wanted) {
+    const match = byLowerId.get(String(id).toLowerCase());
+    if (match) seed.add(match);
+  }
+  return seed;
+}
+
+// Seed the selection once: from the navigation context when it carries one
+// (e.g. arriving from a dimension or principle detail), else from the
+// project's last finished run. Runs in an effect because the chips
+// (allDimensions) and the project info load asynchronously; it never seeds
+// after the user has touched the selection, so a late answer cannot clobber
+// their own picks. Returns whether the seed came from the last run.
+function useSeedPreselectedDims({ allDimensions, preselectDims, fallbackDims, setSelectedDims, touched }) {
   const seededRef = useRef(false);
+  const [fromLastRun, setFromLastRun] = useState(false);
   useEffect(() => {
-    if (seededRef.current) return;
-    if (!preselectDims || preselectDims.length === 0) return;
-    if (allDimensions.length === 0) return;
-    const byLowerId = new Map(allDimensions.map((d) => [String(d.id).toLowerCase(), d.id]));
-    const seed = new Set();
-    for (const id of preselectDims) {
-      const match = byLowerId.get(String(id).toLowerCase());
-      if (match) seed.add(match);
-    }
+    if (seededRef.current || touched || allDimensions.length === 0) return;
+    const fromNav = (preselectDims?.length ?? 0) > 0;
+    const wanted = fromNav ? preselectDims : (fallbackDims ?? []);
+    if (wanted.length === 0) return;
     seededRef.current = true;
-    if (seed.size > 0) setSelectedDims(seed);
-  }, [allDimensions, preselectDims]);
+    const seed = matchVisible(allDimensions, wanted);
+    if (seed.size === 0) return;
+    setSelectedDims(seed);
+    setFromLastRun(!fromNav);
+  }, [allDimensions, preselectDims, fallbackDims, touched]);
+  return fromLastRun;
 }
 
 /**
@@ -64,12 +76,22 @@ function useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims) {
  * `onValidationFail` instead of starting. A one-shot clean scan is consumed
  * only once the start actually goes through, so a refused or failed start
  * leaves the toggle armed for the retry.
+ *
+ * With no navigation preselection the selection starts from `fallbackDims`,
+ * the project's last finished run; `seededFromLastRun` says it did.
  */
-export function useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], project = null, timeLimitS = null }) {
-  const { selectedDims, setSelectedDims, toggleDim, selectAll, clearAll, refuseEmptySelection } = useDimensionSet(allDimensions);
+export function useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], fallbackDims = [], project = null, timeLimitS = null }) {
+  const set = useDimensionSet(allDimensions);
+  const { selectedDims, setSelectedDims, refuseEmptySelection } = set;
   const [cleanScan, setCleanScan] = useState(CLEAN_PERSIST.OFF);
+  // The user's own picks end every automatic seeding.
+  const [touched, setTouched] = useState(false);
+  const touch = (fn) => (...a) => { setTouched(true); fn(...a); };
+  const toggleDim = touch(set.toggleDim);
+  const selectAll = touch(set.selectAll);
+  const clearAll = touch(set.clearAll);
 
-  useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims);
+  const fromLastRun = useSeedPreselectedDims({ allDimensions, preselectDims, fallbackDims, setSelectedDims, touched });
 
   const handleScan = () => {
     if (refuseEmptySelection(onValidationFail)) return;
@@ -85,5 +107,6 @@ export function useDimensionSelection({ allDimensions, info, branch, scopePath, 
     }
   };
 
-  return { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan };
+  // "as your last run" holds only while the selection is still that seed.
+  return { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan, seededFromLastRun: fromLastRun && !touched };
 }

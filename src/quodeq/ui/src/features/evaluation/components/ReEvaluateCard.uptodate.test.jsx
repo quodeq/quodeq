@@ -39,4 +39,18 @@ describe('ReEvaluateCard up-to-date dimensions', () => {
     renderCard({ project: 'p-count', projectInfo: info, api: makeFakeApi({ getProjectInfo: vi.fn().mockResolvedValue(info) }) });
     await waitFor(() => expect(document.querySelector('.eval-detected-line')).toHaveTextContent(/^3,892 source files/));
   });
+
+  it('starts from the last run\'s dimensions and says so', async () => {
+    const info = { name: 'demo', path: '/repos/myproj', location: 'local', ephemeral: false, evaluable: true, latestRunDimensions: ['reliability'] };
+    const api = makeFakeApi({
+      getProjectInfo: vi.fn().mockResolvedValue(info),
+      listPlugins: vi.fn().mockResolvedValue([{ dimensions: [
+        { id: 'security', label: 'Security' }, { id: 'reliability', label: 'Reliability' },
+      ] }]),
+    });
+    renderCard({ project: 'p-lastrun', projectInfo: info, api });
+    await waitFor(() => expect(screen.getByRole('button', { name: /reliability/i })).toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByRole('button', { name: /security/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(document.querySelector('.eval-dims-counter')).toHaveTextContent('as your last run');
+  });
 });
