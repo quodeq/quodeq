@@ -1992,7 +1992,7 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  min-height: 9.5rem;
+  min-height: 7.5rem;
   justify-content: center;
 }
 
@@ -2059,41 +2059,6 @@ textarea:focus {
   white-space: nowrap;
 }
 
-/* One segment per tip. Walked tips stay lit, the current one fills over a
-   rotation (TIPS_ROTATE_MS in LoadingScreen.jsx). */
-.loading-tip-progress {
-  display: flex;
-  gap: 4px;
-}
-
-.loading-tip-progress__seg {
-  position: relative;
-  flex: 1;
-  height: 3px;
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--color-border);
-}
-
-.loading-tip-progress__seg--done {
-  background: var(--color-text-subtle);
-  opacity: 0.5;
-}
-
-.loading-tip-progress__seg--current::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--logo-q);
-  transform-origin: left;
-  animation: loading-tip-fill 8s linear forwards;
-}
-
-@keyframes loading-tip-fill {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
-}
-
 @media (max-width: 640px) {
   .loading-tips-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -2107,7 +2072,6 @@ textarea:focus {
 
 @media (prefers-reduced-motion: reduce) {
   .loading-tip--fading { transform: none; }
-  .loading-tip-progress__seg--current::after { animation: none; transform: none; }
 }
 
 .loading-screen--leaving {
