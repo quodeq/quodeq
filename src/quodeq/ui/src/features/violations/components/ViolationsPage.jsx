@@ -116,13 +116,13 @@ function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePri
     </span>
   );
   return (
-    <div className="violations-page__top">
+    <div className="term-page-top violations-page__top">
       <TermHeader
         name={t('violations.termName')}
         sub={subLine}
         badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
-      <div className="violations-flag-row">
+      <div className="term-seg violations-flag-row" role="group" aria-label={t('violations.viewAria')}>
         <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === VIOLATIONS_SUB_TAB.DIMENSION} onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.DIMENSION)} />
         <FlagPill flag={t('violations.flagByType')}      active={activeSubTab === VIOLATIONS_SUB_TAB.TYPE}      onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.TYPE)} />
         <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === VIOLATIONS_SUB_TAB.FILE}      onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.FILE)} />

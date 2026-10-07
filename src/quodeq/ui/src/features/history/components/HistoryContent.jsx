@@ -68,14 +68,14 @@ function NotReadyToast({ message, onDismiss }) {
 function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, runNav, onRunClick }) {
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   return (
-    <div className="history-page__top">
+    <div className="term-page-top history-page__top">
       <TermHeader
         name={t('history.termName')}
         sub={`${t(pluralKey(trend.length, 'history.evalsCountOne', 'history.evalsCountMany'), { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
         badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
       {availableRuns && availableRuns.length > 0 && (
-        <div className="history-run-nav">
+        <div className="term-page-top__controls history-run-nav">
           <RunNavigator
             currentRun={runNavLabel}
             isLatest={overviewRunIndex === 0}

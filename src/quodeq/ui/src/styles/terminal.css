@@ -231,44 +231,86 @@
 }
 
 /* ------------------------------------------------------------
-   FlagPill: `--flag` toggle
+   Page top row + toolbar buttons, shared by Compare, Violations, Map
+   and History so every screen header reads the same:
+   TermHeader on the left, controls top-aligned on the right.
    ------------------------------------------------------------ */
-.term-flag-pill {
+.term-page-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--term-space-3);
+  margin: 0 0 var(--term-space-3);
+}
+.term-page-top > .term-header { margin: 0; }
+.term-page-top__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* TermButton: outlined, accent on hover, accent fill when it holds the
+   current selection (`--on`). */
+.term-btn {
   appearance: none;
-  font-family: var(--term-font-mono);
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
   line-height: 1;
-  padding: var(--term-space-1) var(--term-space-2);
+  padding: 6px 12px;
   background: transparent;
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
-  border-radius: var(--term-radius);
+  border-radius: 6px;
+  white-space: nowrap;
   cursor: pointer;
   transition: background-color 0.12s, color 0.12s, border-color 0.12s;
 }
-.term-flag-pill:hover {
-  color: var(--color-text);
-  border-color: var(--color-text-muted);
+.term-btn:hover:not(:disabled) {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
 }
-.term-flag-pill__dashes {
-  opacity: 0.55;
-  margin-right: 2px;
-}
-.term-flag-pill__count {
-  opacity: 0.7;
-}
-.term-flag-pill--active {
+.term-btn--on,
+.term-btn--on:hover:not(:disabled) {
   background: var(--color-accent);
   color: var(--color-on-accent);
   border-color: var(--color-accent);
 }
-.term-flag-pill--active:hover {
-  background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
-  color: var(--color-on-accent);
+.term-btn:disabled,
+.term-btn[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
-.term-flag-pill--active .term-flag-pill__dashes,
-.term-flag-pill--active .term-flag-pill__count { opacity: 0.9; }
+.term-btn[aria-disabled="true"]:hover {
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+/* Segmented group: one frame around mutually exclusive options. */
+.term-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+.term-seg > .term-btn {
+  padding: 5px 11px;
+  border-color: transparent;
+  border-radius: 4px;
+}
+.term-seg > .term-btn:hover:not(:disabled):not(.term-btn--on) { border-color: transparent; }
+
+/* FlagPill extras: the trailing count, e.g. `dismissed (12)`. */
+.term-flag-pill__count { opacity: 0.7; }
+.term-btn--on .term-flag-pill__count { opacity: 0.9; }
 
 /* ------------------------------------------------------------
    SevBadge: CRIT / MAJ / MIN
@@ -565,32 +607,11 @@ button.term-sev-badge--clickable:focus-visible {
 /* ------------------------------------------------------------
    Violations (migrated) — terminal-style flag row & sev row
    ------------------------------------------------------------ */
-.violations-page--terminal .violations-flag-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--term-space-2);
-  margin: 0;
-}
 .violations-sev-row {
   display: inline-flex;
   gap: var(--term-space-1);
   align-items: center;
   margin-left: var(--term-space-2);
-}
-
-/* Violations title row: TermHeader on the left, flag pills on the right.
-   Controls gravity-bottom to align with the sub line; wraps onto a new
-   row on narrow viewports. Mirrors the Map page pattern. */
-.violations-page--terminal .violations-page__top {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--term-space-3);
-  margin-bottom: var(--term-space-4);
-}
-.violations-page--terminal .violations-page__top > .term-header {
-  margin: 0;
 }
 
 /* Inline severity badges next to the sub text */
@@ -610,20 +631,6 @@ button.term-sev-badge--clickable:focus-visible {
   gap: var(--term-space-2);
   align-items: center;
   margin: 0 0 var(--term-space-3);
-}
-
-/* ------------------------------------------------------------
-   History (migrated) — TermHeader + run-navigator on same row
-   ------------------------------------------------------------ */
-.history-page--terminal .history-page__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--term-space-3);
-  margin: 0 0 var(--term-space-3);
-}
-.history-page--terminal .history-page__top .term-header {
-  margin: 0;
 }
 
 /* ------------------------------------------------------------
@@ -686,9 +693,12 @@ button.term-sev-badge--clickable:focus-visible {
   color: var(--term-sev-accent);
   border-color: color-mix(in srgb, var(--term-sev-accent) 40%, transparent);
 }
-.term-flag-pill--critical.term-flag-pill--active,
-.term-flag-pill--major.term-flag-pill--active,
-.term-flag-pill--minor.term-flag-pill--active {
+.term-flag-pill--critical.term-btn--on,
+.term-flag-pill--major.term-btn--on,
+.term-flag-pill--minor.term-btn--on,
+.term-flag-pill--critical.term-btn--on:hover:not(:disabled),
+.term-flag-pill--major.term-btn--on:hover:not(:disabled),
+.term-flag-pill--minor.term-btn--on:hover:not(:disabled) {
   background: var(--term-sev-accent);
   color: var(--color-on-accent);
   border-color: var(--term-sev-accent);

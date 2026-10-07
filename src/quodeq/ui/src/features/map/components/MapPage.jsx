@@ -55,16 +55,12 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
     <div className="map-filter-wrap" ref={ref}>
       <button
         type="button"
-        className={`map-pill map-filter-btn${isFiltered ? ' is-filtered' : ''}`}
+        className={`term-btn map-filter-btn${isFiltered ? ' is-filtered' : ''}`}
         onClick={() => setOpen((v) => !v)}
         title={isFiltered ? t('map.dimensionsOf', { selected: selectedDimensions.size, total: allDimensions.length }) : t('map.allDimensions')}
         aria-label={isFiltered ? t('map.dimensionsAria', { selected: selectedDimensions.size, total: allDimensions.length }) : t('map.dimensions')}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-        </svg>
-        {t('map.dimensions')}
-        {isFiltered && <span className="map-filter-btn__dot" aria-hidden="true" />}
+        {t('map.dimensions')} {open ? '▾' : '▸'}
       </button>
       {open && (
         <div className="map-filter-dropdown">
@@ -85,29 +81,29 @@ function MapControls({ viewState, galaxyState, dimensionState }) {
   const { galaxyMode, setGalaxyMode } = galaxyState;
   const { allDimensions, selectedDimensions, onToggleDimension } = dimensionState;
   return (
-    <div className="map-controls">
+    <div className="term-page-top__controls map-controls">
       <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
       {vizStyle === VIZ_STYLE.ZOOMPACK && (
-        <div className="map-pill-group">
+        <div className="term-seg">
           {VIEW_MODES.map((m) => (
-            <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)} aria-pressed={viewMode === m.id}>
+            <button key={m.id} type="button" className={`term-btn${viewMode === m.id ? ' term-btn--on' : ''}`} onClick={() => setViewMode(m.id)} aria-pressed={viewMode === m.id}>
               {m.label}
             </button>
           ))}
         </div>
       )}
       {vizStyle === VIZ_STYLE.GALAXY && (
-        <div className="map-pill-group">
+        <div className="term-seg">
           {GALAXY_MODES.map((m) => (
-            <button key={m.id} type="button" className={`map-pill${galaxyMode === m.id ? ' active' : ''}`} onClick={() => setGalaxyMode(m.id)} aria-pressed={galaxyMode === m.id}>
+            <button key={m.id} type="button" className={`term-btn${galaxyMode === m.id ? ' term-btn--on' : ''}`} onClick={() => setGalaxyMode(m.id)} aria-pressed={galaxyMode === m.id}>
               {m.label}
             </button>
           ))}
         </div>
       )}
-      <div className="map-pill-group">
+      <div className="term-seg">
         {VIZ_STYLES.map((s) => (
-          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? t('map.comingSoon') : ''} aria-pressed={vizStyle === s.id}>
+          <button key={s.id} type="button" className={`term-btn${vizStyle === s.id ? ' term-btn--on' : ''}`} aria-disabled={!s.enabled || undefined} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? t('map.comingSoon') : ''} aria-pressed={vizStyle === s.id}>
             {s.label}
           </button>
         ))}
@@ -201,7 +197,7 @@ export default function MapPage(props) {
 
   return (
     <div className={`map-page map-page--terminal${isRefreshing ? ' section-pending' : ''}`}>
-      <div className="map-page__top">
+      <div className="term-page-top map-page__top">
         <TermHeader
           name="map"
           sub={sub}

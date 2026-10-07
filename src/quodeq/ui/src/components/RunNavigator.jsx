@@ -7,10 +7,10 @@ import { t } from '../strings/index.js';
 
 function RunNavPager({ currentRun, isLatest, isOldest, onPrev, onNext, onPrevHover, onNextHover }) {
   return (
-    <div className="run-nav-pager">
+    <div className="term-seg run-nav-pager">
       <button
         type="button"
-        className="run-nav-btn"
+        className="term-btn run-nav-btn"
         onClick={onPrev}
         onMouseEnter={onPrevHover}
         onFocus={onPrevHover}
@@ -23,7 +23,7 @@ function RunNavPager({ currentRun, isLatest, isOldest, onPrev, onNext, onPrevHov
       <span className="run-nav-label">{currentRun}</span>
       <button
         type="button"
-        className="run-nav-btn"
+        className="term-btn run-nav-btn"
         onClick={onNext}
         onMouseEnter={onNextHover}
         onFocus={onNextHover}
@@ -45,7 +45,7 @@ export default function RunNavigator({
     <div className="run-navigator">
       <button
         type="button"
-        className="run-nav-action run-nav-action--primary"
+        className="term-btn run-nav-action"
         onClick={onLatest}
         onMouseEnter={onLatestHover}
         onFocus={onLatestHover}
@@ -63,7 +63,7 @@ export default function RunNavigator({
       {onView && (
         <button
           type="button"
-          className="run-nav-action run-nav-action--outline"
+          className="term-btn run-nav-action"
           onClick={onView}
           title={t('runNav.openRunTitle')}
         >

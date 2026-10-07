@@ -682,99 +682,17 @@
   flex-shrink: 0;
 }
 
-/* "Latest" and "View run" action buttons */
-.run-navigator .run-nav-action {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-  cursor: pointer;
-  line-height: 1;
-  transition: color 120ms ease, background 120ms ease;
-}
-
-.run-navigator .run-nav-action:hover:not(:disabled):not(.run-nav-action--primary):not(.run-nav-action--outline) {
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
-}
-
-.run-navigator .run-nav-action:disabled {
-  opacity: 0.3;
-  cursor: default;
-  pointer-events: none;
-}
-
-.run-navigator .run-nav-action--outline {
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-}
-
-.run-navigator .run-nav-action--outline:hover:not(:disabled) {
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
-  border-color: var(--color-text-muted);
-}
-
-.run-navigator .run-nav-action--primary {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-accent);
-  border: none;
-}
-
-.run-navigator .run-nav-action--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
-  color: var(--color-accent);
-}
-
-/* Segmented pager: [‹][date][›] as one bordered unit */
-.run-nav-pager {
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--radius-md);
-  background: transparent;
-  overflow: hidden;
-  line-height: 1;
-  gap: 2px;
-}
-
+/* ‹ / › inside the shared .term-seg pager: square, glyph-sized. */
 .run-navigator .run-nav-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 7px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.run-navigator .run-nav-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
-  color: var(--color-text);
-}
-
-.run-navigator .run-nav-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+  padding: 4px 8px;
+  font-size: 13px;
 }
 
 /* Date label inside the pager */
 .run-navigator .run-nav-label {
-  padding: 4px var(--space-3);
+  padding: 0 var(--space-2);
   font-family: var(--font-data);
-  font-size: var(--text-xs);
+  font-size: 11.5px;
   font-weight: var(--weight-medium);
   color: var(--color-text);
   white-space: nowrap;
@@ -3498,9 +3416,9 @@
   background: var(--color-surface-alt);
   opacity: 0.6;
 }
-/* Pill row rides the real .violations-flag-row spacing; pills approximate
-   the FlagPill footprint. */
-.violations-skeleton__pill { width: 110px; height: 24px; border-radius: 12px; }
+/* Pill row approximates the header's segmented view switch. */
+.violations-skeleton .violations-flag-row { display: flex; gap: var(--space-2); }
+.violations-skeleton__pill { width: 96px; height: 26px; border-radius: 6px; }
 .violations-skeleton__group {
   display: flex;
   flex-direction: column;

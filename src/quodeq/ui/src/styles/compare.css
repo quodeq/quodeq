@@ -39,18 +39,9 @@
 
 /* ── header ─────────────────────────────────────────────────────────── */
 
-/* Page top row — shared TermHeader (the "▶ name" prompt every screen uses)
-   on the left, view controls on the right, following the history/violations
-   `*__top` pattern so titles and their rhythm match the rest of the app. */
-.compare-page__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--term-space-3);
-  flex-wrap: wrap;
-}
-
-.compare-page__top .term-header { margin: 0; }
+/* Page top row: the shared .term-page-top (terminal.css). The page's
+   column gap owns the spacing below it, so its own margin is dropped. */
+.compare-page__top { margin-bottom: 0; }
 
 .compare-page__titles { min-width: 0; }
 
@@ -61,56 +52,12 @@
   margin-left: 4px;
 }
 
-.compare-header__controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-.compare-sort {
-  display: inline-flex;
-  gap: 2px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.compare-sort__btn {
-  font: inherit;
-  font-size: 11.5px;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  padding: 5px 11px;
-  cursor: pointer;
-}
-
-.compare-sort__btn--on {
-  color: var(--color-on-accent);
-  background: var(--color-accent);
-}
 
 /* ── scope picker ───────────────────────────────────────────────────── */
 
 .compare-picker { position: relative; }
 
-.compare-picker__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font: inherit;
-  font-size: 11.5px;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 6px 12px;
-  cursor: pointer;
-}
+.compare-picker__toggle { gap: 9px; }
 
 .compare-picker__toggle--filtered {
   color: var(--color-accent);
@@ -1072,17 +1019,6 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
    speaks in --color-accent, project B (right) in --color-info. Gaps read
    A minus B, tinted toward whichever side leads. */
 
-/* Header duel launcher: sits with the sort/scope controls; the menu is
-   the shared dueltrigger popover with the two-pick chrome on top. */
-.compare-dueltrigger__btn--launcher {
-  font-size: 11.5px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-text-muted);
-}
-.compare-dueltrigger__btn--launcher:hover { color: var(--color-accent); border-color: var(--color-accent); }
-
 .compare-dueltrigger__hint {
   display: block;
   padding: 8px 10px 6px;
@@ -1445,22 +1381,6 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
    value-holding select was the wrong control. */
 
 .compare-dueltrigger { position: relative; display: inline-flex; }
-
-.compare-dueltrigger__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font: inherit;
-  font-size: 11px;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 5px 10px;
-  cursor: pointer;
-}
-
-.compare-dueltrigger__btn:hover { color: var(--color-accent); border-color: var(--color-accent); }
 
 /* Opens DOWNWARD: .compare-table is an overflow container, and content
    escaping its top edge is unreachable, while content past its bottom

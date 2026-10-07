@@ -15,22 +15,22 @@ export default function CompareFleetHeader({
   pickerOpen, setPickerOpen,
 }) {
   return (
-    <div className="compare-page__top">
+    <div className="term-page-top compare-page__top">
       <TermHeader
         name={t('compare.title')}
         sub={t('compare.subtitle', { count: scopeCount, files: nf(totalFiles) })}
       />
-      <div className="compare-header__controls">
+      <div className="term-page-top__controls">
         {openDuelPair && scoredRows.length >= 2 && (
           <DuelTrigger targets={scoredRows} onStart={openDuelPair} openDirect={openDuel} />
         )}
         {board.length > 0 && (
           <DimensionTrigger board={board} onOpen={openDimension} />
         )}
-        <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
+        <span className="term-seg" role="group" aria-label={t('compare.sortAria')}>
           <button
             type="button"
-            className="compare-sort__btn compare-sort__btn--on"
+            className="term-btn term-btn--on"
             onClick={toggleSortDir}
             aria-label={t('compare.sortToggleAria')}
           >

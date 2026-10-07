@@ -102,7 +102,7 @@ function duelGapHint(duel, a, b) {
 function CompareDuelHeader({ duel, a, b, onOpenProject }) {
   return (
     <>
-      <div className="compare-page__top">
+      <div className="term-page-top compare-page__top">
         {/* No local back button — the app breadcrumb already walks back,
             same as the dimension screen. */}
         <div className="compare-page__titles">

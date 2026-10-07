@@ -1674,6 +1674,7 @@
   "violations.typeGroupCounts": "{open} open · {closed} closed",
   "violations.noTypesFound": "No requirement types with findings.",
   "violations.typeMenuAria": "Actions for {req}",
+  "violations.viewAria": "Group violations",
   "violations.typeMenuGlyph": "⋯",
   "violations.dismissAllProject": "Dismiss all {count} in this project",
   "violations.dismissAllProjectOne": "Dismiss the 1 finding in this project",
