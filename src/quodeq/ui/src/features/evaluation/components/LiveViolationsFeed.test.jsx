@@ -33,7 +33,7 @@ describe('LiveViolationsFeed', () => {
     renderFeed({ liveViolations: violations });
     expect(document.querySelector('.vlive-dimension-name')).toHaveTextContent('reliability');
     expect(document.querySelector('.vlive-dimension-count')).toHaveTextContent('2');
-    expect(screen.getByText('2 across 1 dimension')).toBeInTheDocument();
+    expect(screen.getByText('2 new')).toBeInTheDocument();
     expect(screen.getByText('1 crit')).toBeInTheDocument();
     expect(screen.getByText('1 maj')).toBeInTheDocument();
   });
@@ -151,42 +151,17 @@ describe('LiveViolationsFeed', () => {
     });
   });
 
-  it('shows the passing checks next to the violations while running', async () => {
-    // The console line prints "40 v · 1056 c"; the header says the same
-    // thing in words, so the feed never reads as "the run found 40 things".
-    getEvaluationProgress.mockResolvedValue({
-      currentDimension: 'reliability',
-      dimensions: [
-        { id: 'reliability', state: 'running', files: { taken: 30, total: 100 }, compliance: 1056 },
-        { id: 'security', state: 'done', files: { taken: 10, total: 10 }, compliance: 200 },
-      ],
-    });
-    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
-    expect(await screen.findByText(/1256 checks passed/)).toBeInTheDocument();
-  });
-
-  it('keeps the passing checks on a finished job', async () => {
-    getEvaluationProgress.mockResolvedValue({
-      dimensions: [{ id: 'reliability', state: 'done', files: { taken: 1, total: 1 }, compliance: 1 }],
-    });
-    renderFeed({ liveViolations: violations, job: { jobId: 'j3', status: 'done' } });
-    expect(await screen.findByText(/1 check passed/)).toBeInTheDocument();
-  });
-
   it('counts only what it renders', () => {
     renderFeed({ liveViolations: violations, hiddenCarriedCount: 5 });
-    expect(screen.getByText('2 across 1 dimension')).toBeInTheDocument();
+    expect(screen.getByText('2 new')).toBeInTheDocument();
   });
 
   it('keeps the header when the filter empties the list', () => {
     // A fully-cached dimension produces zero new findings. Returning null
     // here would make the feed vanish and read as "nothing found". The
-    // "0 across 0 dimensions" phrasing would be confusing, so a wholly
-    // filtered-out run says "no new findings" instead.
+    // A wholly filtered-out run says "no new findings".
     renderFeed({ liveViolations: {}, hiddenCarriedCount: 12 });
     expect(screen.getByText(/no new findings/)).toBeInTheDocument();
-    expect(screen.getByText(/12 carried forward hidden/)).toBeInTheDocument();
-    expect(screen.queryByText(/across 0 dimension/)).toBeNull();
   });
 
   it('still renders nothing when there is genuinely nothing', () => {
@@ -200,7 +175,16 @@ describe('LiveViolationsFeed', () => {
       liveViolations: {},
       hiddenCarriedCount: 12,
     });
-    expect(screen.getByText(/12 carried forward hidden/)).toBeInTheDocument();
+    expect(screen.getByText(/no new findings/)).toBeInTheDocument();
     expect(container.querySelector('.vlive-card')).toBeNull();
+  });
+
+  it('the head counts new findings and nothing else', async () => {
+    getEvaluationProgress.mockResolvedValue({ currentDimension: 'reliability', dimensions: [{ id: 'reliability', state: 'running', compliance: 900, files: { taken: 3, total: 10 } }] });
+    renderFeed({ liveViolations: violations, hiddenCarriedCount: 64, job: { jobId: 'j1', status: 'running' } });
+    expect(await screen.findByText('2 new · streaming')).toBeInTheDocument();
+    expect(screen.queryByText(/carried forward hidden/)).toBeNull();
+    expect(screen.queryByText(/checks passed/)).toBeNull();
+    expect(document.querySelector('.vlive-head-dim')).toBeNull();
   });
 });

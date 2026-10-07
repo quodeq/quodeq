@@ -201,9 +201,11 @@ describe('EvaluationStatus live-findings filter', () => {
     expect(screen.getByTestId('strip-sum')).toHaveTextContent('1');
   });
 
-  it('discloses how many are hidden rather than hiding them silently', () => {
+  it('filters carried findings without a disclosure line (the setting is the control)', async () => {
     renderStatus();
-    expect(screen.getByText(/2 carried forward hidden/)).toBeInTheDocument();
+    expect(await screen.findByText('new.py:1')).toBeInTheDocument();
+    expect(screen.queryByText(/carried forward hidden/)).not.toBeInTheDocument();
+    expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
   });
 
   it('shows everything when the preference is off', async () => {
@@ -233,7 +235,6 @@ describe('EvaluationStatus live-findings filter', () => {
     );
     expect(await screen.findByText('new.py:1')).toBeInTheDocument();
     expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
-    expect(screen.getByText(/1 carried forward hidden/)).toBeInTheDocument();
   });
 
   it('says nothing about carries when the run has none', () => {

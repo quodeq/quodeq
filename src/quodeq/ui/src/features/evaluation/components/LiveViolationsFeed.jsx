@@ -14,7 +14,6 @@ import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { DIM_STATE } from '../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 import { KEY } from '../../../vocab/keyboard.js';
-import { pluralKey } from '../../../utils/plural.js';
 
 // A collapsed row: 38px min-height plus its 1px border. The virtualizer
 // measures the real height, this only sizes rows it has not mounted yet.
@@ -157,33 +156,17 @@ function computeQueuedFiles(runningDim) {
     : null;
 }
 
-function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, passedCount, isRunning, currentDimension }) {
+// The head says how many new findings this run has, and that it is still
+// streaming. Passed checks are in the progress details; carried-forward
+// findings follow the "new findings only" setting.
+function LiveViolationsHead({ totalCount, isRunning }) {
+  const count = totalCount > 0 ? t('evaluate.newCount', { count: totalCount }) : t('evaluate.noNewFindings');
   return (
     <div className="vlive-head">
       <span className="vlive-head-left">
         <SectionLabel>{t('evaluate.liveViolationsLabel')}</SectionLabel>
-        <span className="vlive-counter">
-          {totalCount > 0
-            ? t(
-              pluralKey(orderedDimsCount, 'evaluate.acrossDimsOne', 'evaluate.acrossDimsMany'),
-              { count: totalCount, dims: orderedDimsCount },
-            )
-            : t('evaluate.noNewFindings')}
-          {/* The console line prints "40 v · 1056 c". Saying the passing
-              checks here keeps the feed from reading as the run's whole
-              output: the rows are the violations, this is the rest. */}
-          {passedCount > 0 && (
-            <span className="vlive-counter-passed"> · {t(pluralKey(passedCount, 'evaluate.checksPassedOne', 'evaluate.checksPassedMany'), { count: passedCount })}</span>
-          )}
-          {hiddenCarriedCount > 0 && (
-            <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>
-          )}
-          {isRunning && <> · {t('evaluate.streaming')}</>}
-        </span>
+        <span className="vlive-counter">{isRunning ? `${count} · ${t('evaluate.streaming')}` : count}</span>
       </span>
-      {isRunning && currentDimension && (
-        <span className="vlive-head-dim">{currentDimension}</span>
-      )}
     </div>
   );
 }
@@ -223,9 +206,6 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   const queued = computeQueuedFiles(runningDim);
 
   const currentDimension = progress?.currentDimension;
-  // Compliance counts come from the same tally the console heartbeat prints
-  // (scan progress), not from the finding stream, which carries violations only.
-  const passedCount = (progress?.dimensions || []).reduce((sum, d) => sum + (d?.compliance ?? 0), 0);
   const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity, currentDimension),
     // lastActivity is a ref's current value — it's intentionally not in deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,14 +221,7 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
 
   return (
     <div className="vlive-feed">
-      <LiveViolationsHead
-        totalCount={totalCount}
-        orderedDimsCount={orderedDims.length}
-        hiddenCarriedCount={hiddenCarriedCount}
-        passedCount={passedCount}
-        isRunning={isRunning}
-        currentDimension={currentDimension}
-      />
+      <LiveViolationsHead totalCount={totalCount} isRunning={isRunning} />
       {(totalCount > 0 || isRunning) && (
         <>
           <LiveFindingsTicker liveViolations={liveViolations} isRunning={isRunning} />
