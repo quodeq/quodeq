@@ -35,3 +35,21 @@ def test_no_runs_or_no_project_is_empty(tmp_path):
     (tmp_path / "p").mkdir()
     assert latest_run_dimensions(tmp_path, "p") == []
     assert latest_run_dimensions(tmp_path, "missing") == []
+
+
+def test_a_run_whose_status_cannot_be_read_is_skipped_not_fatal(tmp_path, monkeypatch):
+    """A status.json from a newer CLI raises on read; project info must not fail for it."""
+    from quodeq.core.run.state import UnsupportedSchemaError
+    from quodeq.services import latest_run_dims as module
+
+    proj = tmp_path / "p"
+    _run(proj, "r-old", state="done", dims=["security"], started="2026-10-01T10:00:00+00:00")
+    _run(proj, "r-newer", state="done", dims=["usability"], started="2026-10-06T10:00:00+00:00")
+    real = module.read_status
+
+    def read(run_dir):
+        if run_dir.name == "r-newer":
+            raise UnsupportedSchemaError("schema 999")
+        return real(run_dir)
+    monkeypatch.setattr(module, "read_status", read)
+    assert latest_run_dimensions(tmp_path, "p") == ["security"]

@@ -108,25 +108,32 @@ function JobIdentityStrip({ job, projectLabel, onGoToProjects }) {
   );
 }
 
+function countAll(byDim) {
+  return Object.values(byDim).reduce((n, vs) => n + vs.length, 0);
+}
+
 export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel, onGoToProjects }) {
   const { newOnly } = useLiveFeedSettings();
   // Filter ONCE, above both consumers. JobStatStrip derives its violations
   // cell from the same object the feed lists, so filtering in each child
   // separately is how the counter and the list drift apart (see #878).
-  const { shown, hiddenCarriedCount } = useMemo(() => {
-    if (!newOnly) return { shown: liveViolations, hiddenCarriedCount: 0 };
-    const next = {};
-    let hidden = 0;
+  const { shown, fresh, hiddenCarriedCount } = useMemo(() => {
+    // `fresh` is this run's findings only: the tile and the feed head count
+    // it whatever the setting shows. `shown` is what the rows list.
+    const freshOnly = {};
+    let carried = 0;
     for (const [dim, vs] of Object.entries(liveViolations || {})) {
       // Both cache writers normalise through createViolation now, so entries
       // carry `carriedForward`. The snake_case spelling stays accepted: the
       // SSE stream used to write raw wire payloads
       // here, and an entry written before this must not read as fresh.
-      const fresh = (vs || []).filter((v) => !(v.carriedForward ?? v.carried_forward));
-      hidden += (vs || []).length - fresh.length;
-      if (fresh.length) next[dim] = fresh;
+      const keep = (vs || []).filter((v) => !(v.carriedForward ?? v.carried_forward));
+      carried += (vs || []).length - keep.length;
+      if (keep.length) freshOnly[dim] = keep;
     }
-    return { shown: next, hiddenCarriedCount: hidden };
+    return newOnly
+      ? { shown: freshOnly, fresh: freshOnly, hiddenCarriedCount: carried }
+      : { shown: liveViolations, fresh: freshOnly, hiddenCarriedCount: 0 };
   }, [liveViolations, newOnly]);
 
   if (!job) return null;
@@ -144,9 +151,9 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
     <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobIdentityStrip job={job} projectLabel={projectLabel} onGoToProjects={onGoToProjects} />
-      <JobStatStrip job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
+      <JobStatStrip job={job} liveViolations={fresh} hiddenCarriedCount={hiddenCarriedCount} />
       <ScanProgress job={job} />
-      <LiveViolationsFeed job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
+      <LiveViolationsFeed job={job} liveViolations={shown} newCount={countAll(fresh)} hiddenCarriedCount={hiddenCarriedCount} />
     </div>
   );
 }

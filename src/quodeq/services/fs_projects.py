@@ -289,5 +289,5 @@ def get_project_info(
         "availableDimensions": available_dimensions,
         "hasFingerprints": fingerprints_found,
         "pathMissing": path_missing,
-        "latestRunDimensions": latest_run_dimensions(Path(reports_dir), project),
+        "latestRunDimensions": latest_run_dimensions(Path(reports_dir), project, log=SHARED_LOG),
     }

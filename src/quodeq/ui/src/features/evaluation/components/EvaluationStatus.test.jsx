@@ -208,12 +208,14 @@ describe('EvaluationStatus live-findings filter', () => {
     expect(screen.queryByText('old-a.py:2')).not.toBeInTheDocument();
   });
 
-  it('shows everything when the preference is off', async () => {
+  it('shows every row when the preference is off, but still counts only new ones', async () => {
+    // "new violations" and "N new" mean this run's findings whatever rows
+    // the setting shows; carried-forward ones are not new.
     localStorage.setItem(NEW_FINDINGS_ONLY_KEY, 'false');
     renderStatus();
     expect(await screen.findByText('old-a.py:2')).toBeInTheDocument();
-    expect(screen.queryByText(/carried forward hidden/)).not.toBeInTheDocument();
-    expect(screen.getByTestId('strip-sum')).toHaveTextContent('3');
+    expect(screen.getByTestId('strip-sum')).toHaveTextContent('1');
+    expect(screen.getByText(/^1 new/)).toBeInTheDocument();
   });
 
   it('hides snake_case carried_forward findings too (SSE payloads with no violation-model mapping)', async () => {

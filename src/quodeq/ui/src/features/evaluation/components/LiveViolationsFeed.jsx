@@ -184,7 +184,7 @@ function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimensio
   );
 }
 
-export default function LiveViolationsFeed({ liveViolations, job = null, hiddenCarriedCount = 0 }) {
+export default function LiveViolationsFeed({ liveViolations, job = null, hiddenCarriedCount = 0, newCount = null }) {
   // Per-dim activity timestamps power "latest active dimension on top".
   const lastActivity = useDimensionActivity(liveViolations);
 
@@ -207,11 +207,14 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   // A fully-cached dimension yields zero NEW findings. Bailing out here
   // would make the feed disappear and read as "nothing found", so keep the
   // header whenever the filter is what emptied the list.
-  if (!totalCount && !hiddenCarriedCount) return null;
+  // A running job keeps the feed even before its first finding: the latest
+  // header says it is live.
+  if (!totalCount && !hiddenCarriedCount && !isRunning) return null;
 
   return (
     <div className="vlive-feed">
-      <LiveViolationsHead totalCount={totalCount} isRunning={isRunning} />
+      {/* The head counts new findings even when the rows include carried ones. */}
+      <LiveViolationsHead totalCount={newCount ?? totalCount} isRunning={isRunning} />
       {(totalCount > 0 || isRunning) && (
         <LiveViolationsCard
           liveViolations={liveViolations}

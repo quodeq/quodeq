@@ -50,4 +50,13 @@ describe('the run progress block', () => {
     expect(await screen.findByRole('button', { name: /details/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('job-123')).toBeNull();
   });
+
+  it('per-dimension sums are labelled file-analyses, not files', async () => {
+    // 52 + 20 analyzed, 0 + 32 to go: counts over dimensions, which a
+    // "source files" figure beside them must not be read against.
+    renderProgress({ jobId: 'job-1', status: 'running', logs: [] });
+    fireEvent.click(await screen.findByRole('button', { name: /details/i }));
+    expect(screen.getByText('file-analyses this run')).toBeInTheDocument();
+    expect(screen.getByText('file-analyses to go')).toBeInTheDocument();
+  });
 });

@@ -213,4 +213,10 @@ describe('LiveViolationsFeed', () => {
     renderFeed({ liveViolations: {}, hiddenCarriedCount: 3, job: { jobId: 'j1', status: 'running' } });
     expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
   });
+
+  it('a running job with no findings at all still shows the feed and the latest header', () => {
+    renderFeed({ liveViolations: {}, hiddenCarriedCount: 0, job: { jobId: 'j1', status: 'running' } });
+    expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
+    expect(screen.getByText(/no new findings · streaming/)).toBeInTheDocument();
+  });
 });
