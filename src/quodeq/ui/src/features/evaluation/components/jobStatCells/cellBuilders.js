@@ -4,6 +4,7 @@
  */
 
 import { formatDuration } from '../../../../utils/formatters.js';
+import { formatDurationCoarse } from '../../../../utils/dateFormatting.js';
 import { isTimeLimitExit } from '../../../../models/exitReason.js';
 import { t } from '../../../../strings/index.js';
 import { suppressedSuffix, carriedSuffix, formatSevHint } from './derivations.js';
@@ -84,8 +85,14 @@ function buildRunningCells(inputs) {
   // progress data instead of repeating "running".
   const dc = inputs.dimCycle ?? null;
   const runKnown = inputs.totalFiles > 0;
-  const modeHint = inputs.scanMode === SCAN_MODE.INCREMENTAL ? t('evaluate.modeIncremental')
-    : inputs.scanMode === SCAN_MODE.CLEAN ? t('evaluate.modeFullRescan') : '';
+  // A clean scan re-reads every file, an incremental one targets what
+  // changed; no hint until the mode is known.
+  const filesHint = inputs.scanMode === SCAN_MODE.CLEAN ? t('evaluate.filesHint')
+    : inputs.scanMode === SCAN_MODE.INCREMENTAL ? t('evaluate.changedFilesHint') : null;
+  // The run's own budget when it has one; an unlimited run keeps the ETA.
+  const elapsedHint = inputs.budgetS > 0
+    ? t('evaluate.ofBudget', { budget: formatDurationCoarse(inputs.budgetS) })
+    : (inputs.etaHint ?? null);
   return [
     {
       // The counter lives in the hint, not the label. Tile labels are a
@@ -103,11 +110,13 @@ function buildRunningCells(inputs) {
       label: t('evaluate.filesThisRun'),
       value: runKnown ? inputs.takenFiles : '—',
       trailing: runKnown ? `/ ${inputs.totalFiles}` : null,
-      hint: runKnown ? `${inputs.overallPct}%${modeHint}` : HINT_PREPARING,
+      hint: runKnown ? filesHint : HINT_PREPARING,
       tone: CELL_TONE.DEFAULT,
     },
-    foundCell(inputs.liveCount, 'violations', formatSevHint(inputs.sevCounts), inputs.suppressedCount, inputs.carriedCount),
-    elapsedCell(inputs.elapsedS, 'elapsed', inputs.etaHint ?? null),
+    // This run's new findings only: suppressed and carried-forward ones are
+    // not what the run found, and the feed below says the rest.
+    foundCell(inputs.liveCount, t('evaluate.newViolationsLabel'), formatSevHint(inputs.sevCounts)),
+    elapsedCell(inputs.elapsedS, 'elapsed', elapsedHint),
   ];
 }
 
@@ -125,6 +134,7 @@ function buildRunningCells(inputs) {
  * @param {object|null} [inputs.dimCycle] — from buildDimensionCycle (running only)
  * @param {object} [inputs.sevCounts] — from sumSeverities (running only)
  * @param {string|null} [inputs.scanMode] — from deriveScanMode (running only)
+ * @param {number} [inputs.budgetS] — the run's time budget in seconds; 0 or absent = unlimited (running only)
  * @returns {Array<{label,value,hint,tone,trailing?}>} exactly 4 cells.
  */
 export function buildJobStatCells(status, inputs) {
