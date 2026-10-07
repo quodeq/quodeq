@@ -31,7 +31,7 @@ describe('LiveViolationsFeed', () => {
 
   it('groups violations per dimension with counts', () => {
     renderFeed({ liveViolations: violations });
-    expect(document.querySelector('.vlive-dimension-name')).toHaveTextContent('reliability');
+    expect(document.querySelector('.vlive-dimension-group:not(.vlatest-group) .vlive-dimension-name')).toHaveTextContent('reliability');
     expect(document.querySelector('.vlive-dimension-count')).toHaveTextContent('2');
     expect(screen.getByText('2 new')).toBeInTheDocument();
     expect(screen.getByText('1 crit')).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe('LiveViolationsFeed', () => {
 
   it('expands a row to its detail on click', () => {
     renderFeed({ liveViolations: violations });
-    fireEvent.click(document.querySelector('.vlive-dimension-label'));
+    fireEvent.click(document.querySelector('.vlive-dimension-group:not(.vlatest-group) .vlive-dimension-label'));
     const row = screen.getByRole('button', { name: /^critical finding: Crash on nil/i });
     expect(row).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(row);
@@ -72,7 +72,7 @@ describe('LiveViolationsFeed', () => {
     };
     const group = (name) => Array.from(document.querySelectorAll('.vlive-dimension-label'))
       .find((b) => b.querySelector('.vlive-dimension-name')?.textContent === name);
-    const groupNames = () => Array.from(document.querySelectorAll('.vlive-dimension-name')).map((n) => n.textContent);
+    const groupNames = () => Array.from(document.querySelectorAll('.vlive-dimension-group:not(.vlatest-group) .vlive-dimension-name')).map((n) => n.textContent);
 
     // Opening the running group on its own mounted every one of its rows,
     // and a dimension with thousands of findings made the screen lag.
@@ -100,7 +100,7 @@ describe('LiveViolationsFeed', () => {
     });
 
     const many = { security: Array.from({ length: 120 }, (_, i) => ({ severity: 'minor', principle: 'p', file: `F${i}.swift`, line: i })) };
-    const groupRows = () => document.querySelectorAll('.vlive-dimension-group .vdetail-row').length;
+    const groupRows = () => document.querySelectorAll('.vlive-dimension-group:not(.vlatest-group) .vdetail-row').length;
 
     it('lists every finding of an open group when there is no scroller to virtualize against', () => {
       renderFeed({ liveViolations: many });
@@ -142,7 +142,7 @@ describe('LiveViolationsFeed', () => {
       const QC = withQueryClient();
       const { rerender } = render(<QC><LiveViolationsFeed liveViolations={one} /></QC>);
       fireEvent.click(group('security'));
-      const inGroup = () => within(document.querySelector('.vlive-dimension-group'));
+      const inGroup = () => within(document.querySelector('.vlive-dimension-group:not(.vlatest-group)'));
       fireEvent.click(inGroup().getByRole('button', { name: /finding: First/i }));
       const two = { security: [...one.security, { severity: 'critical', principle: 'p', file: 'B.swift', line: 2, title: 'Second' }] };
       rerender(<QC><LiveViolationsFeed liveViolations={two} /></QC>);
@@ -186,5 +186,31 @@ describe('LiveViolationsFeed', () => {
     expect(screen.queryByText(/carried forward hidden/)).toBeNull();
     expect(screen.queryByText(/checks passed/)).toBeNull();
     expect(document.querySelector('.vlive-head-dim')).toBeNull();
+  });
+
+  it('latest is the first group of the card, open by default', () => {
+    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
+    const groups = document.querySelectorAll('.vlive-card > .vlive-dimension-group');
+    expect(groups[0]).toHaveTextContent(/latest 10/i);
+    expect(screen.getByRole('button', { name: /latest 10/i })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opening a dimension closes latest', () => {
+    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
+    fireEvent.click(screen.getByRole('button', { name: /^reliability/i }));
+    expect(screen.getByRole('button', { name: /latest 10/i })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('open dimension rows show the principle, then the title', () => {
+    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
+    fireEvent.click(screen.getByRole('button', { name: /^reliability/i }));
+    const row = screen.getByRole('button', { name: /finding: Crash on nil/i });
+    expect(row.querySelector('.vticker-dim')).toHaveTextContent('fault tolerance');
+    expect(row.querySelector('.vrow-rule')).toHaveTextContent('Crash on nil');
+  });
+
+  it('an empty run still shows the latest group header', () => {
+    renderFeed({ liveViolations: {}, hiddenCarriedCount: 3, job: { jobId: 'j1', status: 'running' } });
+    expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
   });
 });

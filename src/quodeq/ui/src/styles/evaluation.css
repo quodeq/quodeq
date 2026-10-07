@@ -3573,16 +3573,9 @@ button.eval-provider-badge--clickable:focus-visible {
   flex-direction: column;
   gap: 8px;
 }
-.vticker-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 16px;
-  border-bottom: 1px solid var(--color-border-soft, var(--color-border));
-  background: color-mix(in srgb, var(--color-bg) 45%, var(--color-surface));
-}
-.vticker-title,
+/* "latest 10": the first group of the findings accordion. */
+.vlatest-group .vlive-dimension-name { color: var(--color-accent); }
+.vlatest-group .vticker-state { margin-left: auto; }
 .vticker-state {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
   font-size: 11px;
@@ -3610,6 +3603,10 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .vlive-card .vdetail-row-main.vlive-collapsible.vticker-row-main {
   grid-template-columns: 4px 74px 120px minmax(0, 1fr) minmax(0, 200px);
+}
+/* Dimension rows: the same cells plus the expand chevron. */
+.vlive-card .vdetail-row-main.vlive-collapsible.vticker-row-main.vlive-row--expandable {
+  grid-template-columns: 4px 74px 120px minmax(0, 1fr) minmax(0, 200px) 16px;
 }
 .vticker-pin-main {
   display: grid;
@@ -3693,6 +3690,9 @@ button.eval-provider-badge--clickable:focus-visible {
 @container vlive-feed (max-width: 560px) {
   .vlive-card .vdetail-row-main.vlive-collapsible.vticker-row-main {
     grid-template-columns: 4px 74px minmax(0, 1fr);
+  }
+  .vlive-card .vdetail-row-main.vlive-collapsible.vticker-row-main.vlive-row--expandable {
+    grid-template-columns: 4px 74px minmax(0, 1fr) 16px;
   }
   .vticker-pin-main { grid-template-columns: 4px 74px minmax(0, 1fr) 24px; }
   .vticker-dim,

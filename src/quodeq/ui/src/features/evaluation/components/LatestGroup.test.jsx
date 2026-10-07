@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import LiveFindingsTicker from './LiveFindingsTicker.jsx';
+import LatestGroup from './LatestGroup.jsx';
 import { latestFindings, addPin } from './liveTicker.js';
 
-const f = (arrivalSeq, title, severity = 'major') => ({ arrivalSeq, title, severity, principle: 'p', file: `${title}.swift`, line: 1 });
+const f = (arrivalSeq, title, severity = 'major') => ({ arrivalSeq, title, severity, principle: 'Fault Tolerance', file: `${title}.swift`, line: 1 });
+const group = (props) => <LatestGroup open onToggle={() => {}} {...props} />;
 const titles = () => Array.from(document.querySelectorAll('.vticker-row .vrow-rule')).map((n) => n.textContent);
 
 describe('latestFindings', () => {
@@ -32,22 +33,38 @@ describe('addPin', () => {
   });
 });
 
-describe('LiveFindingsTicker', () => {
+describe('LatestGroup', () => {
   afterEach(() => { vi.useRealTimers(); });
 
-  it('renders nothing without findings', () => {
-    const { container } = render(<LiveFindingsTicker liveViolations={{}} isRunning />);
-    expect(container.firstChild).toBeNull();
+  it('an empty run shows just the header', () => {
+    render(group({ liveViolations: {}, isRunning: true }));
+    expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
+    expect(document.querySelector('.vticker-row')).toBeNull();
+  });
+
+  it('the header carries no count and each row shows the principle, then the title', () => {
+    render(group({ liveViolations: { reliability: [f(1, 'Crash on nil')] }, isRunning: true }));
+    const header = screen.getByRole('button', { name: /latest 10/i });
+    expect(header.querySelector('.vlive-dimension-count')).toBeNull();
+    const dim = document.querySelector('.vticker-row .vticker-dim');
+    expect(dim).toHaveTextContent('Fault Tolerance');
+    expect(dim).toHaveAttribute('title', 'reliability');
+  });
+
+  it('closed, it keeps only the header', () => {
+    render(group({ liveViolations: { security: [f(1, 'first')] }, isRunning: true, open: false }));
+    expect(screen.getByRole('button', { name: /latest 10/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelector('.vticker-row')).toBeNull();
   });
 
   it('lists the latest findings newest first', () => {
-    render(<LiveFindingsTicker liveViolations={{ security: [f(1, 'first'), f(2, 'second')] }} isRunning />);
+    render(group({ liveViolations: { security: [f(1, 'first'), f(2, 'second')] }, isRunning: true }));
     expect(titles()).toEqual(['second', 'first']);
     expect(screen.getByText('live')).toBeInTheDocument();
   });
 
   it('pins a clicked finding with its detail, and unpins it', () => {
-    render(<LiveFindingsTicker liveViolations={{ security: [f(1, 'Crash on nil', 'critical')] }} isRunning={false} />);
+    render(group({ liveViolations: { security: [f(1, 'Crash on nil', 'critical')] }, isRunning: false }));
     fireEvent.click(screen.getByRole('button', { name: /Pin critical finding: Crash on nil/ }));
     const pin = document.querySelector('.vticker-pin');
     expect(pin).not.toBeNull();
@@ -59,13 +76,13 @@ describe('LiveFindingsTicker', () => {
 
   it('holds still while hovered and says how many are waiting', () => {
     vi.useFakeTimers();
-    const { rerender } = render(<LiveFindingsTicker liveViolations={{ security: [f(1, 'first')] }} isRunning />);
-    fireEvent.pointerEnter(document.querySelector('.vticker-card'));
-    rerender(<LiveFindingsTicker liveViolations={{ security: [f(1, 'first'), f(2, 'second')] }} isRunning />);
+    const { rerender } = render(group({ liveViolations: { security: [f(1, 'first')] }, isRunning: true }));
+    fireEvent.pointerEnter(document.querySelector('.vlatest-rows'));
+    rerender(group({ liveViolations: { security: [f(1, 'first'), f(2, 'second')] }, isRunning: true }));
     act(() => { vi.advanceTimersByTime(1000); });
     expect(titles()).toEqual(['first']);
     expect(screen.getByText('paused · 1 new waiting')).toBeInTheDocument();
-    fireEvent.pointerLeave(document.querySelector('.vticker-card'));
+    fireEvent.pointerLeave(document.querySelector('.vlatest-rows'));
     act(() => { vi.advanceTimersByTime(1000); });
     expect(titles()).toEqual(['second', 'first']);
   });

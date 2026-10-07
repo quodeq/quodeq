@@ -3,14 +3,14 @@ import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { FindingDetailBody } from '../../../components/findingDetail.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
 import { SevBadge } from '../../../components/terminal/index.js';
-import { latestFindings, countFindings, addPin } from './liveTicker.js';
+import { latestFindings, countFindings, addPin, TICKER_SIZE } from './liveTicker.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 import { KEY } from '../../../vocab/keyboard.js';
 
-// One ticker update per window at most, so a burst of findings reads as a
-// few steps instead of a flicker.
+// One update per window at most, so a burst of findings reads as a few
+// steps instead of a flicker.
 const TICKER_THROTTLE_MS = 250;
 const REAL_SEVERITY_SET = new Set(SEVERITY_ORDER);
 
@@ -25,7 +25,12 @@ function fileRef(v) {
   };
 }
 
-function FindingCells({ dim, v }) {
+/**
+ * A finding's cells, shared by the latest rows and the dimension rows: the
+ * severity, the principle (its dimension in the tooltip), the title, the
+ * file.
+ */
+export function FindingCells({ dim, v }) {
   const { filename, ref, display } = fileRef(v);
   return (
     <>
@@ -33,8 +38,8 @@ function FindingCells({ dim, v }) {
       {REAL_SEVERITY_SET.has(v.severity)
         ? <SevBadge level={v.severity} format="long" />
         : <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>}
-      <span className="vticker-dim">{dim}</span>
-      <span className="vrow-rule">{v.title || v.principle || ''}</span>
+      <span className="vticker-dim" title={dim}>{v.principle || dim}</span>
+      <span className="vrow-rule">{v.title || ''}</span>
       {filename ? <FileCopyBtn display={display} copyText={ref} /> : <span />}
     </>
   );
@@ -126,10 +131,12 @@ function usePauseOnHover() {
 }
 
 /**
- * The latest findings across every dimension, newest on top. Clicking one
- * pins it above the ticker with its detail open until it is closed.
+ * The first group of the live findings accordion: the latest findings across
+ * every dimension, newest on top. Clicking one pins it, with its detail, at
+ * the top of the group until it is closed. No count: the feed head and the
+ * tiles already say how many.
  */
-export default function LiveFindingsTicker({ liveViolations, isRunning }) {
+export default function LatestGroup({ liveViolations, isRunning, open, onToggle }) {
   const [paused, hoverHandlers] = usePauseOnHover();
   const [pins, setPins] = useState([]);
   const latest = useMemo(() => latestFindings(liveViolations), [liveViolations]);
@@ -142,23 +149,25 @@ export default function LiveFindingsTicker({ liveViolations, isRunning }) {
   const onPin = useCallback((row) => setPins((cur) => addPin(cur, row)), []);
   const onUnpin = useCallback((key) => setPins((cur) => cur.filter((p) => p.key !== key)), []);
 
-  if (!shown.length && !pins.length) return null;
   return (
-    <div className="vticker">
+    <div className={`vlive-dimension-group vlatest-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
+      <button type="button" className="vlive-dimension-label" onClick={onToggle} aria-expanded={open}>
+        <span className={`vlive-dimension-caret${open ? ' vlive-dimension-caret--open' : ''}`} aria-hidden="true">▸</span>
+        <span className="vlive-dimension-name">{t('evaluate.latestFindings', { count: TICKER_SIZE })}</span>
+        <TickerState isRunning={isRunning} paused={paused} waiting={total - shownTotalRef.current} />
+      </button>
       {pins.length > 0 && (
         <div className="vticker-pins" aria-label={t('evaluate.pinnedFindings')}>
           {pins.map((row) => <PinnedFinding key={row.key} row={row} onUnpin={onUnpin} />)}
         </div>
       )}
-      <div className="vlive-card vticker-card" {...hoverHandlers}>
-        <div className="vticker-head">
-          <span className="vticker-title">{t('evaluate.latestFindings', { count: shown.length })}</span>
-          <TickerState isRunning={isRunning} paused={paused} waiting={total - shownTotalRef.current} />
+      {open && shown.length > 0 && (
+        <div className="vlatest-rows" {...hoverHandlers}>
+          {shown.map((row) => (
+            <TickerRow key={row.key} row={row} pinned={pinnedKeys.has(row.key)} arrived={arrived.has(row.key)} onPin={onPin} />
+          ))}
         </div>
-        {shown.map((row) => (
-          <TickerRow key={row.key} row={row} pinned={pinnedKeys.has(row.key)} arrived={arrived.has(row.key)} onPin={onPin} />
-        ))}
-      </div>
+      )}
     </div>
   );
 }

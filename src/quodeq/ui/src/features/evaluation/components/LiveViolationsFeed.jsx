@@ -1,12 +1,10 @@
 import { memo, useState, useMemo, useCallback, useRef } from 'react';
-import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { FindingDetailBody } from '../../../components/findingDetail.jsx';
-import { parseFileRef } from '../../../utils/formatters.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
 import { orderDimensions, sortBySeverity, sameDim } from './liveViolationsOrdering.js';
-import LiveFindingsTicker from './LiveFindingsTicker.jsx';
+import LatestGroup, { FindingCells } from './LatestGroup.jsx';
 import VirtualList, { useDashboardScrollElement, useScrollMargin } from '../../explorer/components/VirtualList.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
@@ -18,24 +16,15 @@ import { KEY } from '../../../vocab/keyboard.js';
 // A collapsed row: 38px min-height plus its 1px border. The virtualizer
 // measures the real height, this only sizes rows it has not mounted yet.
 const ROW_HEIGHT_ESTIMATE = 39;
-// The 3 real severities (as opposed to a missing/unrecognised one), for
-// deciding whether SevBadge (which only knows those 3) can render this row.
-const REAL_SEVERITY_SET = new Set(SEVERITY_ORDER);
 
 // Open state lives in the group, not here: the virtual list unmounts rows
 // scrolled out of view, and a row would come back closed.
-const ViolationLiveRow = memo(function ViolationLiveRow({ violation, rowKey, open, onToggle }) {
+const ViolationLiveRow = memo(function ViolationLiveRow({ dim, violation, rowKey, open, onToggle }) {
   const v = violation;
-  const { filePath, line } = parseFileRef(v.file, v.line);
-  const filename = filePath ? filePath.split('/').pop() : null;
-  const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
-  const ref = line != null ? `${filePath}:${range}` : filePath;
-  const display = line != null ? `${filename}:${range}` : filename;
-
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div
-        className="vdetail-row-main vlive-collapsible"
+        className="vdetail-row-main vlive-collapsible vticker-row-main vlive-row--expandable"
         role="button"
         tabIndex={0}
         aria-expanded={open}
@@ -43,12 +32,8 @@ const ViolationLiveRow = memo(function ViolationLiveRow({ violation, rowKey, ope
         onClick={() => onToggle(rowKey)}
         onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggle(rowKey); } }}
       >
-        <span className="vlive-rail" aria-hidden="true" />
-        {REAL_SEVERITY_SET.has(v.severity)
-          ? <SevBadge level={v.severity} format="long" />
-          : <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>}
-        <span className="vrow-rule">{v.principle || ''}</span>
-        {filename ? <FileCopyBtn display={display} copyText={ref} /> : <span />}
+        {/* Same shape as the latest rows: principle, then the title. */}
+        <FindingCells dim={dim} v={v} />
         <svg
           className={`vlive-chevron${open ? ' open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24"
@@ -111,7 +96,7 @@ function DimensionRows({ dim, violations }) {
   const estimateSize = useCallback(() => ROW_HEIGHT_ESTIMATE, []);
   const renderRow = (v) => {
     const key = rowKeyOf(dim, v);
-    return <ViolationLiveRow violation={v} rowKey={key} open={expanded.has(key)} onToggle={toggleRow} />;
+    return <ViolationLiveRow dim={dim} violation={v} rowKey={key} open={expanded.has(key)} onToggle={toggleRow} />;
   };
   return (
     <div ref={listRef}>
@@ -138,16 +123,19 @@ const DimensionGroup = memo(function DimensionGroup({ dim, violations, open, sca
   );
 });
 
-// Every group starts closed and stays that way until the user opens it.
-// Several can be open at once; nothing opens on its own.
+// "latest 10" starts open and every dimension closed. Several dimensions can
+// be open at once; opening one closes "latest 10", so one live list leads.
 function useOpenDims() {
   const [openDims, setOpenDims] = useState(() => new Set());
-  const toggle = useCallback((dim) => setOpenDims((cur) => {
+  const [latestOpen, setLatestOpen] = useState(true);
+  const toggleDim = useCallback((dim) => setOpenDims((cur) => {
     const next = new Set(cur);
-    if (next.has(dim)) next.delete(dim); else next.add(dim);
+    if (next.has(dim)) next.delete(dim);
+    else { next.add(dim); setLatestOpen(false); }
     return next;
   }), []);
-  return [openDims, toggle];
+  const toggleLatest = useCallback(() => setLatestOpen((v) => !v), []);
+  return { openDims, toggleDim, latestOpen, toggleLatest };
 }
 
 function computeQueuedFiles(runningDim) {
@@ -171,9 +159,11 @@ function LiveViolationsHead({ totalCount, isRunning }) {
   );
 }
 
-function LiveViolationsCard({ orderedDims, openDims, toggleDim, currentDimension, isRunning, queued }) {
+function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimension, isRunning, queued }) {
+  const { openDims, toggleDim, latestOpen, toggleLatest } = open;
   return (
     <div className="vlive-card">
+      <LatestGroup liveViolations={liveViolations} isRunning={isRunning} open={latestOpen} onToggle={toggleLatest} />
       {orderedDims.map(({ dim, violations }) => (
         <DimensionGroup
           key={dim}
@@ -211,7 +201,7 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [liveViolations, currentDimension]);
 
-  const [openDims, toggleDim] = useOpenDims();
+  const open = useOpenDims();
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
   // A fully-cached dimension yields zero NEW findings. Bailing out here
@@ -223,17 +213,14 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
     <div className="vlive-feed">
       <LiveViolationsHead totalCount={totalCount} isRunning={isRunning} />
       {(totalCount > 0 || isRunning) && (
-        <>
-          <LiveFindingsTicker liveViolations={liveViolations} isRunning={isRunning} />
-          <LiveViolationsCard
-            orderedDims={orderedDims}
-            openDims={openDims}
-            toggleDim={toggleDim}
-            currentDimension={currentDimension}
-            isRunning={isRunning}
-            queued={queued}
-          />
-        </>
+        <LiveViolationsCard
+          liveViolations={liveViolations}
+          orderedDims={orderedDims}
+          open={open}
+          currentDimension={currentDimension}
+          isRunning={isRunning}
+          queued={queued}
+        />
       )}
     </div>
   );
