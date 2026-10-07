@@ -22,7 +22,7 @@ const EVAL_OPTIONS_HINT = (
   </>
 );
 
-function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScopeBrowser, onCloseScopeBrowser, isReadOnlyEphemeral, urlActions, activeModel, branchLabel, scopeValue, onGoToSettings, onGoToProjects }) {
+function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScopeBrowser, onCloseScopeBrowser, isReadOnlyEphemeral, urlActions, activeModel, branchLabel, scopeValue, estimates, onGoToSettings, onGoToProjects }) {
   const { urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = urlActions;
   return (
     <>
@@ -47,7 +47,7 @@ function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScope
 
       <ScopeBrowserOverlay open={scopeBrowserOpen} info={info} scope={scope} onClose={onCloseScopeBrowser} />
 
-      <DetectedLine scanData={scope.scanData} />
+      <DetectedLine scanData={scope.scanData} estimates={estimates} />
 
       {isReadOnlyEphemeral && (
         <div className="ephemeral-completed-note">
@@ -134,6 +134,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         urlActions={{ urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore }}
         activeModel={activeModel}
         branchLabel={branchLabel}
+        estimates={estimates}
         scopeValue={scopeValue}
         onGoToSettings={onGoToSettings}
         onGoToProjects={onGoToProjects}

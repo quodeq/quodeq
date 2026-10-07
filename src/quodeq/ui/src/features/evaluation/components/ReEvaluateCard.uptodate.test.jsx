@@ -3,6 +3,9 @@ import { screen, waitFor } from '@testing-library/react';
 import { invalidateDimensionCache } from '../hooks/usePluginDimensions.js';
 import { makeFakeApi, renderCard } from './_reEvaluateCard.fixtures.jsx';
 
+vi.mock('../hooks/useScanData.js', () => ({
+  useScanData: () => ({ scanData: { codeFiles: 3926, languages: { py: 2335 } }, loading: false, error: null }),
+}));
 vi.mock('../hooks/useScanEstimates.js', () => ({
   useScanEstimates: () => ({
     loading: false,
@@ -29,5 +32,11 @@ describe('ReEvaluateCard up-to-date dimensions', () => {
     renderCard({ project: 'p-uptodate', projectInfo: info, api });
     await waitFor(() => expect(screen.getByRole('button', { name: /security/i })).toHaveClass('eval-dim-card--uptodate'));
     expect(screen.getByRole('button', { name: /reliability/i })).not.toHaveClass('eval-dim-card--uptodate');
+  });
+
+  it('shows the one file count the estimates give', async () => {
+    const info = { name: 'demo', path: '/repos/myproj', location: 'local', ephemeral: false, evaluable: true };
+    renderCard({ project: 'p-count', projectInfo: info, api: makeFakeApi({ getProjectInfo: vi.fn().mockResolvedValue(info) }) });
+    await waitFor(() => expect(document.querySelector('.eval-detected-line')).toHaveTextContent(/^3,892 source files/));
   });
 });

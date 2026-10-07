@@ -397,7 +397,7 @@
   "evaluate.customBudget": "custom {label}",
   "evaluate.customLimitTitle": "Custom limit from Settings",
   "evaluate.detailsFallback": "details",
-  "evaluate.detectedSourceFiles": "detected {count} source files",
+  "evaluate.sourceFiles": "{count} source files",
   "evaluate.dimPlural": "{count} dimensions",
   "evaluate.dimScanning": "scanning",
   "evaluate.dimSingular": "{count} dimension",

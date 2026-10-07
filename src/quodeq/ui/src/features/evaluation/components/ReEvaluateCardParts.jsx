@@ -51,15 +51,20 @@ export function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, 
   );
 }
 
-export function DetectedLine({ scanData }) {
+// One count: the files the evaluation dispatches (what the cards count too),
+// or the scan's own count until the estimates land. The languages go by
+// name: the scan's per-language counts use another definition of source
+// file and would not add up to it.
+export function DetectedLine({ scanData, estimates = null }) {
   const s = createScanSummary(scanData);
   if (!s || !(s.codeFiles > 0)) return null;
   const langs = detectedLanguages(s.languages);
+  const count = estimates?.projectFiles > 0 ? estimates.projectFiles : s.codeFiles;
   return (
     <div className="eval-detected-line">
-      {t('evaluate.detectedSourceFiles', { count: formatCount(s.codeFiles) })}
-      {langs.map(({ name, count }) => (
-        <span key={name}> · {name} {formatCount(count)}</span>
+      {t('evaluate.sourceFiles', { count: formatCount(count) })}
+      {langs.map(({ name }) => (
+        <span key={name}> · {name}</span>
       ))}
     </div>
   );
