@@ -52,3 +52,23 @@ export function HydratedReportContent({ dimensions, severities = REPORT_SEVERITI
   }, [markdown, markdownRef]);
   return <ReportContent markdown={markdown} />;
 }
+
+/**
+ * One pane spec whose body hydrates the deferred detail before building:
+ * `render` mounts HydratedReportContent, which leaves its Markdown in
+ * *markdownRef* for copy and download; before the pane has rendered once,
+ * those fall back to a build without detail rather than blocking.
+ * @param {{id: string, type: string, title: string, filename: string, dimensions: Array, severities?: Set|null, build: Function, markdownRef: {current: string|null}}} spec
+ * @returns {Object}
+ */
+export function hydratedReportSpec({ id, type, title, filename, dimensions, severities, build, markdownRef }) {
+  const fallback = () => markdownRef.current ?? build(dimensions);
+  return {
+    id,
+    type,
+    title,
+    render: () => <HydratedReportContent dimensions={dimensions} severities={severities} build={build} markdownRef={markdownRef} />,
+    copy: fallback,
+    download: () => ({ filename, body: fallback() }),
+  };
+}
