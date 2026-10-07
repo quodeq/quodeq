@@ -3572,7 +3572,7 @@ button.eval-provider-badge--clickable:focus-visible {
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
   min-height: 38px;
 }
-.vlive-card .vdetail-row:last-of-type .vdetail-row-main.vlive-collapsible { border-bottom: 0; }
+.vlive-card .vlive-dimension-group:last-child [role="listitem"]:last-child .vdetail-row-main.vlive-collapsible { border-bottom: 0; }
 .vlive-card .vdetail-row-main.vlive-collapsible:hover {
   background: color-mix(in srgb, var(--color-bg) 40%, var(--color-surface));
 }
@@ -3766,18 +3766,6 @@ button.eval-provider-badge--clickable:focus-visible {
 .vlive-dimension-count { animation: vlive-count-bump 500ms ease-out; }
 @keyframes vlive-count-bump {
   30% { border-color: var(--color-accent); color: var(--color-accent); }
-}
-.vlive-dimension-more {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 10px 16px;
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-  border-bottom: 1px solid var(--color-border-soft, var(--color-border));
 }
 
 @container vlive-feed (max-width: 560px) {

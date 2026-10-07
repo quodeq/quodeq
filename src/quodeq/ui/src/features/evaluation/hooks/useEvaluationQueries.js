@@ -10,7 +10,7 @@
  * nothing ran under the default build, and the two drifted (#1383). The
  * server decides what a finding is, once, on the stream.
  */
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NO_JOB_ID, evaluationKeys } from "../../../api/queryKeys.js";
 import { statusRefetchInterval } from "./useEvaluation.helpers.js";
@@ -23,6 +23,18 @@ function groupFindingsByDimension(findings) {
     (liveViolations[dim] ??= []).push(f);
   }
   return liveViolations;
+}
+
+// The cache only appends (or cuts a block off the front), so a dimension with
+// the same length and the same first and last row holds the same rows. Hand
+// back its previous array then: the feed memoises each dimension on it, and a
+// finding in one dimension would otherwise re-render and re-sort every other.
+function keepUnchangedDimensions(next, prev) {
+  for (const [dim, rows] of Object.entries(next)) {
+    const old = prev[dim];
+    if (old && old.length === rows.length && old[0] === rows[0] && old.at(-1) === rows.at(-1)) next[dim] = old;
+  }
+  return next;
 }
 
 // The slot is never fetched (enabled: false below): the stream fills it with
@@ -63,7 +75,12 @@ export function useEvaluationQueries(api, jobId, streamState) {
   // rows are unchanged. A fresh object on every render would defeat the memos
   // in the stat strip and the live feed, which compare this by identity.
   const findings = findingsQuery.data;
-  const liveViolations = useMemo(() => groupFindingsByDimension(findings || []), [findings]);
+  const previous = useRef({});
+  const liveViolations = useMemo(() => {
+    const grouped = keepUnchangedDimensions(groupFindingsByDimension(findings || []), previous.current);
+    previous.current = grouped;
+    return grouped;
+  }, [findings]);
 
   return { job, liveViolations };
 }

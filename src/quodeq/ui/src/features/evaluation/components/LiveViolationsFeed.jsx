@@ -1,13 +1,13 @@
-import { useState, useMemo, useCallback } from 'react';
+import { memo, useState, useMemo, useCallback, useRef } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { FindingDetailBody } from '../../../components/findingDetail.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
-import { staggerDelayStyle } from '../../../utils/animation.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
 import { orderDimensions, sortBySeverity, sameDim } from './liveViolationsOrdering.js';
 import LiveFindingsTicker from './LiveFindingsTicker.jsx';
+import VirtualList, { useDashboardScrollElement, useScrollMargin } from '../../explorer/components/VirtualList.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
@@ -16,17 +16,16 @@ import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 import { KEY } from '../../../vocab/keyboard.js';
 import { pluralKey } from '../../../utils/plural.js';
 
-const ANIM_DELAY_PER_ITEM_MS = 40;
-const ANIM_MAX_DELAY_MS = 400;
-// An open group mounts this many rows at a time. A dimension can hold
-// thousands of findings, and mounting all of them is what made long runs lag.
-const DIM_PAGE_SIZE = 50;
+// A collapsed row: 38px min-height plus its 1px border. The virtualizer
+// measures the real height, this only sizes rows it has not mounted yet.
+const ROW_HEIGHT_ESTIMATE = 39;
 // The 3 real severities (as opposed to a missing/unrecognised one), for
 // deciding whether SevBadge (which only knows those 3) can render this row.
 const REAL_SEVERITY_SET = new Set(SEVERITY_ORDER);
 
-function ViolationLiveRow({ violation, index }) {
-  const [open, setOpen] = useState(false);
+// Open state lives in the group, not here: the virtual list unmounts rows
+// scrolled out of view, and a row would come back closed.
+const ViolationLiveRow = memo(function ViolationLiveRow({ violation, rowKey, open, onToggle }) {
   const v = violation;
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
@@ -35,18 +34,15 @@ function ViolationLiveRow({ violation, index }) {
   const display = line != null ? `${filename}:${range}` : filename;
 
   return (
-    <div
-      className={`vdetail-row vdetail-row--${v.severity}`}
-      style={staggerDelayStyle(index, ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}
-    >
+    <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div
         className="vdetail-row-main vlive-collapsible"
         role="button"
         tabIndex={0}
         aria-expanded={open}
         aria-label={t('evaluate.findingAria', { severity: severityLabel(v.severity), title: v.title || v.file || t('evaluate.detailsFallback') })}
-        onClick={() => setOpen(o => !o)}
-        onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
+        onClick={() => onToggle(rowKey)}
+        onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggle(rowKey); } }}
       >
         <span className="vlive-rail" aria-hidden="true" />
         {REAL_SEVERITY_SET.has(v.severity)
@@ -67,6 +63,10 @@ function ViolationLiveRow({ violation, index }) {
       {open && <FindingDetailBody v={v} />}
     </div>
   );
+});
+
+function rowKeyOf(dim, v) {
+  return `${dim}-${v.arrivalSeq ?? ''}-${v.file}-${v.principle}-${String(v.line ?? '')}`;
 }
 
 function severityMix(violations) {
@@ -94,28 +94,50 @@ function DimensionHeader({ dim, violations, open, scanning, onToggle }) {
   );
 }
 
-function DimensionGroup({ dim, violations, open, scanning, onToggle }) {
-  const [limit, setLimit] = useState(DIM_PAGE_SIZE);
+// Only the rows near the viewport are mounted, however many the dimension
+// holds, the same virtual list the Explorer's detail pages use.
+function DimensionRows({ dim, violations }) {
   // Sorted only while open: a closed group costs one header however big it is.
-  const rows = useMemo(() => (open ? sortBySeverity(violations).slice(0, limit) : []), [open, violations, limit]);
-  const remaining = violations.length - rows.length;
+  const rows = useMemo(() => sortBySeverity(violations), [violations]);
+  const scrollElement = useDashboardScrollElement();
+  const listRef = useRef(null);
+  const scrollMargin = useScrollMargin(listRef, scrollElement);
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggleRow = useCallback((key) => setExpanded((cur) => {
+    const next = new Set(cur);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  }), []);
+  const getItemKey = useCallback((i) => (rows[i] ? rowKeyOf(dim, rows[i]) : i), [dim, rows]);
+  const estimateSize = useCallback(() => ROW_HEIGHT_ESTIMATE, []);
+  const renderRow = (v) => {
+    const key = rowKeyOf(dim, v);
+    return <ViolationLiveRow violation={v} rowKey={key} open={expanded.has(key)} onToggle={toggleRow} />;
+  };
   return (
-    <div className={`vlive-dimension-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
-      <DimensionHeader dim={dim} violations={violations} open={open} scanning={scanning} onToggle={onToggle} />
-      {rows.map((v, i) => (
-        <ViolationLiveRow key={`${dim}-${v.arrivalSeq ?? ''}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
-      ))}
-      {open && remaining > 0 && (
-        <div className="vlive-dimension-more">
-          <span>{t('evaluate.showingOf', { shown: rows.length, total: violations.length })}</span>
-          <button type="button" className="term-btn--primary term-btn--sm" onClick={() => setLimit((n) => n + DIM_PAGE_SIZE)}>
-            {t('evaluate.showMoreFindings', { count: Math.min(DIM_PAGE_SIZE, remaining) })}
-          </button>
-        </div>
-      )}
+    <div ref={listRef}>
+      <VirtualList
+        items={rows}
+        scrollElement={scrollElement}
+        scrollMargin={scrollMargin}
+        estimateSize={estimateSize}
+        getItemKey={getItemKey}
+        renderItem={renderRow}
+        label={t('evaluate.dimFindingsList', { dim })}
+      />
     </div>
   );
 }
+
+// Memoised so a finding landing in one dimension does not re-render the others.
+const DimensionGroup = memo(function DimensionGroup({ dim, violations, open, scanning, onToggle }) {
+  return (
+    <div className={`vlive-dimension-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
+      <DimensionHeader dim={dim} violations={violations} open={open} scanning={scanning} onToggle={() => onToggle(dim)} />
+      {open && <DimensionRows dim={dim} violations={violations} />}
+    </div>
+  );
+});
 
 // Every group starts closed and stays that way until the user opens it.
 // Several can be open at once; nothing opens on its own.
@@ -176,7 +198,7 @@ function LiveViolationsCard({ orderedDims, openDims, toggleDim, currentDimension
           violations={violations}
           open={openDims.has(dim)}
           scanning={isRunning && sameDim(dim, currentDimension)}
-          onToggle={() => toggleDim(dim)}
+          onToggle={toggleDim}
         />
       ))}
       {isRunning && (

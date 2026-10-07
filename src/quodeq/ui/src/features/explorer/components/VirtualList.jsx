@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 /**
@@ -19,6 +19,29 @@ export function useDashboardScrollElement() {
 }
 
 /**
+ * The offset of `ref`'s element from the top of `scrollElement`'s content,
+ * for VirtualList's `scrollMargin`. Re-measured whenever anything in the
+ * scroller resizes, since content above the list moves it.
+ */
+export function useScrollMargin(ref, scrollElement) {
+  const [margin, setMargin] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !scrollElement) return undefined;
+    const measure = () => {
+      const offset = el.getBoundingClientRect().top - scrollElement.getBoundingClientRect().top + scrollElement.scrollTop;
+      setMargin((cur) => (Math.abs(cur - offset) < 1 ? cur : offset));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    for (const child of scrollElement.children) observer.observe(child);
+    return () => observer.disconnect();
+  }, [ref, scrollElement]);
+  return margin;
+}
+
+/**
  * Absolutely-positioned virtual list over a flattened items array (headers
  * and rows mixed in one list, so one scroller virtualizes the whole page).
  *
@@ -30,14 +53,19 @@ export function useDashboardScrollElement() {
  * Without a scroll container (no `.dashboard` ancestor in the DOM — a moved
  * shell or a jsdom test) it degrades to a plain fully-rendered list rather
  * than rendering nothing.
+ *
+ * `scrollMargin` is the list's distance from the top of the scroller's
+ * content. A list that starts below other content needs it (see
+ * useScrollMargin), or the virtualizer picks the rows for the wrong slice.
  */
-export default function VirtualList({ items, scrollElement, estimateSize, getItemKey, renderItem, overscan = 6, label }) {
+export default function VirtualList({ items, scrollElement, estimateSize, getItemKey, renderItem, overscan = 6, label, scrollMargin = 0 }) {
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollElement,
     estimateSize,
     overscan,
     getItemKey,
+    scrollMargin,
   });
 
   if (!scrollElement) {
@@ -76,7 +104,7 @@ export default function VirtualList({ items, scrollElement, estimateSize, getIte
               top: 0,
               left: 0,
               width: '100%',
-              transform: `translateY(${virtualRow.start}px)`,
+              transform: `translateY(${virtualRow.start - scrollMargin}px)`,
             }}
           >
             {renderItem(item)}

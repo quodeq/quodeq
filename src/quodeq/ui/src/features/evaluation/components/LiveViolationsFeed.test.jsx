@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
@@ -99,17 +99,55 @@ describe('LiveViolationsFeed', () => {
       expect(group('security')).toHaveAttribute('aria-expanded', 'true');
     });
 
-    it('mounts an open group 50 rows at a time', () => {
-      const many = { security: Array.from({ length: 120 }, (_, i) => ({ severity: 'minor', principle: 'p', file: `F${i}.swift`, line: i })) };
+    const many = { security: Array.from({ length: 120 }, (_, i) => ({ severity: 'minor', principle: 'p', file: `F${i}.swift`, line: i })) };
+    const groupRows = () => document.querySelectorAll('.vlive-dimension-group .vdetail-row').length;
+
+    it('lists every finding of an open group when there is no scroller to virtualize against', () => {
       renderFeed({ liveViolations: many });
       fireEvent.click(group('security'));
-      const groupRows = () => document.querySelectorAll('.vlive-dimension-group .vdetail-row').length;
-      expect(groupRows()).toBe(50);
-      expect(screen.getByText('showing 50 of 120')).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Show 50 more' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Show 20 more' }));
+      expect(screen.getByRole('list', { name: 'security findings' })).toBeInTheDocument();
       expect(groupRows()).toBe(120);
-      expect(screen.queryByText(/showing \d+ of/)).toBeNull();
+    });
+
+    // A dimension can hold thousands of findings; mounting all of them is
+    // what made long runs lag. Under the dashboard scroller only the rows
+    // near the viewport mount, like the Explorer's detail pages.
+    it('mounts only the rows near the viewport inside the dashboard scroller', () => {
+      const column = document.createElement('div');
+      column.className = 'app-shell__main-column';
+      const scroller = document.createElement('main');
+      scroller.className = 'dashboard';
+      // jsdom has no layout; the virtualizer reads the viewport off these.
+      Object.defineProperty(scroller, 'offsetHeight', { value: 400 });
+      Object.defineProperty(scroller, 'offsetWidth', { value: 800 });
+      column.appendChild(scroller);
+      document.body.appendChild(column);
+      // The virtualizer measures each mounted row's offsetHeight.
+      const rowHeight = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(39);
+      try {
+        const QC = withQueryClient();
+        render(<QC><LiveViolationsFeed liveViolations={many} /></QC>, { container: scroller });
+        fireEvent.click(group('security'));
+        expect(groupRows()).toBeGreaterThan(0);
+        // A 400px viewport of 39px rows plus the overscan, nowhere near 120.
+        expect(groupRows()).toBeLessThan(30);
+      } finally {
+        rowHeight.mockRestore();
+        column.remove();
+      }
+    });
+
+    it('keeps a row open when a new finding lands in its group', () => {
+      const one = { security: [{ severity: 'major', principle: 'p', file: 'A.swift', line: 1, title: 'First' }] };
+      const QC = withQueryClient();
+      const { rerender } = render(<QC><LiveViolationsFeed liveViolations={one} /></QC>);
+      fireEvent.click(group('security'));
+      const inGroup = () => within(document.querySelector('.vlive-dimension-group'));
+      fireEvent.click(inGroup().getByRole('button', { name: /finding: First/i }));
+      const two = { security: [...one.security, { severity: 'critical', principle: 'p', file: 'B.swift', line: 2, title: 'Second' }] };
+      rerender(<QC><LiveViolationsFeed liveViolations={two} /></QC>);
+      expect(inGroup().getByRole('button', { name: /finding: First/i })).toHaveAttribute('aria-expanded', 'true');
+      expect(inGroup().getByRole('button', { name: /finding: Second/i })).toHaveAttribute('aria-expanded', 'false');
     });
   });
 
