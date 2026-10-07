@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createJob } from './job.js';
+import { createJob, applyStatusFrame } from './job.js';
 
 test('createJob maps aiProvider and aiModel from API response', () => {
   const raw = { jobId: 'ext-1', aiProvider: 'llamacpp', aiModel: 'qwen3.6-27b' };
@@ -24,4 +24,11 @@ test('createJob maps timeLimitS, including 0 (unlimited)', () => {
 test('createJob maps exitReason from API response', () => {
   assert.equal(createJob({ jobId: 'j1', exitReason: 'deadline' }).exitReason, 'deadline');
   assert.equal(createJob({ jobId: 'j1' }).exitReason, null);
+});
+
+test('the commit arrives from the REST job and from a status frame', () => {
+  assert.equal(createJob({ jobId: 'j', commitSha: 'abc' }).commitSha, 'abc');
+  assert.equal(createJob({ job_id: 'j' }).commitSha, null);
+  const merged = applyStatusFrame(createJob({ jobId: 'j' }), { commit_sha: 'ed0e84b' });
+  assert.equal(merged.commitSha, 'ed0e84b');
 });
