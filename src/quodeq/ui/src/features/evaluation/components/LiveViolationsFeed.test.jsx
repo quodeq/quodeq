@@ -31,10 +31,11 @@ describe('LiveViolationsFeed', () => {
 
   it('groups violations per dimension with counts', () => {
     renderFeed({ liveViolations: violations });
-    expect(screen.getByText('reliability')).toBeInTheDocument();
+    expect(document.querySelector('.vlive-dimension-name')).toHaveTextContent('reliability');
+    expect(document.querySelector('.vlive-dimension-count')).toHaveTextContent('2');
     expect(screen.getByText('2 across 1 dimension')).toBeInTheDocument();
-    expect(screen.getByText('critical')).toBeInTheDocument();
-    expect(screen.getByText('major')).toBeInTheDocument();
+    expect(screen.getByText('1 crit')).toBeInTheDocument();
+    expect(screen.getByText('1 maj')).toBeInTheDocument();
   });
 
   it('streams the queued count from progress while running', async () => {
@@ -57,17 +58,14 @@ describe('LiveViolationsFeed', () => {
 
   it('expands a row to its detail on click', () => {
     renderFeed({ liveViolations: violations });
-    const row = screen.getByRole('button', { name: /critical finding: Crash on nil/i });
+    fireEvent.click(document.querySelector('.vlive-dimension-label'));
+    const row = screen.getByRole('button', { name: /^critical finding: Crash on nil/i });
     expect(row).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(row);
     expect(row).toHaveAttribute('aria-expanded', 'true');
   });
 
-  // The tab switch unmounts the feed. On the way back the per-dimension
-  // activity clock starts empty, every group ties, and the stable sort put
-  // the first dimension evaluated on top and open while another one was
-  // being analyzed.
-  describe('which group is open on mount while a run is on', () => {
+  describe('dimension groups', () => {
     const twoDims = {
       security: [{ severity: 'major', principle: 'input validation', file: 'S.swift', line: 1 }],
       reliability: [{ severity: 'critical', principle: 'fault tolerance', file: 'A.swift', line: 56 }],
@@ -76,27 +74,42 @@ describe('LiveViolationsFeed', () => {
       .find((b) => b.querySelector('.vlive-dimension-name')?.textContent === name);
     const groupNames = () => Array.from(document.querySelectorAll('.vlive-dimension-name')).map((n) => n.textContent);
 
-    it('opens the dimension being analyzed, on top, not the first one evaluated', async () => {
+    // Opening the running group on its own mounted every one of its rows,
+    // and a dimension with thousands of findings made the screen lag.
+    it('all start closed while a run is on, the one being analyzed on top', async () => {
       getEvaluationProgress.mockResolvedValue({ currentDimension: 'reliability', dimensions: [{ id: 'reliability', state: 'running' }] });
       renderFeed({ liveViolations: twoDims, job: { jobId: 'j3', status: 'running' } });
-      await waitFor(() => expect(group('reliability')).toHaveAttribute('aria-expanded', 'true'));
-      expect(group('security')).toHaveAttribute('aria-expanded', 'false');
-      expect(groupNames()).toEqual(['reliability', 'security']);
-    });
-
-    it('opens none when the dimension being analyzed has no findings yet', async () => {
-      getEvaluationProgress.mockResolvedValue({ currentDimension: 'maintainability', dimensions: [{ id: 'maintainability', state: 'running' }] });
-      renderFeed({ liveViolations: twoDims, job: { jobId: 'j4', status: 'running' } });
-      await screen.findByText(/scanning for more/);
-      await waitFor(() => expect(group('security')).toHaveAttribute('aria-expanded', 'false'));
+      await waitFor(() => expect(groupNames()).toEqual(['reliability', 'security']));
       expect(group('reliability')).toHaveAttribute('aria-expanded', 'false');
+      expect(group('security')).toHaveAttribute('aria-expanded', 'false');
+      expect(group('reliability')).toHaveTextContent('scanning');
     });
 
-    it('opens the top group once the run is over', () => {
+    it('all start closed once the run is over', () => {
       renderFeed({ liveViolations: twoDims, job: { jobId: 'j5', status: 'done' } });
-      const [first, second] = groupNames();
-      expect(group(first)).toHaveAttribute('aria-expanded', 'true');
-      expect(group(second)).toHaveAttribute('aria-expanded', 'false');
+      expect(group('reliability')).toHaveAttribute('aria-expanded', 'false');
+      expect(group('security')).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('opens several at once', () => {
+      renderFeed({ liveViolations: twoDims });
+      fireEvent.click(group('reliability'));
+      fireEvent.click(group('security'));
+      expect(group('reliability')).toHaveAttribute('aria-expanded', 'true');
+      expect(group('security')).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('mounts an open group 50 rows at a time', () => {
+      const many = { security: Array.from({ length: 120 }, (_, i) => ({ severity: 'minor', principle: 'p', file: `F${i}.swift`, line: i })) };
+      renderFeed({ liveViolations: many });
+      fireEvent.click(group('security'));
+      const groupRows = () => document.querySelectorAll('.vlive-dimension-group .vdetail-row').length;
+      expect(groupRows()).toBe(50);
+      expect(screen.getByText('showing 50 of 120')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Show 50 more' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Show 20 more' }));
+      expect(groupRows()).toBe(120);
+      expect(screen.queryByText(/showing \d+ of/)).toBeNull();
     });
   });
 

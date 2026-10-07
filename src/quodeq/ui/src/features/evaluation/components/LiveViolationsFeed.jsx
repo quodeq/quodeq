@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { FindingDetailBody } from '../../../components/findingDetail.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
@@ -6,7 +6,8 @@ import { staggerDelayStyle } from '../../../utils/animation.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
-import { orderDimensions, autoOpenTarget } from './liveViolationsOrdering.js';
+import { orderDimensions, sortBySeverity, sameDim } from './liveViolationsOrdering.js';
+import LiveFindingsTicker from './LiveFindingsTicker.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
@@ -17,6 +18,9 @@ import { pluralKey } from '../../../utils/plural.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
+// An open group mounts this many rows at a time. A dimension can hold
+// thousands of findings, and mounting all of them is what made long runs lag.
+const DIM_PAGE_SIZE = 50;
 // The 3 real severities (as opposed to a missing/unrecognised one), for
 // deciding whether SevBadge (which only knows those 3) can render this row.
 const REAL_SEVERITY_SET = new Set(SEVERITY_ORDER);
@@ -65,40 +69,64 @@ function ViolationLiveRow({ violation, index }) {
   );
 }
 
-function DimensionGroup({ dim, violations, open, onToggle }) {
+function severityMix(violations) {
+  const mix = { critical: 0, major: 0, minor: 0 };
+  for (const v of violations) if (v.severity in mix) mix[v.severity] += 1;
+  return mix;
+}
+
+function DimensionHeader({ dim, violations, open, scanning, onToggle }) {
   const count = violations.length;
+  const mix = severityMix(violations);
+  return (
+    <button type="button" className="vlive-dimension-label" onClick={onToggle} aria-expanded={open}>
+      <span className={`vlive-dimension-caret${open ? ' vlive-dimension-caret--open' : ''}`} aria-hidden="true">▸</span>
+      <span className="vlive-dimension-name">{dim}</span>
+      {scanning && <span className="vlive-dimension-scanning">{t('evaluate.dimScanning')}</span>}
+      <span className="vlive-dimension-mix">
+        {SEVERITY_ORDER.map((level) => (mix[level] > 0
+          ? <SevBadge key={level} level={level} format="count-abbr" count={mix[level]} />
+          : null))}
+      </span>
+      {/* Keyed on the count so the bump animation replays on every arrival. */}
+      <span key={count} className="vlive-dimension-count">{count}</span>
+    </button>
+  );
+}
+
+function DimensionGroup({ dim, violations, open, scanning, onToggle }) {
+  const [limit, setLimit] = useState(DIM_PAGE_SIZE);
+  // Sorted only while open: a closed group costs one header however big it is.
+  const rows = useMemo(() => (open ? sortBySeverity(violations).slice(0, limit) : []), [open, violations, limit]);
+  const remaining = violations.length - rows.length;
   return (
     <div className={`vlive-dimension-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
-      <button
-        type="button"
-        className="vlive-dimension-label"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
-        <span className={`vlive-dimension-caret${open ? ' vlive-dimension-caret--open' : ''}`} aria-hidden="true">▸</span>
-        <span className="vlive-dimension-name">{dim}</span>
-        <span className="vlive-dimension-count">{count}</span>
-      </button>
-      {open && violations.map((v, i) => (
-        <ViolationLiveRow key={`${dim}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
+      <DimensionHeader dim={dim} violations={violations} open={open} scanning={scanning} onToggle={onToggle} />
+      {rows.map((v, i) => (
+        <ViolationLiveRow key={`${dim}-${v.arrivalSeq ?? ''}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
       ))}
+      {open && remaining > 0 && (
+        <div className="vlive-dimension-more">
+          <span>{t('evaluate.showingOf', { shown: rows.length, total: violations.length })}</span>
+          <button type="button" className="term-btn--primary term-btn--sm" onClick={() => setLimit((n) => n + DIM_PAGE_SIZE)}>
+            {t('evaluate.showMoreFindings', { count: Math.min(DIM_PAGE_SIZE, remaining) })}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-// Single-open-at-a-time accordion, following `autoOpenTarget`: whenever the
-// target changes (a new dimension starts producing findings, the run moves
-// on to one that has none yet, the run ends) the accordion follows it. The
-// user can still click any header to switch which one is open.
-function useAutoOpenDim(target) {
-  const [openDim, setOpenDim] = useState(null);
-  const prevTargetRef = useRef(undefined);
-  useEffect(() => {
-    if (target === undefined || prevTargetRef.current === target) return;
-    prevTargetRef.current = target;
-    setOpenDim(target);
-  }, [target]);
-  return [openDim, setOpenDim];
+// Every group starts closed and stays that way until the user opens it.
+// Several can be open at once; nothing opens on its own.
+function useOpenDims() {
+  const [openDims, setOpenDims] = useState(() => new Set());
+  const toggle = useCallback((dim) => setOpenDims((cur) => {
+    const next = new Set(cur);
+    if (next.has(dim)) next.delete(dim); else next.add(dim);
+    return next;
+  }), []);
+  return [openDims, toggle];
 }
 
 function computeQueuedFiles(runningDim) {
@@ -138,7 +166,7 @@ function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, 
   );
 }
 
-function LiveViolationsCard({ orderedDims, openDim, setOpenDim, isRunning, queued }) {
+function LiveViolationsCard({ orderedDims, openDims, toggleDim, currentDimension, isRunning, queued }) {
   return (
     <div className="vlive-card">
       {orderedDims.map(({ dim, violations }) => (
@@ -146,8 +174,9 @@ function LiveViolationsCard({ orderedDims, openDim, setOpenDim, isRunning, queue
           key={dim}
           dim={dim}
           violations={violations}
-          open={openDim === dim}
-          onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
+          open={openDims.has(dim)}
+          scanning={isRunning && sameDim(dim, currentDimension)}
+          onToggle={() => toggleDim(dim)}
         />
       ))}
       {isRunning && (
@@ -180,7 +209,7 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [liveViolations, currentDimension]);
 
-  const [openDim, setOpenDim] = useAutoOpenDim(autoOpenTarget({ isRunning, progress, orderedDims }));
+  const [openDims, toggleDim] = useOpenDims();
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
   // A fully-cached dimension yields zero NEW findings. Bailing out here
@@ -199,7 +228,17 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
         currentDimension={currentDimension}
       />
       {(totalCount > 0 || isRunning) && (
-        <LiveViolationsCard orderedDims={orderedDims} openDim={openDim} setOpenDim={setOpenDim} isRunning={isRunning} queued={queued} />
+        <>
+          <LiveFindingsTicker liveViolations={liveViolations} isRunning={isRunning} />
+          <LiveViolationsCard
+            orderedDims={orderedDims}
+            openDims={openDims}
+            toggleDim={toggleDim}
+            currentDimension={currentDimension}
+            isRunning={isRunning}
+            queued={queued}
+          />
+        </>
       )}
     </div>
   );

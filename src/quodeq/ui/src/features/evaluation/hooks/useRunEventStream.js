@@ -40,7 +40,11 @@ const MAX_FINDINGS_IN_CACHE = 5000;
 // block at a time pays that once per block instead.
 const FINDINGS_TRIM_SLACK = 1000;
 
-function appendBoundedFinding(prev, data) {
+// Each row is stamped with its place in the stream. The feed's per-dimension
+// grouping loses the order across dimensions, and the live ticker needs it to
+// show the latest findings whichever dimension they came from.
+function appendBoundedFinding(prev, finding) {
+  const data = { ...finding, arrivalSeq: (prev.at(-1)?.arrivalSeq ?? 0) + 1 };
   if (prev.length >= MAX_FINDINGS_IN_CACHE + FINDINGS_TRIM_SLACK) {
     const trimmed = prev.slice(prev.length - MAX_FINDINGS_IN_CACHE + 1);
     trimmed.push(data);

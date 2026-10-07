@@ -129,7 +129,6 @@ src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.dimensionsAnd
 src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.elapsed.test.js:10
 src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.rateAndHints.test.js:13
 src/quodeq/ui/src/features/evaluation/components/buildScanPayload.test.jsx:5
-src/quodeq/ui/src/features/evaluation/components/liveViolationsOrdering.js:5
 src/quodeq/ui/src/features/evaluation/components/scanModePersistence.js:4
 src/quodeq/ui/src/features/evaluation/components/scanProgressCoverage.js:4
 src/quodeq/ui/src/features/evaluation/components/scanProgressTotals.aggregate.test.js:6
