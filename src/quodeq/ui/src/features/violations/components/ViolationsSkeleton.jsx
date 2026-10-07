@@ -2,7 +2,7 @@
 // dimension data is loading (and while an error-retry is in flight). The
 // floating inline spinner it replaces reserved no height, so the sub-tab
 // pills and dimension groups popped in below the header when data landed.
-// Rides the real .violations-flag-row for the pill row's spacing; the
+// The pill row stands in for the header's view switch; the
 // groups are representative (3 groups of a header + two card rows) since
 // the real dimension count varies per project. House skeleton idiom:
 // static dimmed blocks, no shimmer, no spinner.
