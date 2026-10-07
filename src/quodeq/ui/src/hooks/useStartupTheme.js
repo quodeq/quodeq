@@ -18,7 +18,7 @@ import { NAV_TAB } from '../vocab/navTab.js';
 export const STARTUP_LOADER_LINGER_MS = 250;
 // Shortest time the startup loader stays up from mount, so a warm boot shows
 // the first tip long enough to read instead of flashing it for a frame.
-export const STARTUP_LOADER_MIN_MS = 4000;
+export const STARTUP_LOADER_MIN_MS = 5000;
 
 /**
  * Returns whether the app is currently rendering dark, taking the saved

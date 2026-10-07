@@ -72,23 +72,7 @@ function useRotatingTip(enabled) {
     }, TIPS_ROTATE_MS);
     return () => { clearInterval(id); clearTimeout(swap); };
   }, [started, order.length]);
-  return { tipKey: started ? order[idx] : null, position: idx, count: order.length, fading };
-}
-
-// One segment per tip: the walked ones stay lit and the current one fills
-// over a rotation, so the bar says how far through the tips you are. Keyed on
-// the position so the fill restarts with every swap.
-function TipProgress({ position, count }) {
-  return (
-    <div className="loading-tip-progress" aria-hidden="true">
-      {Array.from({ length: count }, (_, i) => {
-        let cls = 'loading-tip-progress__seg';
-        if (i < position) cls += ' loading-tip-progress__seg--done';
-        if (i === position) cls += ' loading-tip-progress__seg--current';
-        return <span key={i === position ? `current-${position}` : i} className={cls} />;
-      })}
-    </div>
-  );
+  return { tipKey: started ? order[idx] : null, fading };
 }
 
 // Non-default `variant` values (the default is 'fullscreen' -- see the
@@ -114,11 +98,11 @@ const VARIANT_SHELL = 'shell';
  * loaders or dimmed containers on the same route.
  *
  * `tips` (boot only) switches to the tip-first layout: the logo on the left
- * and the rotating tip as the headline beside it, with one progress segment
- * per tip. Every other loader shows the logo alone.
+ * and the rotating tip as the headline beside it. Every other loader shows
+ * the logo alone.
  */
 export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, leaving = false }) {
-  const { tipKey, position, count, fading } = useRotatingTip(tips);
+  const { tipKey, fading } = useRotatingTip(tips);
   const classes = ['loading-screen'];
   if (variant === VARIANT_INLINE) classes.push('loading-screen--inline');
   if (variant === VARIANT_SHELL) classes.push('loading-screen--shell');
@@ -141,13 +125,10 @@ export default function LoadingScreen({ message, variant = 'fullscreen', tips = 
         <LoaderLogo className="loading-logo" />
         <div className="loading-tips-panel">
           {tipKey && (
-            <>
-              <div className={fading ? 'loading-tip loading-tip--fading' : 'loading-tip'}>
-                <span className="loading-tip__label">{t('loading.tipLabel')}</span>
-                <TipText text={t(tipKey)} />
-              </div>
-              <TipProgress position={position} count={count} />
-            </>
+            <div className={fading ? 'loading-tip loading-tip--fading' : 'loading-tip'}>
+              <span className="loading-tip__label">{t('loading.tipLabel')}</span>
+              <TipText text={t(tipKey)} />
+            </div>
           )}
           {message && <p className="loading-message">{message}</p>}
         </div>
