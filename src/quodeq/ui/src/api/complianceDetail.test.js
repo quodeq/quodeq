@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  attachComplianceDetailRefs, groupDeferredCompliance, mergeComplianceDetail,
-  attachFindingDetailRefs, mergeFindingDetail, markDetailOutdated,
+  attachComplianceDetailRefs, groupDeferredCompliance,
+  attachFindingDetailRefs, attachRunFindingDetailRefs,
+  pageSelector, replaceWithDetail, missingFromDetail, markDetailUnavailable,
 } from './complianceDetail.js';
 
 const slim = (file, line, principle, extra = {}) => ({
@@ -25,11 +26,19 @@ function scoresPayload() {
   };
 }
 
-test('attach: deferred items get one shared ref per dimension', () => {
-  const data = attachComplianceDetailRefs(scoresPayload(), 'proj', 'run-3', 7);
+test('attach: deferred items get one shared ref per dimension, naming content only', () => {
+  const data = attachComplianceDetailRefs(scoresPayload(), 'proj', 'run-3');
   const [a, b] = data.accumulated.dimensions[0].compliance;
-  assert.deepEqual(a.detailRef, { project: 'proj', asOf: 'run-3', dimension: 'security', generation: 7, kind: 'compliance' });
+  assert.deepEqual(a.detailRef, { project: 'proj', asOf: 'run-3', dimension: 'security', kind: 'compliance' });
   assert.equal(a.detailRef, b.detailRef);
+});
+
+test('attach: two responses for the same content get equal refs', () => {
+  const first = attachComplianceDetailRefs(scoresPayload(), 'proj', null).accumulated.dimensions[0].compliance[0].detailRef;
+  const second = attachComplianceDetailRefs(scoresPayload(), 'proj', null).accumulated.dimensions[0].compliance[0].detailRef;
+  assert.deepEqual(first, second);
+  const run = attachRunFindingDetailRefs({ dimensions: [{ dimension: 'd', violations: [slim('a.py', 1, 'P1')] }] }, 'proj', 'r1');
+  assert.deepEqual(run.dimensions[0].violations[0].detailRef, { project: 'proj', run: 'r1', dimension: 'd', kind: 'violation', source: 'local' });
 });
 
 test('attach: deferred violations get a violation-kind ref of their own', () => {
@@ -38,40 +47,32 @@ test('attach: deferred violations get a violation-kind ref of their own', () => 
     violations: [{ file: 'a.py', line: 1, principle: 'P1', title: 'v', detailDeferred: true }],
     compliance: [slim('b.py', 2, 'P1')],
   }] } };
-  attachFindingDetailRefs(data, 'proj', null, 3);
+  attachFindingDetailRefs(data, 'proj', null);
   const [dim] = data.accumulated.dimensions;
   assert.equal(dim.violations[0].detailRef.kind, 'violation');
   assert.equal(dim.compliance[0].detailRef.kind, 'compliance');
   assert.notEqual(dim.violations[0].detailRef, dim.compliance[0].detailRef);
 });
 
-test('merge: fills reqRefs as well as the three text fields', () => {
-  const ref = { project: 'p', asOf: null, dimension: 'security', generation: 1, kind: 'violation' };
-  const item = { file: 'a.py', line: 1, endLine: null, principle: 'P1', title: 't', reqRefs: [], detailDeferred: true, detailRef: ref };
-  const [out] = mergeFindingDetail([item], [{ ref, items: [{ file: 'a.py', line: 1, endLine: null, principle: 'P1', title: 't', reason: 'r', snippet: 's', context: 'c', reqRefs: [{ label: 'x' }] }] }]);
-  assert.deepEqual(out.reqRefs, [{ label: 'x' }]);
-  assert.equal(out.reason, 'r');
-  assert.equal(out.detailDeferred, false);
-});
-
 test('attach: items that already carry detail are left alone', () => {
-  const data = attachComplianceDetailRefs(scoresPayload(), 'proj', null, 1);
+  const data = attachComplianceDetailRefs(scoresPayload(), 'proj', null);
   assert.equal(data.accumulated.dimensions[1].compliance[0].detailRef, undefined);
 });
 
 test('attach: tolerates a payload with no accumulated dimensions', () => {
-  assert.deepEqual(attachComplianceDetailRefs({}, 'proj', null, 1), {});
+  assert.deepEqual(attachComplianceDetailRefs({}, 'proj', null), {});
 });
 
-test('group: narrows to the shared principle and common path prefix', () => {
-  const data = attachComplianceDetailRefs(scoresPayload(), 'proj', null, 1);
+test('group: narrows to the shared principle and common path prefix, and keeps its items', () => {
+  const data = attachComplianceDetailRefs(scoresPayload(), 'proj', null);
   const groups = groupDeferredCompliance(data.accumulated.dimensions[0].compliance);
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].scope, { principle: 'P1', pathPrefix: 'src/' });
+  assert.equal(groups[0].items.length, 2);
 });
 
 test('group: mixed principles and unrelated paths drop the filters', () => {
-  const ref = { project: 'p', asOf: null, dimension: 'd', generation: 1 };
+  const ref = { project: 'p', asOf: null, dimension: 'd' };
   const groups = groupDeferredCompliance([
     { ...slim('a.py', 1, 'P1'), detailRef: ref },
     { ...slim('b.py', 2, 'P2'), detailRef: ref },
@@ -84,55 +85,93 @@ test('group: nothing deferred means nothing to fetch', () => {
   assert.deepEqual(groupDeferredCompliance(undefined), []);
 });
 
-test('merge: fills detail by identity and keeps everything else', () => {
-  const ref = { project: 'p', asOf: null, dimension: 'security', generation: 1 };
-  const items = [{ ...slim('src/b.py', 2, 'P1'), detailRef: ref, dimension: 'security' }];
-  const merged = mergeComplianceDetail(items, [{ ref, items: [full('src/a.py', 1, 'P1'), full('src/b.py', 2, 'P1')] }]);
-  assert.equal(merged[0].snippet, 'code src/b.py:2');
-  assert.equal(merged[0].reason, 'why src/b.py:2');
-  assert.equal(merged[0].context, 'ctx src/b.py:2');
-  assert.equal(merged[0].detailDeferred, false);
-  assert.equal(merged[0].dimension, 'security');
+// The page's items say which of the server's rows belong on it: the fields
+// they all agree on. One file is the File page, one principle the Principle
+// page, one type a by-type file; a dimension's synthetic file agrees on none.
+test('selector: keeps the rows matching every field the items are unanimous on', () => {
+  const select = pageSelector([slim('src/a.py', 1, 'P1'), slim('src/a.py', 9, 'P2')]);
+  assert.equal(select(full('src/a.py', 3, 'P3')), true);
+  assert.equal(select(full('src/a.py.bak', 3, 'P1')), false);
+  const byPrinciple = pageSelector([slim('a.py', 1, 'P1'), slim('b.py', 2, 'P1')]);
+  assert.equal(byPrinciple(full('c.py', 1, 'P1')), true);
+  assert.equal(byPrinciple(full('a.py', 1, 'P2')), false);
 });
 
-test('merge: same-identity items get their details in order', () => {
-  const ref = { project: 'p', asOf: null, dimension: 'd', generation: 1 };
-  const items = [{ ...slim('a.py', 1, 'P1'), detailRef: ref }, { ...slim('a.py', 1, 'P1'), detailRef: ref }];
-  const merged = mergeComplianceDetail(items, [{
-    ref, items: [full('a.py', 1, 'P1', { reason: 'first' }), full('a.py', 1, 'P1', { reason: 'second' })],
-  }]);
-  assert.deepEqual(merged.map((m) => m.reason), ['first', 'second']);
+test('selector: items that agree on nothing take every row', () => {
+  const select = pageSelector([slim('a.py', 1, 'P1'), slim('b.py', 2, 'P2')]);
+  assert.equal(select(full('zzz.py', 1, 'P9')), true);
+  assert.equal(pageSelector([])(full('a.py', 1, 'P1')), true);
 });
 
-test('merge: an item with no match stays as it was', () => {
-  const ref = { project: 'p', asOf: null, dimension: 'd', generation: 1 };
-  const item = { ...slim('gone.py', 1, 'P1'), detailRef: ref };
-  const merged = mergeComplianceDetail([item], [{ ref, items: [] }]);
-  assert.equal(merged[0], item);
+test('replace: a loaded group becomes the server rows, in its first position', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'security' };
+  const other = { ...full('x.py', 1, 'U1'), dimension: 'usability' };
+  const items = [{ ...slim('src/a.py', 1, 'P1'), detailRef: ref }, other, { ...slim('src/b.py', 2, 'P1'), detailRef: ref }];
+  const rows = [full('src/a.py', 1, 'P1'), full('src/b.py', 2, 'P1'), full('src/c.py', 3, 'P1')];
+  const out = replaceWithDetail(items, [{ ref, items: rows }], () => true);
+  assert.deepEqual(out.map((i) => i.file), ['src/a.py', 'src/b.py', 'src/c.py', 'x.py']);
+  assert.equal(out[0].snippet, 'code src/a.py:1');
+  assert.equal(out[0].detailDeferred, false);
+  assert.equal(out[0].detailRef, ref);
+  assert.equal(out[3], other);
 });
 
-// A group that LOADED and has no row for an item means the item's identity
-// (file, line, principle, title) no longer exists on the server: the client
-// renders a snapshot older than the server's state. Saying so beats a card
-// that shows only its title.
-test('outdated: an item with no row in its loaded group is outdated, not deferred', () => {
-  const ref = { project: 'p', asOf: null, dimension: 'd', generation: 1 };
-  const otherRef = { ...ref, dimension: 'e' };
-  const gone = { ...slim('gone.py', 1, 'P1'), detailRef: ref };
-  const waiting = { ...slim('later.py', 2, 'P1'), detailRef: otherRef };
-  const marked = markDetailOutdated([gone, waiting], [ref]);
+test('replace: the selector keeps the rows that belong on the page', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'd' };
+  const items = [{ ...slim('a.py', 1, 'P1'), detailRef: ref }];
+  const out = replaceWithDetail(items, [{ ref, items: [full('a.py', 1, 'P1'), full('b.py', 2, 'P1')] }], (r) => r.file === 'a.py');
+  assert.deepEqual(out.map((i) => i.file), ['a.py']);
+});
+
+test('replace: a changed finding shows as the server has it now', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'd' };
+  const items = [{ ...slim('a.py', 10, 'P1', { title: 'Old title' }), detailRef: ref }];
+  const out = replaceWithDetail(items, [{ ref, items: [full('a.py', 12, 'P1', { title: 'New title' })] }], () => true);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].title, 'New title');
+  assert.equal(out[0].line, 12);
+});
+
+test('replace: a group still loading keeps its deferred items', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'd' };
+  const later = { ...ref, dimension: 'e' };
+  const waiting = { ...slim('later.py', 2, 'P1'), detailRef: later };
+  const out = replaceWithDetail([{ ...slim('a.py', 1, 'P1'), detailRef: ref }, waiting], [{ ref, items: [full('a.py', 1, 'P1')] }], () => true);
+  assert.equal(out[1], waiting);
+});
+
+test('replace: nothing loaded returns the same array', () => {
+  const items = [slim('a.py', 1, 'P1')];
+  assert.equal(replaceWithDetail(items, [], () => true), items);
+});
+
+// The list payload the page was built from can fall behind the detail: a
+// finding it names at a file and line the server no longer has there was
+// re-reported, moved or suppressed since. The page then refreshes the
+// payload; the detail already shows the server's rows.
+test('drift: a deferred item with no row at its file and line is missing', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'd' };
+  const items = [{ ...slim('a.py', 10, 'P1'), detailRef: ref }];
+  assert.equal(missingFromDetail(items, [{ ref, items: [full('a.py', 12, 'P1')] }], () => true), true);
+  assert.equal(missingFromDetail(items, [{ ref, items: [full('a.py', 10, 'P1', { title: 'Renamed' })] }], () => true), false);
+});
+
+test('drift: extra server rows and groups still loading are not drift', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'd' };
+  const later = { ...ref, dimension: 'e' };
+  const items = [{ ...slim('a.py', 1, 'P1'), detailRef: ref }, { ...slim('b.py', 2, 'P1'), detailRef: later }];
+  assert.equal(missingFromDetail(items, [{ ref, items: [full('a.py', 1, 'P1'), full('c.py', 3, 'P1')] }], () => true), false);
+  assert.equal(missingFromDetail(items, [], () => true), false);
+});
+
+test('unavailable: the items of a failed group leave the deferred state and say so', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'd' };
+  const other = { ...ref, dimension: 'e' };
+  const failed = { ...slim('a.py', 1, 'P1'), detailRef: ref };
+  const waiting = { ...slim('b.py', 2, 'P1'), detailRef: other };
+  const marked = markDetailUnavailable([failed, waiting], [ref]);
   assert.equal(marked[0].detailDeferred, false);
-  assert.equal(marked[0].detailOutdated, true);
-  assert.equal(marked[0].reason, null);
+  assert.equal(marked[0].detailUnavailable, true);
   assert.equal(marked[1], waiting);
-});
-
-test('outdated: nothing loaded leaves the array alone', () => {
-  const items = [slim('a.py', 1, 'P1')];
-  assert.equal(markDetailOutdated(items, []), items);
-});
-
-test('merge: nothing loaded returns the same array', () => {
-  const items = [slim('a.py', 1, 'P1')];
-  assert.equal(mergeComplianceDetail(items, []), items);
+  assert.equal(markDetailUnavailable([waiting], []).length, 1);
 });

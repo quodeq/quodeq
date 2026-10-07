@@ -1825,6 +1825,31 @@ button.eval-provider-badge--clickable:focus-visible {
   color: var(--color-text);
   line-height: var(--leading-normal);
 }
+.vlive-detail-reason--unavailable {
+  color: var(--color-text-muted);
+}
+
+/* ── Finding detail skeleton ──
+   Stands in for the DETAIL paragraph and the code block while the page's
+   detail query answers (components/DetailSkeleton.jsx). House idiom, see
+   .overview-skeleton__bar: static dimmed blocks, no shimmer. */
+.detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.detail-skeleton__bar {
+  display: block;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+.detail-skeleton__bar--line { width: 85%; height: 10px; }
+.detail-skeleton__bar--short { width: 55%; }
+/* About the height of a three-line code block, so the card does not grow
+   when the real snippet lands. */
+.detail-skeleton__bar--code { width: 100%; height: 56px; }
 
 
 /* File meta row: [dir/][filename.py:12 📋] */

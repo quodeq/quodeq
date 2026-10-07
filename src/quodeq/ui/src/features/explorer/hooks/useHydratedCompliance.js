@@ -2,50 +2,58 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { projectKeys } from '../../../api/queryKeys.js';
-import { groupDeferredFindings, markDetailOutdated, markDetailUnavailable, mergeFindingDetail } from '../../../api/complianceDetail.js';
-import { STALE_TIME_MS } from '../../../hooks/queryDefaults.js';
+import {
+  groupDeferredFindings, markDetailUnavailable, missingFromDetail, pageSelector, replaceWithDetail,
+} from '../../../api/complianceDetail.js';
+import { STALE_TIME_MS, refetchWhileError } from '../../../hooks/queryDefaults.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
-// (project, generation) pairs whose scores were already invalidated because a
-// page found outdated items: one refresh per snapshot, not one per render.
-const resynced = new Set();
+// When each project's queries were last refreshed because a page's list
+// payload named a finding the detail no longer has. One refresh per staleness
+// window: the drift is real only until the payload catches up, and a payload
+// that never agrees with the detail must not refetch in a loop.
+const resyncedAt = new Map();
 
-/** Forget which snapshots were already refreshed (test seam). */
+/** Forget the refresh times (test seam). */
 export function resetDetailResyncForTests() {
-  resynced.clear();
+  resyncedAt.clear();
 }
 
-// Accumulated refs (/scores) carry `asOf`; run refs carry `run` and are
-// immutable, so only the accumulated ones can go stale.
-function accumulatedRefs(groups) {
-  return groups.map((g) => g.ref).filter((ref) => !ref.run);
+const sourceOf = (ref) => ref.source || PROJECT_SOURCE.LOCAL;
+
+/**
+ * Refresh the project's queries when the page's list payload fell behind
+ * the detail: a deferred item (file and line) with no row in its loaded
+ * group was re-reported, moved or suppressed since the payload was built.
+ * The refetched payload reaches the page through the live selectors, and
+ * the detail queries refetch with it, since they sit in the project subtree.
+ */
+function useDriftResync(groups, drifted) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!drifted) return;
+    const now = Date.now();
+    for (const { ref } of groups) {
+      const stamp = `${ref.project}\u0000${sourceOf(ref)}`;
+      const last = resyncedAt.get(stamp);
+      if (last !== undefined && now - last < STALE_TIME_MS) continue;
+      resyncedAt.set(stamp, now);
+      queryClient.invalidateQueries({ queryKey: projectKeys.project(ref.project, sourceOf(ref)) });
+    }
+  }, [groups, drifted, queryClient]);
 }
 
 /**
- * Keep the page's snapshot in step with the server. The File and Principle
- * pages render findings built when the user clicked, from the app-root
- * /scores payload, while the detail is fetched from the server's current
- * state. Two cases make the two disagree, and both refresh the project's
- * queries so the snapshot catches up: a loaded group without a row for an
- * item (the finding changed since; once per snapshot generation), and a
- * payload older than its staleness window when the page opens (nothing else
- * refetches it in the desktop webview).
+ * Refresh an accumulated payload older than its staleness window when the
+ * page opens: nothing else refetches it in the desktop webview, whose
+ * window never blurs.
  */
-function useSnapshotResync(groups, hydrated) {
+function useOpenRefresh(groups) {
   const queryClient = useQueryClient();
-  const outdated = hydrated.some((item) => item?.detailOutdated);
   useEffect(() => {
-    if (!outdated) return;
-    for (const ref of accumulatedRefs(groups)) {
-      const stamp = `${ref.project}\u0000${ref.generation}`;
-      if (resynced.has(stamp)) continue;
-      resynced.add(stamp);
-      queryClient.invalidateQueries({ queryKey: projectKeys.project(ref.project, PROJECT_SOURCE.LOCAL) });
-    }
-  }, [groups, outdated, queryClient]);
-  useEffect(() => {
-    for (const ref of accumulatedRefs(groups)) {
+    for (const { ref } of groups) {
+      if (ref.run) continue;
       const state = queryClient.getQueryState(projectKeys.scores(ref.project, ref.asOf, PROJECT_SOURCE.LOCAL));
       if (state?.dataUpdatedAt && Date.now() - state.dataUpdatedAt > STALE_TIME_MS) {
         queryClient.invalidateQueries({ queryKey: projectKeys.project(ref.project, PROJECT_SOURCE.LOCAL) });
@@ -62,56 +70,63 @@ function detailQuery(api, ref, kind, scope) {
     return {
       queryKey: projectKeys.runFindingDetail(ref, kind, scope),
       queryFn: () => fetchDetail(ref.project, { kind, dimension: ref.dimension, run: ref.run, ...scope }),
+      // A run's rows move only through this client's own mutations, which
+      // invalidate the project subtree.
+      staleTime: Infinity,
     };
   }
   return {
-    queryKey: projectKeys.findingDetail(ref.project, ref.asOf, kind, ref.dimension, ref.generation, scope),
+    queryKey: projectKeys.findingDetail(ref.project, ref.asOf, kind, ref.dimension, scope),
     queryFn: () => api.getFindingDetail(ref.project, { kind, dimension: ref.dimension, asOf: ref.asOf, ...scope }),
+    // An as-of view is frozen; the latest view moves with every finished run.
+    staleTime: ref.asOf ? Infinity : STALE_TIME_MS,
   };
 }
 
 /**
- * Items of one kind with the detail /scores or /scores/<run> deferred
- * filled back in.
+ * The rows a page renders for *items*, with the detail /scores, /scores/<run>
+ * or /eval deferred: each loaded group's deferred items are replaced by the
+ * rows the server holds for it (api/complianceDetail.js replaceWithDetail).
  *
- * Returns *items* unchanged while the detail loads, or when none of them is
- * deferred (items from /eval already carry it). Items whose detail fetch
- * failed come back with `detailUnavailable` set; items whose group loaded
- * without a row for them come back with `detailOutdated` set, and the
- * project's scores are refreshed so the page's snapshot catches up (see
- * useSnapshotResync).
+ * Returns *items* unchanged while the detail loads (the cards show a
+ * skeleton for a deferred item), or when none of them is deferred. Items
+ * whose detail fetch failed come back with `detailUnavailable` set and the
+ * query retries on its own. A refetch keeps the rows it replaces on screen,
+ * and a payload the detail no longer agrees with refreshes the project's
+ * queries (useDriftResync).
  * @param {Array} items
  * @param {string} kind FINDING_TYPE.VIOLATION or FINDING_TYPE.COMPLIANCE
+ * @param {{select?: (row: Object) => boolean}} [options] which of the group's
+ *   rows belong on the page; defaults to the fields *items* are unanimous on.
  * @returns {Array}
  */
-export function useHydratedFindings(items, kind) {
+export function useHydratedFindings(items, kind, { select } = {}) {
   const api = useApi();
   const groups = useMemo(() => groupDeferredFindings(items), [items]);
+  const selectRow = useMemo(() => select || pageSelector(items || []), [select, items]);
   const combine = useCallback((results) => ({
     loaded: results.flatMap((r, i) => (r.data ? [{ ref: groups[i].ref, items: r.data }] : [])),
-    failed: results.flatMap((r, i) => (r.isError ? [groups[i].ref] : [])),
+    failed: results.flatMap((r, i) => (r.isError && !r.data ? [groups[i].ref] : [])),
   }), [groups]);
   const { loaded, failed } = useQueries({
-    queries: groups.map(({ ref, scope }) => ({
-      ...detailQuery(api, ref, kind, scope),
-      // Keyed on the scores response generation, so an entry can never go stale.
-      staleTime: Infinity,
-    })),
+    queries: groups.map(({ ref, scope }) => ({ ...detailQuery(api, ref, kind, scope), refetchInterval: refetchWhileError })),
     combine,
   });
-  const hydrated = useMemo(() => {
-    const merged = mergeFindingDetail(items || [], loaded);
-    return markDetailUnavailable(markDetailOutdated(merged, loaded.map((l) => l.ref)), failed);
-  }, [items, loaded, failed]);
-  useSnapshotResync(groups, hydrated);
+  const { hydrated, drifted } = useMemo(() => ({
+    hydrated: markDetailUnavailable(replaceWithDetail(items || [], loaded, selectRow), failed),
+    drifted: missingFromDetail(items || [], loaded, selectRow),
+  }), [items, loaded, failed, selectRow]);
+  useDriftResync(groups, drifted);
+  useOpenRefresh(groups);
   return hydrated;
 }
 
 /**
  * Compliance items with the detail /scores deferred filled back in.
  * @param {Array} items
+ * @param {{select?: (row: Object) => boolean}} [options]
  * @returns {Array}
  */
-export function useHydratedCompliance(items) {
-  return useHydratedFindings(items, FINDING_TYPE.COMPLIANCE);
+export function useHydratedCompliance(items, options) {
+  return useHydratedFindings(items, FINDING_TYPE.COMPLIANCE, options);
 }

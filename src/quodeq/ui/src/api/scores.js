@@ -16,18 +16,13 @@ import { fleetQuery, projectPath } from './paths.js';
 
 // ── Unified Scores ─────────────────────────────────────────────────────
 
-// Numbers each /scores response, so compliance detail fetched for one
-// response is never merged into another (see attachComplianceDetailRefs).
-let scoresGeneration = 0;
-
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
 export async function getProjectScores(projectId, asOfRun = null) {
   const data = await request(`${projectPath(projectId)}/scores${asOfQuery(asOfRun)}`);
   // The server's warm-up still owes the project: hand the pending body
   // through untouched so the hooks poll on it (see scoresShape.isPendingPayload).
   if (isPendingPayload(data)) return data;
-  scoresGeneration += 1;
-  return attachFindingDetailRefs(parseUnifiedScores(data), projectId, asOfRun, scoresGeneration);
+  return attachFindingDetailRefs(parseUnifiedScores(data), projectId, asOfRun);
 }
 
 /**

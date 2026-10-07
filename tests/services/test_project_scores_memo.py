@@ -125,3 +125,47 @@ def test_parent_projects_are_not_memoized(tmp_path: Path) -> None:
         payload, stamp = get_project_scores_stamped(tmp_path, "proj")
     assert stamp is None and payload is not None
     versions.assert_not_called()
+
+
+# A detail page asks /compliance-detail once per dimension and kind, all at
+# once. On a memo miss every request used to build the whole payload for
+# itself, beside the others; the first now builds and the rest wait and read.
+def test_concurrent_misses_build_the_payload_once(tmp_path: Path) -> None:
+    import threading
+    import time
+
+    from quodeq.services.dashboard import make_run_dimension_fetcher
+
+    _write_run(tmp_path)
+    factory_calls: list[float] = []
+    guard = threading.Lock()
+
+    def counting_factory(reports_root: Path, project: str):
+        with guard:
+            factory_calls.append(time.monotonic())
+        time.sleep(0.05)
+        return make_run_dimension_fetcher(reports_root, project)
+
+    deps = ScoringDeps(base_fetcher_factory=counting_factory)
+    # One build asks the factory for the trend's reader and the accumulated
+    # block's; a single sequential read says how many times that is.
+    get_project_scores(tmp_path, "proj", None, deps)
+    per_build = len(factory_calls)
+    assert per_build >= 1
+    factory_calls.clear()
+
+    results: list[dict] = []
+
+    def read() -> None:
+        results.append(get_project_scores(tmp_path, "proj", None, deps))
+
+    with patch(f"{_MODULE}._PAYLOADS", StampCache()):
+        threads = [threading.Thread(target=read) for _ in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+    assert len(factory_calls) == per_build
+    assert len(results) == 6
+    assert all(r is results[0] for r in results)

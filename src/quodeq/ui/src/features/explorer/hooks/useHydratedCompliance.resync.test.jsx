@@ -6,13 +6,14 @@ import { STALE_TIME_MS } from '../../../hooks/queryDefaults.js';
 import { useHydratedFindings, resetDetailResyncForTests } from './useHydratedCompliance.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
-// The File and Principle pages render a snapshot of findings built when the
-// user clicked, while the detail is fetched from the server's current state.
-// A finding re-reported since (new title, shifted lines) has no detail row:
-// the item is marked outdated, and the project's scores are invalidated once
-// so the snapshot catches up. Opening a page over a payload older than its
-// staleness window refreshes it too, instead of waiting for a miss.
-const ref = { project: 'proj', asOf: null, dimension: 'security', generation: 7, kind: 'violation' };
+// The File and Principle pages render the rows their detail query returns;
+// the list payload they were opened from only says what to ask for. When
+// that payload names a finding the detail no longer has at its file and
+// line, the page already shows the server's rows, and the project's queries
+// are refreshed once per staleness window so the rest of the page catches
+// up. Opening a page over a payload older than its staleness window
+// refreshes it too, instead of waiting for a miss.
+const ref = { project: 'proj', asOf: null, dimension: 'security', kind: 'violation' };
 const slim = (file, line, title = 'bad') => ({
   file, line, endLine: null, principle: 'P1', title,
   reason: null, snippet: null, context: null, detailDeferred: true, detailRef: ref,
@@ -32,33 +33,33 @@ function setup(getFindingDetail, { scoresUpdatedAt } = {}) {
   return { wrapper, invalidate };
 }
 
+const projectInvalidations = (invalidate) =>
+  invalidate.mock.calls.filter(([arg]) => arg?.queryKey?.join() === projectKeys.project('proj', 'local').join());
+
 beforeEach(() => resetDetailResyncForTests());
 
-describe('useHydratedFindings with a stale snapshot', () => {
-  it('marks an item with no detail row as outdated and invalidates the project once', async () => {
+describe('useHydratedFindings over a payload that fell behind', () => {
+  it('renders the server rows and refreshes the project once', async () => {
     const get = vi.fn(async () => [{ ...slim('a.py', 12, 'New title'), detailDeferred: false, reason: 'why', snippet: 'code' }]);
     const items = [slim('a.py', 10, 'Old title'), slim('b.py', 3)];
     const { wrapper, invalidate } = setup(get, { scoresUpdatedAt: Date.now() });
     const { result, rerender } = renderHook(() => useHydratedFindings(items, FINDING_TYPE.VIOLATION), { wrapper });
 
-    await waitFor(() => expect(result.current[0].detailOutdated).toBe(true));
-    expect(result.current[0].detailDeferred).toBe(false);
-    expect(result.current[0].reason).toBeNull();
-    expect(result.current[1].detailOutdated).toBe(true);
-    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: projectKeys.project('proj', 'local') }));
+    await waitFor(() => expect(result.current).toHaveLength(1));
+    expect(result.current[0]).toMatchObject({ title: 'New title', line: 12, reason: 'why', detailDeferred: false });
+    await waitFor(() => expect(projectInvalidations(invalidate)).toHaveLength(1));
     rerender();
     rerender();
-    expect(invalidate.mock.calls.filter(([arg]) => arg?.queryKey?.join() === projectKeys.project('proj', 'local').join())).toHaveLength(1);
+    expect(projectInvalidations(invalidate)).toHaveLength(1);
   });
 
-  it('does not invalidate when every item found its detail', async () => {
+  it('does not refresh when every item still has its row', async () => {
     const item = slim('a.py', 10);
     const get = vi.fn(async () => [{ ...item, detailDeferred: false, reason: 'why', snippet: 'code' }]);
     const { wrapper, invalidate } = setup(get, { scoresUpdatedAt: Date.now() });
     const { result } = renderHook(() => useHydratedFindings([item], FINDING_TYPE.VIOLATION), { wrapper });
 
     await waitFor(() => expect(result.current[0].snippet).toBe('code'));
-    expect(result.current[0].detailOutdated).toBeUndefined();
     expect(invalidate).not.toHaveBeenCalled();
   });
 
@@ -68,7 +69,7 @@ describe('useHydratedFindings with a stale snapshot', () => {
     const { wrapper, invalidate } = setup(get, { scoresUpdatedAt: Date.now() - STALE_TIME_MS - 1000 });
     renderHook(() => useHydratedFindings([item], FINDING_TYPE.VIOLATION), { wrapper });
 
-    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: projectKeys.project('proj', 'local') }));
+    await waitFor(() => expect(projectInvalidations(invalidate)).toHaveLength(1));
   });
 
   it('leaves a fresh payload alone when the page opens', async () => {
