@@ -3293,20 +3293,25 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .eval-dim-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 12px;
+  /* Four per row so every name fits on one line and no row is stretched
+     by a wrapped neighbour; two per row on narrow screens. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 760px) {
+  .eval-dim-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .eval-dim-card {
   appearance: none;
   display: flex;
-  gap: 11px;
+  gap: 10px;
   align-items: flex-start;
   text-align: left;
   font: inherit;
   background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
   border: 1px solid var(--color-border-soft, var(--color-border));
   border-radius: var(--eval-tile-radius, 10px);
-  padding: 13px 15px;
+  padding: 11px 14px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -3326,7 +3331,8 @@ button.eval-provider-badge--clickable:focus-visible {
   border: 1px solid var(--color-border);
   background: transparent;
   flex-shrink: 0;
-  margin-top: 1px;
+  /* Centred on the name's 18px line. */
+  margin-top: 2.5px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3346,7 +3352,11 @@ button.eval-provider-badge--clickable:focus-visible {
 .eval-dim-card__title-row {
   display: block;
   min-width: 0;
-  line-height: 1.35;
+  /* A fixed line: the bordered std tag must not set it. */
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .eval-dim-card__name {
   display: inline;
@@ -3376,7 +3386,7 @@ button.eval-provider-badge--clickable:focus-visible {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
   font-size: 11px;
   color: var(--color-text-muted);
-  margin-top: 5px;
+  margin-top: 3px;
   font-variant-numeric: tabular-nums;
 }
 .eval-dim-card__meta-line { white-space: nowrap; }
@@ -3766,3 +3776,17 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .scan-progress__pair { display: inline-flex; align-items: center; gap: 8px; }
 .scan-progress__pair-label { color: var(--color-text-subtle); }
+
+/* Dimension cards with nothing to analyze step back; selected ones keep their check. */
+.eval-dim-card__std { vertical-align: 1px; line-height: 13px; }
+.eval-dim-card--uptodate {
+  background: color-mix(in srgb, var(--color-bg) 85%, var(--color-surface));
+  border-color: var(--color-border-soft, var(--color-border));
+}
+.eval-dim-card--uptodate .eval-dim-card__name { color: var(--color-text-muted); }
+.eval-dim-card--uptodate .eval-dim-card__meta { color: var(--color-text-subtle); }
+.eval-dim-card--uptodate .eval-dim-card__check { opacity: 0.6; }
+/* Identity values share one line height so repository, scope and model sit on one baseline. */
+.eval-identity__value,
+.eval-identity__value--action { line-height: 18px; }
+.eval-identity__code { display: inline-block; line-height: 18px; vertical-align: top; }

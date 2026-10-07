@@ -61,14 +61,14 @@ function DimensionChip({ dim, isSelected, onToggle }) {
   );
 }
 
-function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
+function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading, upToDate }) {
   const info = typeInfo(dim);
   return (
     <DimensionToggle
       dim={dim}
       isSelected={isSelected}
       onToggle={onToggle}
-      className={`eval-dim-card${isSelected ? ' eval-dim-card--selected' : ''}`}
+      className={`eval-dim-card${isSelected ? ' eval-dim-card--selected' : ''}${upToDate ? ' eval-dim-card--uptodate' : ''}`}
     >
       <span className="eval-dim-card__check" aria-hidden="true">{isSelected ? '✓' : ''}</span>
       <span className="eval-dim-card__body">
@@ -95,7 +95,7 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
   );
 }
 
-function DimensionSelectorTerminal({ sorted, selectedDims, onToggle, onSelectAll, onClearAll, dimMetas, metasLoading }) {
+function DimensionSelectorTerminal({ sorted, selectedDims, onToggle, onSelectAll, onClearAll, dimMetas, upToDateIds, metasLoading }) {
   return (
     <div className="form-group eval-dims-section">
       <div className="dimension-label-row dimension-label-row--terminal">
@@ -120,6 +120,7 @@ function DimensionSelectorTerminal({ sorted, selectedDims, onToggle, onSelectAll
             onToggle={onToggle}
             meta={dimMetas?.[dim.id] ?? null}
             metaLoading={metasLoading}
+            upToDate={upToDateIds?.has(dim.id) ?? false}
           />
         ))}
       </div>
@@ -151,10 +152,12 @@ function DimensionSelectorChips({ sorted, selectedDims, onToggle, onSelectAll, o
  * @param {object} props
  * @param {object} [props.dimMetas] terminal variant only: dim id → pre-run
  *   meta lines (["312 files to analyze", "85% analyzed"]); null/missing → omitted.
+ * @param {Set<string>} [props.upToDateIds] terminal variant only: ids of dimensions
+ *   with nothing to analyze; their cards are muted.
  * @param {boolean} [props.metasLoading] terminal variant only: estimates are
  *   still being computed — cards show a small placeholder instead of nothing.
  */
-export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null, metasLoading = false }) {
+export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null, upToDateIds = null, metasLoading = false }) {
   const sorted = useMemo(() => [...allDimensions].sort((a, b) => {
     const oa = typeConfig(a).order;
     const ob = typeConfig(b).order;
@@ -165,6 +168,6 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
   const shared = { sorted, selectedDims, onToggle, onSelectAll, onClearAll };
 
   return variant === DIMENSION_SELECTOR_VARIANT_TERMINAL
-    ? <DimensionSelectorTerminal {...shared} dimMetas={dimMetas} metasLoading={metasLoading} />
+    ? <DimensionSelectorTerminal {...shared} dimMetas={dimMetas} upToDateIds={upToDateIds} metasLoading={metasLoading} />
     : <DimensionSelectorChips {...shared} />;
 }

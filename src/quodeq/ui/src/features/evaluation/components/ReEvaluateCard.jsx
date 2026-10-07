@@ -8,8 +8,8 @@ import { UrlRestoreSection, DetectedLine, BudgetChips, RunBar, IdentityHeader, S
 import { TermHeader } from '../../../components/terminal/index.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
-import { t, LOCALE } from '../../../strings/index.js';
-import { PERCENT } from '../../../constants.js';
+import { t } from '../../../strings/index.js';
+import { buildDimMetas, buildUpToDateIds } from '../dimMetas.js';
 
 export { buildScanPayload } from '../hooks/useDimensionSelection.js';
 
@@ -21,26 +21,6 @@ const EVAL_OPTIONS_HINT = (
     <div><strong>{t('evaluate.hintBudgetLabel')}</strong>: {t('evaluate.hintBudgetText')}</div>
   </>
 );
-
-// Per-dimension meta lines, matching the selected scan mode: how much work
-// is left ("312 files to analyze"), how much the cache already covers
-// ("85% analyzed"), or "up to date" when every current fingerprint already
-// has a cached result. One entry per line — a single string would wrap
-// unevenly across cards on wide screens.
-function buildDimMetas(estimates, isClean) {
-  if (!estimates?.dimensions) return null;
-  return Object.fromEntries(Object.entries(estimates.dimensions).map(([id, est]) => {
-    const total = est.total ?? 0;
-    if (!(total > 0)) return [id, null];
-    const count = isClean ? total : (est.count ?? 0);
-    const cached = isClean ? 0 : (est.cached ?? 0);
-    if (count === 0) return [id, [t('evaluate.upToDate')]];
-    const pct = Math.round((cached / total) * PERCENT);
-    const lines = [t('evaluate.filesToAnalyze', { count: count.toLocaleString(LOCALE) })];
-    if (pct > 0) lines.push(t('evaluate.pctAnalyzed', { pct }));
-    return [id, lines];
-  }));
-}
 
 function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScopeBrowser, onCloseScopeBrowser, isReadOnlyEphemeral, urlActions, activeModel, branchLabel, scopeValue, onGoToSettings, onGoToProjects }) {
   const { urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = urlActions;
@@ -82,7 +62,7 @@ function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScope
   );
 }
 
-function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, allDimensions, selectedDims, toggleDim, selectAll, clearAll, dimMetas, estimatesLoading, handleScan, estimates, budget, hasModel }) {
+function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, allDimensions, selectedDims, toggleDim, selectAll, clearAll, dimMetas, upToDateIds, estimatesLoading, handleScan, estimates, budget, hasModel }) {
   return (
     <>
       <ScanModeCards value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
@@ -96,6 +76,7 @@ function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, a
           onSelectAll={selectAll}
           onClearAll={clearAll}
           dimMetas={dimMetas}
+          upToDateIds={upToDateIds}
           metasLoading={estimatesLoading}
         />
       )}
@@ -121,11 +102,12 @@ function computeReEvalViewState({ info, scope, disabled, cleanScan, estimates })
   const canStart = !disabled && !info.pathMissing && !isReadOnlyEphemeral;
   const isClean = cleanScan !== CLEAN_PERSIST.OFF;
   const dimMetas = buildDimMetas(estimates, isClean);
+  const upToDateIds = buildUpToDateIds(estimates, isClean);
   const branchLabel = scope.isLocal ? (scope.scanData?.currentBranch || scope.branch) : null;
   const scopeValue = scope.scopePath
     ? `${scope.scopePath}/`
     : `${info.path}/ · ${t('evaluate.wholeProject')}`;
-  return { isReadOnlyEphemeral, canStart, dimMetas, branchLabel, scopeValue };
+  return { isReadOnlyEphemeral, canStart, dimMetas, upToDateIds, branchLabel, scopeValue };
 }
 
 function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope, estimates, estimatesLoading, budget, onGoToSettings, onGoToProjects }) {
@@ -136,7 +118,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
   } = actions;
   const [scopeBrowserOpen, setScopeBrowserOpen] = useState(false);
   const activeModel = readActiveProviderModel();
-  const { isReadOnlyEphemeral, canStart, dimMetas, branchLabel, scopeValue } =
+  const { isReadOnlyEphemeral, canStart, dimMetas, upToDateIds, branchLabel, scopeValue } =
     computeReEvalViewState({ info, scope, disabled, cleanScan, estimates });
 
   return (
@@ -168,6 +150,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         selectAll={selectAll}
         clearAll={clearAll}
         dimMetas={dimMetas}
+        upToDateIds={upToDateIds}
         estimatesLoading={estimatesLoading}
         handleScan={handleScan}
         estimates={estimates}
