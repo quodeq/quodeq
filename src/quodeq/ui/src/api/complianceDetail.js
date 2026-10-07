@@ -2,10 +2,14 @@
  * Finding detail that /scores, /scores/<run> and a run's dimension eval defer.
  *
  * All three send violation and compliance items without `reason`, `snippet`,
- * `context` and `reqRefs` (flagged `detailDeferred`), since those fields are
- * most of their payload. Pages that render finding cards fetch the detail
- * from /compliance-detail (per kind; `?asOf=` for accumulated items, `?run=`
- * for one run's) and merge it back by identity.
+ * `context` and `reqRefs` (flagged `detailDeferred`): those fields are most
+ * of their payload, and only the File, Principle and Finding pages and the
+ * reports render them. Those pages ask /compliance-detail for the rows they
+ * show (per dimension and kind; `?asOf=` for accumulated items, `?run=` for
+ * one run's) and the answer REPLACES the deferred items: the list payload
+ * says what to ask for, the detail answer is what the page renders. Nothing
+ * is matched back by identity, so a finding the server re-reported under a
+ * new title or at a shifted line shows as it is now.
  */
 import { FINDING_TYPE } from '../vocab/findingType.js';
 import { DEFAULT_PROJECT_SOURCE } from '../vocab/projectSource.js';
@@ -14,20 +18,19 @@ import { DEFAULT_PROJECT_SOURCE } from '../vocab/projectSource.js';
 const LIST_BY_KIND = Object.freeze({ [FINDING_TYPE.VIOLATION]: 'violations', [FINDING_TYPE.COMPLIANCE]: 'compliance' });
 
 /**
- * Tag each deferred item with where its detail lives. One ref object per
- * dimension and kind, shared by its items. `generation` tells two /scores
- * responses for the same project and asOf apart, so detail cached for an
- * older payload is never merged into a newer one.
+ * Tag each deferred item with where its detail lives: one ref object per
+ * dimension and kind, shared by its items. A ref names content (project,
+ * as-of run, dimension, kind), never the response it came from, so the
+ * detail fetched for one /scores response serves the next one too.
  * @param {Object} data Parsed unified scores payload (mutated and returned).
  * @param {string} project
  * @param {string|null} asOf
- * @param {number} generation
  * @returns {Object}
  */
-export function attachFindingDetailRefs(data, project, asOf, generation) {
+export function attachFindingDetailRefs(data, project, asOf) {
   for (const dim of data?.accumulated?.dimensions || []) {
     for (const [kind, list] of Object.entries(LIST_BY_KIND)) {
-      const ref = { project, asOf: asOf || null, dimension: dim.dimension, generation, kind };
+      const ref = { project, asOf: asOf || null, dimension: dim.dimension, kind };
       for (const item of dim[list] || []) {
         if (item?.detailDeferred) item.detailRef = ref;
       }
@@ -39,12 +42,9 @@ export function attachFindingDetailRefs(data, project, asOf, generation) {
 /** `attachFindingDetailRefs` under its pre-kind name. */
 export const attachComplianceDetailRefs = attachFindingDetailRefs;
 
-// Numbers each /scores/<run> and eval response (both sources), see attachFindingDetailRefs.
-let runScoresGeneration = 0;
-
 function attachRunRefs(node, project, run, source) {
   for (const [kind, list] of Object.entries(LIST_BY_KIND)) {
-    const ref = { project, run, dimension: node.dimension, generation: runScoresGeneration, kind, source };
+    const ref = { project, run, dimension: node.dimension, kind, source };
     for (const item of node[list] || []) {
       if (item?.detailDeferred) item.detailRef = ref;
     }
@@ -61,7 +61,6 @@ function attachRunRefs(node, project, run, source) {
  * @returns {Object}
  */
 export function attachRunFindingDetailRefs(data, project, run, source = DEFAULT_PROJECT_SOURCE) {
-  runScoresGeneration += 1;
   for (const dim of data?.dimensions || []) attachRunRefs(dim, project, run, source);
   return data;
 }
@@ -77,7 +76,6 @@ export function attachRunFindingDetailRefs(data, project, run, source = DEFAULT_
  */
 export function attachEvalFindingDetailRefs(data, project, run, source = DEFAULT_PROJECT_SOURCE) {
   if (!data?.dimension) return data;
-  runScoresGeneration += 1;
   attachRunRefs(data, project, run, source);
   return data;
 }
@@ -97,7 +95,7 @@ function commonPrefix(strings) {
  * that still covers them: their principle when they share one, and the
  * common prefix of their file paths.
  * @param {Array} items
- * @returns {Array<{ref: Object, scope: {principle: string|undefined, pathPrefix: string|undefined}}>}
+ * @returns {Array<{ref: Object, scope: {principle: string|undefined, pathPrefix: string|undefined}, items: Array}>}
  */
 export function groupDeferredFindings(items) {
   const byRef = new Map();
@@ -116,6 +114,7 @@ export function groupDeferredFindings(items) {
         principle: principles.size === 1 ? [...principles][0] ?? undefined : undefined,
         pathPrefix: prefix || undefined,
       },
+      items: group,
     };
   });
 }
@@ -123,33 +122,82 @@ export function groupDeferredFindings(items) {
 /** `groupDeferredFindings` under its pre-kind name. */
 export const groupDeferredCompliance = groupDeferredFindings;
 
-const identity = (i) => [i.file, i.line, i.endLine, i.principle, i.title].join('\u0000');
+// The fields a page's items can agree on. A row the server sends belongs on
+// the page when it matches every field the page's items are unanimous about:
+// one file (the File page), one principle (the Principle page), one type (a
+// by-type file). A dimension's synthetic file agrees on none and takes the
+// dimension whole.
+const SELECTION_FIELDS = ['file', 'principle', 'violationType'];
 
 /**
- * Fill deferred items with the detail loaded for their ref. Items sharing an
- * identity take their details in server order, which is the order they
- * arrived in. Items with nothing loaded yet are returned as they were.
+ * The predicate that picks, among the rows the server sends for *items*'
+ * groups, the ones that belong on the page holding *items*.
+ * @param {Array} items
+ * @returns {(row: Object) => boolean}
+ */
+export function pageSelector(items) {
+  const wanted = [];
+  for (const field of SELECTION_FIELDS) {
+    const values = new Set((items || []).map((i) => i?.[field] ?? null));
+    if (values.size === 1 && !values.has(null)) wanted.push([field, [...values][0]]);
+  }
+  if (!wanted.length) return () => true;
+  return (row) => wanted.every(([field, value]) => row?.[field] === value);
+}
+
+function selectedRows(loaded, select) {
+  const byRef = new Map();
+  for (const { ref, items: rows } of loaded) {
+    byRef.set(ref, (rows || []).filter(select).map((row) => ({ ...row, detailRef: ref, detailDeferred: false })));
+  }
+  return byRef;
+}
+
+/**
+ * *items* with each loaded group's deferred items replaced, in the group's
+ * first position, by the rows the server sent for it that *select* keeps.
+ * Groups still loading keep their deferred items; failed groups are the
+ * caller's business (see markDetailUnavailable).
  * @param {Array} items
  * @param {Array<{ref: Object, items: Array}>} loaded
+ * @param {(row: Object) => boolean} select
  * @returns {Array}
  */
-export function mergeFindingDetail(items, loaded) {
+export function replaceWithDetail(items, loaded, select) {
   if (!loaded.length) return items;
-  const queues = new Map();
-  for (const { ref, items: details } of loaded) {
-    const byIdentity = new Map();
-    for (const d of details) {
-      const key = identity(d);
-      const same = byIdentity.get(key) ?? [];
-      same.push(d);
-      byIdentity.set(key, same);
+  const rowsByRef = selectedRows(loaded, select);
+  const placed = new Set();
+  const out = [];
+  for (const item of items) {
+    const ref = item?.detailDeferred ? item.detailRef : null;
+    if (!ref || !rowsByRef.has(ref)) {
+      out.push(item);
+    } else if (!placed.has(ref)) {
+      placed.add(ref);
+      out.push(...rowsByRef.get(ref));
     }
-    queues.set(ref, byIdentity);
   }
-  return items.map((item) => {
-    const detail = item?.detailDeferred && queues.get(item.detailRef)?.get(identity(item))?.shift();
-    if (!detail) return item;
-    return { ...item, reason: detail.reason, snippet: detail.snippet, context: detail.context, reqRefs: detail.reqRefs, detailDeferred: false };
+  return out;
+}
+
+const place = (i) => `${i.file}\u0000${i.line}`;
+
+/**
+ * True when a loaded group has no row at the file and line of one of its
+ * deferred items: the list payload the page was built from names a finding
+ * the server no longer has there (re-reported, moved or suppressed since).
+ * @param {Array} items
+ * @param {Array<{ref: Object, items: Array}>} loaded
+ * @param {(row: Object) => boolean} select
+ * @returns {boolean}
+ */
+export function missingFromDetail(items, loaded, select) {
+  if (!loaded.length) return false;
+  const rowsByRef = selectedRows(loaded, select);
+  const placesByRef = new Map([...rowsByRef].map(([ref, rows]) => [ref, new Set(rows.map(place))]));
+  return items.some((item) => {
+    const places = item?.detailDeferred ? placesByRef.get(item.detailRef) : undefined;
+    return places !== undefined && !places.has(place(item));
   });
 }
 
@@ -169,26 +217,3 @@ export function markDetailUnavailable(items, failedRefs) {
       : item
   ));
 }
-
-/**
- * Flag deferred items whose group LOADED without a row for them. Their
- * identity (file, line, principle, title) no longer exists on the server:
- * the client is rendering a snapshot older than the server's state, for
- * example after a run re-reported the finding under a new title or at a
- * shifted line. They leave the deferred state and carry `detailOutdated`,
- * which the cards turn into a note and the hydration hook into a refresh.
- * @param {Array} items
- * @param {Array<Object>} loadedRefs the refs whose detail fetch succeeded
- * @returns {Array}
- */
-export function markDetailOutdated(items, loadedRefs) {
-  if (!loadedRefs.length) return items;
-  return items.map((item) => (
-    item?.detailDeferred && loadedRefs.includes(item.detailRef)
-      ? { ...item, detailDeferred: false, detailOutdated: true }
-      : item
-  ));
-}
-
-/** `mergeFindingDetail` under its pre-kind name. */
-export const mergeComplianceDetail = mergeFindingDetail;

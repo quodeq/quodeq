@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { OverviewReportContent, hydrateReportDimensions } from './OverviewReportContent.jsx';
+import { REPORT_SEVERITIES } from './HydratedReportContent.jsx';
 import { withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
 
 // The Overview report prints critical and major violations with their
@@ -18,12 +19,17 @@ const accumulated = { summary: { numericAverage: 7.5, overallGrade: 'B' }, dimen
 const dimensions = [{ dimension: 'security', overallScore: '7.5', overallGrade: 'B', violations: [slim, minorSlim], compliance: [] }];
 
 describe('hydrateReportDimensions', () => {
-  it('replaces each dimension\'s violations by identity and leaves the rest', () => {
+  it('replaces each dimension\'s printed violations with its fetched rows and leaves the rest', () => {
     const hydrated = [{ ...slim, reason: 'because', detailDeferred: false }];
-    const [dim] = hydrateReportDimensions(dimensions, hydrated);
+    const [dim] = hydrateReportDimensions(dimensions, hydrated, REPORT_SEVERITIES);
     expect(dim.violations[0].reason).toBe('because');
     expect(dim.violations[1]).toBe(minorSlim);
     expect(dim.overallScore).toBe('7.5');
+  });
+
+  it('leaves a dimension whose detail has not loaded alone', () => {
+    const [dim] = hydrateReportDimensions(dimensions, [slim, minorSlim], REPORT_SEVERITIES);
+    expect(dim).toBe(dimensions[0]);
   });
 });
 

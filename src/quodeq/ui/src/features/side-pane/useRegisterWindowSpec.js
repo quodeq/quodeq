@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSidePane } from './SidePaneContext.jsx';
+import { createSpecStore, liveSpec } from './liveSpec.jsx';
 
 /**
  * Registers a window spec for a given type while the calling component is
@@ -19,11 +20,27 @@ export function useRegisterWindowSpec(type, spec) {
   // setState and pegging React's "Maximum update depth" warning.
   //
   // Instead, anchor the effect on the spec's visible identity (id + title)
-  // and read the current closures from a ref. This keeps the dock title in
-  // sync when it changes (e.g. file detail with a different filter) while
-  // ignoring closure-only churn from data updates.
-  const specRef = useRef(spec);
-  specRef.current = spec;
+  // and register a live spec that reads the latest closures from a store
+  // (liveSpec.jsx). This keeps the dock title in sync when it changes (e.g.
+  // file detail with a different filter) and lets a registered or docked
+  // window follow data updates (the finding detail arriving after the first
+  // render, say) without re-registering for them.
+  const store = useRef(null);
+  if (store.current === null) store.current = createSpecStore(spec);
+  useEffect(() => { store.current.set(spec); }, [spec]);
+  // One live spec per page spec. The effect below also re-runs when the dock
+  // changes (hasWindow), and replaceWindow short-circuits only on the same
+  // object: a fresh wrapper per run would re-set the windows, change
+  // hasWindow, and loop.
+  const wrappers = useRef(new WeakMap());
+  const liveFor = useCallback((pageSpec) => {
+    let live = wrappers.current.get(pageSpec);
+    if (!live) {
+      live = liveSpec(store.current, pageSpec);
+      wrappers.current.set(pageSpec, live);
+    }
+    return live;
+  }, []);
   const specId = spec?.id ?? null;
   const specTitle = spec?.title ?? null;
 
@@ -32,13 +49,13 @@ export function useRegisterWindowSpec(type, spec) {
       unregisterSpec(type);
       return undefined;
     }
-    const current = specRef.current;
-    registerSpec(type, current);
-    if (hasWindow(current.id)) {
-      replaceWindow(current);
+    const live = liveFor(store.current.get());
+    registerSpec(type, live);
+    if (hasWindow(live.id)) {
+      replaceWindow(live);
     }
     return () => unregisterSpec(type);
-  }, [type, specId, specTitle, registerSpec, unregisterSpec, replaceWindow, hasWindow]);
+  }, [type, specId, specTitle, registerSpec, unregisterSpec, replaceWindow, hasWindow, liveFor]);
 
   const isInDock = spec ? hasWindow(spec.id) : false;
   const isAtCap = windows.length >= MAX_WINDOWS;
@@ -47,6 +64,6 @@ export function useRegisterWindowSpec(type, spec) {
     spec: spec ?? null,
     hasWindow: isInDock,
     isAtCap,
-    toggle: () => { if (spec) toggleWindow(spec); },
+    toggle: () => { if (spec) toggleWindow(liveFor(spec)); },
   };
 }

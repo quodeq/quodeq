@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+- **Detail pages keep their detail**: the File and Principle pages, and the reports and fix plans built from them, sometimes showed a finding's title with no detail text and no code, mostly while scores were updating. Those pages now render the rows their own `/compliance-detail` query returns instead of patching detail into the list payload's rows by identity: the query is keyed on what it asks for (run or as-of, dimension, scope), not on the `/scores` response it was fetched for, so a refetch of the list keeps the rows on screen and refreshes them in place. A finding whose detail is still loading shows a skeleton where its text and code go; one whose detail failed to load says so and retries. The report and fix-plan panes follow the page's data instead of printing the rows they were registered with. On the server, concurrent `/scores` and `/compliance-detail` requests that miss the payload memo build it once.
+
 ## [1.12.2] - 2026-10-06
 
 1.12.1 never reached PyPI: its publish stopped at the security audit. 1.12.2 is the same release with the fix below, and carries everything listed under 1.12.1.

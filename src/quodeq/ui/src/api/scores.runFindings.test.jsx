@@ -20,13 +20,13 @@ describe('getRunScores', () => {
   it('tags each deferred item with a ref naming the run and the local source', async () => {
     const { dimensions: [dim] } = await getRunScores('p1', 'r1');
     expect(dim.violations[0].detailRef).toEqual({
-      project: 'p1', run: 'r1', dimension: 'security', kind: 'violation', source: PROJECT_SOURCE.LOCAL, generation: expect.any(Number),
+      project: 'p1', run: 'r1', dimension: 'security', kind: 'violation', source: PROJECT_SOURCE.LOCAL,
     });
     expect(dim.compliance[0].detailRef.kind).toBe('compliance');
     expect(dim.compliance[0].detailRef).not.toBe(dim.violations[0].detailRef);
   });
 
-  it('shares one ref per dimension and kind, and numbers responses apart', async () => {
+  it('shares one ref per dimension and kind, equal across responses', async () => {
     request.mockResolvedValue({ dimensions: [{ dimension: 'security', violations: [
       { req: 'R1', file: 'a.py', line: 1, detailDeferred: true }, { req: 'R2', file: 'a.py', line: 9, detailDeferred: true },
     ] }] });
@@ -35,7 +35,7 @@ describe('getRunScores', () => {
     expect(a.detailRef).toBe(b.detailRef);
     request.mockResolvedValue(runPayload());
     const second = await getRunScores('p1', 'r1');
-    expect(second.dimensions[0].violations[0].detailRef.generation).toBeGreaterThan(a.detailRef.generation);
+    expect(second.dimensions[0].violations[0].detailRef).toEqual(a.detailRef);
   });
 
   it('leaves items with their detail alone', async () => {

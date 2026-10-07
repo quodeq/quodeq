@@ -22,7 +22,7 @@ describe('getDimensionEval', () => {
   it('tags the flat lists with a ref naming the run, the dimension and the local source', async () => {
     const data = await getDimensionEval('p1', 'r1', 'security');
     expect(data.violations[0].detailRef).toEqual({
-      project: 'p1', run: 'r1', dimension: 'security', kind: 'violation', source: PROJECT_SOURCE.LOCAL, generation: expect.any(Number),
+      project: 'p1', run: 'r1', dimension: 'security', kind: 'violation', source: PROJECT_SOURCE.LOCAL,
     });
     expect(data.compliance[0].detailRef.kind).toBe('compliance');
     expect(data.compliance[0].detailRef).not.toBe(data.violations[0].detailRef);
@@ -35,11 +35,11 @@ describe('getDimensionEval', () => {
     expect(data.violations[0].reason).toBe('why');
   });
 
-  it('numbers responses apart', async () => {
+  it('gives two responses for the same run equal refs, so one detail query serves both', async () => {
     const first = await getDimensionEval('p1', 'r1', 'security');
     request.mockResolvedValue(evalPayload());
     const second = await getDimensionEval('p1', 'r1', 'security');
-    expect(second.violations[0].detailRef.generation).toBeGreaterThan(first.violations[0].detailRef.generation);
+    expect(second.violations[0].detailRef).toEqual(first.violations[0].detailRef);
   });
 });
 

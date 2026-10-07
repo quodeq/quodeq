@@ -3,6 +3,7 @@ import { parseFileRef } from '../../../utils/formatters.js';
 import { staggerDelayStyle } from '../../../utils/animation.js';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
+import DetailSkeleton from '../../../components/DetailSkeleton.jsx';
 import { RefLinks } from '../../../components/findingDetail.jsx';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
@@ -69,13 +70,11 @@ function ViolationDetail({ item }) {
           </>}
         </div>
       )}
+      {item.detailDeferred && <DetailSkeleton />}
       {item.detailUnavailable && (
         <p className="vlive-detail-reason vlive-detail-reason--unavailable">{t('explorer.detailUnavailable')}</p>
       )}
-      {item.detailOutdated && (
-        <p className="vlive-detail-reason vlive-detail-reason--unavailable">{t('explorer.detailOutdated')}</p>
-      )}
-      <ContextBlock context={item.context} snippet={item.snippet} scope={item.scope} line={item.line} />
+      {!item.detailDeferred && <ContextBlock context={item.context} snippet={item.snippet} scope={item.scope} line={item.line} />}
     </div>
   );
 }

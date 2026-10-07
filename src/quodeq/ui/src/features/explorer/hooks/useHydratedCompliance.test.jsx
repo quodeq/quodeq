@@ -4,7 +4,7 @@ import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { useHydratedCompliance, useHydratedFindings } from './useHydratedCompliance.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
-const ref = { project: 'proj', asOf: null, dimension: 'security', generation: 1, kind: 'compliance' };
+const ref = { project: 'proj', asOf: null, dimension: 'security', kind: 'compliance' };
 const slim = (file, line) => ({
   file, line, endLine: null, principle: 'P1', title: 'ok',
   reason: null, snippet: null, context: null, detailDeferred: true, detailRef: ref,
@@ -21,7 +21,7 @@ function setup(getFindingDetail, sharedGetFindingDetail = vi.fn()) {
 }
 
 describe('useHydratedFindings for one run', () => {
-  const runRef = { project: 'proj', run: 'r1', dimension: 'security', generation: 1, kind: 'violation', source: 'local' };
+  const runRef = { project: 'proj', run: 'r1', dimension: 'security', kind: 'violation', source: 'local' };
 
   it('refills a run ref from that run, not the accumulated lists', async () => {
     const item = { ...slim('src/v.py', 3), detailRef: runRef };
@@ -66,6 +66,42 @@ describe('useHydratedCompliance', () => {
     await waitFor(() => expect(result.current[0].snippet).toBe('code'));
     expect(result.current[0].reqRefs).toEqual([{ label: 'CWE-1' }]);
     expect(get).toHaveBeenCalledWith('proj', { kind: 'violation', dimension: 'security', asOf: null, principle: 'P1', pathPrefix: 'src/v.py' });
+  });
+
+  it('replaces the deferred items with the rows the server holds for the page', async () => {
+    const get = vi.fn(async () => [
+      { ...slim('src/a.py', 1), reason: 'why a', detailDeferred: false },
+      { ...slim('src/a.py', 7), reason: 'why new', detailDeferred: false },
+    ]);
+    const items = [slim('src/a.py', 1)];
+    const { result } = renderHook(() => useHydratedCompliance(items), { wrapper: setup(get) });
+
+    await waitFor(() => expect(result.current).toHaveLength(2));
+    expect(result.current.map((i) => i.reason)).toEqual(['why a', 'why new']);
+    expect(result.current.every((i) => i.detailDeferred === false && i.detailRef === ref)).toBe(true);
+  });
+
+  it('keeps the rows of a different file out of a one-file page', async () => {
+    const get = vi.fn(async () => [
+      { ...slim('src/a.py', 1), reason: 'mine', detailDeferred: false },
+      { ...slim('src/a.py.bak', 1), reason: 'not mine', detailDeferred: false },
+    ]);
+    const { result } = renderHook(() => useHydratedCompliance([slim('src/a.py', 1)]), { wrapper: setup(get) });
+
+    await waitFor(() => expect(result.current[0].reason).toBe('mine'));
+    expect(result.current).toHaveLength(1);
+  });
+
+  it('lets the caller choose the rows that belong on the page', async () => {
+    const get = vi.fn(async () => [
+      { ...slim('src/a.py', 1), severity: 'critical', detailDeferred: false },
+      { ...slim('src/a.py', 2), severity: 'minor', detailDeferred: false },
+    ]);
+    const select = (row) => row.severity === 'critical';
+    const { result } = renderHook(() => useHydratedCompliance([slim('src/a.py', 1)], { select }), { wrapper: setup(get) });
+
+    await waitFor(() => expect(result.current[0].detailDeferred).toBe(false));
+    expect(result.current.map((i) => i.line)).toEqual([1]);
   });
 
   it('does not fetch when nothing is deferred', () => {

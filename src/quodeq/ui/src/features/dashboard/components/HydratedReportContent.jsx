@@ -11,26 +11,28 @@ import { SEVERITY } from '../../../vocab/severity.js';
  */
 export const REPORT_SEVERITIES = new Set([SEVERITY.CRITICAL, SEVERITY.MAJOR]);
 
-const identity = (v) => [v.file, v.line, v.endLine, v.principle, v.title].join('\u0000');
-
 function printedViolations(dimensions, severities) {
   return (dimensions || []).flatMap((dim) => (dim.violations || []).filter((v) => !severities || severities.has(v.severity)));
 }
 
 /**
- * The dimensions with each printed violation replaced by its hydrated
- * counterpart (matched by finding identity); other rows and every other
- * field are left as they are.
+ * The dimensions with the printed violations of each replaced by the rows
+ * its detail fetch returned (they carry the ref of the dimension they were
+ * fetched for); the rows *severities* leaves unprinted, and every other
+ * field, stay as they are. A dimension whose detail has not loaded is left
+ * alone.
  * @param {Array} dimensions
  * @param {Array} hydrated
+ * @param {Set|null} [severities]
  * @returns {Array}
  */
-export function hydrateReportDimensions(dimensions, hydrated) {
-  const byIdentity = new Map(hydrated.map((v) => [identity(v), v]));
-  return (dimensions || []).map((dim) => ({
-    ...dim,
-    violations: (dim.violations || []).map((v) => byIdentity.get(identity(v)) ?? v),
-  }));
+export function hydrateReportDimensions(dimensions, hydrated, severities = null) {
+  return (dimensions || []).map((dim) => {
+    const rows = hydrated.filter((v) => v.detailRef?.dimension === dim.dimension && !v.detailDeferred);
+    if (!rows.length) return dim;
+    const unprinted = severities ? (dim.violations || []).filter((v) => !severities.has(v.severity)) : [];
+    return { ...dim, violations: [...rows, ...unprinted] };
+  });
 }
 
 /**
@@ -42,8 +44,9 @@ export function hydrateReportDimensions(dimensions, hydrated) {
  */
 export function HydratedReportContent({ dimensions, severities = REPORT_SEVERITIES, build, markdownRef }) {
   const printed = useMemo(() => printedViolations(dimensions, severities), [dimensions, severities]);
-  const hydrated = useHydratedFindings(printed, FINDING_TYPE.VIOLATION);
-  const markdown = useMemo(() => build(hydrateReportDimensions(dimensions, hydrated)), [build, dimensions, hydrated]);
+  const select = useMemo(() => (severities ? (v) => severities.has(v.severity) : undefined), [severities]);
+  const hydrated = useHydratedFindings(printed, FINDING_TYPE.VIOLATION, { select });
+  const markdown = useMemo(() => build(hydrateReportDimensions(dimensions, hydrated, severities)), [build, dimensions, hydrated, severities]);
   useEffect(() => {
     if (markdownRef) markdownRef.current = markdown;
   }, [markdown, markdownRef]);
