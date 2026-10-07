@@ -2817,10 +2817,13 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .evaluate-panel__top--row {
   display: flex;
-  align-items: flex-start;
+  /* Actions sit on the title's line, not above it. */
+  align-items: center;
   justify-content: space-between;
   gap: var(--term-space-3);
+  margin-bottom: var(--term-space-4);
 }
+.evaluate-panel__top--row .term-header { margin: 0; }
 .evaluate-panel__top-actions {
   display: flex;
   gap: var(--term-space-2);
@@ -2974,7 +2977,7 @@ button.eval-provider-badge--clickable:focus-visible {
   to   { transform: translateX(400%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .eval-run-pill__dot,
+  .eval-run-dot,
   .vlive-footer__dot,
   .eval-dim-card__meta--skeleton,
   .scan-progress__dim-dot--running { animation: none; }
@@ -3000,12 +3003,6 @@ button.eval-provider-badge--clickable:focus-visible {
   vertical-align: middle;
   white-space: nowrap;
 }
-.eval-run-pill--running {
-  color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-warning) 24%, transparent);
-  padding-left: 7px;
-}
 .eval-run-pill--done {
   color: var(--color-success);
   background: color-mix(in srgb, var(--color-success) 8%, transparent);
@@ -3021,12 +3018,49 @@ button.eval-provider-badge--clickable:focus-visible {
   background: transparent;
   border: 1px solid var(--color-border);
 }
-.eval-run-pill__dot {
-  width: 5px;
-  height: 5px;
+/* A running job: a pulsing accent dot beside the title. */
+.eval-run-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 10px;
   border-radius: 50%;
-  background: var(--color-warning);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+  vertical-align: middle;
   animation: eval-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Pill buttons: stop, details, console (quiet) ── */
+.eval-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.eval-pill-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.eval-pill-btn--stop:hover {
+  border-color: var(--color-danger-border, var(--color-danger));
+  color: var(--color-danger-text, var(--color-danger));
+  background: var(--color-danger-bg, transparent);
+}
+.eval-pill-btn__stop-glyph {
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  background: currentColor;
 }
 
 /* ── Identity strip (repository · job id / scope · model · mode) ── */

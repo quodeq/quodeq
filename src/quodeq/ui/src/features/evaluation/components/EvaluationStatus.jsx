@@ -32,15 +32,18 @@ function termNameForStatus(status, exitReason) {
   return t('evaluate.termCancelled');
 }
 
+// A running job shows a pulsing dot: the title already says the run is in
+// progress. Finished jobs keep a pill that names how they ended.
 function RunPill({ status, exitReason }) {
+  if (status === JOB_STATUS.RUNNING) {
+    return <span className="eval-run-dot" role="img" aria-label={t('evaluate.runningAria')} />;
+  }
   const timeLimit = isTimeLimitEnd(status, exitReason);
-  const mod = status === JOB_STATUS.RUNNING ? 'running'
-    : status === JOB_STATUS.DONE ? 'done'
+  const mod = status === JOB_STATUS.DONE ? 'done'
     : !timeLimit && (status === JOB_STATUS.FAILED || status === JOB_STATUS.LOST) ? 'failed'
     : 'neutral';
   return (
     <span className={`eval-run-pill eval-run-pill--${mod}`}>
-      {status === JOB_STATUS.RUNNING && <span className="eval-run-pill__dot" aria-hidden="true" />}
       {timeLimit ? exitReasonLabel(exitReason) : jobStatusLabel(status)}
     </span>
   );
@@ -57,7 +60,10 @@ function JobHeader({ job, onDismiss, onCancel }) {
       />
       <div className="evaluate-panel__top-actions">
         {isRunning && (
-          <button type="button" className="term-btn term-btn--ghost term-btn--sm" onClick={onCancel}>{t('evaluate.cancelBtn')}</button>
+          <button type="button" className="eval-pill-btn eval-pill-btn--stop" onClick={onCancel}>
+            <span className="eval-pill-btn__stop-glyph" aria-hidden="true" />
+            {t('evaluate.stopBtn')}
+          </button>
         )}
         {!isRunning && isDone && (
           <button type="button" className="term-btn term-btn--primary term-btn--sm" onClick={() => onDismiss(EVAL_DISMISS_ACTION.VIEW)}>

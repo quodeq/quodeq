@@ -376,6 +376,8 @@
   "evaluate.cachedBarTitle": "{count} files analyzed in previous runs",
   "evaluate.cancelBody": "The run will stop. Choose what happens to findings collected so far.",
   "evaluate.cancelBtn": "cancel",
+  "evaluate.stopBtn": "stop",
+  "evaluate.runningAria": "running",
   "evaluate.cancelFailed": "Could not cancel evaluation.",
   "evaluate.cancelNewFolderAria": "Cancel new folder",
   "evaluate.cancelTitle": "Cancel evaluation?",
