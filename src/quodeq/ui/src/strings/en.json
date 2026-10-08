@@ -405,7 +405,6 @@
   "evaluate.dimensionsLabelCap": "Dimensions",
   "evaluate.dimensionsLoadFailed": "Failed to load dimensions. Try refreshing the page or check that the server is running.",
   "evaluate.dimsSelectedCounter": "{selected} of {total} selected · run in order",
-  "evaluate.dimsSelectedCounterLastRun": "{selected} of {total} selected · as your last run · run in order",
   "evaluate.discardFindings": "Discard findings",
   "evaluate.ephemeralNote": "This was a one-shot ephemeral evaluation. The working copy was deleted after it ran, so re-evaluating would require cloning again. Add the project from URL once more if you want a fresh run.",
   "evaluate.errorOccurred": "An error occurred",

@@ -36,7 +36,6 @@ from quodeq.services.wiring import (
     write_repository_info,
 )
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
-from quodeq.services.latest_run_dims import latest_run_dimensions
 
 _logger = logging.getLogger(__name__)
 
@@ -289,5 +288,4 @@ def get_project_info(
         "availableDimensions": available_dimensions,
         "hasFingerprints": fingerprints_found,
         "pathMissing": path_missing,
-        "latestRunDimensions": latest_run_dimensions(Path(reports_dir), project, log=SHARED_LOG),
     }

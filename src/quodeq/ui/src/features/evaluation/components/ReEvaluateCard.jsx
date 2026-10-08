@@ -62,7 +62,7 @@ function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScope
   );
 }
 
-function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, allDimensions, selectedDims, toggleDim, selectAll, clearAll, dimMetas, upToDateIds, seededFromLastRun, estimatesLoading, handleScan, estimates, budget, hasModel }) {
+function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, allDimensions, selectedDims, toggleDim, selectAll, clearAll, dimMetas, upToDateIds, estimatesLoading, handleScan, estimates, budget, hasModel }) {
   return (
     <>
       <ScanModeCards value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
@@ -77,7 +77,6 @@ function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, a
           onClearAll={clearAll}
           dimMetas={dimMetas}
           upToDateIds={upToDateIds}
-          seededFromLastRun={seededFromLastRun}
           metasLoading={estimatesLoading}
         />
       )}
@@ -112,7 +111,7 @@ function computeReEvalViewState({ info, scope, disabled, cleanScan, estimates })
 }
 
 function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope, estimates, estimatesLoading, budget, onGoToSettings, onGoToProjects }) {
-  const { all: allDimensions, selected: selectedDims, seededFromLastRun } = dimensions;
+  const { all: allDimensions, selected: selectedDims } = dimensions;
   const {
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
@@ -153,7 +152,6 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         clearAll={clearAll}
         dimMetas={dimMetas}
         upToDateIds={upToDateIds}
-        seededFromLastRun={seededFromLastRun}
         estimatesLoading={estimatesLoading}
         handleScan={handleScan}
         estimates={estimates}
@@ -166,7 +164,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
 
 export default function ReEvaluateCard({ project, projectInfo, onStart, disabled, preselectDims, onGoToSettings, onGoToProjects }) {
   const {
-    info, error, retry, allDimensions, selectedDims, seededFromLastRun,
+    info, error, retry, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     isLocal, scanData, estimates, estimatesLoading, branch, setBranch, scopePath, setScopePath,
@@ -199,7 +197,7 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
       info={info}
       project={project}
       disabled={disabled}
-      dimensions={{ all: allDimensions, selected: selectedDims, seededFromLastRun }}
+      dimensions={{ all: allDimensions, selected: selectedDims }}
       actions={{
         toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
         urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,

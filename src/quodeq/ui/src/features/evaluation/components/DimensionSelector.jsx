@@ -95,14 +95,14 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading, upToDate 
   );
 }
 
-function DimensionSelectorTerminal({ sorted, selectedDims, onToggle, onSelectAll, onClearAll, dimMetas, upToDateIds, metasLoading, seededFromLastRun }) {
+function DimensionSelectorTerminal({ sorted, selectedDims, onToggle, onSelectAll, onClearAll, dimMetas, upToDateIds, metasLoading }) {
   return (
     <div className="form-group eval-dims-section">
       <div className="dimension-label-row dimension-label-row--terminal">
         <span className="eval-dims-heading">
           <label>{t('evaluate.dimensionsLabel')}</label>
           <span className="eval-dims-counter">
-            {t(seededFromLastRun ? 'evaluate.dimsSelectedCounterLastRun' : 'evaluate.dimsSelectedCounter', { selected: selectedDims.size, total: sorted.length })}
+            {t('evaluate.dimsSelectedCounter', { selected: selectedDims.size, total: sorted.length })}
           </span>
         </span>
         <div className="dimension-chip-actions">
@@ -154,12 +154,10 @@ function DimensionSelectorChips({ sorted, selectedDims, onToggle, onSelectAll, o
  *   meta lines (["312 files to analyze", "85% analyzed"]); null/missing → omitted.
  * @param {Set<string>} [props.upToDateIds] terminal variant only: ids of dimensions
  *   with nothing to analyze; their cards are muted.
- * @param {boolean} [props.seededFromLastRun] terminal variant only: the selection is
- *   still the one the project's last run used; the counter says so.
  * @param {boolean} [props.metasLoading] terminal variant only: estimates are
  *   still being computed — cards show a small placeholder instead of nothing.
  */
-export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null, upToDateIds = null, metasLoading = false, seededFromLastRun = false }) {
+export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null, upToDateIds = null, metasLoading = false }) {
   const sorted = useMemo(() => [...allDimensions].sort((a, b) => {
     const oa = typeConfig(a).order;
     const ob = typeConfig(b).order;
@@ -170,6 +168,6 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
   const shared = { sorted, selectedDims, onToggle, onSelectAll, onClearAll };
 
   return variant === DIMENSION_SELECTOR_VARIANT_TERMINAL
-    ? <DimensionSelectorTerminal {...shared} dimMetas={dimMetas} upToDateIds={upToDateIds} metasLoading={metasLoading} seededFromLastRun={seededFromLastRun} />
+    ? <DimensionSelectorTerminal {...shared} dimMetas={dimMetas} upToDateIds={upToDateIds} metasLoading={metasLoading} />
     : <DimensionSelectorChips {...shared} />;
 }
