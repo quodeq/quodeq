@@ -34,6 +34,7 @@ from typing import Any
 from quodeq.shared import cancellation
 from quodeq.analysis.errors import provider_exit_reason
 from quodeq.core.run.exit_reason import ExitReason
+from quodeq.core.run.origin import RunOrigin
 from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
 from quodeq.analysis._run_lifecycle_support import (
@@ -197,6 +198,11 @@ class RunLifecycleContext:
         changes; set before entering so the first write carries both."""
         self._status.commit_sha = commit_sha
         self._status.commit_dirty = dirty
+
+    def set_origin(self, origin: RunOrigin) -> None:
+        """Record where the run came from (a CI workflow or the CLI); set
+        before entering so the first write carries it."""
+        self._status.origin = origin
 
     def set_deadline(self, deadline_at: str | None) -> None:
         """Record the run-level deadline. Visible immediately in status.json."""

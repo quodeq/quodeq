@@ -36,6 +36,7 @@ from quodeq.analysis.subprocess import AnalysisError
 from quodeq.core.run.job_status import external_job_id
 from quodeq.core.types.project_source import ProjectLocation
 from quodeq._cli_env import resolve_time_limit
+from quodeq.config.ci_env import current_run_origin
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.data.fs.project_resolver import ProjectIdentity
 from quodeq.data.git_cli import git_head_sha, git_worktree_dirty
@@ -221,6 +222,7 @@ def _run_lifecycle_body(
             ai_provider=ai_provider,
             ai_model=ai_model,
         )
+        context.set_origin(current_run_origin())
         if not is_repo_url(args.repo):
             source = str(inputs.src)
             context.set_commit_sha(git_head_sha(source), dirty=git_worktree_dirty(source))

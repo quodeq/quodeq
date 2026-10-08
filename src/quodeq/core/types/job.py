@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from quodeq.core.run.origin import RunOrigin
+
 
 @dataclass(frozen=True, slots=True)
 class JobSnapshot:
@@ -36,3 +38,5 @@ class JobSnapshot:
     # The commit the run evaluates, and the git origin of its project folder.
     commit_sha: str | None = None
     origin_url: str | None = None
+    # Where the run came from (a CI workflow or the CLI), when it recorded it.
+    origin: RunOrigin | None = None

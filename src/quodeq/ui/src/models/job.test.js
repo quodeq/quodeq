@@ -39,3 +39,9 @@ test('the git origin arrives from the REST job and survives a status frame', () 
   assert.equal(createJob({ jobId: 'j' }).originUrl, null);
   assert.equal(applyStatusFrame(job, { state: 'running' }).originUrl, 'https://github.com/quodeq/quodeq');
 });
+
+test('the run origin arrives from the REST job', () => {
+  const origin = { kind: 'ci', pr: 1402, prUrl: 'https://github.com/quodeq/quodeq/pull/1402' };
+  assert.deepEqual(createJob({ jobId: 'j', origin }).origin, origin);
+  assert.equal(createJob({ jobId: 'j' }).origin, null);
+});

@@ -108,3 +108,23 @@ describe('the end of a PR review', () => {
     expect(screen.queryByRole('button', { name: /open on github/i })).toBeNull();
   });
 });
+
+describe('a run that recorded where it came from', () => {
+  beforeEach(() => { getEvaluationProgress.mockReset(); openExternal.mockReset(); });
+  const pr = { kind: 'ci', event: 'pull_request', pr: 1402, prUrl: 'https://github.com/quodeq/quodeq/pull/1402' };
+
+  it('a PR review is named by its pull request and opens it', async () => {
+    getEvaluationProgress.mockResolvedValue(diff);
+    renderJob({ ...prDone, origin: pr });
+    expect(await screen.findByText('PR review #1402')).toHaveClass('eval-run-tag');
+    expect(screen.queryByText(/diff review/)).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: /open on github/i }));
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/quodeq/quodeq/pull/1402');
+  });
+
+  it('the nightly is named nightly', async () => {
+    getEvaluationProgress.mockResolvedValue(full);
+    renderJob({ ...external, origin: { kind: 'ci', event: 'schedule', workflow: 'Quodeq Nightly' } });
+    expect(await screen.findByText('nightly')).toHaveClass('eval-run-tag');
+  });
+});

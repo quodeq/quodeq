@@ -15,6 +15,7 @@
  * @property {string|null}   endedAt
  * @property {string|null}   commitSha      - The commit the run evaluates; null when unknown
  * @property {string|null}   originUrl      - git origin of the run's project folder; null when unknown
+ * @property {object|null}   origin         - where the run came from ({kind: 'ci'|'cli', event, workflow, pr, prUrl, runUrl}); null when not recorded
  * @property {string|null}   deadlineAt     - ISO-8601 wall-clock deadline for the run; null when unlimited or not yet set
  * @property {number|null}   exitCode
  * @property {string|null}   error
@@ -58,6 +59,7 @@ const JOB_FIELDS = {
   aiModel:          [['ai_model', 'aiModel'], null],
   commitSha:        [['commit_sha', 'commitSha'], null],
   originUrl:        ['originUrl', null],
+  origin:           ['origin', null],
 };
 
 // RunState values that have no JobStatus counterpart: the job is still going.
