@@ -84,7 +84,7 @@ describe('ContextBlock editor-tab strip', () => {
   it('shows a check on the copy button for a beat after copying', async () => {
     vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue();
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
     try {
       render(<ContextBlock context={context} line={42} file="src/app/hello.py" />);
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy path' })); });
@@ -94,6 +94,7 @@ describe('ContextBlock editor-tab strip', () => {
       expect(screen.getByRole('button', { name: 'Copy path' })).not.toHaveClass('code-tab-copy--copied');
     } finally {
       vi.useRealTimers();
+      vi.unstubAllGlobals();
     }
   });
 
