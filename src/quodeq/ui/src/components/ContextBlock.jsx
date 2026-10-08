@@ -14,8 +14,8 @@
  *   scrollbar size is known and the collapsed→expanded transition doesn't
  *   snap.
  */
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { CopyIcon, COPY_FEEDBACK_MS } from './CopyButton.jsx';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { CheckIcon, CopyIcon, XIcon, COPY_FEEDBACK_MS } from './CopyButton.jsx';
 import { measureWidth, cssFontFromElement } from '../utils/pretext.js';
 import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js';
 import { copyToClipboard } from '../utils/clipboard.js';
@@ -106,24 +106,34 @@ function TabPath({ filePath, line }) {
 
 /**
  * Copies `path:line`. Lives beside the toggle rather than inside it so the
- * strip never nests one button in another.
+ * strip never nests one button in another. The icon turns into a check (or an
+ * X when the clipboard refuses) for one beat, so the click visibly landed.
  */
 function CopyPathBtn({ text }) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState(null); // null | 'copied' | 'failed'
+  useEffect(() => {
+    if (!status) return undefined;
+    const timer = setTimeout(() => setStatus(null), COPY_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
   const onCopy = (e) => {
     // Same reason as FileCopyBtn: a finding row may toggle on click.
     e.stopPropagation();
-    copyToClipboard(text)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-      })
-      .catch((err) => console.warn('Clipboard copy failed:', err?.message || err));
+    // copyToClipboard never rejects: it resolves whether the write landed.
+    copyToClipboard(text).then((ok) => setStatus(ok ? 'copied' : 'failed'));
   };
-  const label = copied ? t('common.copied') : t('context.copyPath');
+  const label = status === 'copied' ? t('common.copiedShort')
+    : status === 'failed' ? t('common.copyFailed') : t('context.copyPath');
+  const icon = status === 'copied' ? <CheckIcon /> : status === 'failed' ? <XIcon /> : <CopyIcon />;
   return (
-    <button type="button" className="code-tab-copy" onClick={onCopy} title={label} aria-label={label}>
-      <CopyIcon />
+    <button
+      type="button"
+      className={`code-tab-copy${status ? ` code-tab-copy--${status}` : ''}`}
+      onClick={onCopy}
+      title={label}
+      aria-label={label}
+    >
+      {icon}
     </button>
   );
 }

@@ -2309,6 +2309,16 @@ button.eval-provider-badge--clickable:focus-visible {
   background: var(--color-accent-soft);
 }
 
+.code-tab-copy--copied,
+.code-tab-copy--copied:hover {
+  color: var(--color-success);
+}
+
+.code-tab-copy--failed,
+.code-tab-copy--failed:hover {
+  color: var(--color-danger);
+}
+
 .code-tab-copy:focus-visible {
   outline: 1px solid var(--color-accent);
 }
