@@ -361,7 +361,6 @@
   "evaluate.allBtn": "all",
   "evaluate.allCap": "All",
   "evaluate.alreadyRunning": "An evaluation is already running. Cancel it or wait for it to finish.",
-  "evaluate.alreadyRunningShort": "An evaluation is already running",
   "evaluate.always": "always",
   "evaluate.alwaysTitle": "Clean scan for every run, all projects",
   "evaluate.analysisFailed": "Analysis failed",

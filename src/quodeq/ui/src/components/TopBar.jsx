@@ -129,17 +129,11 @@ function ThemeToggleButton({ onToggleTheme, effectiveDark }) {
   );
 }
 
+// While a run is live the run chip takes this slot, so the button is hidden.
 function EvaluateButton({ onEvaluate, evaluating }) {
-  if (!onEvaluate) return null;
+  if (!onEvaluate || evaluating) return null;
   return (
-    <button
-      type="button"
-      className={`topbar-btn topbar-btn--evaluate${evaluating ? ' topbar-btn--evaluate--running' : ''}`}
-      onClick={evaluating ? undefined : onEvaluate}
-      aria-disabled={evaluating || undefined}
-      title={evaluating ? t('evaluate.alreadyRunningShort') : undefined}
-      aria-live="polite"
-    >
+    <button type="button" className="topbar-btn topbar-btn--evaluate" onClick={onEvaluate}>
       <span className="topbar-btn__play" aria-hidden="true">▸</span>
       <span>{t('common.evaluate')}</span>
     </button>
