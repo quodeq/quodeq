@@ -51,3 +51,8 @@ test('a finished run with no new violations says none, not none yet', () => {
   const [, , found] = buildJobStatCells('done', { ...base, liveCount: 0, sevCounts: {} });
   assert.equal(found.hint, 'none');
 });
+
+test('a run whose time budget ran out says so instead of "all done"', () => {
+  const [dims] = buildJobStatCells('done', { ...base, exitReason: 'time_limit' });
+  assert.equal(dims.hint, 'time limit reached');
+});

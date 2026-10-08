@@ -10,7 +10,7 @@
 import ConsoleButton from '../../../components/ConsoleButton.jsx';
 import ScanProgressDetail from './ScanProgressDetail.jsx';
 import { computeCoverageView } from './scanProgressCoverage.js';
-import { exitReasonInfo, exitReasonWarn } from '../../../models/exitReason.js';
+import { exitReasonInfo, exitReasonWarn, isTimeLimitExit } from '../../../models/exitReason.js';
 import { t } from '../../../strings/index.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { PERCENT } from '../../../constants.js';
@@ -53,10 +53,10 @@ export function ScanProgressBanner({ isFailed, isLost, status, progress, logs, e
   if (isLost) {
     return <div className="scan-progress__error">{t('evaluate.jobTrackingLost')}</div>;
   }
-  // Done-with-errors: the provider died mid-run but files had already been
-  // analysed, so the run kept its partial results. Warn that the numbers
-  // below cover only part of the project.
-  if (status === JOB_STATUS.DONE && failInfo && exitReasonWarn(reason)) {
+  // Done but partial: the provider died mid-run, or the time budget ran out
+  // with files left, after some files had been analysed. Warn that the
+  // numbers below cover only part of the project.
+  if (status === JOB_STATUS.DONE && failInfo && (exitReasonWarn(reason) || isTimeLimitExit(reason))) {
     return (
       <div className="scan-progress__warning" role="alert">
         <strong>{failInfo.label}</strong> · {t('evaluate.runStoppedEarly')}

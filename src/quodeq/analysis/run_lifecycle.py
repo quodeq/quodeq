@@ -50,9 +50,20 @@ from quodeq.analysis._run_lifecycle_support import (
     seed_dimension_states,
 )
 from quodeq.core.run.state import RunState, TERMINAL_STATES, validate_transition
+from quodeq.data.fs.dimensions_state_store import read_dimensions
 from quodeq.data.fs.run_status_store import write_status
 
 _logger = logging.getLogger(__name__)
+
+
+def _any_dim_time_limited(run_dir: Path) -> bool:
+    """A dimension ran out of its slice of the time budget with files left.
+
+    The run can still end before its own deadline, so only the per-dim
+    records say the results are partial.
+    """
+    dims = read_dimensions(run_dir).get("dimensions") or {}
+    return any(isinstance(d, dict) and d.get("exit_reason") == ExitReason.TIME_LIMIT for d in dims.values())
 
 
 class RunLifecycleContext:
@@ -133,7 +144,8 @@ class RunLifecycleContext:
         self._transition(
             RunState.DONE,
             exit_reason=self._pending_exit_reason
-            or ("incomplete_dimensions" if skipped else None),
+            or ("incomplete_dimensions" if skipped else None)
+            or (ExitReason.TIME_LIMIT if _any_dim_time_limited(self._run_dir) else None),
         )
 
     def _exit_system_exit(self) -> None:
