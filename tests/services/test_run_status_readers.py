@@ -32,7 +32,7 @@ def test_reads_status_json_once_for_all_four_fields(tmp_path: Path):
         return real_read_text(self, *a, **kw)
 
     with patch("pathlib.Path.read_text", counting_read_text):
-        logs, dims, deadline, provider, model, limit = _read_enriched_status_fields(run_dir)
+        logs, dims, deadline, provider, model, limit, _commit = _read_enriched_status_fields(run_dir)
 
     assert dims == ["security", "performance"]
     assert deadline == "2026-09-02T20:00:00+00:00"
@@ -45,7 +45,7 @@ def test_reads_status_json_once_for_all_four_fields(tmp_path: Path):
 def test_missing_status_json_returns_all_nones(tmp_path: Path):
     run_dir = tmp_path / "run"
     run_dir.mkdir()
-    logs, dims, deadline, provider, model, limit = _read_enriched_status_fields(run_dir)
+    logs, dims, deadline, provider, model, limit, _commit = _read_enriched_status_fields(run_dir)
     assert (dims, deadline, provider, model, limit) == (None, None, None, None, None)
 
 

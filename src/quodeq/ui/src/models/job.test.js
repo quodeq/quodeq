@@ -32,3 +32,10 @@ test('the commit arrives from the REST job and from a status frame', () => {
   const merged = applyStatusFrame(createJob({ jobId: 'j' }), { commit_sha: 'ed0e84b' });
   assert.equal(merged.commitSha, 'ed0e84b');
 });
+
+test('the git origin arrives from the REST job and survives a status frame', () => {
+  const job = createJob({ jobId: 'j', originUrl: 'https://github.com/quodeq/quodeq' });
+  assert.equal(job.originUrl, 'https://github.com/quodeq/quodeq');
+  assert.equal(createJob({ jobId: 'j' }).originUrl, null);
+  assert.equal(applyStatusFrame(job, { state: 'running' }).originUrl, 'https://github.com/quodeq/quodeq');
+});
