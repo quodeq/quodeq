@@ -6,7 +6,8 @@ import JobStatStrip from './JobStatStrip.jsx';
 import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
 import { deriveScanMode } from './buildJobStatCells.js';
 import { SCAN_MODE } from './scanModes.js';
-import { isExternal, isDiffReview, diffFileCount, SHORT_SHA } from '../externalRun.js';
+import { isExternal, isDiffReview, diffFileCount, githubCommitUrl, SHORT_SHA } from '../externalRun.js';
+import { openExternal } from '../../updates/openExternal.js';
 import { formatRunTime } from '../../../utils/dateFormatting.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import useLiveFeedSettings from '../../settings/hooks/useLiveFeedSettings.js';
@@ -65,31 +66,57 @@ function ExternalTag({ job, progress }) {
   return <span className="eval-run-tag">{label}</span>;
 }
 
+// A PR review that has ended: its results are the review comment on the
+// pull request, not a run in this app.
+function isReviewEnd(job, progress) {
+  return job.status !== JOB_STATUS.RUNNING && isExternal(job) && isDiffReview(progress);
+}
+
+function StatusMark({ job }) {
+  // A run whose folder vanished ended in a way nobody recorded here: a
+  // neutral "ended", never a guessed "complete" or the red "lost".
+  if (job.vanished) return <span className="eval-run-pill eval-run-pill--neutral">{t('evaluate.endedPill')}</span>;
+  return <RunPill status={job.status} exitReason={job.exitReason} />;
+}
+
+function PrimaryPill({ label, onClick }) {
+  return (
+    <button type="button" className="eval-scan-pill eval-scan-pill--sm" onClick={onClick}>
+      <span className="eval-scan-pill__glyph" aria-hidden="true">▶</span>
+      {label}
+    </button>
+  );
+}
+
+function JobActions({ job, progress, onDismiss, onCancel }) {
+  if (job.status === JOB_STATUS.RUNNING) {
+    return (
+      <button type="button" className="eval-pill-btn eval-pill-btn--stop" onClick={onCancel}>
+        <span className="eval-pill-btn__stop-glyph" aria-hidden="true" />
+        {t('evaluate.stopBtn')}
+      </button>
+    );
+  }
+  const reviewEnd = isReviewEnd(job, progress);
+  const commitUrl = reviewEnd ? githubCommitUrl(job.originUrl, job.commitSha) : null;
+  return (
+    <>
+      {commitUrl && <PrimaryPill label={t('evaluate.openOnGitHub')} onClick={() => openExternal(commitUrl)} />}
+      {!reviewEnd && job.status === JOB_STATUS.DONE && (
+        <PrimaryPill label={t('evaluate.viewResults')} onClick={() => onDismiss(EVAL_DISMISS_ACTION.VIEW)} />
+      )}
+      <button type="button" className="eval-pill-btn" onClick={() => onDismiss(EVAL_DISMISS_ACTION.CLOSE)}>{t('evaluate.closeBtn')}</button>
+    </>
+  );
+}
+
 function JobHeader({ job, progress, onDismiss, onCancel }) {
-  const isRunning = job.status === JOB_STATUS.RUNNING;
-  const isDone = job.status === JOB_STATUS.DONE;
+  const name = job.vanished ? t('evaluate.termEnded') : termNameForStatus(job.status, job.exitReason);
   return (
     <div className="evaluate-panel__top evaluate-panel__top--row">
-      <TermHeader
-        name={termNameForStatus(job.status, job.exitReason)}
-        badge={<><RunPill status={job.status} exitReason={job.exitReason} /><ExternalTag job={job} progress={progress} /></>}
-      />
+      <TermHeader name={name} badge={<><StatusMark job={job} /><ExternalTag job={job} progress={progress} /></>} />
       <div className="evaluate-panel__top-actions">
-        {isRunning && (
-          <button type="button" className="eval-pill-btn eval-pill-btn--stop" onClick={onCancel}>
-            <span className="eval-pill-btn__stop-glyph" aria-hidden="true" />
-            {t('evaluate.stopBtn')}
-          </button>
-        )}
-        {!isRunning && isDone && (
-          <button type="button" className="eval-scan-pill eval-scan-pill--sm" onClick={() => onDismiss(EVAL_DISMISS_ACTION.VIEW)}>
-            <span className="eval-scan-pill__glyph" aria-hidden="true">▶</span>
-            {t('evaluate.viewResults')}
-          </button>
-        )}
-        {!isRunning && (
-          <button type="button" className="eval-pill-btn" onClick={() => onDismiss(EVAL_DISMISS_ACTION.CLOSE)}>{t('evaluate.closeBtn')}</button>
-        )}
+        <JobActions job={job} progress={progress} onDismiss={onDismiss} onCancel={onCancel} />
       </div>
     </div>
   );
@@ -147,6 +174,10 @@ function JobIdentityStrip({ job, progress, projectLabel, onGoToProjects }) {
   );
 }
 
+function labelOf(project) {
+  return project?.displayName || project?.name || null;
+}
+
 function countAll(byDim) {
   return Object.values(byDim).reduce((n, vs) => n + vs.length, 0);
 }
@@ -184,14 +215,13 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
   // to the project the job was STARTED for. Never fall back to the global
   // selection: switching projects mid-run would mislabel a running
   // evaluation with a project it never touched. Unknown beats wrong.
-  const jobProjectLabel = jobProjectInfo?.displayName || jobProjectInfo?.name || null;
-  const startedLabel = startedProjectInfo?.displayName || startedProjectInfo?.name || null;
-  const projectLabel = jobProjectLabel || startedLabel || null;
+  const projectLabel = labelOf(jobProjectInfo) || labelOf(startedProjectInfo) || null;
 
   return (
     <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} progress={progress} onDismiss={onDismiss} onCancel={onCancel} />
       <JobIdentityStrip job={job} progress={progress} projectLabel={projectLabel} onGoToProjects={onGoToProjects} />
+      {isReviewEnd(job, progress) && <p className="eval-review-posted">{t('evaluate.reviewPosted')}</p>}
       <JobStatStrip job={job} liveViolations={fresh} hiddenCarriedCount={hiddenCarriedCount} />
       <ScanProgress job={job} />
       <LiveViolationsFeed job={job} liveViolations={shown} newCount={countAll(fresh)} hiddenCarriedCount={hiddenCarriedCount} />

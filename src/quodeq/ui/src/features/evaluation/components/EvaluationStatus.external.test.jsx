@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EvaluationStatus from './EvaluationStatus.jsx';
@@ -10,6 +10,8 @@ import { formatRunTime } from '../../../utils/dateFormatting.js';
 vi.mock('./ScanProgress.jsx', () => ({ default: () => null }));
 vi.mock('./JobStatStrip.jsx', () => ({ default: () => null }));
 vi.mock('../../../api/index.js', () => ({ getEvaluationProgress: vi.fn() }));
+vi.mock('../../updates/openExternal.js', () => ({ openExternal: vi.fn() }));
+import { openExternal } from '../../updates/openExternal.js';
 
 function renderJob(job) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -25,7 +27,7 @@ const diff = { dimensions: [
 ] };
 
 describe('the run screen for an external run', () => {
-  beforeEach(() => getEvaluationProgress.mockReset());
+  beforeEach(() => { getEvaluationProgress.mockReset(); });
 
   it('a run the app started has no external tag or started cell', async () => {
     getEvaluationProgress.mockResolvedValue(full);
@@ -49,5 +51,43 @@ describe('the run screen for an external run', () => {
     renderJob(external);
     expect(await screen.findByText('external · diff review')).toBeInTheDocument();
     expect(screen.getByText('diff · 12 files')).toBeInTheDocument();
+  });
+});
+
+const prDone = { ...external, status: 'done', originUrl: 'https://github.com/quodeq/quodeq.git' };
+
+describe('the end of a PR review', () => {
+  beforeEach(() => { getEvaluationProgress.mockReset(); openExternal.mockReset(); });
+
+  it('points to the pull request and opens the commit on GitHub', async () => {
+    getEvaluationProgress.mockResolvedValue(diff);
+    render(<QueryClientProvider client={new QueryClient()}><EvaluationStatus job={prDone} onDismiss={vi.fn()} /></QueryClientProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: /open on github/i }));
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/quodeq/quodeq/commit/7e506ae1234');
+    expect(screen.getByText('the review is posted on the pull request')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /view results/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /close/i })).toHaveClass('eval-pill-btn');
+  });
+
+  it('a review whose folder vanished reads as ended, not lost', async () => {
+    getEvaluationProgress.mockResolvedValue(diff);
+    renderJob({ ...prDone, status: 'lost', vanished: true });
+    expect(await screen.findByText('evaluation_ended')).toBeInTheDocument();
+    expect(screen.getByText('ended')).toHaveClass('eval-run-pill--neutral');
+    expect(await screen.findByRole('button', { name: /open on github/i })).toBeInTheDocument();
+  });
+
+  it('a finished nightly keeps view results', async () => {
+    getEvaluationProgress.mockResolvedValue(full);
+    renderJob({ ...prDone });
+    expect(await screen.findByRole('button', { name: /view results/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /open on github/i })).toBeNull();
+  });
+
+  it('no GitHub origin, no open on GitHub', async () => {
+    getEvaluationProgress.mockResolvedValue(diff);
+    renderJob({ ...prDone, originUrl: 'https://gitlab.com/a/b' });
+    await screen.findByText('the review is posted on the pull request');
+    expect(screen.queryByRole('button', { name: /open on github/i })).toBeNull();
   });
 });

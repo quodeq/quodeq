@@ -3066,6 +3066,14 @@ button.eval-provider-badge--clickable:focus-visible {
   vertical-align: middle;
 }
 
+/* A PR review's end: its results live on the pull request. */
+.eval-review-posted {
+  margin: 12px 0 0;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 /* ── Pill buttons: stop, details, console (quiet) ── */
 .eval-pill-btn {
   display: inline-flex;

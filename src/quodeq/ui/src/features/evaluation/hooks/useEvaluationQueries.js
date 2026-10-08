@@ -14,6 +14,23 @@ import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NO_JOB_ID, evaluationKeys } from "../../../api/queryKeys.js";
 import { statusRefetchInterval } from "./useEvaluation.helpers.js";
+import { JOB_STATUS } from "../../../vocab/jobStatus.js";
+
+const HTTP_NOT_FOUND = 404;
+const STATUS_RETRIES = 3;
+
+// A 404 for a job already seen means its run is gone: a PR review's folder
+// is deleted by the CI runner when the job ends. Not worth asking again.
+function isGone(error) {
+  return error?.status === HTTP_NOT_FOUND;
+}
+
+// The last state the job had, read as ended. LOST makes every terminal check
+// treat it as over; `vanished` lets the screen say "ended" rather than
+// "lost", since how it really ended is unknown.
+function vanishedJob(job) {
+  return { ...job, status: JOB_STATUS.LOST, vanished: true };
+}
 
 // The rows the cache already holds, per dimension, in cache order.
 function groupFindingsByDimension(findings) {
@@ -58,10 +75,16 @@ export function useEvaluationQueries(api, jobId, streamState) {
     queryFn: () => api.getEvaluation(jobId),
     enabled: !!jobId,
     staleTime: Infinity,
-    refetchInterval: statusRefetchInterval(streamState),
+    refetchInterval: (query) => (isGone(query.state.error) ? false : statusRefetchInterval(streamState)),
+    retry: (count, error) => !isGone(error) && count < STATUS_RETRIES,
   });
 
-  const job = statusQuery.data || null;
+  // React Query keeps the last good data through an error.
+  const gone = !!statusQuery.data && isGone(statusQuery.error);
+  const job = useMemo(
+    () => (gone ? vanishedJob(statusQuery.data) : statusQuery.data || null),
+    [gone, statusQuery.data],
+  );
 
   // --- Findings (a flat list, then grouped into liveViolations) --------
   const findingsQuery = useQuery({
