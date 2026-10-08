@@ -109,8 +109,12 @@ function TabPath({ filePath, line }) {
  * strip never nests one button in another. The icon turns into a check (or an
  * X when the clipboard refuses) for one beat, so the click visibly landed.
  */
+// Clipboard-write feedback, local like FileCopyBtn's: 'failed' means the copy
+// failed, not a job or run status, so it stays out of vocab/*.js.
+const COPY_STATUS = Object.freeze({ COPIED: 'copied', FAILED: 'failed' });
+
 function CopyPathBtn({ text }) {
-  const [status, setStatus] = useState(null); // null | 'copied' | 'failed'
+  const [status, setStatus] = useState(null);
   useEffect(() => {
     if (!status) return undefined;
     const timer = setTimeout(() => setStatus(null), COPY_FEEDBACK_MS);
@@ -120,11 +124,13 @@ function CopyPathBtn({ text }) {
     // Same reason as FileCopyBtn: a finding row may toggle on click.
     e.stopPropagation();
     // copyToClipboard never rejects: it resolves whether the write landed.
-    copyToClipboard(text).then((ok) => setStatus(ok ? 'copied' : 'failed'));
+    copyToClipboard(text)
+      .then((ok) => setStatus(ok ? COPY_STATUS.COPIED : COPY_STATUS.FAILED))
+      .catch((err) => console.warn('[ContextBlock] copy feedback failed:', err?.message || err));
   };
-  const label = status === 'copied' ? t('common.copiedShort')
-    : status === 'failed' ? t('common.copyFailed') : t('context.copyPath');
-  const icon = status === 'copied' ? <CheckIcon /> : status === 'failed' ? <XIcon /> : <CopyIcon />;
+  const label = status === COPY_STATUS.COPIED ? t('common.copiedShort')
+    : status === COPY_STATUS.FAILED ? t('common.copyFailed') : t('context.copyPath');
+  const icon = status === COPY_STATUS.COPIED ? <CheckIcon /> : status === COPY_STATUS.FAILED ? <XIcon /> : <CopyIcon />;
   return (
     <button
       type="button"
