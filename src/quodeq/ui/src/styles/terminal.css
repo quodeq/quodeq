@@ -2288,17 +2288,6 @@ button.term-sev-badge--clickable:focus-visible {
   line-height: 1;
 }
 
-/* While a run is live the button dims and stops accepting clicks — the run
-   chip beside it owns the "watch progress" affordance, and a dimmed primary
-   means you can't double-start. */
-.topbar-btn--evaluate--running,
-.topbar-btn--evaluate--running:hover {
-  color: var(--color-text-subtle);
-  border-color: var(--color-border);
-  background: transparent;
-  cursor: default;
-}
-
 /* Run chip — while an evaluation runs, the run takes the primary slot:
    live dimension, mini progress bar, percent. Click-through to the
    Evaluate tab, so the run is never lost by leaving the page. */

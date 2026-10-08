@@ -3,7 +3,7 @@ import { PERCENT } from '../constants.js';
 import { useLiveProgress } from '../features/evaluation/EvaluationLiveContext.jsx';
 
 /**
- * TopBar.jsx's live-run chip (replaces the dimmed Evaluate button while a
+ * TopBar.jsx's live-run chip (takes the Evaluate button's slot while a
  * run is in flight) and the bottom-edge progress hairline. Extracted
  * verbatim.
  */
