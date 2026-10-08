@@ -87,17 +87,14 @@ function DimensionRows({ dim, violations }) {
   const scrollElement = useDashboardScrollElement();
   const listRef = useRef(null);
   const scrollMargin = useScrollMargin(listRef, scrollElement);
-  const [expanded, setExpanded] = useState(() => new Set());
-  const toggleRow = useCallback((key) => setExpanded((cur) => {
-    const next = new Set(cur);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  }), []);
+  // One finding open at a time; closing the group drops it with the rows.
+  const [expanded, setExpanded] = useState(null);
+  const toggleRow = useCallback((key) => setExpanded((cur) => (cur === key ? null : key)), []);
   const getItemKey = useCallback((i) => (rows[i] ? rowKeyOf(dim, rows[i]) : i), [dim, rows]);
   const estimateSize = useCallback(() => ROW_HEIGHT_ESTIMATE, []);
   const renderRow = (v) => {
     const key = rowKeyOf(dim, v);
-    return <ViolationLiveRow dim={dim} violation={v} rowKey={key} open={expanded.has(key)} onToggle={toggleRow} />;
+    return <ViolationLiveRow dim={dim} violation={v} rowKey={key} open={expanded === key} onToggle={toggleRow} />;
   };
   return (
     <div ref={listRef}>
@@ -124,28 +121,15 @@ const DimensionGroup = memo(function DimensionGroup({ dim, violations, open, sca
   );
 });
 
-// "latest" starts open and every dimension closed. Several dimensions can
-// be open at once; opening one closes "latest", so one live list leads.
+const LATEST = Symbol('latest');
+
+// An accordion: one group open at a time, "latest" first. Opening a group
+// closes the one that was open.
 function useOpenDims() {
-  const [openDims, setOpenDims] = useState(() => new Set());
-  const [latestOpen, setLatestOpen] = useState(true);
-  // The ref lets the stable toggle know whether it opens or closes, so the
-  // set updater stays pure (React may run an updater twice) and closing
-  // latest happens beside it, not inside it.
-  const openRef = useRef(openDims);
-  openRef.current = openDims;
-  const toggleDim = useCallback((dim) => {
-    const opening = !openRef.current.has(dim);
-    setOpenDims((cur) => {
-      const next = new Set(cur);
-      if (next.has(dim)) next.delete(dim);
-      else next.add(dim);
-      return next;
-    });
-    if (opening) setLatestOpen(false);
-  }, []);
-  const toggleLatest = useCallback(() => setLatestOpen((v) => !v), []);
-  return { openDims, toggleDim, latestOpen, toggleLatest };
+  const [openGroup, setOpenGroup] = useState(LATEST);
+  const toggle = useCallback((id) => setOpenGroup((cur) => (cur === id ? null : id)), []);
+  const toggleLatest = useCallback(() => toggle(LATEST), [toggle]);
+  return { openGroup, toggleDim: toggle, latestOpen: openGroup === LATEST, toggleLatest };
 }
 
 function computeQueuedFiles(runningDim) {
@@ -192,7 +176,7 @@ function CleanDimensionRow({ dim }) {
 }
 
 function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimension, isRunning, queued, review }) {
-  const { openDims, toggleDim, latestOpen, toggleLatest } = open;
+  const { openGroup, toggleDim, latestOpen, toggleLatest } = open;
   return (
     <div className="vlive-card">
       <LatestGroup liveViolations={liveViolations} isRunning={isRunning} open={latestOpen} onToggle={toggleLatest} passed={review.passed} />
@@ -201,7 +185,7 @@ function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimensio
           key={dim}
           dim={dim}
           violations={violations}
-          open={openDims.has(dim)}
+          open={openGroup === dim}
           scanning={isRunning && sameDim(dim, currentDimension)}
           onToggle={toggleDim}
         />

@@ -147,7 +147,8 @@ export default function LatestGroup({ liveViolations, isRunning, open, onToggle,
   if (!paused) shownTotalRef.current = total;
   const arrived = useArrivedKeys(shown);
   const pinnedKeys = new Set(pins.map((p) => p.key));
-  const onPin = useCallback((row) => setPins((cur) => addPin(cur, row)), []);
+  // One pinned finding: a new pin replaces it.
+  const onPin = useCallback((row) => setPins((cur) => addPin(cur, row, 1)), []);
   const onUnpin = useCallback((key) => setPins((cur) => cur.filter((p) => p.key !== key)), []);
 
   return (
@@ -157,7 +158,8 @@ export default function LatestGroup({ liveViolations, isRunning, open, onToggle,
         <span className="vlive-dimension-name">{t('evaluate.latestFindings')}</span>
         <TickerState isRunning={isRunning} paused={paused} waiting={total - shownTotalRef.current} />
       </button>
-      {pins.length > 0 && (
+      {/* Hidden with the group, back when it opens again. */}
+      {open && pins.length > 0 && (
         <div className="vticker-pins" aria-label={t('evaluate.pinnedFindings')}>
           {pins.map((row) => <PinnedFinding key={row.key} row={row} onUnpin={onUnpin} />)}
         </div>

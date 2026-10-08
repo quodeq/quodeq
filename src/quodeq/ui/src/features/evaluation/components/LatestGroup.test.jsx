@@ -76,6 +76,24 @@ describe('LatestGroup', () => {
     expect(document.querySelector('.vticker-pin')).toBeNull();
   });
 
+  it('keeps one pin: a new one replaces it', () => {
+    render(group({ liveViolations: { security: [f(1, 'first'), f(2, 'second')] }, isRunning: false }));
+    fireEvent.click(screen.getByRole('button', { name: /Pin major finding: first/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Pin major finding: second/ }));
+    expect(document.querySelectorAll('.vticker-pin')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /Pin major finding: second/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('hides the pin while closed and shows it again on open', () => {
+    const props = { liveViolations: { security: [f(1, 'first')] }, isRunning: false };
+    const { rerender } = render(group(props));
+    fireEvent.click(screen.getByRole('button', { name: /Pin major finding: first/ }));
+    rerender(group({ ...props, open: false }));
+    expect(document.querySelector('.vticker-pin')).toBeNull();
+    rerender(group(props));
+    expect(document.querySelector('.vticker-pin')).not.toBeNull();
+  });
+
   it('holds still while hovered and says how many are waiting', () => {
     vi.useFakeTimers();
     const { rerender } = render(group({ liveViolations: { security: [f(1, 'first')] }, isRunning: true }));

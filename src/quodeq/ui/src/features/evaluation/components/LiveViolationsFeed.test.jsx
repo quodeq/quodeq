@@ -91,12 +91,31 @@ describe('LiveViolationsFeed', () => {
       expect(group('security')).toHaveAttribute('aria-expanded', 'false');
     });
 
-    it('opens several at once', () => {
+    it('opens one at a time', () => {
       renderFeed({ liveViolations: twoDims });
       fireEvent.click(group('reliability'));
       fireEvent.click(group('security'));
-      expect(group('reliability')).toHaveAttribute('aria-expanded', 'true');
+      expect(group('reliability')).toHaveAttribute('aria-expanded', 'false');
       expect(group('security')).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(screen.getByRole('button', { name: /^latest/i }));
+      expect(group('security')).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('expands one finding at a time and drops it when the group closes', () => {
+      const pair = { security: [
+        { severity: 'major', principle: 'p', file: 'A.swift', line: 1, title: 'First' },
+        { severity: 'minor', principle: 'p', file: 'B.swift', line: 2, title: 'Second' },
+      ] };
+      renderFeed({ liveViolations: pair });
+      fireEvent.click(group('security'));
+      const row = (name) => screen.getByRole('button', { name: new RegExp(`finding: ${name}`, 'i') });
+      fireEvent.click(row('First'));
+      fireEvent.click(row('Second'));
+      expect(row('First')).toHaveAttribute('aria-expanded', 'false');
+      expect(row('Second')).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(group('security'));
+      fireEvent.click(group('security'));
+      expect(row('Second')).toHaveAttribute('aria-expanded', 'false');
     });
 
     const many = { security: Array.from({ length: 120 }, (_, i) => ({ severity: 'minor', principle: 'p', file: `F${i}.swift`, line: i })) };
