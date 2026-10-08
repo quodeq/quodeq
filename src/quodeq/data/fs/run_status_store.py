@@ -71,6 +71,8 @@ def _build_status_payload(status: RunStatus) -> dict[str, Any]:
         payload["commit_sha"] = status.commit_sha
     if status.commit_dirty is not None:
         payload["commit_dirty"] = status.commit_dirty
+    if status.origin is not None:
+        payload["origin"] = status.origin.to_dict()
     return payload
 
 

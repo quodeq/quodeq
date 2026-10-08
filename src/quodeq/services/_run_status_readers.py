@@ -12,9 +12,11 @@ that a circular import.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.core.run.job_status import is_external_job_id
+from quodeq.core.run.origin import RunOrigin
 from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services.wiring import read_repository_info, read_run_state, read_run_status_json, tail_run_log  # noqa: F401
@@ -130,14 +132,24 @@ def read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | No
     return _provider_model_from_data(_load_status_json(run_dir))
 
 
-def _read_enriched_status_fields(
-    run_dir: Path, *, with_logs: bool = True,
-) -> tuple[list[str], list[str] | None, str | None, str | None, str | None, int | None, str | None]:
-    """Best-effort read of (logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s, commit_sha).
+@dataclass(frozen=True, slots=True)
+class StatusFields:
+    """The status.json-backed fields of an index-served job (and its log tail)."""
 
-    Reads and parses status.json once, deriving all four status-backed
-    fields from the same dict instead of four independent reads. With
-    ``with_logs=False`` the 500-line run-log tail is skipped and logs is [].
+    logs: list[str] = field(default_factory=list)
+    dimensions: list[str] | None = None
+    deadline_at: str | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    time_limit_s: int | None = None
+    commit_sha: str | None = None
+    origin: RunOrigin | None = None
+
+
+def _read_enriched_status_fields(run_dir: Path, *, with_logs: bool = True) -> StatusFields:
+    """Best-effort read of the status.json-backed fields, parsing the file once.
+
+    With ``with_logs=False`` the 500-line run-log tail is skipped and logs is [].
     """
     logs: list[str] = []
     if with_logs:
@@ -149,11 +161,17 @@ def _read_enriched_status_fields(
         data = _load_status_json(run_dir)
     except (OSError, ValueError):
         data = None
-    dimensions = _dimensions_from_data(run_dir, data)
-    deadline_at = _deadline_from_data(data)
     ai_provider, ai_model = _provider_model_from_data(data)
-    time_limit_s = _time_limit_from_data(data)
-    return logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s, _commit_from_data(data)
+    return StatusFields(
+        logs=logs,
+        dimensions=_dimensions_from_data(run_dir, data),
+        deadline_at=_deadline_from_data(data),
+        ai_provider=ai_provider,
+        ai_model=ai_model,
+        time_limit_s=_time_limit_from_data(data),
+        commit_sha=_commit_from_data(data),
+        origin=RunOrigin.from_dict((data or {}).get("origin")),
+    )
 
 
 def build_job_snapshot(row: "_run_index.RunRow", *, with_logs: bool = True) -> JobSnapshot:
@@ -163,19 +181,8 @@ def build_job_snapshot(row: "_run_index.RunRow", *, with_logs: bool = True) -> J
     List reads pass it for non-running rows only: the dashboard adopts a
     running CLI job straight from the list and shows its logs.
     """
-    logs: list[str] = []
-    dimensions: list[str] | None = None
-    deadline_at: str | None = None
-    ai_provider: str | None = None
-    ai_model: str | None = None
-    time_limit_s: int | None = None
-    commit_sha: str | None = None
-    origin_url: str | None = None
-    if row.run_dir:
-        logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s, commit_sha = (
-            _read_enriched_status_fields(Path(row.run_dir), with_logs=with_logs)
-        )
-        origin_url = read_origin_url(Path(row.run_dir))
+    run_dir = Path(row.run_dir) if row.run_dir else None
+    fields = _read_enriched_status_fields(run_dir, with_logs=with_logs) if run_dir else StatusFields()
     return JobSnapshot(
         job_id=row.job_id,
         status=row.state,
@@ -183,19 +190,20 @@ def build_job_snapshot(row: "_run_index.RunRow", *, with_logs: bool = True) -> J
         started_at=row.started_at,
         ended_at=row.finalized_at,
         exit_code=None,
-        logs=logs,
+        logs=fields.logs,
         output_project=row.project_uuid,
         output_run_id=row.run_id,
         phase=row.phase,
-        deadline_at=deadline_at,
+        deadline_at=fields.deadline_at,
         current_dimension=row.current_dimension,
-        dimensions=dimensions,
+        dimensions=fields.dimensions,
         error=row.exit_reason,
         source="external" if is_external_job_id(row.job_id) else "internal",
         exit_reason=row.exit_reason,
-        ai_provider=ai_provider,
-        ai_model=ai_model,
-        time_limit_s=time_limit_s,
-        commit_sha=commit_sha,
-        origin_url=origin_url,
+        ai_provider=fields.ai_provider,
+        ai_model=fields.ai_model,
+        time_limit_s=fields.time_limit_s,
+        commit_sha=fields.commit_sha,
+        origin_url=read_origin_url(run_dir) if run_dir else None,
+        origin=fields.origin,
     )

@@ -315,4 +315,7 @@ _.load_standard_catalog  # data/fs/standard_index_loader.py: admission catalog l
 
 # pywebview window event. The toolkit fires it; we only subscribe.
 _.minimized  # dashboard/_webview_window_visibility.py: pywebview window event, fired by the toolkit.
-
+# core/run/origin.py: RunOrigin fields serialized into status.json and the job
+# JSON (to_dict / to_camel_dict); the dashboard reads them by key.
+_.workflow
+_.run_url

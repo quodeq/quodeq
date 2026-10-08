@@ -10,6 +10,8 @@ import enum
 from dataclasses import dataclass
 from typing import Any
 
+from quodeq.core.run.origin import RunOrigin
+
 SCHEMA_VERSION = 2
 STATUS_FILENAME = "status.json"
 
@@ -59,6 +61,8 @@ class RunStatus:
     # True when the working tree had uncommitted tracked changes at run start,
     # so two runs on one commit may still have evaluated different code.
     commit_dirty: bool | None = None
+    # Where the run came from (a CI workflow or the CLI), recorded at start.
+    origin: RunOrigin | None = None
 
     @classmethod
     def from_status_dict(cls, d: dict[str, Any]) -> "RunStatus":
@@ -79,6 +83,7 @@ class RunStatus:
             time_limit_s=d.get("time_limit_s"),
             commit_sha=d.get("commit_sha"),
             commit_dirty=d.get("commit_dirty"),
+            origin=RunOrigin.from_dict(d.get("origin")),
         )
 
 

@@ -29,6 +29,7 @@ from quodeq.analysis._run_lifecycle_guards import (  # noqa: F401 -- re-export
 )
 from quodeq.core.observability import LogSink
 from quodeq.core.run.exit_reason import ExitReason
+from quodeq.core.run.origin import RunOrigin
 from quodeq.shared import cancellation
 from quodeq.core.run.state import RunState, RunStatus, TERMINAL_STATES
 from quodeq.data.fs.run_status_store import read_status
@@ -69,6 +70,7 @@ class StatusWriter:
         self.run_dir = run_dir
         self.commit_sha: str | None = None
         self.commit_dirty: bool | None = None
+        self.origin: RunOrigin | None = None
         self.job_id = job_id
         self.started_at = utc_now_iso(timespec=ISO_SECONDS)
         self.dimensions = list(dimensions)
@@ -95,6 +97,7 @@ class StatusWriter:
             time_limit_s=self.time_limit_s,
             commit_sha=self.commit_sha,
             commit_dirty=self.commit_dirty,
+            origin=self.origin,
         )
         self._write_status(self.run_dir, status)
 
