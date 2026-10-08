@@ -148,13 +148,14 @@ function comparePageStatus(projectsLoaded, fleetProjects, rootRef) {
 
 /** Picks the active view: duel, dimension drill-down, or the fleet landing
  * page. */
-function ComparePageBody({ duelView, dimensionView, board, openDimension, openProject, openPrinciple, onOpenProjectDimension, shared }) {
+function ComparePageBody({ duelView, dimensionView, board, selectedProject, openDimension, openProject, openPrinciple, onOpenProjectDimension, shared }) {
   if (duelView) return <CompareDuelView duel={duelView} onOpenProject={openProject} />;
   if (dimensionView) {
     return (
       <CompareDimensionView
         view={dimensionView}
         board={board}
+        selectedProject={selectedProject}
         onOpenDimension={openDimension}
         onOpenProject={openProject}
         onOpenPrinciple={openPrinciple}
@@ -167,6 +168,7 @@ function ComparePageBody({ duelView, dimensionView, board, openDimension, openPr
 
 export default function ComparePage({
   projects, projectsLoaded, onOpenProject,
+  selectedProject = null,
   dimension = null,
   onOpenDimension,
   onSwitchDimension,
@@ -208,7 +210,7 @@ export default function ComparePage({
   return (
     <div className="compare-page dashboard-fade" ref={rootRef}>
       <ComparePageBody
-        duelView={duelView} dimensionView={dimensionView} board={board}
+        duelView={duelView} dimensionView={dimensionView} board={board} selectedProject={selectedProject}
         openDimension={openDimension} openProject={openProject} openPrinciple={openPrinciple}
         onOpenProjectDimension={onOpenProjectDimension} shared={shared}
       />

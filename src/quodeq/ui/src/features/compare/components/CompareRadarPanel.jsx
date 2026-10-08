@@ -3,12 +3,10 @@ import CompareRadar from './CompareRadar.jsx';
 import RadarPanelShell from './RadarPanelShell.jsx';
 
 /**
- * Radar overlaying the leader / trailer / scope average for one dimension
- * (hovering a standings row overlays that project too, via `series`, built
- * by the caller so it can react to hover state without this panel knowing
- * about it).
+ * Radar of the active project over the scope average for one dimension.
+ * `series` and `active` come from the caller, which owns the hover state.
  */
-export default function CompareRadarPanel({ view, axes, series }) {
+export default function CompareRadarPanel({ view, axes, series, active = null }) {
   return (
     <RadarPanelShell
       ariaLabel={t('compare.radialAria')}
@@ -18,14 +16,9 @@ export default function CompareRadarPanel({ view, axes, series }) {
     >
       <CompareRadar axes={axes} series={series} />
       <div className="compare-radar__legend">
-        {view.lead && (
-          <span className="compare-radar__legendItem compare-radar__legendItem--lead">
-            {view.lead.row.name}
-          </span>
-        )}
-        {view.trail && view.trail !== view.lead && (
-          <span className="compare-radar__legendItem compare-radar__legendItem--trail">
-            {view.trail.row.name}
+        {active && (
+          <span className="compare-radar__legendItem compare-radar__legendItem--project">
+            {active.row.name}
           </span>
         )}
         <span className="compare-radar__legendItem compare-radar__legendItem--average">

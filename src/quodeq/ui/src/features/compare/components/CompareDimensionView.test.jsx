@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildRadarSeries, buildDimensionMatrixRows } from './CompareDimensionView.jsx';
+import { buildRadarSeries, buildDimensionMatrixRows, resolveActiveStanding } from './CompareDimensionView.jsx';
 import { buildRow, buildDimensionView } from '../compareModel.js';
 import { NOW, makeSummary, makeProject, DIM_SEC } from '../_compareModel.fixtures.js';
 
@@ -17,22 +17,31 @@ function makeView() {
   return buildDimensionView('security', rows, NOW, summaries);
 }
 
+const standingOf = (view, id) => view.standings.find((s) => s.row.id === id);
+
+describe('resolveActiveStanding', () => {
+  it('prefers the hovered row, then the selected project, then the leader', () => {
+    const view = makeView();
+    expect(resolveActiveStanding(view, 'c', 'a')).toBe(standingOf(view, 'c'));
+    expect(resolveActiveStanding(view, null, 'a')).toBe(standingOf(view, 'a'));
+    expect(resolveActiveStanding(view, null, 'not-in-scope')).toBe(view.lead);
+    expect(resolveActiveStanding(view, null, null)).toBe(view.lead);
+  });
+});
+
 describe('buildRadarSeries', () => {
-  it('reads each plotted standing by principle key, null where it has no score', () => {
+  it('plots the scope average and the active standing by principle key, null where it has no score', () => {
     const view = makeView();
     expect(view.principles.map((p) => p.key)).toEqual(['confidentiality', 'integrity']);
-    const byVariant = Object.fromEntries(buildRadarSeries(view, 'c').map((s) => [s.variant, s.values]));
-    expect(byVariant.average).toEqual([6, 7]);
-    expect(byVariant.lead).toEqual([7, 8]);
-    expect(byVariant.trail).toEqual([5, 6]);
-    expect(byVariant.focus).toEqual([null, 7]);
+    const series = buildRadarSeries(view, standingOf(view, 'c'));
+    expect(series.map((s) => s.variant)).toEqual(['average', 'project']);
+    expect(series[0].values).toEqual([6, 7]);
+    expect(series[1].values).toEqual([null, 7]);
   });
 
-  it('recolors a hovered lead/trail instead of plotting it twice', () => {
+  it('plots only the average without an active standing', () => {
     const view = makeView();
-    const series = buildRadarSeries(view, 'b');
-    expect(series.map((s) => s.variant)).toEqual(['average', 'trail', 'lead']);
-    expect(series.find((s) => s.variant === 'lead').focused).toBe(true);
+    expect(buildRadarSeries(view, null).map((s) => s.variant)).toEqual(['average']);
   });
 
   it('plots the first of two principles that collapse to one key', () => {
@@ -48,8 +57,8 @@ describe('buildRadarSeries', () => {
     const summaries = { a: makeSummary({ dims: [dim] }) };
     const view = buildDimensionView('security', [buildRow(makeProject({ id: 'a' }), summaries.a, NOW)], NOW, summaries);
     expect(view.principles.map((p) => p.key)).toEqual(['error handling']);
-    const lead = buildRadarSeries(view, null).find((s) => s.variant === 'lead');
-    expect(lead.values).toEqual([8]);
+    const project = buildRadarSeries(view, view.lead).find((s) => s.variant === 'project');
+    expect(project.values).toEqual([8]);
   });
 });
 

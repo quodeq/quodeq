@@ -55,19 +55,33 @@ function PrincipleFacts({ p, onOpenPrinciple }) {
   );
 }
 
-function PrincipleBars({ p, onOpenPrinciple }) {
+/** Ranked bars, one per project in standings order. The view's active
+ * project (hovered anywhere, else the app's selection) keeps full colour
+ * while the rest fade, and hovering a bar makes that project active. A
+ * dashed tick across the bars marks the scope average. */
+function PrincipleBars({ p, activeId, setFocusId, onOpenPrinciple }) {
+  const avgPct = p.avg == null ? null : Math.round(p.avg * SCORE_TO_PCT);
   return (
-    <div className="compare-principle__bars">
+    <div
+      className={`compare-principle__bars${activeId ? ' has-active' : ''}`}
+      onMouseLeave={setFocusId ? () => setFocusId(null) : undefined}
+    >
       {p.perProject.map((pp) => (
         <button
           key={pp.id}
           type="button"
-          className="compare-principle__slot"
+          className={`compare-principle__slot${pp.id === activeId ? ' is-active' : ''}`}
           title={t('compare.openPrincipleIn', { principle: p.label, project: pp.name })}
           aria-label={t('compare.openPrincipleIn', { principle: p.label, project: pp.name })}
           onClick={() => onOpenPrinciple?.(pp)}
+          onMouseEnter={setFocusId ? () => setFocusId(pp.id) : undefined}
+          onFocus={setFocusId ? () => setFocusId(pp.id) : undefined}
+          onBlur={setFocusId ? () => setFocusId(null) : undefined}
         >
           <span className="compare-principle__barTrack" aria-hidden="true">
+            {avgPct != null && (
+              <span className="compare-principle__avgTick" style={{ bottom: `${avgPct}%` }} />
+            )}
             <span
               className="compare-principle__bar"
               style={{
@@ -83,7 +97,20 @@ function PrincipleBars({ p, onOpenPrinciple }) {
   );
 }
 
-function PrincipleCard({ p, onOpenPrinciple }) {
+/** The active project's score on this principle, named so the bar row can
+ * be read without a tooltip. A dash when it has no score here. */
+function PrincipleActiveLine({ p, activeId }) {
+  const pp = activeId ? p.perProject.find((x) => x.id === activeId) : null;
+  if (!pp) return null;
+  return (
+    <div className="compare-principle__active">
+      <span className="compare-principle__activeName">{pp.name}</span>
+      <span className="compare-principle__activeScore">{pp.score == null ? '—' : score1(pp.score)}</span>
+    </div>
+  );
+}
+
+function PrincipleCard({ p, activeId, setFocusId, onOpenPrinciple }) {
   return (
     <article className="compare-principle">
       <h3 className="compare-principle__name">{p.label}</h3>
@@ -91,17 +118,20 @@ function PrincipleCard({ p, onOpenPrinciple }) {
         <PrincipleDonut score={p.avg} />
         <PrincipleFacts p={p} onOpenPrinciple={onOpenPrinciple} />
       </div>
-      <PrincipleBars p={p} onOpenPrinciple={onOpenPrinciple} />
+      <PrincipleBars p={p} activeId={activeId} setFocusId={setFocusId} onOpenPrinciple={onOpenPrinciple} />
+      <PrincipleActiveLine p={p} activeId={activeId} />
     </article>
   );
 }
 
-export default function ComparePrincipleCards({ principles, onOpenPrinciple }) {
+/** `activeId` / `setFocusId` tie the cards into the dimension view's one
+ * active project; both are optional so the cards also render standalone. */
+export default function ComparePrincipleCards({ principles, activeId = null, setFocusId = null, onOpenPrinciple }) {
   return (
     <ComparePanel ariaLabel={t('compare.principlesAria')} header={t('compare.principlesHeader', { count: principles.length })} note={t('compare.principlesNote')}>
       <div className="compare-principles">
         {principles.map((p) => (
-          <PrincipleCard key={p.key} p={p} onOpenPrinciple={onOpenPrinciple} />
+          <PrincipleCard key={p.key} p={p} activeId={activeId} setFocusId={setFocusId} onOpenPrinciple={onOpenPrinciple} />
         ))}
       </div>
     </ComparePanel>

@@ -13,6 +13,9 @@ export function compareRoute(params, props) {
     <ComparePage
       projects={props.navigation.projects}
       projectsLoaded={props.navigation.projectsLoaded}
+      // The dimension drill-down highlights this project by default (radar
+      // polygon, standings row, matrix row) until a row is hovered.
+      selectedProject={props.navigation.selectedProject}
       dimension={params.dimension || null}
       onOpenProject={(id, source = PROJECT_SOURCE.LOCAL) => {
         // Remote fleet rows open through the shared source; the same
