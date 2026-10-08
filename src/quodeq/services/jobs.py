@@ -13,7 +13,7 @@ import subprocess
 from quodeq.shared.clock import utc_now_iso
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.exit_reason import DEADLINE_EXIT_REASONS
-from quodeq.core.run.job_status import JobStatus, is_external_job_id, strip_external_prefix
+from quodeq.core.run.job_status import JobStatus, is_external_job_id
 from quodeq.core.types import JobSnapshot
 
 from quodeq.shared.process_kill import kill_tree as _kill_tree, terminate_process
@@ -31,6 +31,7 @@ from quodeq.services._job_model import (
     mark_spawn_failed,
     new_job,
 )
+from quodeq.services._external_jobs import ProcessControl
 from quodeq.services._job_monitor_mixin import JobMonitorMixin
 from quodeq.services._job_file_store import (
     FileJobStore,
@@ -41,7 +42,7 @@ from quodeq.services._job_capacity_mixin import JobCapacityMixin
 # Re-export public names so existing imports from this module keep working.
 __all__ = [
     "Job", "JobLaunchOptions", "JobProcessSeams", "JobStore", "InMemoryJobStore",
-    "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager", "JobStatus",
+    "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager", "JobStatus", "ProcessControl",
     "DEADLINE_EXIT_REASONS",
     # Owned by _job_model (which _job_monitor_mixin also reads them from) and
     # re-exported here: tests import and patch them at this module's path.
@@ -218,14 +219,8 @@ class JobManager(JobMonitorMixin, JobCapacityMixin):
 
     def _cancel_external(self, job_id: str, reports_root: Path, run_dir: Path | None, *, wait: bool, on_exit: Callable[[], None] | None) -> bool:
         """Send SIGTERM to an external run's process; *run_dir* skips the scan when valid."""
-        from quodeq.services._external_jobs import ExitHandling, cancel_external_run, is_safe_run_segment, resolve_external_run_project
-        run_id = strip_external_prefix(job_id)
-        if not is_safe_run_segment(run_id):
-            return False
-        project_uuid = resolve_external_run_project(reports_root, run_id, run_dir_hint=run_dir)
-        if project_uuid is None:
-            return False
-        return cancel_external_run(project_uuid, run_id, reports_root, control=self._process_control, after=ExitHandling(wait, on_exit))
+        from quodeq.services._external_jobs import ExitHandling, cancel_external_job
+        return cancel_external_job(job_id, reports_root, run_dir, control=self._process_control, after=ExitHandling(wait, on_exit))
 
     def shutdown(self) -> None:
         """Kill all running job subprocesses. Called on server shutdown."""

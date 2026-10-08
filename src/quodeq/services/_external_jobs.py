@@ -188,6 +188,27 @@ def cancel_external_run(
     return True
 
 
+def cancel_external_job(
+    job_id: str, reports_root: Path, run_dir: Path | None, *,
+    control: ProcessControl | None = None, after: ExitHandling | None = None,
+) -> bool:
+    """Stop the external run behind *job_id*; False when there is nothing to stop.
+
+    *run_dir*, when it is a real folder, is trusted over a scan of
+    *reports_root*. A run outside the reports folder (a PR review in
+    $RUNNER_TEMP) is then addressed from its own folder,
+    ``<root>/<project>/<run_id>``, so its .pid is found.
+    """
+    run_id = strip_external_prefix(job_id)
+    if not is_safe_run_segment(run_id):
+        return False
+    root = run_dir.parent.parent if run_dir is not None and run_dir.is_dir() else reports_root
+    project_uuid = resolve_external_run_project(root, run_id, run_dir_hint=run_dir)
+    if project_uuid is None:
+        return False
+    return cancel_external_run(project_uuid, run_id, root, control=control, after=after)
+
+
 def sync_indexed_run(db: sqlite3.Connection, job_id: str) -> bool:
     """Sync the run directory the index already knows for *job_id*.
 
