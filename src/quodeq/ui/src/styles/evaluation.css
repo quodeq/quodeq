@@ -2572,28 +2572,6 @@ button.eval-provider-badge--clickable:focus-visible {
 /* Legend under the coverage bar. */
 
 
-/* Footer: run summary left, detail/console toggles right. */
-.scan-progress__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 14px;
-  padding-top: 13px;
-  border-top: 1px solid var(--color-border-soft, var(--color-border));
-}
-.scan-progress__foot-summary {
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.scan-progress__foot-summary strong {
-  color: var(--color-text);
-  font-weight: 500;
-}
-
 .scan-progress__actions {
   display: inline-flex;
   align-items: center;

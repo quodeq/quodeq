@@ -129,12 +129,21 @@ const DimensionGroup = memo(function DimensionGroup({ dim, violations, open, sca
 function useOpenDims() {
   const [openDims, setOpenDims] = useState(() => new Set());
   const [latestOpen, setLatestOpen] = useState(true);
-  const toggleDim = useCallback((dim) => setOpenDims((cur) => {
-    const next = new Set(cur);
-    if (next.has(dim)) next.delete(dim);
-    else { next.add(dim); setLatestOpen(false); }
-    return next;
-  }), []);
+  // The ref lets the stable toggle know whether it opens or closes, so the
+  // set updater stays pure (React may run an updater twice) and closing
+  // latest happens beside it, not inside it.
+  const openRef = useRef(openDims);
+  openRef.current = openDims;
+  const toggleDim = useCallback((dim) => {
+    const opening = !openRef.current.has(dim);
+    setOpenDims((cur) => {
+      const next = new Set(cur);
+      if (next.has(dim)) next.delete(dim);
+      else next.add(dim);
+      return next;
+    });
+    if (opening) setLatestOpen(false);
+  }, []);
   const toggleLatest = useCallback(() => setLatestOpen((v) => !v), []);
   return { openDims, toggleDim, latestOpen, toggleLatest };
 }
