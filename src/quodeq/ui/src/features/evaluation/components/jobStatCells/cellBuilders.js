@@ -81,7 +81,8 @@ function buildDoneCells(inputs) {
       label: t('evaluate.dimensionsTile'),
       value: dimsKnown ? inputs.dimsDone : '—',
       trailing: dimsKnown ? `/ ${inputs.dimsTotal}` : null,
-      hint: dimsKnown && inputs.dimsDone === inputs.dimsTotal ? t('evaluate.allDone') : null,
+      hint: isTimeLimitExit(inputs.exitReason) ? t('evaluate.timeLimitReached')
+        : dimsKnown && inputs.dimsDone === inputs.dimsTotal ? t('evaluate.allDone') : null,
       tone: CELL_TONE.DEFAULT,
     },
     {

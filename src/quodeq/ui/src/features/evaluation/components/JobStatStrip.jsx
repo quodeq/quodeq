@@ -47,7 +47,9 @@ function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal,
   return buildJobStatCells(job.status, {
     overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
     carriedCount: hiddenCarriedCount,
-    exitReason: job.exitReason,
+    // A clean exit leaves job.exitReason empty; the run's own status says
+    // whether its time budget ran out.
+    exitReason: job.exitReason ?? progress?.exitReason,
     dimCycle: buildDimensionCycle(progress),
     sevCounts: sumSeverities(liveViolations),
     scanMode: deriveScanMode(progress),

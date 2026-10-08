@@ -2730,6 +2730,7 @@ button.eval-provider-badge--clickable:focus-visible {
   flex-shrink: 0;
 }
 .scan-progress__dim-dot--done    { background: var(--color-success, #56d364); }
+.scan-progress__dim-dot--partial { background: var(--color-warning); }
 .scan-progress__dim-dot--running {
   background: var(--color-accent);
   animation: eval-pulse 1.6s ease-in-out infinite;

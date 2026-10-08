@@ -83,3 +83,16 @@ def test_explicit_exit_reason_is_not_overwritten(tmp_path: Path) -> None:
     assert status is not None
     assert status["exit_reason"] == "time_limit"
     assert _states(tmp_path)["usability"] == "incomplete"
+
+
+def test_a_dimension_cut_by_its_time_slice_marks_the_run_time_limited(tmp_path: Path) -> None:
+    """The run can end before its own deadline while a dimension ran out of its slice."""
+    with RunLifecycleContext(run_dir=tmp_path, job_id="j1", dimensions=["security", "usability"]) as lifecycle:
+        for dim, reason in (("security", None), ("usability", "time_limit")):
+            write_dim_state(tmp_path, dim, DimState.RUNNING)
+            write_dim_state(tmp_path, dim, DimState.DONE, exit_reason=reason)
+        lifecycle.transition_to_finalizing()
+
+    status = read_status(tmp_path)
+    assert status["state"] == "done"
+    assert status["exit_reason"] == "time_limit"
