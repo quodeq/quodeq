@@ -21,7 +21,6 @@ import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js'
 import { copyToClipboard } from '../utils/clipboard.js';
 import { parseFileRef } from '../utils/textFormatting.js';
 import { t } from '../strings/index.js';
-import { KEY } from '../vocab/keyboard.js';
 
 const CONTEXT_PADDING = 5;
 const CODE_LINE_HEIGHT = 18; // must match terminal.css .ctx-line line-height
