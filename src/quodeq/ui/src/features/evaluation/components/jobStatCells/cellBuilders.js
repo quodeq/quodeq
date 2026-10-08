@@ -66,18 +66,38 @@ function statusHint(s) {
   return null;
 }
 
-function severityHint(n) {
-  if (!n) return 'none';
-  return `${n} total`;
+// A finished run's tiles say what the running tiles said, settled: the
+// header already says it is complete, so no status tile.
+function buildDoneCells(inputs) {
+  const dimsKnown = inputs.dimsTotal > 0;
+  const filesKnown = inputs.totalFiles > 0;
+  return [
+    {
+      label: t('evaluate.dimensionsTile'),
+      value: dimsKnown ? inputs.dimsDone : '—',
+      trailing: dimsKnown ? `/ ${inputs.dimsTotal}` : null,
+      hint: dimsKnown && inputs.dimsDone === inputs.dimsTotal ? t('evaluate.allDone') : null,
+      tone: CELL_TONE.DEFAULT,
+    },
+    {
+      label: t('evaluate.filesThisRun'),
+      value: filesKnown ? inputs.takenFiles : '—',
+      trailing: filesKnown ? `/ ${inputs.totalFiles}` : null,
+      hint: filesHintFor(inputs.scanMode),
+      tone: CELL_TONE.DEFAULT,
+    },
+    foundCell(inputs.liveCount, t('evaluate.newViolationsLabel'), formatSevHint(inputs.sevCounts)),
+    elapsedCell(inputs.elapsedS, t('evaluate.durationLabel'),
+      inputs.budgetS > 0 ? t('evaluate.ofBudget', { budget: formatDurationCoarse(inputs.budgetS) }) : t('evaluate.totalHint')),
+  ];
 }
 
-function buildDoneCells(statusCell, inputs) {
-  return [
-    statusCell,
-    { label: 'SCANNED', value: inputs.totalFiles > 0 ? inputs.totalFiles : '—', hint: 'files', tone: CELL_TONE.DEFAULT },
-    foundCell(inputs.liveCount, 'VIOLATIONS', severityHint(inputs.liveCount), inputs.suppressedCount, inputs.carriedCount),
-    elapsedCell(inputs.elapsedS, 'DURATION', 'total'),
-  ];
+// A clean scan re-reads every file, an incremental one targets what
+// changed; no hint until the mode is known.
+function filesHintFor(scanMode) {
+  if (scanMode === SCAN_MODE.CLEAN) return t('evaluate.filesHint');
+  if (scanMode === SCAN_MODE.INCREMENTAL) return t('evaluate.changedFilesHint');
+  return null;
 }
 
 function buildRunningCells(inputs) {
@@ -85,10 +105,7 @@ function buildRunningCells(inputs) {
   // progress data instead of repeating "running".
   const dc = inputs.dimCycle ?? null;
   const runKnown = inputs.totalFiles > 0;
-  // A clean scan re-reads every file, an incremental one targets what
-  // changed; no hint until the mode is known.
-  const filesHint = inputs.scanMode === SCAN_MODE.CLEAN ? t('evaluate.filesHint')
-    : inputs.scanMode === SCAN_MODE.INCREMENTAL ? t('evaluate.changedFilesHint') : null;
+  const filesHint = filesHintFor(inputs.scanMode);
   // The run's own budget when it has one; an unlimited run keeps the ETA.
   const elapsedHint = inputs.budgetS > 0
     ? t('evaluate.ofBudget', { budget: formatDurationCoarse(inputs.budgetS) })
@@ -134,6 +151,8 @@ function buildRunningCells(inputs) {
  * @param {object|null} [inputs.dimCycle] — from buildDimensionCycle (running only)
  * @param {object} [inputs.sevCounts] — from sumSeverities (running only)
  * @param {string|null} [inputs.scanMode] — from deriveScanMode (running only)
+ * @param {number} [inputs.dimsDone] — dimensions finished (done only)
+ * @param {number} [inputs.dimsTotal] — dimensions in the run (done only)
  * @param {number} [inputs.budgetS] — the run's time budget in seconds; 0 or absent = unlimited (running only)
  * @returns {Array<{label,value,hint,tone,trailing?}>} exactly 4 cells.
  */
@@ -151,7 +170,7 @@ export function buildJobStatCells(status, inputs) {
   };
 
   if (status === JOB_STATUS.DONE) {
-    return buildDoneCells(statusCell, inputs);
+    return buildDoneCells(inputs);
   }
 
   if (status === JOB_STATUS.RUNNING) {

@@ -28,11 +28,21 @@ describe('the run header', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('terminal states keep their pill and buttons', () => {
-    renderWithClient(<EvaluationStatus job={{ ...baseJob, status: 'done' }} onDismiss={vi.fn()} />);
-    expect(document.querySelector('.eval-run-pill--done')).not.toBeNull();
+  it('a finished job shows a still check and the view results / close pills', () => {
+    const onDismiss = vi.fn();
+    renderWithClient(<EvaluationStatus job={{ ...baseJob, status: 'done' }} onDismiss={onDismiss} />);
+    expect(screen.getByLabelText('complete')).toHaveClass('eval-run-check');
+    expect(document.querySelector('.eval-run-pill')).toBeNull();
+    expect(screen.getByRole('button', { name: /view results/i })).toHaveClass('eval-scan-pill');
+    expect(screen.getByRole('button', { name: /close/i })).toHaveClass('eval-pill-btn');
     expect(screen.queryByRole('button', { name: /stop/i })).toBeNull();
-    expect(screen.getByRole('button', { name: /view results/i })).toBeInTheDocument();
+  });
+
+  it('a run that did not finish keeps a pill that says how it ended', () => {
+    renderWithClient(<EvaluationStatus job={{ ...baseJob, status: 'failed' }} onDismiss={vi.fn()} />);
+    expect(document.querySelector('.eval-run-pill--failed')).not.toBeNull();
+    expect(screen.queryByLabelText('complete')).toBeNull();
+    expect(screen.getByRole('button', { name: /close/i })).toHaveClass('eval-pill-btn');
   });
 
   it('the identity strip has no job id and the repository cell opens Repositories', () => {

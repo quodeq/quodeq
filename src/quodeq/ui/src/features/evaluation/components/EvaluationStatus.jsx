@@ -36,6 +36,11 @@ function RunPill({ status, exitReason }) {
   if (status === JOB_STATUS.RUNNING) {
     return <span className="eval-run-dot" role="img" aria-label={t('evaluate.runningAria')} />;
   }
+  // Finished: the dot settles into a still check. Other endings keep a pill
+  // that names how the run ended, which the title alone does not say.
+  if (status === JOB_STATUS.DONE) {
+    return <span className="eval-run-check" role="img" aria-label={t('evaluate.completeAria')}>✓</span>;
+  }
   const timeLimit = isTimeLimitEnd(status, exitReason);
   const mod = status === JOB_STATUS.DONE ? 'done'
     : !timeLimit && (status === JOB_STATUS.FAILED || status === JOB_STATUS.LOST) ? 'failed'
@@ -64,12 +69,13 @@ function JobHeader({ job, onDismiss, onCancel }) {
           </button>
         )}
         {!isRunning && isDone && (
-          <button type="button" className="term-btn term-btn--primary term-btn--sm" onClick={() => onDismiss(EVAL_DISMISS_ACTION.VIEW)}>
-            <span aria-hidden="true">▸</span> {t('evaluate.viewResults')}
+          <button type="button" className="eval-scan-pill eval-scan-pill--sm" onClick={() => onDismiss(EVAL_DISMISS_ACTION.VIEW)}>
+            <span className="eval-scan-pill__glyph" aria-hidden="true">▶</span>
+            {t('evaluate.viewResults')}
           </button>
         )}
         {!isRunning && (
-          <button type="button" className="term-btn term-btn--secondary term-btn--sm" onClick={() => onDismiss(EVAL_DISMISS_ACTION.CLOSE)}>{t('evaluate.closeBtn')}</button>
+          <button type="button" className="eval-pill-btn" onClick={() => onDismiss(EVAL_DISMISS_ACTION.CLOSE)}>{t('evaluate.closeBtn')}</button>
         )}
       </div>
     </div>
