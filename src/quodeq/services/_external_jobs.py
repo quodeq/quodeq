@@ -6,9 +6,10 @@ Only the cancel path -- reading the ``.pid`` file and delivering signals --
 remains here.
 
 The cancel path is SIGTERM first, then SIGKILL after a grace window if the
-process hasn't died. Tree kill is delegated to ``_kill_tree`` so subagent
-children get reaped alongside the parent on both POSIX (``killpg``) and
-Windows (``taskkill /T``). By default only the SIGTERM is delivered on the
+process hasn't died. Tree kill is delegated to ``kill_external_tree`` so subagent
+children get reaped alongside the parent (``taskkill /T`` on Windows) without
+signalling the launcher's process group: a CI step shares the self-hosted
+runner's group, and a group kill would stop the runner. By default only the SIGTERM is delivered on the
 caller's thread; the grace wait and SIGKILL escalation run on a daemon
 thread so a cancel request never holds an HTTP worker for the grace window.
 """
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
     import sqlite3
 
 from quodeq.config.services_env import cancel_grace_s
-from quodeq.shared.process_kill import kill_tree as _kill_tree
+from quodeq.shared.process_kill import kill_external_tree
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.run.job_status import strip_external_prefix
 from quodeq.services._run_index_fs import (
@@ -46,7 +47,7 @@ _POLL_INTERVAL_S = 0.05
 # Settle window after SIGKILL, so a caller that reads status.json right
 # after cancel sees a finished state rather than a half-written one.
 _SETTLE_WAIT_S = 1.0
-# SIGKILL on POSIX; Windows has no SIGKILL but _kill_tree treats any signal as
+# SIGKILL on POSIX; Windows has no SIGKILL but kill_external_tree treats any signal as
 # "taskkill /F /T" -- the fallback to SIGTERM keeps the call valid.
 _FORCE_KILL_SIGNAL = getattr(signal, "SIGKILL", signal.SIGTERM)
 _ESCALATION_THREAD_NAME = "cancel-escalation-"
@@ -66,7 +67,7 @@ def _start_daemon(fn: Callable[[], None], name: str) -> None:
 class ProcessControl:
     """Injectable seam for the process-control calls ``cancel_external_run`` makes."""
 
-    kill_tree: Callable[[int, int], None] = _kill_tree
+    kill_tree: Callable[[int, int], None] = kill_external_tree
     pid_alive: Callable[[int], bool] = is_pid_alive
     start_background: Callable[[Callable[[], None], str], None] = _start_daemon
 

@@ -54,6 +54,12 @@ _ALLOWLIST: set[str] = {
     # streaming git process group (git plus any ssh/credential helper that
     # holds stderr) at the deadline.
     "data/fs/git_stream.py:65",
+    # kill_external_tree / _descendants: reached only after the
+    # `if sys.platform == PLATFORM_WIN32` return (win32 delegates to
+    # kill_tree's taskkill /T); ps is wrapped in `except (OSError, ...)`.
+    # Stops an external run without signalling its launcher's group.
+    "shared/process_kill.py:104",
+    "shared/process_kill.py:136",
 }
 
 
