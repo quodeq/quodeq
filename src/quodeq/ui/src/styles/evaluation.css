@@ -3618,7 +3618,7 @@ button.eval-provider-badge--clickable:focus-visible {
   flex-direction: column;
   gap: 8px;
 }
-/* "latest 10": the first group of the findings accordion. */
+/* "latest": the first group of the findings accordion. */
 .vlatest-group .vlive-dimension-name { color: var(--color-accent); }
 .vlatest-group .vticker-state { margin-left: auto; }
 .vticker-state {

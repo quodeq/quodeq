@@ -3,7 +3,7 @@ import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { FindingDetailBody } from '../../../components/findingDetail.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
 import { SevBadge } from '../../../components/terminal/index.js';
-import { latestFindings, countFindings, addPin, TICKER_SIZE } from './liveTicker.js';
+import { latestFindings, countFindings, addPin } from './liveTicker.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { SEVERITY_ORDER } from '../../../vocab/severity.js';
@@ -153,7 +153,7 @@ export default function LatestGroup({ liveViolations, isRunning, open, onToggle 
     <div className={`vlive-dimension-group vlatest-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
       <button type="button" className="vlive-dimension-label" onClick={onToggle} aria-expanded={open}>
         <span className={`vlive-dimension-caret${open ? ' vlive-dimension-caret--open' : ''}`} aria-hidden="true">▸</span>
-        <span className="vlive-dimension-name">{t('evaluate.latestFindings', { count: TICKER_SIZE })}</span>
+        <span className="vlive-dimension-name">{t('evaluate.latestFindings')}</span>
         <TickerState isRunning={isRunning} paused={paused} waiting={total - shownTotalRef.current} />
       </button>
       {pins.length > 0 && (

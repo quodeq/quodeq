@@ -462,7 +462,7 @@
   "evaluate.jobTrackingLost": "Server restarted, job tracking lost",
   "evaluate.keepFindings": "Keep findings",
   "evaluate.keepRunning": "Keep running",
-  "evaluate.latestFindings": "latest {count}",
+  "evaluate.latestFindings": "latest",
   "evaluate.liveViolations": "live violations",
   "evaluate.liveViolationsLabel": "live violations",
   "evaluate.loadingDots": "Loading...",
