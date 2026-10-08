@@ -31,3 +31,12 @@ test('origin forms of the same GitHub repo normalise alike', async () => {
   assert.equal(normalizeOriginUrl(null), null);
   assert.equal(normalizeOriginUrl('  '), null);
 });
+
+test('a run is filed under the project with the same origin', async () => {
+  const { findProjectByOrigin } = await import('./projectIdentity.js');
+  const projects = [{ id: 'p1', name: 'quodeq', originUrl: 'git@github.com:quodeq/quodeq.git' }, { id: 'p2', name: 'other', originUrl: null }];
+  assert.equal(findProjectByOrigin(projects, 'https://github.com/quodeq/quodeq')?.id, 'p1');
+  assert.equal(findProjectByOrigin(projects, null), null);
+  assert.equal(findProjectByOrigin(projects, 'https://github.com/x/y'), null);
+  assert.equal(findProjectByOrigin(null, 'https://github.com/quodeq/quodeq'), null);
+});

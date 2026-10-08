@@ -12,7 +12,7 @@ import {
   useLiveJob, useLiveJobError, useLiveFindings, useLiveStartedProject, useEvaluationActions,
 } from '../features/evaluation/EvaluationLiveContext.jsx';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
-import { findProject, projectIdOrSelf } from '../utils/projectIdentity.js';
+import { findProject, findProjectByOrigin, projectIdOrSelf } from '../utils/projectIdentity.js';
 
 const EvaluateScreen = lazy(() => import('../features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('../features/settings/components/SettingsPage.jsx'));
@@ -44,7 +44,11 @@ export function EvaluateCase({ selectedProject, projects, onGoToProjects, onGoTo
   // card label follows the job rather than the selection. Before the
   // report-path marker resolves outputProject, the project the job was
   // started for fills the gap; the global selection is never used.
-  const jobProjectInfo = job?.outputProject ? findProject(projects, job.outputProject) : null;
+  // A run filed under a throwaway project (a PR review in CI) is matched to
+  // the known project with the same git origin.
+  const jobProjectInfo = job?.outputProject
+    ? findProject(projects, job.outputProject) || findProjectByOrigin(projects, job.originUrl)
+    : null;
   const startedProjectInfo = startedProject ? findProject(projects, startedProject) : null;
   return (
     <EvaluateScreen

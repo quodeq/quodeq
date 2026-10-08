@@ -54,3 +54,16 @@ export function normalizeOriginUrl(url) {
   if (u.toLowerCase().endsWith(GIT_SUFFIX)) u = u.slice(0, -GIT_SUFFIX.length);
   return u.toLowerCase() || null;
 }
+
+/**
+ * The project whose git origin is the same repository as `url`: how a run
+ * filed under a throwaway project (a PR review) finds the project it reviews.
+ * @param {Array<{originUrl?: string|null}>|null|undefined} projects
+ * @param {string|null|undefined} url
+ * @returns {object|null}
+ */
+export function findProjectByOrigin(projects, url) {
+  const key = normalizeOriginUrl(url);
+  if (!key) return null;
+  return projects?.find((p) => normalizeOriginUrl(p.originUrl) === key) || null;
+}
