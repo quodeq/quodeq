@@ -5,6 +5,7 @@
  */
 import { normalizeOriginUrl } from '../../utils/projectIdentity.js';
 import { JOB_SOURCE } from '../../vocab/jobStatus.js';
+import { t } from '../../strings/index.js';
 
 /** Characters of a commit sha shown in the identity strip and details. */
 export const SHORT_SHA = 7;
@@ -12,6 +13,10 @@ export const SHORT_SHA = 7;
 const DIFF_REASON = 'diff';
 const GITHUB_HOST = 'github.com/';
 const SHA_RE = /^[0-9a-f]{7,40}$/i;
+const ORIGIN_CI = 'ci';
+const SCHEDULE_EVENT = 'schedule';
+const NIGHTLY_RE = /nightly/i;
+const WEB_URL_RE = /^https?:\/\//i;
 
 function dims(progress) {
   return Array.isArray(progress?.dimensions) ? progress.dimensions : [];
@@ -68,4 +73,31 @@ export function githubCommitUrl(originUrl, sha) {
   const repo = normalizeOriginUrl(originUrl);
   if (!repo || !repo.startsWith(GITHUB_HOST) || !SHA_RE.test(sha ?? '')) return null;
   return `https://${repo}/commit/${sha}`;
+}
+
+/**
+ * What to call a run the app did not start, from the origin its CLI
+ * recorded: "PR review #1402", "nightly" (the schedule, or a manual run of
+ * a nightly workflow), "CI" for any other workflow, else "external".
+ * @param {object|null} job
+ * @returns {string}
+ */
+export function externalLabel(job) {
+  const origin = job?.origin;
+  if (origin?.kind !== ORIGIN_CI) return t('evaluate.externalTag');
+  if (Number.isInteger(origin.pr)) return t('evaluate.originPrReview', { pr: origin.pr });
+  if (origin.event === SCHEDULE_EVENT || NIGHTLY_RE.test(origin.workflow ?? '')) return t('evaluate.originNightly');
+  return t('evaluate.originCi');
+}
+
+/**
+ * Where "open on GitHub" goes: the pull request a review was for, else the
+ * commit the run evaluated.
+ * @param {object|null} job
+ * @returns {string|null}
+ */
+export function githubLink(job) {
+  const prUrl = job?.origin?.prUrl;
+  if (typeof prUrl === 'string' && WEB_URL_RE.test(prUrl)) return prUrl;
+  return githubCommitUrl(job?.originUrl, job?.commitSha);
 }

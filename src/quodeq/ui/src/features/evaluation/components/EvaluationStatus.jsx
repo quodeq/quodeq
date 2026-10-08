@@ -6,7 +6,7 @@ import JobStatStrip from './JobStatStrip.jsx';
 import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
 import { deriveScanMode } from './buildJobStatCells.js';
 import { SCAN_MODE } from './scanModes.js';
-import { isExternal, isDiffReview, diffFileCount, githubCommitUrl, SHORT_SHA } from '../externalRun.js';
+import { isExternal, isDiffReview, diffFileCount, externalLabel, githubLink, SHORT_SHA } from '../externalRun.js';
 import { openExternal } from '../../updates/openExternal.js';
 import { formatRunTime } from '../../../utils/dateFormatting.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
@@ -56,14 +56,14 @@ function RunPill({ status, exitReason }) {
   );
 }
 
-// A run this app did not start says so after its status mark; a PR review
-// (a run over a diff) says that too.
+// A run this app did not start says where it came from after its status
+// mark ("nightly", "PR review #1402"), or "external" when it recorded no
+// origin; a run over a diff without a PR number says "diff review" too.
 function ExternalTag({ job, progress }) {
   if (!isExternal(job)) return null;
-  const label = isDiffReview(progress)
-    ? `${t('evaluate.externalTag')} · ${t('evaluate.diffReviewTag')}`
-    : t('evaluate.externalTag');
-  return <span className="eval-run-tag">{label}</span>;
+  const label = externalLabel(job);
+  const diff = isDiffReview(progress) && !Number.isInteger(job.origin?.pr);
+  return <span className="eval-run-tag">{diff ? `${label} · ${t('evaluate.diffReviewTag')}` : label}</span>;
 }
 
 // A PR review that has ended: its results are the review comment on the
@@ -106,7 +106,7 @@ function JobActions({ job, progress, onDismiss, onCancel }) {
     );
   }
   const reviewEnd = isReviewEnd(job, progress);
-  const commitUrl = reviewEnd ? githubCommitUrl(job.originUrl, job.commitSha) : null;
+  const commitUrl = reviewEnd ? githubLink(job) : null;
   return (
     <>
       {commitUrl && <PrimaryPill label={t('evaluate.openOnGitHub')} onClick={() => openExternal(commitUrl)} />}
