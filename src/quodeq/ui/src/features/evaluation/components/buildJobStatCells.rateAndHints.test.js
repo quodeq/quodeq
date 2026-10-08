@@ -116,14 +116,14 @@ test('msUntilNextSecond: normalizes negatives and defaults non-finite to 1000', 
 // suppressed hint — the live counters are net, so say what was netted out
 // ---------------------------------------------------------------------------
 
-test('buildJobStatCells: violations hint reports the suppressed count while running', () => {
+test('buildJobStatCells: a running job counts only its new violations, suppressed left out', () => {
   const cells = buildJobStatCells('running', {
     ...baseInputs, liveCount: 122, suppressedCount: 339,
     sevCounts: { critical: 2, major: 120, minor: 0 },
   });
-  assert.equal(cells[2].label, 'violations');
+  assert.equal(cells[2].label, 'new violations');
   assert.equal(cells[2].value, 122);
-  assert.equal(cells[2].hint, '2 critical · 120 major · 339 suppressed');
+  assert.equal(cells[2].hint, '2 critical · 120 major');
 });
 
 test('buildJobStatCells: VIOLATIONS hint reports it on a finished job too', () => {
@@ -150,13 +150,13 @@ test('suppressedSuffix: ignores negative and non-numeric counts', () => {
 // before the strip ever sees it, so say what was filtered out
 // ---------------------------------------------------------------------------
 
-test('buildJobStatCells: violations hint reports the carried-forward count while running', () => {
+test('buildJobStatCells: a running job leaves carried-forward findings out of its hint', () => {
   const cells = buildJobStatCells('running', {
     ...baseInputs, liveCount: 1, carriedCount: 12,
     sevCounts: { critical: 0, major: 1, minor: 0 },
   });
-  assert.equal(cells[2].label, 'violations');
-  assert.equal(cells[2].hint, '1 major · 12 carried forward');
+  assert.equal(cells[2].label, 'new violations');
+  assert.equal(cells[2].hint, '1 major');
 });
 
 test('buildJobStatCells: VIOLATIONS hint reports the carried-forward count on a finished job too', () => {

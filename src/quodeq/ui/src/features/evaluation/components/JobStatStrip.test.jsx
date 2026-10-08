@@ -37,11 +37,11 @@ describe('JobStatStrip', () => {
     expect(screen.getByText('analyzing')).toBeInTheDocument();
     expect(screen.getByText('dim 1/1')).toBeInTheDocument();
     expect(screen.getByText('files this run')).toBeInTheDocument();
-    expect(screen.getByText('violations')).toBeInTheDocument();
+    expect(screen.getByText('new violations')).toBeInTheDocument();
     expect(screen.getByText('elapsed')).toBeInTheDocument();
     // value cells
-    expect(await screen.findByText('63%')).toBeInTheDocument();
-    expect(screen.getByText('138')).toBeInTheDocument();
+    // The percent lives in the progress bar now; the tile carries the count.
+    expect(await screen.findByText('138')).toBeInTheDocument();
     expect(screen.getByText('/ 220')).toBeInTheDocument();
     expect(screen.getByText('2m 14s')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();    // violations count
@@ -111,7 +111,8 @@ describe('JobStatStrip', () => {
     const startedAt = new Date(Date.now() - 5000).toISOString();
     const wrap = (j) => <QueryClientProvider client={client}><JobStatStrip job={j} liveViolations={{}} rateStore={rateStore} /></QueryClientProvider>;
     const { rerender } = render(wrap({ jobId: 'jt', status: 'running', startedAt }));
-    expect(await screen.findByText('97%')).toBeInTheDocument();
+    // The running files tile reads 34 / 35 (the hint no longer prints a percent).
+    expect(await screen.findByText('34')).toBeInTheDocument();
     const before = getEvaluationProgress.mock.calls.length;
     rerender(wrap({ jobId: 'jt', status: 'cancelled', startedAt }));   // running -> terminal
     expect(await screen.findByText('100%')).toBeInTheDocument();
@@ -148,7 +149,7 @@ describe('JobStatStrip', () => {
     });
     const job = { jobId: 'job-4', status: 'running', startedAt: new Date(now - 5000).toISOString() };
     renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
-    expect(await screen.findByText('1%')).toBeInTheDocument();
+    expect(await screen.findByText('10')).toBeInTheDocument();
     expect(screen.getByText('2h 46m 39s')).toBeInTheDocument();
     nowSpy.mockRestore();
   });
@@ -161,7 +162,7 @@ describe('JobStatStrip', () => {
     });
     const job = { jobId: 'job-4b', status: 'running', startedAt: new Date(now - 5000).toISOString() };
     renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
-    expect(await screen.findByText('1%')).toBeInTheDocument();
+    expect(await screen.findByText('10')).toBeInTheDocument();
     expect(screen.getByText('5s')).toBeInTheDocument();
     nowSpy.mockRestore();
   });

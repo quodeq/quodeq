@@ -25,13 +25,3 @@ export function computeCoverageView(progress) {
     showCoverage, cachedPctWidth, runPctWidth,
   };
 }
-
-// The time limit is one deadline for the whole run, shared across all
-// selected dimensions — so the countdown pairs total elapsed with the
-// run-level budget. Overrun can show briefly: the watchdog allows a short
-// grace past the deadline before killing the job.
-export function computeRunBudget(progress, elapsedS) {
-  const runBudgetS = progress?.budgetS;
-  const overrun = runBudgetS > 0 && elapsedS > runBudgetS;
-  return { runBudgetS, overrun };
-}

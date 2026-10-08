@@ -20,6 +20,14 @@ from quodeq.services.fs_projects import (
 
 
 class TestGetProjectInfo:
+    def test_carries_the_last_finished_runs_dimensions(self, tmp_path: Path):
+        proj = tmp_path / "proj-uuid"
+        (proj / "r1").mkdir(parents=True)
+        (proj / "repository_info.json").write_text(json.dumps({"name": "test", "discipline": "software", "location": "local", "path": str(tmp_path)}))
+        (proj / "r1" / "status.json").write_text(json.dumps({"schema_version": 2, "state": "done", "started_at": "2026-10-01T10:00:00+00:00", "dimensions": ["security"]}))
+        result = get_project_info(str(tmp_path), "proj-uuid", list_dimensions=lambda **_kw: [], has_fingerprints=lambda *_a: False)
+        assert result["latestRunDimensions"] == ["security"]
+
     def test_returns_info(self, tmp_path: Path):
         proj = tmp_path / "proj-uuid"
         proj.mkdir()

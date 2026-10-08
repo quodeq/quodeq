@@ -15,16 +15,17 @@ const CONSOLE_ICON = (
  * dashboard server, Ollama). No open-state highlight — visual stays the
  * same; the dynamic aria-label is what conveys state to assistive tech.
  *
- * @param {{ open: boolean, onToggle: () => void, showDot?: boolean }} props
+ * @param {{ open: boolean, onToggle: () => void, showDot?: boolean, className?: string }} props
+ *   `className` adds a class to the button (the run screen draws it as a pill).
  *   `showDot` renders a small accent dot in the corner — used by the
  *   evaluation card to nudge first-time users.
  */
-export default function ConsoleButton({ open, onToggle, showDot = false }) {
+export default function ConsoleButton({ open, onToggle, showDot = false, className = '' }) {
   const label = open ? t('common.hideConsole') : t('common.showConsole');
   return (
     <button
       type="button"
-      className="console-button"
+      className={`console-button${className ? ` ${className}` : ''}`}
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
       aria-label={label}
       aria-expanded={open}

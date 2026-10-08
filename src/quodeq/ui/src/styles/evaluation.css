@@ -1618,11 +1618,6 @@ button.eval-provider-badge--clickable:focus-visible {
   padding: 0 4px;
 }
 
-.vlive-counter-hidden,
-.vlive-counter-passed {
-  color: var(--color-text-subtle);
-}
-
 .vlive-dimension-group {
 }
 
@@ -2455,54 +2450,10 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 
 /* Head: section label left, "% analyzed" right. */
-.scan-progress__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-}
-.scan-progress__head-pct {
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
+
 
 /* Legend under the coverage bar. */
-.scan-progress__legend {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  margin-top: 11px;
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.scan-progress__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-.scan-progress__legend-swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-.scan-progress__legend-swatch--cached {
-  background: var(--color-accent);
-  opacity: 0.35;
-}
-.scan-progress__legend-swatch--run {
-  background: var(--color-accent);
-}
-.scan-progress__legend-swatch--track {
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
-}
+
 
 /* Footer: run summary left, detail/console toggles right. */
 .scan-progress__foot {
@@ -2537,58 +2488,11 @@ button.eval-provider-badge--clickable:focus-visible {
 /* Detail toggle: a real button next to the console toggle. Same visual
    language as .console-button (ghost border, accent on hover, accent fill
    when open) so the two read as a paired cluster. */
-.scan-progress__detail-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-  user-select: none;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.scan-progress__detail-toggle:hover {
-  color: var(--color-accent);
-  background: var(--color-surface-alt);
-  border-color: var(--color-border);
-}
-.scan-progress__detail-toggle:focus-visible {
-  outline: 1px solid var(--color-accent);
-  outline-offset: 1px;
-}
-.scan-progress__detail-toggle--open {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-}
-.scan-progress__detail-toggle--open:hover {
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-}
+
 /* Stack the active label on top of an invisible ghost label sized to the
    longest possible text ("details") so the button — and therefore the
    1fr progress bar to its left — does not reflow when toggling. */
-.scan-progress__detail-label {
-  display: inline-grid;
-  line-height: 1;
-}
-.scan-progress__detail-label-ghost,
-.scan-progress__detail-label-active {
-  grid-area: 1 / 1;
-}
-.scan-progress__detail-label-ghost {
-  visibility: hidden;
-  pointer-events: none;
-}
-.scan-progress__detail-label-active {
-  text-align: center;
-}
+
 
 .scan-progress__error {
   padding: 8px 10px;
@@ -2626,7 +2530,6 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .scan-progress__bar-fill--done    { background: var(--color-success, #56d364); }
 .scan-progress__bar-fill--partial { background: var(--color-warning); }
-.scan-progress__bar-fill--cached  { background: var(--color-accent); opacity: 0.35; }
 /* The in-run segment: accent gradient + a moving shimmer while live. */
 .scan-progress__bar-fill--live {
   position: relative;
@@ -2655,11 +2558,6 @@ button.eval-provider-badge--clickable:focus-visible {
   height: 4px;
   border-radius: 2px;
   margin-top: 0;
-}
-
-.scan-progress__dim-active {
-  color: var(--color-accent);
-  text-transform: lowercase;
 }
 
 .scan-progress__caret {
@@ -2774,8 +2672,6 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .scan-progress__v        { color: var(--color-sev-critical-text, #f85149); }
 .scan-progress__c        { color: var(--color-success, #56d364); }
-.scan-progress__budget   { color: var(--color-warning); }
-.scan-progress__budget--overrun { color: var(--color-sev-critical-text, #f85149); }
 .scan-progress__partial  { color: var(--color-warning); text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
 .scan-progress__dim-reason { color: var(--color-warning); font-style: italic; }
 
@@ -2817,10 +2713,13 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .evaluate-panel__top--row {
   display: flex;
-  align-items: flex-start;
+  /* Actions sit on the title's line, not above it. */
+  align-items: center;
   justify-content: space-between;
   gap: var(--term-space-3);
+  margin-bottom: var(--term-space-4);
 }
+.evaluate-panel__top--row .term-header { margin: 0; }
 .evaluate-panel__top-actions {
   display: flex;
   gap: var(--term-space-2);
@@ -2974,7 +2873,7 @@ button.eval-provider-badge--clickable:focus-visible {
   to   { transform: translateX(400%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .eval-run-pill__dot,
+  .eval-run-dot,
   .vlive-footer__dot,
   .eval-dim-card__meta--skeleton,
   .scan-progress__dim-dot--running { animation: none; }
@@ -3000,12 +2899,6 @@ button.eval-provider-badge--clickable:focus-visible {
   vertical-align: middle;
   white-space: nowrap;
 }
-.eval-run-pill--running {
-  color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-warning) 24%, transparent);
-  padding-left: 7px;
-}
 .eval-run-pill--done {
   color: var(--color-success);
   background: color-mix(in srgb, var(--color-success) 8%, transparent);
@@ -3021,12 +2914,49 @@ button.eval-provider-badge--clickable:focus-visible {
   background: transparent;
   border: 1px solid var(--color-border);
 }
-.eval-run-pill__dot {
-  width: 5px;
-  height: 5px;
+/* A running job: a pulsing accent dot beside the title. */
+.eval-run-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 10px;
   border-radius: 50%;
-  background: var(--color-warning);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+  vertical-align: middle;
   animation: eval-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Pill buttons: stop, details, console (quiet) ── */
+.eval-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.eval-pill-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.eval-pill-btn--stop:hover {
+  border-color: var(--color-danger-border, var(--color-danger));
+  color: var(--color-danger-text, var(--color-danger));
+  background: var(--color-danger-bg, transparent);
+}
+.eval-pill-btn__stop-glyph {
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  background: currentColor;
 }
 
 /* ── Identity strip (repository · job id / scope · model · mode) ── */
@@ -3363,20 +3293,25 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .eval-dim-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 12px;
+  /* Four per row so every name fits on one line and no row is stretched
+     by a wrapped neighbour; two per row on narrow screens. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 760px) {
+  .eval-dim-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .eval-dim-card {
   appearance: none;
   display: flex;
-  gap: 11px;
+  gap: 10px;
   align-items: flex-start;
   text-align: left;
   font: inherit;
   background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
   border: 1px solid var(--color-border-soft, var(--color-border));
   border-radius: var(--eval-tile-radius, 10px);
-  padding: 13px 15px;
+  padding: 11px 14px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -3396,7 +3331,8 @@ button.eval-provider-badge--clickable:focus-visible {
   border: 1px solid var(--color-border);
   background: transparent;
   flex-shrink: 0;
-  margin-top: 1px;
+  /* Centred on the name's 18px line. */
+  margin-top: 2.5px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3416,7 +3352,11 @@ button.eval-provider-badge--clickable:focus-visible {
 .eval-dim-card__title-row {
   display: block;
   min-width: 0;
-  line-height: 1.35;
+  /* A fixed line: the bordered std tag must not set it. */
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .eval-dim-card__name {
   display: inline;
@@ -3446,7 +3386,7 @@ button.eval-provider-badge--clickable:focus-visible {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
   font-size: 11px;
   color: var(--color-text-muted);
-  margin-top: 5px;
+  margin-top: 3px;
   font-variant-numeric: tabular-nums;
 }
 .eval-dim-card__meta-line { white-space: nowrap; }
@@ -3517,7 +3457,42 @@ button.eval-provider-badge--clickable:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 .eval-run-bar__summary-sub { color: var(--color-text-subtle, var(--color-text-muted)); }
-.eval-run-bar__scan { flex-shrink: 0; }
+/* Scan: the screen's one filled pill, with what it will analyze inside. */
+.eval-scan-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 32px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+.eval-scan-pill:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+.eval-scan-pill:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.eval-scan-pill:disabled { opacity: 0.35; cursor: not-allowed; }
+.eval-scan-pill__glyph { font-size: 10px; }
+.eval-scan-pill__count {
+  padding-left: 9px;
+  border-left: 1px solid color-mix(in srgb, var(--color-on-accent) 35%, transparent);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  opacity: 0.75;
+}
 
 /* ── Live violations card ── */
 .vlive-feed {
@@ -3537,14 +3512,6 @@ button.eval-provider-badge--clickable:focus-visible {
   min-width: 0;
 }
 .vlive-head-left .term-section-label { margin: 0; }
-.vlive-head-dim {
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-subtle, var(--color-text-muted));
-  white-space: nowrap;
-}
 .vlive-card {
   background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
   border: 1px solid var(--color-border-soft, var(--color-border));
@@ -3651,16 +3618,9 @@ button.eval-provider-badge--clickable:focus-visible {
   flex-direction: column;
   gap: 8px;
 }
-.vticker-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 16px;
-  border-bottom: 1px solid var(--color-border-soft, var(--color-border));
-  background: color-mix(in srgb, var(--color-bg) 45%, var(--color-surface));
-}
-.vticker-title,
+/* "latest 10": the first group of the findings accordion. */
+.vlatest-group .vlive-dimension-name { color: var(--color-accent); }
+.vlatest-group .vticker-state { margin-left: auto; }
 .vticker-state {
   font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
   font-size: 11px;
@@ -3688,6 +3648,10 @@ button.eval-provider-badge--clickable:focus-visible {
 }
 .vlive-card .vdetail-row-main.vlive-collapsible.vticker-row-main {
   grid-template-columns: 4px 74px 120px minmax(0, 1fr) minmax(0, 200px);
+}
+/* Dimension rows: the same cells plus the expand chevron. */
+.vlive-card .vdetail-row-main.vlive-collapsible.vticker-row-main.vlive-row--expandable {
+  grid-template-columns: 4px 74px 120px minmax(0, 1fr) minmax(0, 200px) 16px;
 }
 .vticker-pin-main {
   display: grid;
@@ -3772,6 +3736,9 @@ button.eval-provider-badge--clickable:focus-visible {
   .vlive-card .vdetail-row-main.vlive-collapsible.vticker-row-main {
     grid-template-columns: 4px 74px minmax(0, 1fr);
   }
+  .vlive-card .vdetail-row-main.vlive-collapsible.vticker-row-main.vlive-row--expandable {
+    grid-template-columns: 4px 74px minmax(0, 1fr) 16px;
+  }
   .vticker-pin-main { grid-template-columns: 4px 74px minmax(0, 1fr) 24px; }
   .vticker-dim,
   .vticker-row-main .vlive-detail-file-btn,
@@ -3786,3 +3753,40 @@ button.eval-provider-badge--clickable:focus-visible {
   .vlive-dimension-count,
   .vlive-dimension-scanning::before { animation: none; }
 }
+
+/* ── Run progress: one bar for this run, its actions on the same row ── */
+.scan-progress__row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.scan-progress__row > .scan-progress__bar { flex: 1; margin: 0; }
+.scan-progress__actions { display: flex; align-items: center; gap: 8px; }
+.scan-progress__actions .console-button.eval-pill-btn { padding: 0 12px; }
+.scan-progress__actions .console-button__icon { width: 13px; height: 13px; }
+/* Details: the run and the repository as label/value pairs. */
+.scan-progress__pairs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 2px 0 14px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  color: var(--color-text);
+}
+.scan-progress__pair { display: inline-flex; align-items: center; gap: 8px; }
+.scan-progress__pair-label { color: var(--color-text-subtle); }
+
+/* Dimension cards with nothing to analyze step back; selected ones keep their check. */
+.eval-dim-card__std { vertical-align: 1px; line-height: 13px; }
+.eval-dim-card--uptodate {
+  background: color-mix(in srgb, var(--color-bg) 85%, var(--color-surface));
+  border-color: var(--color-border-soft, var(--color-border));
+}
+.eval-dim-card--uptodate .eval-dim-card__name { color: var(--color-text-muted); }
+.eval-dim-card--uptodate .eval-dim-card__meta { color: var(--color-text-subtle); }
+.eval-dim-card--uptodate .eval-dim-card__check { opacity: 0.6; }
+/* Identity values share one line height so repository, scope and model sit on one baseline. */
+.eval-identity__value,
+.eval-identity__value--action { line-height: 18px; }
+.eval-identity__code { display: inline-block; line-height: 18px; vertical-align: top; }

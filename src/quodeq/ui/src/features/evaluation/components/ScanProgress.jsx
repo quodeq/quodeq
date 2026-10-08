@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useEvalLog } from '../eval-log/EvalLogContext.js';
 import { ScanProgressBody } from './ScanProgressParts.jsx';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
-import { useRunElapsed } from '../hooks/useRunElapsed.js';
 import { JOB_STATUS, JOB_FINISHED } from '../../../vocab/jobStatus.js';
 
 // JOB_FINISHED, not JOB_TERMINAL: this set lacked 'lost' before the vocab
@@ -44,9 +43,6 @@ export default function ScanProgress({ job }) {
   // Best-effort: surface the last successful payload, ignore errors silently
   // (progress is purely informational and should never block the UI).
   const progress = progressQuery.data ?? null;
-  // Same server-anchored ticking clock the stat strip shows, so the footer
-  // total can never disagree with the ELAPSED tile.
-  const elapsedS = useRunElapsed(job, progress, progressQuery.dataUpdatedAt);
 
   useSyncEvalLogStatus(evalLog, jobId, status);
 
@@ -62,7 +58,6 @@ export default function ScanProgress({ job }) {
       isFailed={isFailed}
       isLost={isLost}
       progress={progress}
-      elapsedS={elapsedS}
       detailOpen={detailOpen}
       toggleDetail={() => setDetailOpen((v) => !v)}
       consoleOpen={consoleOpen}

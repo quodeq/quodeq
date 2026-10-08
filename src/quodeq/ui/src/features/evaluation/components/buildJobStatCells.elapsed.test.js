@@ -90,8 +90,8 @@ test('buildJobStatCells: builds 4 cells for a running job with progress data', (
   assert.equal(cells[1].label, 'files this run');
   assert.equal(cells[1].value, 138);
   assert.equal(cells[1].trailing, '/ 220');
-  assert.equal(cells[1].hint, '62% · changed since last scan');
-  assert.equal(cells[2].label, 'violations');
+  assert.equal(cells[1].hint, 'changed files');
+  assert.equal(cells[2].label, 'new violations');
   assert.equal(cells[2].value, 2);
   assert.equal(cells[2].tone, 'critical');
   assert.equal(cells[3].label, 'elapsed');
@@ -114,14 +114,14 @@ test('buildJobStatCells: running last dimension keeps the counter and drops the 
   assert.equal(cells[0].hint, 'dim 3/3');
 });
 
-test('buildJobStatCells: running files hint omits mode copy when mode is unknown', () => {
+test('buildJobStatCells: running files hint waits until the mode is known', () => {
   const cells = buildJobStatCells('running', baseInputs);
-  assert.equal(cells[1].hint, '62%');
+  assert.equal(cells[1].hint, null);
 });
 
-test('buildJobStatCells: running files hint says full rescan on clean scans', () => {
+test('buildJobStatCells: running files hint says files on clean scans', () => {
   const cells = buildJobStatCells('running', { ...baseInputs, scanMode: 'clean' });
-  assert.equal(cells[1].hint, '62% · full rescan');
+  assert.equal(cells[1].hint, 'files');
 });
 
 test('buildJobStatCells: running violations hint reports severity buckets', () => {

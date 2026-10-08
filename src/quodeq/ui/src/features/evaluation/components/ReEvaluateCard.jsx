@@ -8,8 +8,8 @@ import { UrlRestoreSection, DetectedLine, BudgetChips, RunBar, IdentityHeader, S
 import { TermHeader } from '../../../components/terminal/index.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
-import { t, LOCALE } from '../../../strings/index.js';
-import { PERCENT } from '../../../constants.js';
+import { t } from '../../../strings/index.js';
+import { buildDimMetas, buildUpToDateIds } from '../dimMetas.js';
 
 export { buildScanPayload } from '../hooks/useDimensionSelection.js';
 
@@ -22,27 +22,7 @@ const EVAL_OPTIONS_HINT = (
   </>
 );
 
-// Per-dimension meta lines, matching the selected scan mode: how much work
-// is left ("312 files to analyze"), how much the cache already covers
-// ("85% analyzed"), or "up to date" when every current fingerprint already
-// has a cached result. One entry per line — a single string would wrap
-// unevenly across cards on wide screens.
-function buildDimMetas(estimates, isClean) {
-  if (!estimates?.dimensions) return null;
-  return Object.fromEntries(Object.entries(estimates.dimensions).map(([id, est]) => {
-    const total = est.total ?? 0;
-    if (!(total > 0)) return [id, null];
-    const count = isClean ? total : (est.count ?? 0);
-    const cached = isClean ? 0 : (est.cached ?? 0);
-    if (count === 0) return [id, [t('evaluate.upToDate')]];
-    const pct = Math.round((cached / total) * PERCENT);
-    const lines = [t('evaluate.filesToAnalyze', { count: count.toLocaleString(LOCALE) })];
-    if (pct > 0) lines.push(t('evaluate.pctAnalyzed', { pct }));
-    return [id, lines];
-  }));
-}
-
-function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScopeBrowser, onCloseScopeBrowser, isReadOnlyEphemeral, urlActions, activeModel, branchLabel, scopeValue, onGoToSettings, onGoToProjects }) {
+function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScopeBrowser, onCloseScopeBrowser, isReadOnlyEphemeral, urlActions, activeModel, branchLabel, scopeValue, estimates, onGoToSettings, onGoToProjects }) {
   const { urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = urlActions;
   return (
     <>
@@ -67,7 +47,7 @@ function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScope
 
       <ScopeBrowserOverlay open={scopeBrowserOpen} info={info} scope={scope} onClose={onCloseScopeBrowser} />
 
-      <DetectedLine scanData={scope.scanData} />
+      <DetectedLine scanData={scope.scanData} estimates={estimates} />
 
       {isReadOnlyEphemeral && (
         <div className="ephemeral-completed-note">
@@ -82,7 +62,7 @@ function ReEvaluateCardTop({ info, project, scope, scopeBrowserOpen, onOpenScope
   );
 }
 
-function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, allDimensions, selectedDims, toggleDim, selectAll, clearAll, dimMetas, estimatesLoading, handleScan, estimates, budget, hasModel }) {
+function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, allDimensions, selectedDims, toggleDim, selectAll, clearAll, dimMetas, upToDateIds, seededFromLastRun, estimatesLoading, handleScan, estimates, budget, hasModel }) {
   return (
     <>
       <ScanModeCards value={cleanScan} onChange={setCleanScan} disabled={!canStart} />
@@ -96,6 +76,8 @@ function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, a
           onSelectAll={selectAll}
           onClearAll={clearAll}
           dimMetas={dimMetas}
+          upToDateIds={upToDateIds}
+          seededFromLastRun={seededFromLastRun}
           metasLoading={estimatesLoading}
         />
       )}
@@ -121,22 +103,23 @@ function computeReEvalViewState({ info, scope, disabled, cleanScan, estimates })
   const canStart = !disabled && !info.pathMissing && !isReadOnlyEphemeral;
   const isClean = cleanScan !== CLEAN_PERSIST.OFF;
   const dimMetas = buildDimMetas(estimates, isClean);
+  const upToDateIds = buildUpToDateIds(estimates, isClean);
   const branchLabel = scope.isLocal ? (scope.scanData?.currentBranch || scope.branch) : null;
   const scopeValue = scope.scopePath
     ? `${scope.scopePath}/`
     : `${info.path}/ · ${t('evaluate.wholeProject')}`;
-  return { isReadOnlyEphemeral, canStart, dimMetas, branchLabel, scopeValue };
+  return { isReadOnlyEphemeral, canStart, dimMetas, upToDateIds, branchLabel, scopeValue };
 }
 
 function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope, estimates, estimatesLoading, budget, onGoToSettings, onGoToProjects }) {
-  const { all: allDimensions, selected: selectedDims } = dimensions;
+  const { all: allDimensions, selected: selectedDims, seededFromLastRun } = dimensions;
   const {
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
   } = actions;
   const [scopeBrowserOpen, setScopeBrowserOpen] = useState(false);
   const activeModel = readActiveProviderModel();
-  const { isReadOnlyEphemeral, canStart, dimMetas, branchLabel, scopeValue } =
+  const { isReadOnlyEphemeral, canStart, dimMetas, upToDateIds, branchLabel, scopeValue } =
     computeReEvalViewState({ info, scope, disabled, cleanScan, estimates });
 
   return (
@@ -152,6 +135,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         urlActions={{ urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore }}
         activeModel={activeModel}
         branchLabel={branchLabel}
+        estimates={estimates}
         scopeValue={scopeValue}
         onGoToSettings={onGoToSettings}
         onGoToProjects={onGoToProjects}
@@ -168,6 +152,8 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         selectAll={selectAll}
         clearAll={clearAll}
         dimMetas={dimMetas}
+        upToDateIds={upToDateIds}
+        seededFromLastRun={seededFromLastRun}
         estimatesLoading={estimatesLoading}
         handleScan={handleScan}
         estimates={estimates}
@@ -180,7 +166,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
 
 export default function ReEvaluateCard({ project, projectInfo, onStart, disabled, preselectDims, onGoToSettings, onGoToProjects }) {
   const {
-    info, error, retry, allDimensions, selectedDims,
+    info, error, retry, allDimensions, selectedDims, seededFromLastRun,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     isLocal, scanData, estimates, estimatesLoading, branch, setBranch, scopePath, setScopePath,
@@ -213,7 +199,7 @@ export default function ReEvaluateCard({ project, projectInfo, onStart, disabled
       info={info}
       project={project}
       disabled={disabled}
-      dimensions={{ all: allDimensions, selected: selectedDims }}
+      dimensions={{ all: allDimensions, selected: selectedDims, seededFromLastRun }}
       actions={{
         toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
         urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,

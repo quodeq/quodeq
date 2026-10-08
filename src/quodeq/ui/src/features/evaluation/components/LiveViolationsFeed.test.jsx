@@ -31,9 +31,9 @@ describe('LiveViolationsFeed', () => {
 
   it('groups violations per dimension with counts', () => {
     renderFeed({ liveViolations: violations });
-    expect(document.querySelector('.vlive-dimension-name')).toHaveTextContent('reliability');
+    expect(document.querySelector('.vlive-dimension-group:not(.vlatest-group) .vlive-dimension-name')).toHaveTextContent('reliability');
     expect(document.querySelector('.vlive-dimension-count')).toHaveTextContent('2');
-    expect(screen.getByText('2 across 1 dimension')).toBeInTheDocument();
+    expect(screen.getByText('2 new')).toBeInTheDocument();
     expect(screen.getByText('1 crit')).toBeInTheDocument();
     expect(screen.getByText('1 maj')).toBeInTheDocument();
   });
@@ -58,7 +58,7 @@ describe('LiveViolationsFeed', () => {
 
   it('expands a row to its detail on click', () => {
     renderFeed({ liveViolations: violations });
-    fireEvent.click(document.querySelector('.vlive-dimension-label'));
+    fireEvent.click(document.querySelector('.vlive-dimension-group:not(.vlatest-group) .vlive-dimension-label'));
     const row = screen.getByRole('button', { name: /^critical finding: Crash on nil/i });
     expect(row).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(row);
@@ -72,7 +72,7 @@ describe('LiveViolationsFeed', () => {
     };
     const group = (name) => Array.from(document.querySelectorAll('.vlive-dimension-label'))
       .find((b) => b.querySelector('.vlive-dimension-name')?.textContent === name);
-    const groupNames = () => Array.from(document.querySelectorAll('.vlive-dimension-name')).map((n) => n.textContent);
+    const groupNames = () => Array.from(document.querySelectorAll('.vlive-dimension-group:not(.vlatest-group) .vlive-dimension-name')).map((n) => n.textContent);
 
     // Opening the running group on its own mounted every one of its rows,
     // and a dimension with thousands of findings made the screen lag.
@@ -100,7 +100,7 @@ describe('LiveViolationsFeed', () => {
     });
 
     const many = { security: Array.from({ length: 120 }, (_, i) => ({ severity: 'minor', principle: 'p', file: `F${i}.swift`, line: i })) };
-    const groupRows = () => document.querySelectorAll('.vlive-dimension-group .vdetail-row').length;
+    const groupRows = () => document.querySelectorAll('.vlive-dimension-group:not(.vlatest-group) .vdetail-row').length;
 
     it('lists every finding of an open group when there is no scroller to virtualize against', () => {
       renderFeed({ liveViolations: many });
@@ -142,7 +142,7 @@ describe('LiveViolationsFeed', () => {
       const QC = withQueryClient();
       const { rerender } = render(<QC><LiveViolationsFeed liveViolations={one} /></QC>);
       fireEvent.click(group('security'));
-      const inGroup = () => within(document.querySelector('.vlive-dimension-group'));
+      const inGroup = () => within(document.querySelector('.vlive-dimension-group:not(.vlatest-group)'));
       fireEvent.click(inGroup().getByRole('button', { name: /finding: First/i }));
       const two = { security: [...one.security, { severity: 'critical', principle: 'p', file: 'B.swift', line: 2, title: 'Second' }] };
       rerender(<QC><LiveViolationsFeed liveViolations={two} /></QC>);
@@ -151,42 +151,17 @@ describe('LiveViolationsFeed', () => {
     });
   });
 
-  it('shows the passing checks next to the violations while running', async () => {
-    // The console line prints "40 v · 1056 c"; the header says the same
-    // thing in words, so the feed never reads as "the run found 40 things".
-    getEvaluationProgress.mockResolvedValue({
-      currentDimension: 'reliability',
-      dimensions: [
-        { id: 'reliability', state: 'running', files: { taken: 30, total: 100 }, compliance: 1056 },
-        { id: 'security', state: 'done', files: { taken: 10, total: 10 }, compliance: 200 },
-      ],
-    });
-    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
-    expect(await screen.findByText(/1256 checks passed/)).toBeInTheDocument();
-  });
-
-  it('keeps the passing checks on a finished job', async () => {
-    getEvaluationProgress.mockResolvedValue({
-      dimensions: [{ id: 'reliability', state: 'done', files: { taken: 1, total: 1 }, compliance: 1 }],
-    });
-    renderFeed({ liveViolations: violations, job: { jobId: 'j3', status: 'done' } });
-    expect(await screen.findByText(/1 check passed/)).toBeInTheDocument();
-  });
-
   it('counts only what it renders', () => {
     renderFeed({ liveViolations: violations, hiddenCarriedCount: 5 });
-    expect(screen.getByText('2 across 1 dimension')).toBeInTheDocument();
+    expect(screen.getByText('2 new')).toBeInTheDocument();
   });
 
   it('keeps the header when the filter empties the list', () => {
     // A fully-cached dimension produces zero new findings. Returning null
     // here would make the feed vanish and read as "nothing found". The
-    // "0 across 0 dimensions" phrasing would be confusing, so a wholly
-    // filtered-out run says "no new findings" instead.
+    // A wholly filtered-out run says "no new findings".
     renderFeed({ liveViolations: {}, hiddenCarriedCount: 12 });
     expect(screen.getByText(/no new findings/)).toBeInTheDocument();
-    expect(screen.getByText(/12 carried forward hidden/)).toBeInTheDocument();
-    expect(screen.queryByText(/across 0 dimension/)).toBeNull();
   });
 
   it('still renders nothing when there is genuinely nothing', () => {
@@ -200,7 +175,48 @@ describe('LiveViolationsFeed', () => {
       liveViolations: {},
       hiddenCarriedCount: 12,
     });
-    expect(screen.getByText(/12 carried forward hidden/)).toBeInTheDocument();
+    expect(screen.getByText(/no new findings/)).toBeInTheDocument();
     expect(container.querySelector('.vlive-card')).toBeNull();
+  });
+
+  it('the head counts new findings and nothing else', async () => {
+    getEvaluationProgress.mockResolvedValue({ currentDimension: 'reliability', dimensions: [{ id: 'reliability', state: 'running', compliance: 900, files: { taken: 3, total: 10 } }] });
+    renderFeed({ liveViolations: violations, hiddenCarriedCount: 64, job: { jobId: 'j1', status: 'running' } });
+    expect(await screen.findByText('2 new · streaming')).toBeInTheDocument();
+    expect(screen.queryByText(/carried forward hidden/)).toBeNull();
+    expect(screen.queryByText(/checks passed/)).toBeNull();
+    expect(document.querySelector('.vlive-head-dim')).toBeNull();
+  });
+
+  it('latest is the first group of the card, open by default', () => {
+    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
+    const groups = document.querySelectorAll('.vlive-card > .vlive-dimension-group');
+    expect(groups[0]).toHaveTextContent(/latest 10/i);
+    expect(screen.getByRole('button', { name: /latest 10/i })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opening a dimension closes latest', () => {
+    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
+    fireEvent.click(screen.getByRole('button', { name: /^reliability/i }));
+    expect(screen.getByRole('button', { name: /latest 10/i })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('open dimension rows show the principle, then the title', () => {
+    renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
+    fireEvent.click(screen.getByRole('button', { name: /^reliability/i }));
+    const row = screen.getByRole('button', { name: /finding: Crash on nil/i });
+    expect(row.querySelector('.vticker-dim')).toHaveTextContent('fault tolerance');
+    expect(row.querySelector('.vrow-rule')).toHaveTextContent('Crash on nil');
+  });
+
+  it('an empty run still shows the latest group header', () => {
+    renderFeed({ liveViolations: {}, hiddenCarriedCount: 3, job: { jobId: 'j1', status: 'running' } });
+    expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
+  });
+
+  it('a running job with no findings at all still shows the feed and the latest header', () => {
+    renderFeed({ liveViolations: {}, hiddenCarriedCount: 0, job: { jobId: 'j1', status: 'running' } });
+    expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
+    expect(screen.getByText(/no new findings · streaming/)).toBeInTheDocument();
   });
 });

@@ -20,6 +20,7 @@
  * @property {number}       runsCount
  * @property {number|null}  filesCount
  * @property {string|null}  scopePath   - subdirectory the project is scoped to, or null for the whole repo
+ * @property {string[]}     latestRunDimensions - dimension ids of the newest finished run; [] when none
  * @property {boolean}      hasFingerprints - true once the backend has indexed the project's files
  * @property {Object|null}  languageStats - e.g. { py: 302, js: 84 }
  * @property {string|null}  scanDate
@@ -60,6 +61,7 @@ const PROJECT_FIELDS = {
   filesCount:      ['filesCount', null],
   scopePath:       ['scopePath', null],
   hasFingerprints: ['hasFingerprints', false],
+  latestRunDimensions: ['latestRunDimensions', () => []],
   languageStats:   ['languageStats', null],
   scanDate:        ['scanDate', null],
   totalFiles:      ['totalFiles', null],

@@ -44,6 +44,7 @@ function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal,
     dimCycle: buildDimensionCycle(progress),
     sevCounts: sumSeverities(liveViolations),
     scanMode: deriveScanMode(progress),
+    budgetS: progress?.budgetS ?? job.timeLimitS ?? 0,
   });
 }
 
