@@ -44,12 +44,12 @@ function StandingScoreCells({ s }) {
   );
 }
 
-function StandingRow({ s, i, view, onOpenProject, onOpenProjectDimension, setFocusId }) {
+function StandingRow({ s, i, view, active, onOpenProject, onOpenProjectDimension, setFocusId }) {
   return (
     <li>
       <button
         type="button"
-        className="compare-standings__row"
+        className={`compare-standings__row${active ? ' is-active' : ''}`}
         title={t('compare.openDimensionIn', { dim: view.label, project: s.row.name })}
         // In a dimension context, a project opens ITS view of the
         // same dimension (cross-project explorer entry), not its
@@ -87,7 +87,10 @@ function StandingRow({ s, i, view, onOpenProject, onOpenProjectDimension, setFoc
   );
 }
 
-export default function CompareStandingsList({ view, onOpenProject, onOpenProjectDimension, setFocusId }) {
+/** `activeId` is the project highlighted across the whole dimension view
+ * (hovered here or in the matrix, else the app's selection); hovering a
+ * row reports it through `setFocusId`. */
+export default function CompareStandingsList({ view, activeId = null, onOpenProject, onOpenProjectDimension, setFocusId }) {
   return (
     <ComparePanel ariaLabel={t('compare.standingsAria')} header={t('compare.standingsHeader', { count: view.standings.length })} note={t('compare.standingsNote', { dim: view.label })}>
       <ul className="compare-standings">
@@ -97,6 +100,7 @@ export default function CompareStandingsList({ view, onOpenProject, onOpenProjec
             s={s}
             i={i}
             view={view}
+            active={s.row.id === activeId}
             onOpenProject={onOpenProject}
             onOpenProjectDimension={onOpenProjectDimension}
             setFocusId={setFocusId}

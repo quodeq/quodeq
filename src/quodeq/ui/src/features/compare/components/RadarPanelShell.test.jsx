@@ -10,13 +10,15 @@ const dim = (label, value) => ({ label, a: value, b: value - 1 });
 function radarView(count) {
   return {
     principles: Array.from({ length: count }, (_, i) => ({ principle: `p${i}` })),
-    lead: { row: { name: 'Alpha' } },
-    trail: { row: { name: 'Beta' } },
   };
 }
 
+const ACTIVE = { row: { id: 'alpha', name: 'Alpha' } };
 const axesFor = (count) => Array.from({ length: count }, (_, i) => ({ label: `p${i}`, value: 5 }));
-const seriesFor = (count) => [{ values: Array(count).fill(5), variant: 'lead' }];
+const seriesFor = (count) => [
+  { values: Array(count).fill(5), variant: 'average' },
+  { values: Array(count).fill(6), variant: 'project' },
+];
 
 describe('RadarPanelShell', () => {
   it('names the section and renders the heading row', () => {
@@ -53,15 +55,23 @@ describe('RadarPanelShell', () => {
 });
 
 describe('compare radar panels', () => {
-  it('CompareRadarPanel draws the radar and the three legend entries', () => {
+  it('CompareRadarPanel draws the radar with the active project and the average in the legend', () => {
     const { container } = render(
-      <CompareRadarPanel view={radarView(3)} axes={axesFor(3)} series={seriesFor(3)} />
+      <CompareRadarPanel view={radarView(3)} axes={axesFor(3)} series={seriesFor(3)} active={ACTIVE} />
     );
     expect(container.querySelector('section.compare-panel')).toHaveAttribute('aria-label');
     expect(screen.getByRole('img', { name: /radar chart/i })).toBeInTheDocument();
-    expect(container.querySelectorAll('.compare-radar__legendItem')).toHaveLength(3);
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Beta')).toBeInTheDocument();
+    expect(container.querySelectorAll('.compare-radar__legendItem')).toHaveLength(2);
+    expect(screen.getByText('Alpha')).toHaveClass('compare-radar__legendItem--project');
+    expect(container.querySelectorAll('.compare-radar__poly--project')).toHaveLength(1);
+    expect(container.querySelectorAll('.compare-radar__poly--average')).toHaveLength(1);
+  });
+
+  it('CompareRadarPanel lists only the average without an active project', () => {
+    const { container } = render(
+      <CompareRadarPanel view={radarView(3)} axes={axesFor(3)} series={seriesFor(3).slice(0, 1)} />
+    );
+    expect(container.querySelectorAll('.compare-radar__legendItem')).toHaveLength(1);
   });
 
   it('CompareRadarPanel shows the fallback with fewer than three principles', () => {

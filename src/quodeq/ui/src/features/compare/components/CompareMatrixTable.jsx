@@ -8,10 +8,10 @@ import { score1 } from '../compareFormatters.js';
  * scope-average footer row. */
 export default function CompareMatrixTable({
   chunkCols, ci, displayRows, shortLabels, headerCell, leadCell, scoreCell,
-  footOverall, hoverClass, setHoverKey, OVERALL,
+  footOverall, hoverClass, setHoverKey, activeRowId = null, onHoverRow = null, OVERALL,
 }) {
   return (
-    <table onMouseLeave={() => setHoverKey(null)}>
+    <table onMouseLeave={() => { setHoverKey(null); onHoverRow?.(null); }}>
       <thead>
         <tr>
           <th className="compare-matrix__project">{t('compare.colProject')}</th>
@@ -21,7 +21,11 @@ export default function CompareMatrixTable({
       </thead>
       <tbody>
         {displayRows.map((row, i) => (
-          <tr key={row.id}>
+          <tr
+            key={row.id}
+            className={row.id === activeRowId ? 'is-active' : undefined}
+            onMouseEnter={onHoverRow ? () => onHoverRow(row.id) : undefined}
+          >
             {leadCell(row, i)}
             {ci === 0 && (
               <td

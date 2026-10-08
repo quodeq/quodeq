@@ -257,7 +257,8 @@
 }
 .compare-matrix th.compare-matrix__project { max-width: none; background: var(--color-surface-alt); }
 .compare-matrix tfoot td.compare-matrix__project { background: var(--color-surface-alt); padding-left: 53px; }
-.compare-matrix tbody tr:hover td.compare-matrix__project { background: var(--color-surface-alt); }
+.compare-matrix tbody tr:hover td.compare-matrix__project,
+.compare-matrix tbody tr.is-active td.compare-matrix__project { background: var(--color-surface-alt); }
 
 /* Crosshair: the hovered cell's whole column tints (the component sets
    the class), and the row tint below intersects it. */
@@ -265,7 +266,10 @@
 .compare-matrix th.compare-matrix__sorted { color: var(--color-accent); }
 .compare-matrix__overall { font-weight: 600; }
 .compare-matrix__none { color: var(--color-text-subtle); }
-.compare-matrix tbody tr:hover { background: var(--color-surface-alt); }
+/* .is-active: the dimension view's active project (hovered in either
+   table, else the app's selection) wears the hover tint while idle. */
+.compare-matrix tbody tr:hover,
+.compare-matrix tbody tr.is-active { background: var(--color-surface-alt); }
 .compare-matrix tfoot td {
   background: var(--color-surface-alt);
   color: var(--color-text-muted);
@@ -764,7 +768,8 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   cursor: pointer;
 }
 
-.compare-standings__row:hover { background: var(--color-surface-alt); }
+.compare-standings__row:hover,
+.compare-standings__row.is-active { background: var(--color-surface-alt); }
 
 .compare-standings__rank { font-size: 11px; color: var(--color-text-subtle); text-align: center; }
 
@@ -831,25 +836,12 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   stroke: var(--color-text-subtle);
   stroke-dasharray: 3 3;
 }
-.compare-radar__poly--lead {
+/* The one project polygon (hovered row, else the app's selection), in the
+   theme accent so it matches the rest of the view's highlight. */
+.compare-radar__poly--project {
   fill: var(--color-accent-soft);
   stroke: var(--color-accent);
   stroke-width: 1.6;
-}
-.compare-radar__poly--trail {
-  fill: var(--color-sev-critical-bg);
-  stroke: var(--color-sev-critical-text);
-}
-/* Standings-row hover overlay — neutral so it reads against both the lead
-   (accent) and trail (critical) polygons. `.is-focused` applies the same
-   look to an already-plotted leader/trailer polygon when its row is
-   hovered, so the hover always answers "which shape is this row". */
-.compare-radar__poly--focus,
-.compare-radar__poly.is-focused {
-  fill: transparent;
-  stroke: var(--color-text);
-  stroke-width: 1.8;
-  stroke-dasharray: none;
 }
 
 .compare-radar__labels { position: absolute; inset: 10px 12px 0; pointer-events: none; }
@@ -899,8 +891,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   background: var(--color-text-subtle);
 }
 
-.compare-radar__legendItem--lead::before { background: var(--color-accent); }
-.compare-radar__legendItem--trail::before { background: var(--color-sev-critical-text); }
+.compare-radar__legendItem--project::before { background: var(--color-accent); }
 
 /* principle cards */
 
@@ -973,7 +964,9 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 
 /* Bars follow the STANDINGS order (same slot = same project in every card),
    each numbered with its standings rank and separated by a faint hairline
-   so a bar can be traced back to the ranked list above. */
+   so a bar can be traced back to the ranked list above. The view's active
+   project keeps full colour while the other bars fade; a dashed tick at
+   the scope average runs across every slot. */
 .compare-principle__bars {
   display: flex;
   align-items: stretch;
@@ -994,22 +987,68 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   border-right: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
 }
 
-.compare-principle__slot:hover { background: var(--color-surface-alt); }
+.compare-principle__slot:hover,
+.compare-principle__slot.is-active { background: var(--color-surface-alt); }
 
 .compare-principle__slot:last-child { border-right: none; }
 
 .compare-principle__barTrack {
+  position: relative;
   display: flex;
   align-items: flex-end;
-  height: 20px;
+  height: 36px;
 }
 
-.compare-principle__bar { display: block; width: 100%; border-radius: 2px; }
+.compare-principle__bar {
+  display: block;
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  transition: opacity 120ms ease;
+}
+
+.compare-principle__bars.has-active .compare-principle__slot:not(.is-active) .compare-principle__bar { opacity: 0.4; }
+
+.compare-principle__avgTick {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  border-top: 1px dashed var(--color-text-subtle);
+  pointer-events: none;
+}
 
 .compare-principle__rank {
   font-size: 9px;
   color: var(--color-text-muted);
   text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-principle__slot.is-active .compare-principle__rank {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* The active project's score on this principle, under the bars. */
+.compare-principle__active {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.compare-principle__activeName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-accent);
+}
+
+.compare-principle__activeScore {
+  flex-shrink: 0;
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
 

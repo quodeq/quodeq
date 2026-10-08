@@ -138,6 +138,8 @@ function makeScoreCell(hoverClass, extremes, setHoverKey) {
  *   onOpenRow?: Function,
  *   cells: Object<string, {score: number|null, onClick?: Function, title?: string}>}[]} props.matrixRows
  * @param {number|null} props.footOverall - Scope average for the overall column.
+ * @param {string|null} [props.activeRowId] - Row highlighted as the view's active project.
+ * @param {Function} [props.onHoverRow] - Reports the hovered row id, null on leave.
  */
 /** Sort toggling + the hover-tint/header/score cell builders, bundled so
  * the component only owns state + render. */
@@ -158,7 +160,9 @@ function buildMatrixCellHelpers(sort, setSort, hoverKey, setHoverKey, extremes) 
   return { hoverClass, headerCell, scoreCell };
 }
 
-export default function CompareMatrix({ ariaLabel, header, note, columns, matrixRows, footOverall }) {
+export default function CompareMatrix({
+  ariaLabel, header, note, columns, matrixRows, footOverall, activeRowId = null, onHoverRow = null,
+}) {
   const [sort, setSort] = useState(null); // {key, dir: 'desc'|'asc'} | null
   const [hoverKey, setHoverKey] = useState(null);
   const { wrapRef, chunks } = useMatrixColumnChunks(columns, matrixRows.length >= 2 && columns.length >= 1);
@@ -192,6 +196,8 @@ export default function CompareMatrix({ ariaLabel, header, note, columns, matrix
             footOverall={footOverall}
             hoverClass={hoverClass}
             setHoverKey={setHoverKey}
+            activeRowId={activeRowId}
+            onHoverRow={onHoverRow}
             OVERALL={OVERALL}
           />
         ))}

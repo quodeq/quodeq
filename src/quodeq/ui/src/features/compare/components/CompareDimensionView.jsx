@@ -1,8 +1,10 @@
 /**
  * CompareDimensionView — one dimension across every project in scope:
- * stat cards, ranked standings with per-principle bars, a radar overlaying
- * the leader / trailer / scope average (hovering a standings row overlays
- * that project too), and one card per principle.
+ * stat cards, ranked standings with per-principle bars, a radar of one
+ * project over the scope average, the projects x principles matrix and one
+ * card per principle. One project is ACTIVE at a time: the hovered row
+ * (standings or matrix), else the app's selected project. The radar plots
+ * it, both tables highlight it and the principle cards mark its bar.
  */
 import { useState } from 'react';
 import { t } from '../../../strings/index.js';
@@ -46,28 +48,25 @@ function firstWinsMap(pairs) {
   return m;
 }
 
-/** Radar series: average always shown, plus lead/trail, plus the hovered
- * standings row (recolored to focus instead of duplicated if it's already
- * plotted as lead/trail). */
-export function buildRadarSeries(view, focusId) {
-  // One key -> score map per plotted standing, so the axis walk is an O(1)
-  // pick per principle instead of a find() over the standing's principles.
+/** The standing every panel highlights: the hovered row while one is
+ * hovered, else the app's selected project, else the leader when that
+ * selection sits outside this scope (so the radar always has a shape). */
+export function resolveActiveStanding(view, focusId, selectedProject) {
+  const byId = (id) => (id ? view.standings.find((s) => s.row.id === id) : null);
+  return byId(focusId) || byId(selectedProject) || view.lead || null;
+}
+
+/** Radar series: the dashed scope average, plus the active standing. */
+export function buildRadarSeries(view, active) {
+  // One key -> score map, so the axis walk is an O(1) pick per principle
+  // instead of a find() over the standing's principles.
   const byKey = (source) => {
     const scores = firstWinsMap(source.principles.map((x) => [x.key, x.score]));
     return view.principles.map((p) => (scores.has(p.key) ? scores.get(p.key) : null));
   };
-  const focusStanding = focusId ? view.standings.find((s) => s.row.id === focusId) : null;
-  const isFocused = (s) => Boolean(focusStanding && s === focusStanding);
-  const extraFocus = focusStanding && focusStanding !== view.lead && focusStanding !== view.trail
-    ? focusStanding
-    : null;
   return [
     { values: view.principles.map((p) => p.avg), variant: 'average' },
-    ...(view.trail && view.trail !== view.lead
-      ? [{ values: byKey(view.trail), variant: 'trail', focused: isFocused(view.trail) }]
-      : []),
-    ...(view.lead ? [{ values: byKey(view.lead), variant: 'lead', focused: isFocused(view.lead) }] : []),
-    ...(extraFocus ? [{ values: byKey(extraFocus), variant: 'focus' }] : []),
+    ...(active ? [{ values: byKey(active), variant: 'project' }] : []),
   ];
 }
 
@@ -93,16 +92,36 @@ export function buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple) {
   }));
 }
 
+/** v4c appendix: the same matrix grammar as the fleet's SCORE_MATRIX, one
+ * level deeper — projects x principles, cells opening that project's own
+ * principle page. Hovering a row makes that project the view's active one. */
+function PrincipleMatrix({ view, activeId, setFocusId, onOpenProject, onOpenPrinciple }) {
+  return (
+    <CompareMatrix
+      ariaLabel={t('compare.principleMatrixAria', { dim: view.label })}
+      header={t('compare.principleMatrixHeader', { rows: view.standings.length, cols: view.principles.length })}
+      note={t('compare.matrixNote')}
+      footOverall={view.avg}
+      columns={view.principles.map((p) => ({ key: p.key, label: p.label, avg: p.avg }))}
+      matrixRows={buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple)}
+      activeRowId={activeId}
+      onHoverRow={setFocusId}
+    />
+  );
+}
+
 export default function CompareDimensionView({
-  view, board, onOpenDimension, onOpenProject, onOpenPrinciple,
+  view, board, selectedProject = null, onOpenDimension, onOpenProject, onOpenPrinciple,
   onOpenProjectDimension,
 }) {
-  // The radar plots leader/trailer/average by default (all N polygons would
-  // be unreadable); hovering a standings row overlays that project on top.
+  // Hover state shared by the standings, the matrix and the principle
+  // bars; null falls back to the selected project (resolveActiveStanding).
   const [focusId, setFocusId] = useState(null);
+  const active = resolveActiveStanding(view, focusId, selectedProject);
+  const activeId = active?.row.id ?? null;
   const dimAttention = buildDimensionAttention(view);
   const axes = view.principles.map((p) => ({ label: p.label, value: p.avg }));
-  const series = buildRadarSeries(view, focusId);
+  const series = buildRadarSeries(view, active);
 
   return (
     <>
@@ -128,27 +147,20 @@ export default function CompareDimensionView({
 
         <div className="compare-lower compare-lower--dim">
           <CompareStandingsList
-            view={view}
-            onOpenProject={onOpenProject}
-            onOpenProjectDimension={onOpenProjectDimension}
-            setFocusId={setFocusId}
+            view={view} activeId={activeId} setFocusId={setFocusId}
+            onOpenProject={onOpenProject} onOpenProjectDimension={onOpenProjectDimension}
           />
-          <CompareRadarPanel view={view} axes={axes} series={series} />
+          <CompareRadarPanel view={view} axes={axes} series={series} active={active} />
         </div>
 
-        {/* v4c appendix: the same matrix grammar as the fleet's SCORE_MATRIX,
-            one level deeper — projects x principles, cells opening that
-            project's own principle page. */}
-        <CompareMatrix
-          ariaLabel={t('compare.principleMatrixAria', { dim: view.label })}
-          header={t('compare.principleMatrixHeader', { rows: view.standings.length, cols: view.principles.length })}
-          note={t('compare.matrixNote')}
-          footOverall={view.avg}
-          columns={view.principles.map((p) => ({ key: p.key, label: p.label, avg: p.avg }))}
-          matrixRows={buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple)}
+        <PrincipleMatrix
+          view={view} activeId={activeId} setFocusId={setFocusId}
+          onOpenProject={onOpenProject} onOpenPrinciple={onOpenPrinciple}
         />
 
-        <ComparePrincipleCards principles={view.principles} onOpenPrinciple={onOpenPrinciple} />
+        <ComparePrincipleCards
+          principles={view.principles} activeId={activeId} setFocusId={setFocusId} onOpenPrinciple={onOpenPrinciple}
+        />
       </div>
     </>
   );
