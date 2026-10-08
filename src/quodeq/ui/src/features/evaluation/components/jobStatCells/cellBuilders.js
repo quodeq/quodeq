@@ -91,7 +91,7 @@ function buildDoneCells(inputs) {
       hint: filesHintFor(inputs.scanMode),
       tone: CELL_TONE.DEFAULT,
     },
-    foundCell(inputs.liveCount, t('evaluate.newViolationsLabel'), formatSevHint(inputs.sevCounts)),
+    foundCell(inputs.liveCount, t('evaluate.newViolationsLabel'), formatSevHint(inputs.sevCounts, t('evaluate.noneFound'))),
     elapsedCell(inputs.elapsedS, t('evaluate.durationLabel'),
       inputs.budgetS > 0 ? t('evaluate.ofBudget', { budget: formatDurationCoarse(inputs.budgetS) }) : t('evaluate.totalHint'),
       inputs.budgetS),

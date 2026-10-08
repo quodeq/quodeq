@@ -423,6 +423,7 @@
   "evaluate.filesLabel": "files",
   "evaluate.filesQueued": "{count} files queued",
   "evaluate.newViolationsLabel": "new violations",
+  "evaluate.noneFound": "none",
   "evaluate.dimensionsTile": "dimensions",
   "evaluate.allDone": "all done",
   "evaluate.durationLabel": "duration",

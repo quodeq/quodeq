@@ -46,3 +46,8 @@ test('a run stopped at its time limit, a few seconds past it, is not flagged', (
   const [, , , duration] = buildJobStatCells('done', { ...base, elapsedS: 620 });
   assert.equal(duration.tone, 'default');
 });
+
+test('a finished run with no new violations says none, not none yet', () => {
+  const [, , found] = buildJobStatCells('done', { ...base, liveCount: 0, sevCounts: {} });
+  assert.equal(found.hint, 'none');
+});

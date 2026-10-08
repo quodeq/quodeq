@@ -182,12 +182,12 @@ export function sumSeverities(liveViolations) {
   return counts;
 }
 
-/** "1 critical · 4 major" — zero buckets omitted; "none yet" when all zero. */
-export function formatSevHint(counts) {
+/** "1 critical · 4 major" — zero buckets omitted; `empty` ("none yet" while running) when all zero. */
+export function formatSevHint(counts, empty = 'none yet') {
   const parts = SEVERITY_ORDER
     .filter((k) => counts?.[k] > 0)
     .map((k) => `${counts[k]} ${k}`);
-  return parts.length > 0 ? parts.join(' · ') : 'none yet';
+  return parts.length > 0 ? parts.join(' · ') : empty;
 }
 
 /**
