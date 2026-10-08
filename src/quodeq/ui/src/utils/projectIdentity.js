@@ -33,3 +33,24 @@ export function projectIdOrSelf(entry) {
 export function findProject(projects, key) {
   return projects?.find((p) => projectId(p) === key) || null;
 }
+
+const GIT_SUFFIX = '.git';
+
+/**
+ * One canonical form for the equivalent spellings of a git remote (https,
+ * ssh, scp-like `git@host:path`, userinfo, trailing `.git` or `/`), so a
+ * project registered over SSH matches a CI checkout over https. Mirrors the
+ * backend's `shared/repo.py:normalize_remote_url`.
+ * @param {string|null|undefined} url
+ * @returns {string|null} e.g. `github.com/owner/repo`, or null when blank
+ */
+export function normalizeOriginUrl(url) {
+  let u = String(url ?? '').trim();
+  if (!u) return null;
+  u = u.replace(/^[a-z+]+:\/\//i, '');
+  u = u.replace(/^[^@/]+@/, '');
+  u = u.replace(/^([^/:]+):(?!\d)/, '$1/');
+  u = u.replace(/\/+$/, '');
+  if (u.toLowerCase().endsWith(GIT_SUFFIX)) u = u.slice(0, -GIT_SUFFIX.length);
+  return u.toLowerCase() || null;
+}
