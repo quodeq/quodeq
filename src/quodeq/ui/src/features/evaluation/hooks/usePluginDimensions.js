@@ -35,6 +35,24 @@ function deduplicateDimensions(plugins, standards) {
 }
 
 /**
+ * Both lists merged. A failed list is logged and read as empty, and the
+ * result is flagged `partial` so the cache does not keep it.
+ */
+async function fetchDimensions(listPlugins, listStandards) {
+  let partial = false;
+  const degrade = (what) => (err) => {
+    console.warn(`Failed to load ${what}:`, err);
+    partial = true;
+    return [];
+  };
+  const [plugins, standards] = await Promise.all([
+    listPlugins().catch(degrade('plugins')),
+    listStandards().catch(degrade('standards')),
+  ]);
+  return { dimensions: [...deduplicateDimensions(plugins, standards).values()], partial };
+}
+
+/**
  * Load-once cache for the merged plugin+standards dimension list.
  *
  * Instance-scoped state (was two module-level variables) so tests can build
@@ -48,17 +66,7 @@ export function createDimensionCache() {
   let refreshPromise = null;
   function load(listPlugins, listStandards) {
     if (cachePromise) return cachePromise;
-    let partial = false;
-    const degrade = (what) => (err) => {
-      console.warn(`Failed to load ${what}:`, err);
-      partial = true;
-      return [];
-    };
-    const promise = Promise.all([
-      listPlugins().catch(degrade('plugins')),
-      listStandards().catch(degrade('standards')),
-    ]).then(([plugins, standards]) => {
-      const dimensions = [...deduplicateDimensions(plugins, standards).values()];
+    const promise = fetchDimensions(listPlugins, listStandards).then(({ dimensions, partial }) => {
       // A partial list is shown but not cached, so the next mount retries.
       if (partial) {
         if (cachePromise === promise) cachePromise = null;
