@@ -104,4 +104,15 @@ describe("useEvaluation idle adoption", () => {
     await tick();
     await waitFor(() => expect(result.current.job?.jobId).toBe("ext-pr"));
   });
+
+  it("a finished run left on screen gives way to a new running one", async () => {
+    const done = { ...nightly, jobId: "ext-done", status: "done" };
+    fakeApi.listEvaluations.mockResolvedValue([done]);
+    fakeApi.getEvaluation.mockImplementation(async (id) => (id === "ext-done" ? done : { ...nightly, jobId: id }));
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.job?.jobId).toBe("ext-done"));
+    fakeApi.listEvaluations.mockResolvedValue([{ ...nightly, jobId: "ext-pr" }]);
+    await tick();
+    await waitFor(() => expect(result.current.job?.jobId).toBe("ext-pr"));
+  });
 });
