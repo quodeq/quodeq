@@ -191,14 +191,14 @@ describe('LiveViolationsFeed', () => {
   it('latest is the first group of the card, open by default', () => {
     renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
     const groups = document.querySelectorAll('.vlive-card > .vlive-dimension-group');
-    expect(groups[0]).toHaveTextContent(/latest 10/i);
-    expect(screen.getByRole('button', { name: /latest 10/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(groups[0].querySelector('.vlive-dimension-name')).toHaveTextContent(/^latest$/);
+    expect(screen.getByRole('button', { name: /^latest/i })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('opening a dimension closes latest', () => {
     renderFeed({ liveViolations: violations, job: { jobId: 'j1', status: 'running' } });
     fireEvent.click(screen.getByRole('button', { name: /^reliability/i }));
-    expect(screen.getByRole('button', { name: /latest 10/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /^latest/i })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('open dimension rows show the principle, then the title', () => {
@@ -211,12 +211,12 @@ describe('LiveViolationsFeed', () => {
 
   it('an empty run still shows the latest group header', () => {
     renderFeed({ liveViolations: {}, hiddenCarriedCount: 3, job: { jobId: 'j1', status: 'running' } });
-    expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^latest/i })).toBeInTheDocument();
   });
 
   it('a running job with no findings at all still shows the feed and the latest header', () => {
     renderFeed({ liveViolations: {}, hiddenCarriedCount: 0, job: { jobId: 'j1', status: 'running' } });
-    expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^latest/i })).toBeInTheDocument();
     expect(screen.getByText(/no new findings · streaming/)).toBeInTheDocument();
   });
 });

@@ -40,7 +40,7 @@ describe('ReEvaluateCard up-to-date dimensions', () => {
     await waitFor(() => expect(document.querySelector('.eval-detected-line')).toHaveTextContent(/^3,892 source files/));
   });
 
-  it('starts from the last run\'s dimensions and says so', async () => {
+  it('enters with nothing selected, whatever the project ran last', async () => {
     const info = { name: 'demo', path: '/repos/myproj', location: 'local', ephemeral: false, evaluable: true, latestRunDimensions: ['reliability'] };
     const api = makeFakeApi({
       getProjectInfo: vi.fn().mockResolvedValue(info),
@@ -48,9 +48,10 @@ describe('ReEvaluateCard up-to-date dimensions', () => {
         { id: 'security', label: 'Security' }, { id: 'reliability', label: 'Reliability' },
       ] }]),
     });
-    renderCard({ project: 'p-lastrun', projectInfo: info, api });
-    await waitFor(() => expect(screen.getByRole('button', { name: /reliability/i })).toHaveAttribute('aria-pressed', 'true'));
+    renderCard({ project: 'p-none', projectInfo: info, api });
+    await waitFor(() => expect(screen.getByRole('button', { name: /reliability/i })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /reliability/i })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: /security/i })).toHaveAttribute('aria-pressed', 'false');
-    expect(document.querySelector('.eval-dims-counter')).toHaveTextContent('as your last run');
+    expect(document.querySelector('.eval-dims-counter')).toHaveTextContent('0 of 2 selected');
   });
 });

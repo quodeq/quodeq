@@ -28,19 +28,4 @@ describe('DimensionSelector up-to-date cards', () => {
     expect(screen.getByRole('button', { name: /security/i })).toHaveClass('eval-dim-card--selected');
     expect(screen.getByRole('button', { name: /accessibility/i })).not.toHaveClass('eval-dim-card--uptodate');
   });
-
-  it('says when the selection is the last run\'s', () => {
-    render(
-      <DimensionSelector
-        variant={DIMENSION_SELECTOR_VARIANT_TERMINAL}
-        allDimensions={DIMS}
-        selectedDims={new Set(['security'])}
-        onToggle={() => {}}
-        onSelectAll={() => {}}
-        onClearAll={() => {}}
-        seededFromLastRun
-      />,
-    );
-    expect(document.querySelector('.eval-dims-counter')).toHaveTextContent('1 of 2 selected · as your last run');
-  });
 });

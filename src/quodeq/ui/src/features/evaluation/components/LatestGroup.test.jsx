@@ -38,14 +38,16 @@ describe('LatestGroup', () => {
 
   it('an empty run shows just the header', () => {
     render(group({ liveViolations: {}, isRunning: true }));
-    expect(screen.getByRole('button', { name: /latest 10/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^latest/i })).toBeInTheDocument();
     expect(document.querySelector('.vticker-row')).toBeNull();
   });
 
   it('the header carries no count and each row shows the principle, then the title', () => {
     render(group({ liveViolations: { reliability: [f(1, 'Crash on nil')] }, isRunning: true }));
-    const header = screen.getByRole('button', { name: /latest 10/i });
+    const header = screen.getByRole('button', { name: /^latest/i });
     expect(header.querySelector('.vlive-dimension-count')).toBeNull();
+    // Not always ten rows, so the name carries no number.
+    expect(header.querySelector('.vlive-dimension-name')).toHaveTextContent(/^latest$/);
     const dim = document.querySelector('.vticker-row .vticker-dim');
     expect(dim).toHaveTextContent('Fault Tolerance');
     expect(dim).toHaveAttribute('title', 'reliability');
@@ -53,7 +55,7 @@ describe('LatestGroup', () => {
 
   it('closed, it keeps only the header', () => {
     render(group({ liveViolations: { security: [f(1, 'first')] }, isRunning: true, open: false }));
-    expect(screen.getByRole('button', { name: /latest 10/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /^latest/i })).toHaveAttribute('aria-expanded', 'false');
     expect(document.querySelector('.vticker-row')).toBeNull();
   });
 

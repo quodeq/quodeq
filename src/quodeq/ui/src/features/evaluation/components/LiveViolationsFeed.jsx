@@ -123,8 +123,8 @@ const DimensionGroup = memo(function DimensionGroup({ dim, violations, open, sca
   );
 });
 
-// "latest 10" starts open and every dimension closed. Several dimensions can
-// be open at once; opening one closes "latest 10", so one live list leads.
+// "latest" starts open and every dimension closed. Several dimensions can
+// be open at once; opening one closes "latest", so one live list leads.
 function useOpenDims() {
   const [openDims, setOpenDims] = useState(() => new Set());
   const [latestOpen, setLatestOpen] = useState(true);

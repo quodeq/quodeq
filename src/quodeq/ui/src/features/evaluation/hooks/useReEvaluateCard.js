@@ -62,11 +62,11 @@ export function useReEvaluateCard(project, onStart, projectInfo, preselectDims) 
   const { branch, setBranch, scopePath, setScopePath, timeLimitS, setTimeLimitS } = useReEvalScope(project);
   const { isLocal, scanData, estimates, estimatesLoading } = useReEvalScan(project, info);
 
-  const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan, seededFromLastRun } =
-    useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail: showToast, preselectDims, fallbackDims: info?.latestRunDimensions, project, timeLimitS });
+  const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
+    useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail: showToast, preselectDims, project, timeLimitS });
 
   return {
-    info, error, retry, allDimensions, selectedDims, seededFromLastRun,
+    info, error, retry, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     isLocal, scanData, estimates, estimatesLoading, branch, setBranch, scopePath, setScopePath,
