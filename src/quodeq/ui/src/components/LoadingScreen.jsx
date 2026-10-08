@@ -17,6 +17,16 @@ const TIP_KEYS = [
   'loading.tips.duel', 'loading.tips.standards', 'loading.tips.customStandard',
   'loading.tips.prReview', 'loading.tips.ollama', 'loading.tips.monorepo',
   'loading.tips.shared',
+  'loading.tips.shareInvite', 'loading.tips.shareSecondMachine',
+  'loading.tips.shareBareRepo', 'loading.tips.shareUpdate',
+  'loading.tips.sharePublishedBy', 'loading.tips.shareLocation',
+  'loading.tips.sharePullCopy', 'loading.tips.shareAssistant',
+  'loading.tips.shareCompare', 'loading.tips.shareDisconnect',
+  'loading.tips.githubSignIn', 'loading.tips.testAccess',
+  'loading.tips.exportZip', 'loading.tips.fetchLatest',
+  'loading.tips.cancelKeep', 'loading.tips.timeLimit',
+  'loading.tips.dismissByType', 'loading.tips.trustModel', 'loading.tips.sarif',
+  'loading.tips.reviewDryRun',
 ];
 const LEADING_QUESTION = /^([^?]+\?)\s+(.+)$/s;
 
