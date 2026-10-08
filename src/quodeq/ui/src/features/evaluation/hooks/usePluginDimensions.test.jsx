@@ -243,6 +243,23 @@ describe('createDimensionCache', () => {
     warnSpy.mockRestore();
   });
 
+  it('returns a partial list when one source fails but does not cache it', async () => {
+    const cache = createDimensionCache();
+    const listPlugins = vi.fn().mockResolvedValue(plugins);
+    const listStandards = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue([]);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(await cache.load(listPlugins, listStandards)).toHaveLength(1);
+    expect(cache.get()).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
+
+    await cache.load(listPlugins, listStandards);
+    expect(listStandards).toHaveBeenCalledTimes(2);
+    expect(cache.get()).toHaveLength(1);
+
+    warnSpy.mockRestore();
+  });
+
   it('two instances do not share state', async () => {
     const a = createDimensionCache();
     const b = createDimensionCache();

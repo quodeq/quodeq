@@ -117,7 +117,11 @@ function StandardRowMain({
       tabIndex={0}
       aria-pressed={isVisible}
       onClick={() => onToggleVisibility(standard.id)}
-      onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggleVisibility(standard.id); } }}
+      onKeyDown={(e) => {
+        // Keys from the nested action buttons bubble here; leave them to the button.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggleVisibility(standard.id); }
+      }}
     >
       <div className="standards-cell standards-cell--name">
         <span className="standards-row-name">{standard.name}</span>

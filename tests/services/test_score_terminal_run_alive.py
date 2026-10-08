@@ -71,3 +71,14 @@ def test_a_stale_pid_reused_by_a_live_process_does_not_block_scoring(tmp_path, m
     score_terminal_run_once("ext-run", job, runner, str(tmp_path), claims=ScoringClaims())
 
     assert runner.submitted == ["score-ext-run"]
+
+
+def test_a_plain_dict_job_is_scored(tmp_path):
+    """Some providers return a plain dict snapshot; getattr would read it as no status."""
+    _cancelled_run(tmp_path, _dead_pid())
+    job = {"status": JobStatus.CANCELLED, "output_project": "proj", "output_run_id": "run"}
+    runner = _Runner()
+
+    score_terminal_run_once("ext-run", job, runner, str(tmp_path), claims=ScoringClaims())
+
+    assert runner.submitted == ["score-ext-run"]

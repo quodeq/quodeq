@@ -48,12 +48,23 @@ export function createDimensionCache() {
   let refreshPromise = null;
   function load(listPlugins, listStandards) {
     if (cachePromise) return cachePromise;
-    cachePromise = Promise.all([
-      listPlugins().catch(() => []),
-      listStandards().catch(() => []),
+    let partial = false;
+    const degrade = (what) => (err) => {
+      console.warn(`Failed to load ${what}:`, err);
+      partial = true;
+      return [];
+    };
+    const promise = Promise.all([
+      listPlugins().catch(degrade('plugins')),
+      listStandards().catch(degrade('standards')),
     ]).then(([plugins, standards]) => {
-      const seen = deduplicateDimensions(plugins, standards);
-      cachedDimensions = [...seen.values()];
+      const dimensions = [...deduplicateDimensions(plugins, standards).values()];
+      // A partial list is shown but not cached, so the next mount retries.
+      if (partial) {
+        if (cachePromise === promise) cachePromise = null;
+        return dimensions;
+      }
+      cachedDimensions = dimensions;
       return cachedDimensions;
     }).catch((err) => {
       console.warn('Failed to load dimensions:', err);
@@ -68,7 +79,8 @@ export function createDimensionCache() {
       // than silently showing an empty dimension list.
       throw err;
     });
-    return cachePromise;
+    cachePromise = promise;
+    return promise;
   }
   function invalidate() {
     cachedDimensions = null;
