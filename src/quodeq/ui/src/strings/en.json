@@ -372,6 +372,7 @@
   "evaluate.busyResumeSetup": "An evaluation is in progress. Cancel it before resuming setup.",
   "evaluate.busyStartTour": "An evaluation is in progress. Cancel it before starting the tour.",
   "evaluate.cancelBody": "The run will stop. Choose what happens to findings collected so far.",
+  "evaluate.cancelBodyExternal": "This run was started outside the app, by CI or a terminal. Stopping it ends that job too.",
   "evaluate.cancelBtn": "cancel",
   "evaluate.stopBtn": "stop",
   "evaluate.runningAria": "running",

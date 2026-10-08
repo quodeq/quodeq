@@ -33,6 +33,7 @@ import { LOCAL_API_PROVIDERS } from "../../../vocab/provider.js";
 import { useEvaluationQueries } from "./useEvaluationQueries.js";
 import { useEvaluationMutations } from "./useEvaluationMutations.js";
 import { ADOPT_POLL_MS } from "./useEvaluation.helpers.js";
+import { JOB_SOURCE } from "../../../vocab/jobStatus.js";
 
 // Re-exported for the existing importers; the set itself lives in vocab/provider.js
 // so the Evaluate header resolves unset limits exactly like the start payload.
@@ -83,15 +84,16 @@ function useResumeRunningJob(api, queryClient, jobId, setJobId, setJobError) {
 // `confirm` is injectable so a different presentation can drive the same
 // rule. Guarded with a typeof check because callers commonly wire this
 // straight to onClick, whose event argument must not shadow the default.
-function useCancelEvaluationCallback(cancelMutation) {
+function useCancelEvaluationCallback(cancelMutation, job) {
+  const external = job?.source === JOB_SOURCE.EXTERNAL;
   return useCallback(async (options) => {
     const confirm = typeof options?.confirm === "function"
       ? options.confirm
-      : confirmCancelEvaluation;
+      : () => confirmCancelEvaluation(undefined, { external });
     const choice = await confirm();
     if (!choice) return;
     cancelMutation.mutate({ discard: choice === CANCEL_CHOICE.DISCARD });
-  }, [cancelMutation]);
+  }, [cancelMutation, external]);
 }
 
 function useClearJobCallback(jobId, queryClient, setJobId, setJobError, setStartedProject) {
@@ -142,7 +144,7 @@ export function useEvaluation() {
     (input) => startMutation.mutateAsync(input),
     [startMutation],
   );
-  const cancelEvaluation = useCancelEvaluationCallback(cancelMutation);
+  const cancelEvaluation = useCancelEvaluationCallback(cancelMutation, job);
   const clearJob = useClearJobCallback(jobId, queryClient, setJobId, setJobError, setStartedProject);
 
   return {
