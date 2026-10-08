@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import { parseFileRef } from '../../../utils/formatters.js';
 import { staggerDelayStyle } from '../../../utils/animation.js';
-import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import DetailSkeleton from '../../../components/DetailSkeleton.jsx';
 import { RefLinks } from '../../../components/findingDetail.jsx';
@@ -74,7 +73,7 @@ function ViolationDetail({ item }) {
       {item.detailUnavailable && (
         <p className="vlive-detail-reason vlive-detail-reason--unavailable">{t('explorer.detailUnavailable')}</p>
       )}
-      {!item.detailDeferred && <ContextBlock context={item.context} snippet={item.snippet} scope={item.scope} line={item.line} />}
+      {!item.detailDeferred && <ContextBlock context={item.context} snippet={item.snippet} scope={item.scope} line={item.line} file={item.file} />}
     </div>
   );
 }
@@ -89,7 +88,7 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
       <div className="vdetail-row-main">
         <SevBadge level={v.severity} format="long" />
         <span className="vrow-label">[{v.principle || principle}]</span>
-        {filename && <FileCopyBtn display={display} copyText={ref} />}
+        {filename && <span className="vlive-detail-file" title={ref}>{display}</span>}
         <ViolationActions v={v} principle={v.principle || principle} onDismiss={onDismiss} />
       </div>
       <ViolationDetail item={v} />
@@ -107,7 +106,7 @@ export function ComplianceCard({ c, principle, index }) {
       <div className="vdetail-row-main">
         <span className="term-sev-badge term-sev-badge--compliant">{t('explorer.compliantBadge')}</span>
         <span className="vrow-label">[{c.principle || principle}]</span>
-        {filename && <FileCopyBtn display={display} copyText={ref} />}
+        {filename && <span className="vlive-detail-file" title={ref}>{display}</span>}
       </div>
       <ViolationDetail item={c} />
     </div>

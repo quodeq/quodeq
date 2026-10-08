@@ -54,7 +54,7 @@ export function FindingDetailBody({ v }) {
       {v.detailUnavailable && (
         <p className="vlive-detail-reason vlive-detail-reason--unavailable">{t('explorer.detailUnavailable')}</p>
       )}
-      {!v.detailDeferred && <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} />}
+      {!v.detailDeferred && <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} file={v.file} />}
     </div>
   );
 }

@@ -831,31 +831,21 @@ button.term-sev-badge--clickable:focus-visible {
   color: var(--color-text-muted);
 }
 
-/* ---------- Code block + "-- see code · N lines" affordance ---------- */
-.vlive-detail--terminal .scope-bar {
+/* ---------- Code block under its editor-tab strip ---------- */
+.vlive-detail--terminal .code-tab {
+  border: var(--term-border);
+  border-radius: var(--term-radius);
+  margin-top: var(--term-space-1);
+}
+.vlive-detail--terminal .code-tab-head {
   font-family: var(--term-font-mono);
   font-size: 11px;
-  color: var(--color-text-muted);
-  padding: var(--term-space-1) 0;
-  background: transparent;
-  border: 0;
 }
-.vlive-detail--terminal .scope-bar-chevron {
-  display: none;
-}
-.vlive-detail--terminal .scope-bar-label::before {
-  content: '-- ';
-  opacity: 0.55;
-  margin-right: 2px;
-}
-.vlive-detail--terminal .scope-bar-code {
+.vlive-detail--terminal .code-tab .scope-bar-code {
   font-family: var(--term-font-mono);
   font-size: 12px;
   background: var(--color-surface);
-  border: var(--term-border);
-  border-radius: var(--term-radius);
   padding: var(--term-space-2) 0;
-  margin-top: var(--term-space-1);
   overflow: auto;
 }
 .vlive-detail--terminal .ctx-line {
