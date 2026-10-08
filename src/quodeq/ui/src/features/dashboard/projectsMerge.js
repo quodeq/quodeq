@@ -6,16 +6,9 @@
  */
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 import { PROJECT_ACTION } from './dashboardVocab.js';
+import { normalizeOriginUrl } from '../../utils/projectIdentity.js';
 
-const GIT_SUFFIX_LENGTH = 4; // ".git"
-
-export function normalizeOriginUrl(url) {
-  if (!url) return null;
-  let u = String(url).trim();
-  if (u.endsWith('/')) u = u.slice(0, -1);
-  if (u.endsWith('.git')) u = u.slice(0, -GIT_SUFFIX_LENGTH);
-  return u || null;
-}
+export { normalizeOriginUrl };
 
 function toMs(value) {
   if (value == null) return null;

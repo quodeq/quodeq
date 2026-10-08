@@ -25,6 +25,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.run.job_status import is_external_job_id
 from quodeq.core.types import EvalPending, ViolationResponse, ViolationSummary
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services import fs_projects, fs_reports
@@ -172,8 +173,10 @@ class FilesystemActionProvider(ActionProvider):
         are removed so no view (Overview fallback, History, status GET) can
         surface the discarded run again.
         """
+        hint = self._evaluations.get_log_run_dir(job_id) if is_external_job_id(job_id) else None
         ok = self._eval_handler.cancel_evaluation(
-            job_id, reports_dir=reports_dir, discard_partial=discard_partial, wait_for_exit=wait_for_exit,
+            job_id, reports_dir=reports_dir, discard_partial=discard_partial,
+            wait_for_exit=wait_for_exit, run_dir_hint=hint,
         )
         if not ok:
             ok = self._evaluations.promote_stale_to_cancelled(job_id, reports_dir=reports_dir)

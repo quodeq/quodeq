@@ -10,6 +10,9 @@ import { t } from "../../../strings/index.js";
 import { STREAM_STATE } from "./runEventSourceRegistry.js";
 
 export const JOB_POLL_MS = 1500;
+// While no run is held, how often to check for one that started elsewhere
+// (the nightly, a PR review, a terminal run).
+export const ADOPT_POLL_MS = 15_000;
 // The status query still refetches, slowly, as a safety net against a frame
 // the stream dropped or a server that never sent one.
 export const SSE_STATUS_SAFETY_NET_MS = 10_000;

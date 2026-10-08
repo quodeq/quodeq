@@ -22,12 +22,16 @@ export const CANCEL_CHOICE = Object.freeze({ PRESERVE: 'preserve', DISCARD: 'dis
  * destructive option ('discard') is rendered red; 'keep' and 'dismiss' are
  * neutral so they don't compete visually.
  *
+ * A run the app did not start (`external`) says that stopping it also ends
+ * the CI job or terminal command it belongs to.
+ *
+ * @param {{ external?: boolean }} [options]
  * @returns {{ title: string, message: string, cancelLabel: string, actions: Array<{key: string, label: string, variant: string}> }}
  */
-export function buildCancelEvaluationDialog() {
+export function buildCancelEvaluationDialog({ external = false } = {}) {
   return {
     title: t('evaluate.cancelTitle'),
-    message: t('evaluate.cancelBody'),
+    message: external ? t('evaluate.cancelBodyExternal') : t('evaluate.cancelBody'),
     cancelLabel: t('evaluate.keepRunning'),
     actions: [
       { key: CANCEL_CHOICE.PRESERVE, label: t('evaluate.keepFindings'), variant: DIALOG_VARIANT.DEFAULT },
@@ -41,8 +45,9 @@ export function buildCancelEvaluationDialog() {
  *
  * @param {(spec: Object) => Promise<string|null>} [choose] dialog runner
  *   (injectable for tests; defaults to the DOM chooseDialog).
+ * @param {{ external?: boolean }} [options] see buildCancelEvaluationDialog
  * @returns {Promise<'preserve'|'discard'|null>} null means "keep running".
  */
-export function confirmCancelEvaluation(choose = chooseDialog) {
-  return choose(buildCancelEvaluationDialog());
+export function confirmCancelEvaluation(choose = chooseDialog, options = {}) {
+  return choose(buildCancelEvaluationDialog(options));
 }

@@ -39,12 +39,17 @@ function progressCell({ overallPct, takenFiles, totalFiles }) {
   };
 }
 
-function elapsedCell(elapsedS, label = 'ELAPSED', hint = null) {
+// A run stopped at its time limit ends a few seconds past it while it
+// winds down; only time well past the budget is an overrun.
+const OVERRUN_GRACE_S = 60;
+
+// A run past its time budget (budgetS > 0) is flagged in the warning tone.
+function elapsedCell(elapsedS, label = 'ELAPSED', hint = null, budgetS = 0) {
   return {
     label,
     value: formatDuration(elapsedS),
     hint,
-    tone: CELL_TONE.DEFAULT,
+    tone: budgetS > 0 && elapsedS > budgetS + OVERRUN_GRACE_S ? CELL_TONE.WARNING : CELL_TONE.DEFAULT,
   };
 }
 
@@ -86,9 +91,10 @@ function buildDoneCells(inputs) {
       hint: filesHintFor(inputs.scanMode),
       tone: CELL_TONE.DEFAULT,
     },
-    foundCell(inputs.liveCount, t('evaluate.newViolationsLabel'), formatSevHint(inputs.sevCounts)),
+    foundCell(inputs.liveCount, t('evaluate.newViolationsLabel'), formatSevHint(inputs.sevCounts, t('evaluate.noneFound'))),
     elapsedCell(inputs.elapsedS, t('evaluate.durationLabel'),
-      inputs.budgetS > 0 ? t('evaluate.ofBudget', { budget: formatDurationCoarse(inputs.budgetS) }) : t('evaluate.totalHint')),
+      inputs.budgetS > 0 ? t('evaluate.ofBudget', { budget: formatDurationCoarse(inputs.budgetS) }) : t('evaluate.totalHint'),
+      inputs.budgetS),
   ];
 }
 
@@ -96,7 +102,7 @@ function buildDoneCells(inputs) {
 // changed; no hint until the mode is known.
 function filesHintFor(scanMode) {
   if (scanMode === SCAN_MODE.CLEAN) return t('evaluate.filesHint');
-  if (scanMode === SCAN_MODE.INCREMENTAL) return t('evaluate.changedFilesHint');
+  if (scanMode === SCAN_MODE.INCREMENTAL || scanMode === SCAN_MODE.DIFF) return t('evaluate.changedFilesHint');
   return null;
 }
 
@@ -133,7 +139,7 @@ function buildRunningCells(inputs) {
     // This run's new findings only: suppressed and carried-forward ones are
     // not what the run found, and the feed below says the rest.
     foundCell(inputs.liveCount, t('evaluate.newViolationsLabel'), formatSevHint(inputs.sevCounts)),
-    elapsedCell(inputs.elapsedS, 'elapsed', elapsedHint),
+    elapsedCell(inputs.elapsedS, 'elapsed', elapsedHint, inputs.budgetS),
   ];
 }
 
@@ -153,7 +159,7 @@ function buildRunningCells(inputs) {
  * @param {string|null} [inputs.scanMode] — from deriveScanMode (running only)
  * @param {number} [inputs.dimsDone] — dimensions finished (done only)
  * @param {number} [inputs.dimsTotal] — dimensions in the run (done only)
- * @param {number} [inputs.budgetS] — the run's time budget in seconds; 0 or absent = unlimited (running only)
+ * @param {number} [inputs.budgetS] — the run's time budget in seconds; 0 or absent = unlimited; time past it is flagged
  * @returns {Array<{label,value,hint,tone,trailing?}>} exactly 4 cells.
  */
 export function buildJobStatCells(status, inputs) {

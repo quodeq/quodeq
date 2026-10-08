@@ -33,3 +33,6 @@ class JobSnapshot:
     ai_model: str | None = None
     # Run budget in seconds. 0 = explicitly unlimited, None = unknown.
     time_limit_s: int | None = None
+    # The commit the run evaluates, and the git origin of its project folder.
+    commit_sha: str | None = None
+    origin_url: str | None = None

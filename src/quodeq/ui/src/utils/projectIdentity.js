@@ -33,3 +33,39 @@ export function projectIdOrSelf(entry) {
 export function findProject(projects, key) {
   return projects?.find((p) => projectId(p) === key) || null;
 }
+
+const GIT_SUFFIX = '.git';
+
+/**
+ * One canonical form for the equivalent spellings of a git remote (https,
+ * ssh, scp-like `git@host:path`, userinfo, trailing `.git` or `/`), so a
+ * project registered over SSH matches a CI checkout over https. A UI-side
+ * comparison key only: it is wider than the backend's
+ * `shared/repo.py:normalize_remote_url` (it also drops http/git schemes and
+ * lowercases), so never send it to the server as an identity.
+ * @param {string|null|undefined} url
+ * @returns {string|null} e.g. `github.com/owner/repo`, or null when blank
+ */
+export function normalizeOriginUrl(url) {
+  let u = String(url ?? '').trim();
+  if (!u) return null;
+  u = u.replace(/^[a-z+]+:\/\//i, '');
+  u = u.replace(/^[^@/]+@/, '');
+  u = u.replace(/^([^/:]+):(?!\d)/, '$1/');
+  u = u.replace(/\/+$/, '');
+  if (u.toLowerCase().endsWith(GIT_SUFFIX)) u = u.slice(0, -GIT_SUFFIX.length);
+  return u.toLowerCase() || null;
+}
+
+/**
+ * The project whose git origin is the same repository as `url`: how a run
+ * filed under a throwaway project (a PR review) finds the project it reviews.
+ * @param {Array<{originUrl?: string|null}>|null|undefined} projects
+ * @param {string|null|undefined} url
+ * @returns {object|null}
+ */
+export function findProjectByOrigin(projects, url) {
+  const key = normalizeOriginUrl(url);
+  if (!key) return null;
+  return projects?.find((p) => normalizeOriginUrl(p.originUrl) === key) || null;
+}

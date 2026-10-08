@@ -1639,6 +1639,23 @@ button.eval-provider-badge--clickable:focus-visible {
   text-align: left;
 }
 .vlive-dimension-label:hover { color: var(--color-text); }
+/* A diff-review dimension with no findings: a header with nothing to open. */
+.vlive-dimension-label--static { cursor: default; }
+.vlive-dimension-label--static:hover { color: var(--color-text-muted); }
+.vlive-dimension-status {
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
+  font-weight: var(--weight-regular);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+}
+.vlatest-empty {
+  padding: 10px 16px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
 .vlive-dimension-label:focus-visible {
   outline: 1px solid var(--color-accent);
   outline-offset: 2px;
@@ -2565,28 +2582,6 @@ button.eval-provider-badge--clickable:focus-visible {
 /* Legend under the coverage bar. */
 
 
-/* Footer: run summary left, detail/console toggles right. */
-.scan-progress__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 14px;
-  padding-top: 13px;
-  border-top: 1px solid var(--color-border-soft, var(--color-border));
-}
-.scan-progress__foot-summary {
-  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.scan-progress__foot-summary strong {
-  color: var(--color-text);
-  font-weight: 500;
-}
-
 .scan-progress__actions {
   display: inline-flex;
   align-items: center;
@@ -3045,6 +3040,26 @@ button.eval-provider-badge--clickable:focus-visible {
   font-weight: 600;
   color: var(--color-accent);
   vertical-align: middle;
+}
+
+/* A run this app did not start: a quiet label after the status mark. */
+.eval-run-tag {
+  margin-left: 10px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  vertical-align: middle;
+}
+
+/* A PR review's end: its results live on the pull request. */
+.eval-review-posted {
+  margin: 12px 0 0;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 /* ── Pill buttons: stop, details, console (quiet) ── */

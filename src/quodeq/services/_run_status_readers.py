@@ -17,7 +17,7 @@ from pathlib import Path
 from quodeq.core.run.job_status import is_external_job_id
 from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.core.types.job import JobSnapshot
-from quodeq.services.wiring import read_run_state, read_run_status_json, tail_run_log  # noqa: F401
+from quodeq.services.wiring import read_repository_info, read_run_state, read_run_status_json, tail_run_log  # noqa: F401
 from quodeq.services.wiring import run_index as _run_index
 
 
@@ -80,6 +80,19 @@ def _provider_model_from_data(data: dict | None) -> tuple[str | None, str | None
     )
 
 
+def _commit_from_data(data: dict | None) -> str | None:
+    """Extract commit_sha from parsed status.json data."""
+    val = (data or {}).get("commit_sha")
+    return val if isinstance(val, str) and val else None
+
+
+def read_origin_url(run_dir: Path) -> str | None:
+    """The git origin of the project folder that holds *run_dir*, or None."""
+    info = read_repository_info(run_dir.parent)
+    url = info.get("originUrl") if isinstance(info, dict) else None
+    return url if isinstance(url, str) and url else None
+
+
 def read_dimensions_from_status(run_dir: Path) -> list[str] | None:
     """Read the `dimensions` list from status.json, or None if unavailable.
 
@@ -119,8 +132,8 @@ def read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | No
 
 def _read_enriched_status_fields(
     run_dir: Path, *, with_logs: bool = True,
-) -> tuple[list[str], list[str] | None, str | None, str | None, str | None, int | None]:
-    """Best-effort read of (logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s).
+) -> tuple[list[str], list[str] | None, str | None, str | None, str | None, int | None, str | None]:
+    """Best-effort read of (logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s, commit_sha).
 
     Reads and parses status.json once, deriving all four status-backed
     fields from the same dict instead of four independent reads. With
@@ -140,7 +153,7 @@ def _read_enriched_status_fields(
     deadline_at = _deadline_from_data(data)
     ai_provider, ai_model = _provider_model_from_data(data)
     time_limit_s = _time_limit_from_data(data)
-    return logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s
+    return logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s, _commit_from_data(data)
 
 
 def build_job_snapshot(row: "_run_index.RunRow", *, with_logs: bool = True) -> JobSnapshot:
@@ -156,10 +169,13 @@ def build_job_snapshot(row: "_run_index.RunRow", *, with_logs: bool = True) -> J
     ai_provider: str | None = None
     ai_model: str | None = None
     time_limit_s: int | None = None
+    commit_sha: str | None = None
+    origin_url: str | None = None
     if row.run_dir:
-        logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s = (
+        logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s, commit_sha = (
             _read_enriched_status_fields(Path(row.run_dir), with_logs=with_logs)
         )
+        origin_url = read_origin_url(Path(row.run_dir))
     return JobSnapshot(
         job_id=row.job_id,
         status=row.state,
@@ -180,4 +196,6 @@ def build_job_snapshot(row: "_run_index.RunRow", *, with_logs: bool = True) -> J
         ai_provider=ai_provider,
         ai_model=ai_model,
         time_limit_s=time_limit_s,
+        commit_sha=commit_sha,
+        origin_url=origin_url,
     )

@@ -10,5 +10,7 @@
  * (buildScanPayload) and read-only views that derive "is clean" from it
  * (ReEvaluateCard, ReEvaluateCardParts).
  */
-export const SCAN_MODE = Object.freeze({ INCREMENTAL: 'incremental', CLEAN: 'clean' });
+// DIFF is a run that only reviews a diff (a PR review in CI): never a
+// choice on the setup card, only what deriveScanMode reports for such a run.
+export const SCAN_MODE = Object.freeze({ INCREMENTAL: 'incremental', CLEAN: 'clean', DIFF: 'diff' });
 export const CLEAN_PERSIST = Object.freeze({ OFF: 'off', ONCE: 'once', PERMANENT: 'permanent' });

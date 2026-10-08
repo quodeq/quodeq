@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { projectKeys } from '../api/queryKeys.js';
 import { invalidateProjects } from './invalidateProjects.js';
-import { JOB_STATUS } from '../vocab/jobStatus.js';
+import { JOB_SOURCE, JOB_STATUS } from '../vocab/jobStatus.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 
@@ -14,7 +14,10 @@ export function useJobCompletionEffect({ job, navTab, queryClient, selectedProje
   const prevJobRef = useRef(null);
   const refreshedRunRef = useRef(null);
   useEffect(() => {
-    if (job?.status === JOB_STATUS.RUNNING && !prevJobRef.current) navTab(NAV_TAB.EVALUATE);
+    // A run the app did not start (CI, terminal) is adopted in the
+    // background: it never moves the user to another tab.
+    const external = job?.source === JOB_SOURCE.EXTERNAL;
+    if (job?.status === JOB_STATUS.RUNNING && !prevJobRef.current && !external) navTab(NAV_TAB.EVALUATE);
     // Auto-refresh dashboard data as soon as the run completes
     const finished = job && job.status !== JOB_STATUS.RUNNING && job.outputProject && job.outputRunId;
     if (finished && refreshedRunRef.current !== job.outputRunId) {
@@ -51,9 +54,11 @@ export function useJobCompletionEffect({ job, navTab, queryClient, selectedProje
       // project B into project A the moment A's background run finished,
       // without any nav reset. The evaluate card's "view results" button
       // remains the explicit way to jump to another project's results.
-      if (!selectedProject || job.outputProject === selectedProject) {
-        selectProjectAndRun(job.outputProject, job.outputRunId);
-      }
+      // An external run never fills an empty selection either: a PR
+      // review's project is a throwaway, and a nightly finishing at night
+      // must not change what the user was looking at.
+      const ownsSelection = external ? job.outputProject === selectedProject : (!selectedProject || job.outputProject === selectedProject);
+      if (ownsSelection) selectProjectAndRun(job.outputProject, job.outputRunId);
     }
     prevJobRef.current = job;
   }, [job]); // eslint-disable-line react-hooks/exhaustive-deps

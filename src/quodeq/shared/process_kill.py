@@ -95,3 +95,52 @@ def kill_proc_tree(proc: Any) -> None:
         proc.kill()
     except (ProcessLookupError, OSError, AttributeError) as exc:
         _logger.debug("process %s already gone: %s", pid, exc)
+
+
+def _descendants(pid: int) -> list[int]:
+    """POSIX: every live descendant of *pid*, from one ``ps`` snapshot; [] if ps fails."""
+    try:
+        out = subprocess.run(
+            ["ps", "-axo", "pid=,ppid="], capture_output=True, text=True, encoding="utf-8", timeout=_TERMINATE_TIMEOUT_S,
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        _logger.debug("ps failed listing descendants of %s: %s", pid, exc)
+        return []
+    children: dict[int, list[int]] = {}
+    for line in out.splitlines():
+        match line.split():
+            case [child, parent] if child.isdigit() and parent.isdigit():
+                children.setdefault(int(parent), []).append(int(child))
+    found: list[int] = []
+    stack = list(children.get(pid, []))
+    while stack:
+        child = stack.pop()
+        found.append(child)
+        stack.extend(children.get(child, []))
+    return found
+
+
+def kill_external_tree(pid: int, sig: int = signal.SIGTERM) -> None:
+    """Kill a process someone else started, and its descendants, never its launcher.
+
+    ``kill_tree`` signals the whole process group. That is only safe when
+    *pid* leads its own group. A ``quodeq evaluate`` run as a CI step shares
+    the group of the runner service that launched it, so a group kill would
+    stop the runner. Then the process and its descendants are signalled one
+    by one. Windows' ``taskkill /T`` already kills only the tree.
+    """
+    if sys.platform == PLATFORM_WIN32:
+        kill_tree(pid, sig)
+        return
+    try:
+        leads_group = os.getpgid(pid) == pid
+    except (ProcessLookupError, OSError):
+        leads_group = False
+    if leads_group:
+        kill_tree(pid, sig)
+        return
+    for target in [*_descendants(pid), pid]:
+        try:
+            os.kill(target, sig)
+        except (ProcessLookupError, OSError) as exc:
+            _logger.debug("process %s already gone: %s", target, exc)

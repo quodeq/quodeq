@@ -40,6 +40,27 @@ def _run_ref(job: JobSnapshot) -> dict[str, str | None]:
     return {"outputProject": job.output_project, "outputRunId": job.output_run_id}
 
 
+def _cancel_run_dir(
+    reports_dir: str | None, job: object, run_dir_hint: Path | None,
+) -> tuple[Path | None, bool]:
+    """The run folder a cancel works on, and whether it lies outside *reports_dir*.
+
+    A job cancelled before the report_path marker landed has no
+    output_project/output_run_id yet: no run dir to wait on, score, discard,
+    or hand to cancel_job as its ext- lookup hint. A run outside the reports
+    folder (a PR review in $RUNNER_TEMP, found through its index row) belongs
+    to whoever started it: the app neither scores nor discards it.
+    """
+    run_dir: Path | None = None
+    project = getattr(job, "output_project", None)
+    run_id = getattr(job, "output_run_id", None)
+    if reports_dir and project and run_id:
+        run_dir = Path(reports_dir) / project / run_id
+    if (run_dir is None or not run_dir.is_dir()) and run_dir_hint is not None and run_dir_hint.is_dir():
+        return run_dir_hint, True
+    return run_dir, False
+
+
 class FsEvaluationMixin:
     """Evaluation lifecycle collaborator: start, status, cancel, score.
 
@@ -181,6 +202,7 @@ class FsEvaluationMixin:
     def cancel_evaluation(
         self, job_id: str, reports_dir: str | None = None,
         *, discard_partial: bool = False, wait_for_exit: bool = False,
+        run_dir_hint: Path | None = None,
     ) -> bool:
         """Cancel a running evaluation job; score completed dims unless discarding.
 
@@ -213,14 +235,9 @@ class FsEvaluationMixin:
         """
         reports_root = Path(reports_dir) if reports_dir else None
         job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
-        # A job cancelled before the report_path marker landed has no
-        # output_project/output_run_id yet — there is no run dir to wait on,
-        # score, discard, or hand to cancel_job as its ext- lookup hint.
-        run_dir: Path | None = None
-        if reports_dir and job and job.output_project and job.output_run_id:
-            run_dir = Path(reports_dir) / job.output_project / job.output_run_id
+        run_dir, outside = _cancel_run_dir(reports_dir, job, run_dir_hint)
         on_exit = None
-        if run_dir is not None and not discard_partial:
+        if run_dir is not None and not discard_partial and not outside:
             ref = _run_ref(job)
 
             def on_exit() -> None:
@@ -235,7 +252,7 @@ class FsEvaluationMixin:
         )
         if ok and run_dir is not None:
             wait_for_terminal_status(run_dir)
-            if discard_partial:
+            if discard_partial and not outside:
                 discard_run_state(reports_dir, _run_ref(job))
         return ok
 

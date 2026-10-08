@@ -30,3 +30,24 @@ test('an unlimited finished run says total, and zero violations is not alarming'
   assert.equal(duration.hint, 'total');
   assert.notEqual(found.tone, 'critical');
 });
+
+test('time past the budget is flagged, running or finished', () => {
+  const [, , , duration] = buildJobStatCells('done', { ...base, elapsedS: 700 });
+  assert.equal(duration.tone, 'warning');
+  const running = buildJobStatCells('running', { ...base, elapsedS: 700 }).at(-1);
+  assert.equal(running.tone, 'warning');
+  const inBudget = buildJobStatCells('done', base).at(-1);
+  assert.equal(inBudget.tone, 'default');
+  const unlimited = buildJobStatCells('done', { ...base, budgetS: 0, elapsedS: 99999 }).at(-1);
+  assert.equal(unlimited.tone, 'default');
+});
+
+test('a run stopped at its time limit, a few seconds past it, is not flagged', () => {
+  const [, , , duration] = buildJobStatCells('done', { ...base, elapsedS: 620 });
+  assert.equal(duration.tone, 'default');
+});
+
+test('a finished run with no new violations says none, not none yet', () => {
+  const [, , found] = buildJobStatCells('done', { ...base, liveCount: 0, sevCounts: {} });
+  assert.equal(found.hint, 'none');
+});

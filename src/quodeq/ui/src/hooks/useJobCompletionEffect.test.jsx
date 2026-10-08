@@ -34,3 +34,27 @@ describe('useJobCompletionEffect project-list refresh', () => {
     expect(listCalls).toHaveLength(1);
   });
 });
+
+describe('useJobCompletionEffect and runs the app did not start', () => {
+  it('an adopted external run does not move the user to Evaluate', () => {
+    const { props } = renderEffect({ status: JOB_STATUS.RUNNING, source: 'external' });
+    expect(props.navTab).not.toHaveBeenCalled();
+  });
+
+  it('a run the app started still opens Evaluate', () => {
+    const { props } = renderEffect({ status: JOB_STATUS.RUNNING, source: 'internal' });
+    expect(props.navTab).toHaveBeenCalled();
+  });
+
+  it('a finished external run does not change an empty selection', () => {
+    const { props } = renderEffect({ status: JOB_STATUS.DONE, source: 'external', outputProject: 'pr-tmp', outputRunId: 'r1' });
+    expect(props.selectProjectAndRun).not.toHaveBeenCalled();
+  });
+
+  it('a finished external run on the selected project still selects its run', () => {
+    const queryClient = new QueryClient();
+    const props = { job: { status: JOB_STATUS.DONE, source: 'external', outputProject: 'p1', outputRunId: 'r1' }, navTab: vi.fn(), queryClient, selectedProject: 'p1', selectProjectAndRun: vi.fn() };
+    renderHook((p) => useJobCompletionEffect(p), { initialProps: props });
+    expect(props.selectProjectAndRun).toHaveBeenCalledWith('p1', 'r1');
+  });
+});

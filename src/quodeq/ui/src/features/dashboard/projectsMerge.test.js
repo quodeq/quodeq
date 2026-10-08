@@ -4,9 +4,17 @@ import { mergeProjects, deriveAction, normalizeOriginUrl } from './projectsMerge
 
 describe('normalizeOriginUrl', () => {
   it('trims .git suffix and trailing slash', () => {
-    assert.equal(normalizeOriginUrl('https://x/y.git'), 'https://x/y');
-    assert.equal(normalizeOriginUrl('https://x/y/'), 'https://x/y');
+    assert.equal(normalizeOriginUrl('https://x/y.git'), 'x/y');
+    assert.equal(normalizeOriginUrl('https://x/y/'), 'x/y');
     assert.equal(normalizeOriginUrl(null), null);
+  });
+
+  it('folds the ssh and https spellings of one repo together', () => {
+    const merged = mergeProjects(
+      [{ id: 'local-1', name: 'app', originUrl: 'git@github.com:org/app.git' }],
+      [{ id: 'shared-9', name: 'app', originUrl: 'https://github.com/org/app' }],
+    );
+    assert.equal(merged.length, 1);
   });
 });
 
