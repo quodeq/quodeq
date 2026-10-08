@@ -2927,6 +2927,16 @@ button.eval-provider-badge--clickable:focus-visible {
   animation: eval-pulse 1.6s ease-in-out infinite;
 }
 
+/* A finished run: the running dot settles into a still check. */
+.eval-run-check {
+  margin-left: 8px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+  vertical-align: middle;
+}
+
 /* ── Pill buttons: stop, details, console (quiet) ── */
 .eval-pill-btn {
   display: inline-flex;
@@ -3485,6 +3495,8 @@ button.eval-provider-badge--clickable:focus-visible {
 .eval-scan-pill:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .eval-scan-pill:disabled { opacity: 0.35; cursor: not-allowed; }
 .eval-scan-pill__glyph { font-size: 10px; }
+/* The header's view results: the same filled pill, sized to the title row. */
+.eval-scan-pill--sm { height: 28px; padding: 0 14px; font-size: 11px; }
 .eval-scan-pill__count {
   padding-left: 9px;
   border-left: 1px solid color-mix(in srgb, var(--color-on-accent) 35%, transparent);

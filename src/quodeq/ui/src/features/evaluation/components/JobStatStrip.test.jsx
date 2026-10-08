@@ -48,15 +48,15 @@ describe('JobStatStrip', () => {
     expect(screen.getByText('1 critical · 1 major')).toBeInTheDocument();
   });
 
-  it('renders SCANNED + VIOLATIONS + DURATION for a done job', async () => {
+  it('renders the settled tiles for a done job', async () => {
     getEvaluationProgress.mockResolvedValue({
       dimensions: [{ state: 'done', files: { taken: 220, total: 220 } }],
       totalElapsedS: 272,
     });
     renderWithClient(<JobStatStrip job={doneJob} liveViolations={{ security: new Array(13).fill({}) }} rateStore={rateStore} />);
-    expect(await screen.findByText('SCANNED')).toBeInTheDocument();
-    expect(screen.getByText('VIOLATIONS')).toBeInTheDocument();
-    expect(screen.getByText('DURATION')).toBeInTheDocument();
+    expect(await screen.findByText('dimensions')).toBeInTheDocument();
+    expect(screen.getByText('new violations')).toBeInTheDocument();
+    expect(screen.getByText('duration')).toBeInTheDocument();
     expect(await screen.findByText('220')).toBeInTheDocument();
     expect(screen.getByText('13')).toBeInTheDocument();
     expect(screen.getByText('4m 32s')).toBeInTheDocument();
@@ -193,7 +193,7 @@ describe('JobStatStrip', () => {
       totalElapsedS: 272,
     });
     renderWithClient(<JobStatStrip job={doneJob} liveViolations={{}} rateStore={rateStore} />);
-    expect(await screen.findByText('SCANNED')).toBeInTheDocument();
+    expect(await screen.findByText('duration')).toBeInTheDocument();
     expect(rateStore.getRateSamples('job-2')).toEqual([]);
   });
 

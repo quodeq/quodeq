@@ -9,6 +9,7 @@ import { defaultRateSampleStore } from './rateSampleStore.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useRunElapsed } from '../hooks/useRunElapsed.js';
 import { JOB_TERMINAL } from '../../../vocab/jobStatus.js';
+import { DIM_STATE } from '../../../vocab/dimState.js';
 
 // JOB_TERMINAL includes 'lost': a lost job is no longer tracked.
 
@@ -23,6 +24,12 @@ function sumLiveViolations(liveViolations) {
 // The parent (EvaluationStatus) may also have filtered out carried-forward
 // findings before this component ever sees liveViolations, per the
 // live-findings-only setting, so FOUND can be net of those too.
+// How many of the run's dimensions finished, for the finished run's tile.
+function countDims(progress) {
+  const dims = progress?.dimensions || [];
+  return { dimsDone: dims.filter((d) => d?.state === DIM_STATE.DONE).length, dimsTotal: dims.length };
+}
+
 function sumSuppressed(progress) {
   return (progress?.dimensions || []).reduce((n, d) => n + (d?.suppressed || 0), 0);
 }
@@ -45,6 +52,7 @@ function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal,
     sevCounts: sumSeverities(liveViolations),
     scanMode: deriveScanMode(progress),
     budgetS: progress?.budgetS ?? job.timeLimitS ?? 0,
+    ...countDims(progress),
   });
 }
 
