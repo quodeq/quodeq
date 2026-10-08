@@ -39,8 +39,10 @@ const GIT_SUFFIX = '.git';
 /**
  * One canonical form for the equivalent spellings of a git remote (https,
  * ssh, scp-like `git@host:path`, userinfo, trailing `.git` or `/`), so a
- * project registered over SSH matches a CI checkout over https. Mirrors the
- * backend's `shared/repo.py:normalize_remote_url`.
+ * project registered over SSH matches a CI checkout over https. A UI-side
+ * comparison key only: it is wider than the backend's
+ * `shared/repo.py:normalize_remote_url` (it also drops http/git schemes and
+ * lowercases), so never send it to the server as an identity.
  * @param {string|null|undefined} url
  * @returns {string|null} e.g. `github.com/owner/repo`, or null when blank
  */
