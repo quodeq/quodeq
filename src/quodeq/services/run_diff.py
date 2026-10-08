@@ -69,6 +69,9 @@ def _comparable(base: tuple[str | None, bool | None], head: tuple[str | None, bo
     return not base[1] and not head[1]
 
 
+_OlderRun = tuple[str, Path, RunState | None]  # (run id, run dir, state)
+
+
 def _older_runs(reports_root: Path, project: str, run_id: str) -> list[str]:
     """Runs older than *run_id* by ``started_at``, newest first."""
     dated = project_run_dates(reports_root, project)  # {run_id: (date_iso, date_label)}
@@ -76,17 +79,23 @@ def _older_runs(reports_root: Path, project: str, run_id: str) -> list[str]:
     return ordered[ordered.index(run_id) + 1:] if run_id in ordered else []
 
 
-def _baseline_for(project_dir: Path, older: list[str], dimension: str) -> str | None:
-    """The newest older run that evaluated *dimension*: a finished one first,
-    then any other terminal one (a cancelled run may still hold full reports)."""
-    candidates: list[tuple[str, RunState]] = []
+def _resolve_older(project_dir: Path, older: list[str]) -> list[_OlderRun]:
+    """Locate each older run and read its state once; every dimension reuses them."""
+    resolved: list[_OlderRun] = []
     for rid in older:
         run_dir = resolve_child_dir(project_dir, rid)
-        if run_dir is None or not (Path(run_dir) / _EVAL_DIR / f"{dimension}{_JSON}").is_file():
-            continue
-        state = _state_of(Path(run_dir))
-        if state in TERMINAL_STATES:
-            candidates.append((rid, state))
+        if run_dir is not None:
+            resolved.append((rid, Path(run_dir), _state_of(Path(run_dir))))
+    return resolved
+
+
+def _baseline_for(older: list[_OlderRun], dimension: str) -> str | None:
+    """The newest older run that evaluated *dimension*: a finished one first,
+    then any other terminal one (a cancelled run may still hold full reports)."""
+    candidates = [
+        (rid, state) for rid, run_dir, state in older
+        if state in TERMINAL_STATES and (run_dir / _EVAL_DIR / f"{dimension}{_JSON}").is_file()
+    ]
     for wanted in (RunState.DONE, None):
         for rid, state in candidates:
             if wanted is None or state == wanted:
@@ -157,7 +166,7 @@ class _DiffContext:
 
     project_dir: Path
     current_dir: Path
-    older: list[str]
+    older: list[_OlderRun]
     suppressed: tuple[set, set]  # (dismissed keys, deleted keys)
     repo_root: Path | None
     head: _CommitState
@@ -165,13 +174,13 @@ class _DiffContext:
 
 def _locate_runs(
     reports_root: Path, project: str, run_id: str, against: str | None,
-) -> tuple[Path, Path, list[str]]:
+) -> tuple[Path, Path, list[_OlderRun]]:
     """``(project_dir, current_dir, older_runs)``; a missing run raises FileNotFoundError."""
     project_dir = _run_dir(reports_root, project)
     current_dir = _run_dir(project_dir, run_id)
     if against:
         _run_dir(project_dir, against)
-    older = [] if against else _older_runs(reports_root, project, run_id)
+    older = [] if against else _resolve_older(project_dir, _older_runs(reports_root, project, run_id))
     return project_dir, current_dir, older
 
 
@@ -219,7 +228,7 @@ def diff_runs(reports_root: Path, project: str, run_id: str, against: str | None
     scopes: dict[str | None, _Scope] = {}
     dimensions: dict[str, Any] = {}
     for dim, report in _reports(ctx.current_dir).items():
-        base = against or _baseline_for(ctx.project_dir, ctx.older, dim)
+        base = against or _baseline_for(ctx.older, dim)
         if base not in scopes:
             scopes[base] = _baseline_scope(ctx.project_dir, ctx.repo_root, base, ctx.head)
         dimensions[dim] = _dimension_entry(ctx, dim, report, base, scopes[base])

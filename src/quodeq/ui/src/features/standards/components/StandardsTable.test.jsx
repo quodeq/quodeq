@@ -171,3 +171,24 @@ describe('StandardsTable families', () => {
     expect(screen.getByText('My Standard')).toBeInTheDocument();
   });
 });
+
+describe('StandardsTable row keyboard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('toggles visibility on Enter on the row itself', () => {
+    render(<StandardsTable grouped={{ custom: [STANDARD] }} actions={actions} />);
+    const row = screen.getByRole('button', { pressed: true });
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(actions.onToggleVisibility).toHaveBeenCalledWith('my-std');
+  });
+
+  it('leaves Enter on a nested action button to that button', () => {
+    render(<StandardsTable grouped={{ custom: [STANDARD] }} actions={actions} />);
+    const downloadBtn = screen.getByRole('button', { name: /download my standard/i });
+    const event = fireEvent.keyDown(downloadBtn, { key: 'Enter' });
+    expect(event).toBe(true); // not preventDefault'ed, so the native click still fires
+    expect(actions.onToggleVisibility).not.toHaveBeenCalled();
+  });
+});

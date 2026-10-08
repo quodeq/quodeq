@@ -101,15 +101,15 @@ def read_tail(
     with open(log_path, "rb") as fh:
         fh.seek(since)
         raw = fh.read(tail_max_bytes(env))
+    # Cut on the raw bytes: re-encoding the lossy-decoded text would count
+    # each invalid byte as three and skip past the next lines.
+    last_nl = raw.rfind(b"\n")
+    if last_nl == -1:
+        return [], since  # no complete line yet
+    raw = raw[: last_nl + 1]
     text = raw.decode("utf-8", errors="replace")
-    if not text.endswith("\n"):
-        last_nl = text.rfind("\n")
-        if last_nl == -1:
-            return [], since  # no complete line yet
-        text = text[: last_nl + 1]
-    consumed = len(text.encode("utf-8"))
     lines = [ln for ln in text.splitlines() if is_visible_log_line(ln)]
-    return lines, since + consumed
+    return lines, since + len(raw)
 
 
 def resolve_stream_log_path(provider, job_id: str) -> Path | None:

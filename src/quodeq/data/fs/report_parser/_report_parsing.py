@@ -101,7 +101,7 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
         "exitReason": data.get("exitReason"),
         "principles": [
             {"name": p.get("name"), "score": p.get("score"), "grade": p.get("grade")}
-            for p in data.get("principles", [])
+            for p in _dict_entries(data, "principles")
         ],
         "detailPrinciples": [],
         "violations": violations,
