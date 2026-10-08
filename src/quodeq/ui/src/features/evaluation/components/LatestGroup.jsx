@@ -134,9 +134,10 @@ function usePauseOnHover() {
  * The first group of the live findings accordion: the latest findings across
  * every dimension, newest on top. Clicking one pins it, with its detail, at
  * the top of the group until it is closed. No count: the feed head and the
- * tiles already say how many.
+ * tiles already say how many. `passed` (a diff review's checks passed) fills
+ * the group while it has nothing to list.
  */
-export default function LatestGroup({ liveViolations, isRunning, open, onToggle }) {
+export default function LatestGroup({ liveViolations, isRunning, open, onToggle, passed = null }) {
   const [paused, hoverHandlers] = usePauseOnHover();
   const [pins, setPins] = useState([]);
   const latest = useMemo(() => latestFindings(liveViolations), [liveViolations]);
@@ -160,6 +161,9 @@ export default function LatestGroup({ liveViolations, isRunning, open, onToggle 
         <div className="vticker-pins" aria-label={t('evaluate.pinnedFindings')}>
           {pins.map((row) => <PinnedFinding key={row.key} row={row} onUnpin={onUnpin} />)}
         </div>
+      )}
+      {open && shown.length === 0 && passed != null && (
+        <div className="vlatest-empty">{t('evaluate.latestEmptyPassed', { count: passed })}</div>
       )}
       {open && shown.length > 0 && (
         <div className="vlatest-rows" {...hoverHandlers}>

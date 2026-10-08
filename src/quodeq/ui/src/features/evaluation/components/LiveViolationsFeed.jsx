@@ -12,6 +12,7 @@ import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { DIM_STATE } from '../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 import { KEY } from '../../../vocab/keyboard.js';
+import { isDiffReview, checksPassed } from '../externalRun.js';
 
 // A collapsed row: 38px min-height plus its 1px border. The virtualizer
 // measures the real height, this only sizes rows it has not mounted yet.
@@ -147,23 +148,45 @@ function computeQueuedFiles(runningDim) {
 // The head says how many new findings this run has, and that it is still
 // streaming. Passed checks are in the progress details; carried-forward
 // findings follow the "new findings only" setting.
-function LiveViolationsHead({ totalCount, isRunning }) {
-  const count = totalCount > 0 ? t('evaluate.newCount', { count: totalCount }) : t('evaluate.noNewFindings');
+// `passed` is the checks-passed total of a diff review, null otherwise.
+function LiveViolationsHead({ totalCount, isRunning, passed }) {
+  const parts = [totalCount > 0 ? t('evaluate.newCount', { count: totalCount }) : t('evaluate.noNewFindings')];
+  if (passed != null) parts.push(t('evaluate.checksPassed', { count: passed }));
+  if (isRunning) parts.push(t('evaluate.streaming'));
   return (
     <div className="vlive-head">
       <span className="vlive-head-left">
         <SectionLabel>{t('evaluate.liveViolationsLabel')}</SectionLabel>
-        <span className="vlive-counter">{isRunning ? `${count} · ${t('evaluate.streaming')}` : count}</span>
+        <span className="vlive-counter">{parts.join(' · ')}</span>
       </span>
     </div>
   );
 }
 
-function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimension, isRunning, queued }) {
+function cleanDimStatus(d) {
+  if (d.state === DIM_STATE.DONE) return t('evaluate.dimPassed', { count: d.compliance ?? 0 });
+  if (d.state === DIM_STATE.RUNNING) return t('evaluate.dimScanning');
+  return t('evaluate.dimQueued');
+}
+
+// A diff-review dimension with no findings: nothing to open, so a plain
+// header row saying how it went.
+function CleanDimensionRow({ dim }) {
+  return (
+    <div className="vlive-dimension-group vlive-dimension-group--collapsed">
+      <div className="vlive-dimension-label vlive-dimension-label--static">
+        <span className="vlive-dimension-name">{dim.id}</span>
+        <span className={dim.state === DIM_STATE.RUNNING ? 'vlive-dimension-scanning' : 'vlive-dimension-status'}>{cleanDimStatus(dim)}</span>
+      </div>
+    </div>
+  );
+}
+
+function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimension, isRunning, queued, review }) {
   const { openDims, toggleDim, latestOpen, toggleLatest } = open;
   return (
     <div className="vlive-card">
-      <LatestGroup liveViolations={liveViolations} isRunning={isRunning} open={latestOpen} onToggle={toggleLatest} />
+      <LatestGroup liveViolations={liveViolations} isRunning={isRunning} open={latestOpen} onToggle={toggleLatest} passed={review.passed} />
       {orderedDims.map(({ dim, violations }) => (
         <DimensionGroup
           key={dim}
@@ -174,6 +197,7 @@ function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimensio
           onToggle={toggleDim}
         />
       ))}
+      {review.cleanDims.map((d) => <CleanDimensionRow key={d.id} dim={d} />)}
       {isRunning && (
         <div className="vlive-footer">
           <span className="vlive-footer__dot" aria-hidden="true" />
@@ -182,6 +206,16 @@ function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimensio
       )}
     </div>
   );
+}
+
+const NOT_A_REVIEW = Object.freeze({ passed: null, cleanDims: [] });
+
+// What a diff review adds to the feed: the checks passed in total, and its
+// dimensions that have no findings to group.
+function diffReviewOf(progress, orderedDims) {
+  if (!isDiffReview(progress)) return NOT_A_REVIEW;
+  const cleanDims = (progress.dimensions || []).filter((d) => !orderedDims.some((o) => sameDim(o.dim, d.id)));
+  return { passed: checksPassed(progress), cleanDims };
 }
 
 export default function LiveViolationsFeed({ liveViolations, job = null, hiddenCarriedCount = 0, newCount = null }) {
@@ -204,18 +238,21 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   const open = useOpenDims();
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
+  const review = diffReviewOf(progress, orderedDims);
+  // The list shows while there is something in it, while the run is live (the
+  // latest header says so before the first finding), and for a clean diff
+  // review (the checks that passed are its result).
+  const showCard = totalCount > 0 || isRunning || review.passed != null;
   // A fully-cached dimension yields zero NEW findings. Bailing out here
   // would make the feed disappear and read as "nothing found", so keep the
   // header whenever the filter is what emptied the list.
-  // A running job keeps the feed even before its first finding: the latest
-  // header says it is live.
-  if (!totalCount && !hiddenCarriedCount && !isRunning) return null;
+  if (!showCard && !hiddenCarriedCount) return null;
 
   return (
     <div className="vlive-feed">
       {/* The head counts new findings even when the rows include carried ones. */}
-      <LiveViolationsHead totalCount={newCount ?? totalCount} isRunning={isRunning} />
-      {(totalCount > 0 || isRunning) && (
+      <LiveViolationsHead totalCount={newCount ?? totalCount} isRunning={isRunning} passed={review.passed} />
+      {showCard && (
         <LiveViolationsCard
           liveViolations={liveViolations}
           orderedDims={orderedDims}
@@ -223,6 +260,7 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
           currentDimension={currentDimension}
           isRunning={isRunning}
           queued={queued}
+          review={review}
         />
       )}
     </div>
