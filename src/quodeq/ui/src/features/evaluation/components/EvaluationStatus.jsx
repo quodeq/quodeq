@@ -5,6 +5,9 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import JobStatStrip from './JobStatStrip.jsx';
 import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
 import { deriveScanMode } from './buildJobStatCells.js';
+import { SCAN_MODE } from './scanModes.js';
+import { isExternal, isDiffReview, diffFileCount, SHORT_SHA } from '../externalRun.js';
+import { formatRunTime } from '../../../utils/dateFormatting.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import useLiveFeedSettings from '../../settings/hooks/useLiveFeedSettings.js';
 import { exitReasonLabel, isTimeLimitExit } from '../../../models/exitReason.js';
@@ -52,14 +55,24 @@ function RunPill({ status, exitReason }) {
   );
 }
 
-function JobHeader({ job, onDismiss, onCancel }) {
+// A run this app did not start says so after its status mark; a PR review
+// (a run over a diff) says that too.
+function ExternalTag({ job, progress }) {
+  if (!isExternal(job)) return null;
+  const label = isDiffReview(progress)
+    ? `${t('evaluate.externalTag')} · ${t('evaluate.diffReviewTag')}`
+    : t('evaluate.externalTag');
+  return <span className="eval-run-tag">{label}</span>;
+}
+
+function JobHeader({ job, progress, onDismiss, onCancel }) {
   const isRunning = job.status === JOB_STATUS.RUNNING;
   const isDone = job.status === JOB_STATUS.DONE;
   return (
     <div className="evaluate-panel__top evaluate-panel__top--row">
       <TermHeader
         name={termNameForStatus(job.status, job.exitReason)}
-        badge={<RunPill status={job.status} exitReason={job.exitReason} />}
+        badge={<><RunPill status={job.status} exitReason={job.exitReason} /><ExternalTag job={job} progress={progress} /></>}
       />
       <div className="evaluate-panel__top-actions">
         {isRunning && (
@@ -82,11 +95,30 @@ function JobHeader({ job, onDismiss, onCancel }) {
   );
 }
 
-function JobIdentityStrip({ job, projectLabel, onGoToProjects }) {
-  const isTerminal = JOB_TERMINAL.has(job.status);
-  // Shares the strip/progress query cache entry — no extra polling.
-  const { data: progress } = useEvaluationProgress(job.jobId, isTerminal);
+function modeLabel(progress) {
   const mode = deriveScanMode(progress);
+  if (mode === SCAN_MODE.DIFF) return t('evaluate.modeDiff', { count: diffFileCount(progress) });
+  return mode ?? '—';
+}
+
+// When an external run started, and on which commit: the app did not start
+// it, so the strip says what it is looking at.
+function StartedCell({ job }) {
+  if (!isExternal(job) || !job.startedAt) return null;
+  return (
+    <IdentityCell label={t('evaluate.idStarted')}>
+      {formatRunTime(job.startedAt, '—', 'JobIdentityStrip')}
+      {job.commitSha && (
+        <>
+          <span className="eval-provider-sep" aria-hidden="true"> · </span>
+          {job.commitSha.slice(0, SHORT_SHA)}
+        </>
+      )}
+    </IdentityCell>
+  );
+}
+
+function JobIdentityStrip({ job, progress, projectLabel, onGoToProjects }) {
   return (
     <IdentityStrip>
       {/* "Unknown beats wrong": a dash, never the global selection. */}
@@ -100,6 +132,7 @@ function JobIdentityStrip({ job, projectLabel, onGoToProjects }) {
       >
         {projectLabel ?? '—'}
       </IdentityCell>
+      <StartedCell job={job} />
       {job.aiProvider && job.aiModel && (
         <IdentityCell label={t('evaluate.idModel')}>
           <span data-testid="job-runtime-chip">
@@ -109,7 +142,7 @@ function JobIdentityStrip({ job, projectLabel, onGoToProjects }) {
           </span>
         </IdentityCell>
       )}
-      <IdentityCell label={t('evaluate.idMode')}>{mode ?? '—'}</IdentityCell>
+      <IdentityCell label={t('evaluate.idMode')}>{modeLabel(progress)}</IdentityCell>
     </IdentityStrip>
   );
 }
@@ -120,6 +153,8 @@ function countAll(byDim) {
 
 export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel, onGoToProjects }) {
   const { newOnly } = useLiveFeedSettings();
+  // Shares the strip/progress query cache entry: no extra polling.
+  const { data: progress } = useEvaluationProgress(job?.jobId, !job || JOB_TERMINAL.has(job.status));
   // Filter ONCE, above both consumers. JobStatStrip derives its violations
   // cell from the same object the feed lists, so filtering in each child
   // separately is how the counter and the list drift apart (see #878).
@@ -155,8 +190,8 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
 
   return (
     <div className="panel evaluate-panel--terminal">
-      <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
-      <JobIdentityStrip job={job} projectLabel={projectLabel} onGoToProjects={onGoToProjects} />
+      <JobHeader job={job} progress={progress} onDismiss={onDismiss} onCancel={onCancel} />
+      <JobIdentityStrip job={job} progress={progress} projectLabel={projectLabel} onGoToProjects={onGoToProjects} />
       <JobStatStrip job={job} liveViolations={fresh} hiddenCarriedCount={hiddenCarriedCount} />
       <ScanProgress job={job} />
       <LiveViolationsFeed job={job} liveViolations={shown} newCount={countAll(fresh)} hiddenCarriedCount={hiddenCarriedCount} />

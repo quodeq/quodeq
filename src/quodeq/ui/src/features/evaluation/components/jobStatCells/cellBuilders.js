@@ -96,7 +96,7 @@ function buildDoneCells(inputs) {
 // changed; no hint until the mode is known.
 function filesHintFor(scanMode) {
   if (scanMode === SCAN_MODE.CLEAN) return t('evaluate.filesHint');
-  if (scanMode === SCAN_MODE.INCREMENTAL) return t('evaluate.changedFilesHint');
+  if (scanMode === SCAN_MODE.INCREMENTAL || scanMode === SCAN_MODE.DIFF) return t('evaluate.changedFilesHint');
   return null;
 }
 

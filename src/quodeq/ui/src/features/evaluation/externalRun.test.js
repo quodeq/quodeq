@@ -34,3 +34,10 @@ test('open on GitHub points at the commit for github origins only', () => {
   assert.equal(githubCommitUrl('https://github.com/quodeq/quodeq', null), null);
   assert.equal(githubCommitUrl('https://github.com/quodeq/quodeq', 'main; rm'), null);
 });
+
+test('the scan mode of a diff review is diff', async () => {
+  const { deriveScanMode } = await import('./components/jobStatCells/derivations.js');
+  const { SCAN_MODE } = await import('./components/scanModes.js');
+  assert.equal(deriveScanMode(diff), SCAN_MODE.DIFF);
+  assert.equal(SCAN_MODE.DIFF, 'diff');
+});

@@ -6,6 +6,7 @@
 import { computeOverallProgress } from '../scanProgressTotals.js';
 import { t } from '../../../../strings/index.js';
 import { SCAN_MODE } from '../scanModes.js';
+import { isDiffReview } from '../../externalRun.js';
 import { MS_PER_SECOND, SECONDS_PER_MINUTE, MINUTES_PER_HOUR, SECONDS_PER_HOUR } from '../../../../utils/time.js';
 import { DIM_STATE } from '../../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../../vocab/severity.js';
@@ -195,11 +196,14 @@ export function formatSevHint(counts) {
  * results exist only on incremental runs. Null while coverage is unknown
  * (legacy dims, preparing) — callers show a placeholder.
  *
- * Returns an identity value ('incremental' | 'clean'), never display text:
- * callers compare it, and the words a user sees come from the catalog.
+ * A run whose dimensions were estimated from a diff (a PR review) is 'diff'.
+ *
+ * Returns an identity value ('incremental' | 'clean' | 'diff'), never display
+ * text: callers compare it, and the words a user sees come from the catalog.
  */
 export function deriveScanMode(progress) {
   if (!progress) return null;
+  if (isDiffReview(progress)) return SCAN_MODE.DIFF;
   const { cachedFiles, projectTotal } = computeOverallProgress(progress);
   if (cachedFiles == null || !(projectTotal > 0)) return null;
   return cachedFiles > 0 ? SCAN_MODE.INCREMENTAL : SCAN_MODE.CLEAN;

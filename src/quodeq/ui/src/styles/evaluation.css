@@ -3037,6 +3037,18 @@ button.eval-provider-badge--clickable:focus-visible {
   vertical-align: middle;
 }
 
+/* A run this app did not start: a quiet label after the status mark. */
+.eval-run-tag {
+  margin-left: 10px;
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  vertical-align: middle;
+}
+
 /* ── Pill buttons: stop, details, console (quiet) ── */
 .eval-pill-btn {
   display: inline-flex;

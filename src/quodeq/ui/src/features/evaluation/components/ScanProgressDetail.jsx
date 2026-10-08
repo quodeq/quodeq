@@ -1,9 +1,9 @@
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import DimRow from './DimRow.jsx';
+import { SHORT_SHA } from '../externalRun.js';
 import { t, LOCALE } from '../../../strings/index.js';
 
-const SHORT_SHA = 7;
 
 // "17:36" in the viewer's clock; null for a missing or unreadable time.
 function clockTime(iso) {
