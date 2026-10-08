@@ -21,7 +21,7 @@ function filesToAnalyze(est, isClean) {
 export function buildDimMetas(estimates, isClean) {
   if (!estimates?.dimensions) return null;
   return Object.fromEntries(Object.entries(estimates.dimensions).map(([id, est]) => {
-    if (!((est.total ?? 0) > 0)) return [id, null];
+    if (!((est?.total ?? 0) > 0)) return [id, null];
     const count = filesToAnalyze(est, isClean);
     if (count === 0) return [id, [t('evaluate.upToDate')]];
     return [id, [t('evaluate.filesToAnalyze', { count: count.toLocaleString(LOCALE) })]];
@@ -38,6 +38,6 @@ export function buildDimMetas(estimates, isClean) {
 export function buildUpToDateIds(estimates, isClean) {
   if (isClean || !estimates?.dimensions) return new Set();
   return new Set(Object.entries(estimates.dimensions)
-    .filter(([, est]) => (est.total ?? 0) > 0 && (est.count ?? 0) === 0)
+    .filter(([, est]) => (est?.total ?? 0) > 0 && (est.count ?? 0) === 0)
     .map(([id]) => id));
 }

@@ -44,7 +44,7 @@ The same background rebuild runs whenever score caches need re-deriving for othe
 
 ### Assistant and terminal
 
-Both ship disabled. The *Assistant* section turns the chat drawer on and picks its provider and model; *Enable terminal* switches on the embedded shell. See the **Assistant** and **Terminal** help sections.
+Both are on by default. The *Assistant* section turns the chat drawer off or on and picks its provider and model; *Enable terminal* turns the embedded shell off or on. See the **Assistant** and **Terminal** help sections.
 
 ### Onboarding
 
