@@ -28,7 +28,9 @@ describe("a run whose folder vanished", () => {
     await act(() => client.invalidateQueries({ queryKey: evaluationKeys.status("ext-pr") }).catch(() => {}));
     await act(() => new Promise((r) => setTimeout(r, 50)));
     expect(result.current.job.vanished).toBe(true);
-    expect(result.current.job.status).not.toBe("running");
+    // Finished for every consumer (no progress polling, no "tracking lost"
+    // banner); the header says "ended" from `vanished`.
+    expect(result.current.job.status).toBe("done");
     expect(result.current.job.commitSha).toBe("7e506ae");
   });
 

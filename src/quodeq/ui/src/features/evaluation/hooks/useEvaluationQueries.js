@@ -25,11 +25,12 @@ function isGone(error) {
   return error?.status === HTTP_NOT_FOUND;
 }
 
-// The last state the job had, read as ended. LOST makes every terminal check
-// treat it as over; `vanished` lets the screen say "ended" rather than
-// "lost", since how it really ended is unknown.
+// The last state the job had, read as finished. DONE makes every consumer
+// treat it as over without failure UI (no progress polling, no "tracking
+// lost" banner); `vanished` lets the header say "ended", since how it
+// really ended is unknown.
 function vanishedJob(job) {
-  return { ...job, status: JOB_STATUS.LOST, vanished: true };
+  return { ...job, status: JOB_STATUS.DONE, vanished: true };
 }
 
 // The rows the cache already holds, per dimension, in cache order.

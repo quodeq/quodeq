@@ -39,13 +39,17 @@ function progressCell({ overallPct, takenFiles, totalFiles }) {
   };
 }
 
+// A run stopped at its time limit ends a few seconds past it while it
+// winds down; only time well past the budget is an overrun.
+const OVERRUN_GRACE_S = 60;
+
 // A run past its time budget (budgetS > 0) is flagged in the warning tone.
 function elapsedCell(elapsedS, label = 'ELAPSED', hint = null, budgetS = 0) {
   return {
     label,
     value: formatDuration(elapsedS),
     hint,
-    tone: budgetS > 0 && elapsedS > budgetS ? CELL_TONE.WARNING : CELL_TONE.DEFAULT,
+    tone: budgetS > 0 && elapsedS > budgetS + OVERRUN_GRACE_S ? CELL_TONE.WARNING : CELL_TONE.DEFAULT,
   };
 }
 

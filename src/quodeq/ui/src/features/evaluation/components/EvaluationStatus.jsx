@@ -72,6 +72,14 @@ function isReviewEnd(job, progress) {
   return job.status !== JOB_STATUS.RUNNING && isExternal(job) && isDiffReview(progress);
 }
 
+// Where an ended PR review's results are. Only a review that finished says
+// it was posted; one whose folder vanished may never have reached the post
+// step, and one that was stopped or failed did not.
+function ReviewEndLine({ job, progress }) {
+  if (!isReviewEnd(job, progress) || job.status !== JOB_STATUS.DONE) return null;
+  return <p className="eval-review-posted">{t(job.vanished ? 'evaluate.reviewGoesToPr' : 'evaluate.reviewPosted')}</p>;
+}
+
 function StatusMark({ job }) {
   // A run whose folder vanished ended in a way nobody recorded here: a
   // neutral "ended", never a guessed "complete" or the red "lost".
@@ -102,7 +110,7 @@ function JobActions({ job, progress, onDismiss, onCancel }) {
   return (
     <>
       {commitUrl && <PrimaryPill label={t('evaluate.openOnGitHub')} onClick={() => openExternal(commitUrl)} />}
-      {!reviewEnd && job.status === JOB_STATUS.DONE && (
+      {!reviewEnd && !job.vanished && job.status === JOB_STATUS.DONE && (
         <PrimaryPill label={t('evaluate.viewResults')} onClick={() => onDismiss(EVAL_DISMISS_ACTION.VIEW)} />
       )}
       <button type="button" className="eval-pill-btn" onClick={() => onDismiss(EVAL_DISMISS_ACTION.CLOSE)}>{t('evaluate.closeBtn')}</button>
@@ -221,7 +229,7 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
     <div className="panel evaluate-panel--terminal">
       <JobHeader job={job} progress={progress} onDismiss={onDismiss} onCancel={onCancel} />
       <JobIdentityStrip job={job} progress={progress} projectLabel={projectLabel} onGoToProjects={onGoToProjects} />
-      {isReviewEnd(job, progress) && <p className="eval-review-posted">{t('evaluate.reviewPosted')}</p>}
+      <ReviewEndLine job={job} progress={progress} />
       <JobStatStrip job={job} liveViolations={fresh} hiddenCarriedCount={hiddenCarriedCount} />
       <ScanProgress job={job} />
       <LiveViolationsFeed job={job} liveViolations={shown} newCount={countAll(fresh)} hiddenCarriedCount={hiddenCarriedCount} />
