@@ -1901,6 +1901,20 @@ button.eval-provider-badge--clickable:focus-visible {
   opacity: 1;
 }
 
+/* The same filename:line as plain text, for cards whose code strip
+   (ContextBlock) is always on screen and already carries the copy button. */
+.vlive-detail-file {
+  padding: 2px 5px;
+  font-family: var(--font-data);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .vlive-snippet {
   margin: 10px 0 0;
   padding: 10px 12px;
@@ -2186,44 +2200,130 @@ button.eval-provider-badge--clickable:focus-visible {
 .vdetail-row--minor     { border-color: var(--color-sev-minor-border); }
 .vdetail-row--unknown   { border-color: var(--color-border); }
 
-.scope-bar {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 0;
+/* Editor-tab code widget (ContextBlock): a strip naming the file sits on top
+   of the code panel and toggles it. Collapsed, only the strip shows. */
+.code-tab {
   margin-top: 8px;
-  background: none;
-  border: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.code-tab-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 0;
+  /* A tint rather than a surface token: the strip has to lift off both the
+     plain card (surface) and the terminal card, whose code panel is also
+     surface. */
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--color-accent);
+}
+
+.code-tab-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0 6px 10px;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--color-text);
+  text-align: left;
   cursor: pointer;
 }
 
-.scope-bar:hover .scope-bar-label {
+.code-tab-toggle:disabled {
+  cursor: default;
+}
+
+.code-tab-toggle:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.code-tab-toggle:hover:not(:disabled) .code-tab-file {
   text-decoration: underline;
 }
 
-.scope-bar--expanded {
-  /* no visual change needed for minimal link */
-}
-
-.scope-bar-chevron {
+.code-tab-chevron {
   display: inline-block;
-  transition: transform 150ms;
+  width: 10px;
+  color: var(--color-text-muted);
   font-size: 0.65rem;
+  transition: transform 150ms;
 }
 
-.scope-bar-chevron--open {
+.code-tab--open .code-tab-chevron {
   transform: rotate(90deg);
 }
 
-.scope-bar-label {
-  /* inherits accent color from parent */
+.code-tab-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.scope-bar-code {
-  margin-top: 4px;
+.code-tab-dir {
+  color: var(--color-text-muted);
+}
+
+.code-tab-file {
+  font-weight: 500;
+}
+
+.code-tab-line {
+  color: var(--color-accent);
+}
+
+.code-tab-label {
+  flex: 1;
+  color: var(--color-accent);
+}
+
+.code-tab-meta {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.code-tab-copy {
+  display: inline-flex;
+  padding: 3px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.code-tab-copy:hover {
+  color: var(--color-text);
+  background: var(--color-accent-soft);
+}
+
+.code-tab-copy:focus-visible {
+  outline: 1px solid var(--color-accent);
+}
+
+/* The code panel joins the strip: no gap, no border of its own beyond the
+   rule that separates it from the strip. */
+.code-tab .scope-bar-code {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .code-tab-chevron { transition: none; }
 }
 .vdetail-row--compliant { border-color: color-mix(in srgb, var(--color-grade-top-text) 55%, transparent); }
 

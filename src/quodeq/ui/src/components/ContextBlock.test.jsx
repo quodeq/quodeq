@@ -51,3 +51,38 @@ describe('ContextBlock highlighted-line indentation', () => {
     expect(hlIndent).toBe(returnIndent);
   });
 });
+
+describe('ContextBlock editor-tab strip', () => {
+  it('names the file and its line while collapsed, without rendering code', () => {
+    const { container } = render(<ContextBlock context={context} line={42} file="src/app/hello.py" />);
+    const toggle = screen.getByRole('button', { expanded: false });
+    expect(toggle).toHaveTextContent('src/app/hello.py:42');
+    expect(toggle).toHaveTextContent('L37-39 · 3 lines');
+    expect(container.querySelector('.ctx-line')).toBeNull();
+  });
+
+  it('opens the code when the strip is clicked', () => {
+    const { container } = render(<ContextBlock context={context} line={42} file="src/app/hello.py" />);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument();
+    expect(container.querySelectorAll('.ctx-line')).toHaveLength(3);
+  });
+
+  it('takes the line from a file ref that carries its own suffix', () => {
+    render(<ContextBlock snippet="x = 1" file="pkg/mod.py:7" />);
+    expect(screen.getByRole('button', { expanded: false })).toHaveTextContent('pkg/mod.py:7');
+  });
+
+  it('offers a copy-path button only when the finding names a file', () => {
+    const { rerender } = render(<ContextBlock context={context} line={42} file="src/app/hello.py" />);
+    expect(screen.getByRole('button', { name: 'Copy path' })).toBeInTheDocument();
+    rerender(<ContextBlock context={context} line={42} />);
+    expect(screen.queryByRole('button', { name: 'Copy path' })).toBeNull();
+    expect(screen.getByRole('button', { expanded: false })).toHaveTextContent('See code');
+  });
+
+  it('says "1 line" for a single-line snippet', () => {
+    render(<ContextBlock snippet="x = 1" line={3} file="a.py" />);
+    expect(screen.getByRole('button', { expanded: false })).toHaveTextContent('L3 · 1 line');
+  });
+});

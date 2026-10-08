@@ -40,7 +40,7 @@ function DismissedCard({ d, onRestore, onDelete }) {
               <p className="dismissed-detail-text">{d.reason}</p>
             </div>
           )}
-          <ContextBlock context={d.context} snippet={d.snippet} scope={d.scope} line={d.line} />
+          <ContextBlock context={d.context} snippet={d.snippet} scope={d.scope} line={d.line} file={d.file} />
         </div>
       )}
     </div>
