@@ -101,7 +101,7 @@ def _descendants(pid: int) -> list[int]:
     """POSIX: every live descendant of *pid*, from one ``ps`` snapshot; [] if ps fails."""
     try:
         out = subprocess.run(
-            ["ps", "-axo", "pid=,ppid="], capture_output=True, text=True, timeout=_TERMINATE_TIMEOUT_S,
+            ["ps", "-axo", "pid=,ppid="], capture_output=True, text=True, encoding="utf-8", timeout=_TERMINATE_TIMEOUT_S,
         ).stdout
     except (OSError, subprocess.SubprocessError) as exc:
         _logger.debug("ps failed listing descendants of %s: %s", pid, exc)
