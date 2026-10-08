@@ -32,42 +32,50 @@ import { evaluationKeys } from "../../../api/queryKeys.js";
 import { LOCAL_API_PROVIDERS } from "../../../vocab/provider.js";
 import { useEvaluationQueries } from "./useEvaluationQueries.js";
 import { useEvaluationMutations } from "./useEvaluationMutations.js";
+import { ADOPT_POLL_MS } from "./useEvaluation.helpers.js";
 
 // Re-exported for the existing importers; the set itself lives in vocab/provider.js
 // so the Evaluate header resolves unset limits exactly like the start payload.
 export { LOCAL_API_PROVIDERS };
 
-// Adopt any in-progress CLI-started external run on mount so it surfaces on
-// the Evaluate tab. setJobId's functional-update guard prevents a
-// late-resolving resume from clobbering a job the user started meanwhile.
-function useResumeRunningJob(api, queryClient, setJobId, setJobError) {
+// Adopt a run started outside the app (CLI, CI, MCP) so it surfaces on the
+// Evaluate tab: once at mount, then every ADOPT_POLL_MS while nothing is
+// held, since the hook mounts once per app start. setJobId's functional
+// guard keeps a late answer from clobbering a job the user started
+// meanwhile. Only the mount check reports a failure as jobError: a CLI run
+// could be in flight and the dashboard would otherwise show no trace of it.
+function useResumeRunningJob(api, queryClient, jobId, setJobId, setJobError) {
+  const adopt = (onError) => api.listEvaluations({ states: ["running"], limit: 1 })
+    .then((jobs) => {
+      const running = jobs?.[0];
+      if (!running) return;
+      setJobId((current) => {
+        if (current) return current;
+        queryClient.setQueryData(evaluationKeys.status(running.jobId), running);
+        return running.jobId;
+      });
+    })
+    .catch(onError);
   useEffect(() => {
     let cancelled = false;
-    api.listEvaluations({ states: ["running"], limit: 1 })
-      .then((jobs) => {
-        if (cancelled) return;
-        const running = jobs?.[0];
-        if (!running) return;
-        setJobId((current) => {
-          if (current) return current;
-          queryClient.setQueryData(evaluationKeys.status(running.jobId), running);
-          return running.jobId;
-        });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        // A failed resume check must not look identical to "nothing is
-        // running": a CLI-started job could still be in flight and the
-        // dashboard would otherwise show no trace of it. Surface it the
-        // same way startEvaluation/cancelEvaluation do, via jobError.
-        console.warn("Failed to fetch running evaluations:", err);
-        setJobError(apiErrorMessage(err, "evaluate.resumeFailed"));
-      });
+    adopt((err) => {
+      if (cancelled) return;
+      console.warn("Failed to fetch running evaluations:", err);
+      setJobError(apiErrorMessage(err, "evaluate.resumeFailed"));
+    });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only resume
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only check
   }, []);
+  useEffect(() => {
+    if (jobId) return undefined;
+    const timer = setInterval(() => {
+      adopt((err) => console.warn("[useEvaluation] running-run check failed:", err));
+    }, ADOPT_POLL_MS);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- adopt reads stable handles
+  }, [jobId]);
 }
 
 // The confirmation UI lives in ../cancelDialog.js (view layer); the hook
@@ -122,7 +130,7 @@ export function useEvaluation() {
   // SSE side-effect — writes status/dimensions/findings into cache.
   // Its connection state drives the status query's poll interval.
   const streamState = useRunEventStream(jobId);
-  useResumeRunningJob(api, queryClient, setJobId, setJobError);
+  useResumeRunningJob(api, queryClient, jobId, setJobId, setJobError);
 
   const { job, liveViolations } = useEvaluationQueries(api, jobId, streamState);
 
