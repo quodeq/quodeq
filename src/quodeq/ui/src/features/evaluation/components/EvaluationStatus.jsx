@@ -89,7 +89,7 @@ function StatusMark({ job }) {
 
 function PrimaryPill({ label, onClick }) {
   return (
-    <button type="button" className="eval-scan-pill eval-scan-pill--sm" onClick={onClick}>
+    <button type="button" className="eval-scan-pill" onClick={onClick}>
       <span className="eval-scan-pill__glyph" aria-hidden="true">▶</span>
       {label}
     </button>
