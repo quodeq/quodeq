@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from quodeq.analysis.manifest_build import count_source_lines
@@ -117,6 +118,6 @@ def test_estimates_build_the_manifest_without_the_line_count(tmp_path: Path, mon
     (src / "a.py").write_text("x\n", encoding="utf-8")
     project_dir = tmp_path / "proj"
     project_dir.mkdir()
-    (project_dir / "repository_info.json").write_text(f'{{"path": "{src}"}}', encoding="utf-8")
+    (project_dir / "repository_info.json").write_text(json.dumps({"path": str(src)}), encoding="utf-8")
     estimates.project_estimates_payload(project_dir, None, False)
     assert seen == [False]
