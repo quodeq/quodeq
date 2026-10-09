@@ -24,7 +24,7 @@ Pick a dimension and a principle in the header. The right column of each row rea
 
 ### Preview, then apply
 
-The preview strip recomputes your selected project's latest run with the draft parameters and shows before and after, per dimension. Nothing is stored until you press **APPLY**, which saves the formula and rescores every run in every project. **RESET Q²** returns to the built-in defaults, also rescoring everything.
+The preview strip recomputes your selected project's latest run with the draft parameters and shows before and after, per dimension. Nothing is stored until you press **APPLY**, which saves the formula and rescores every run in every project. **RESET Q²** returns to the built-in defaults, also rescoring everything. When a Quodeq update changes the formula itself, a formula you saved under the older one is retired: scores use the new defaults, the editor opens on them, and you can tune again from there.
 
 > **Where you see the effect**
 >
