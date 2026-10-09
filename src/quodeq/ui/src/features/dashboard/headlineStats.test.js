@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHeadline, chipDeltas, dimensionHeadlineInput, dimensionOpenTypes, filterSinceBaseline, periodChipDeltas, runCounts, sinceBaselineFor, sumSinceBaseline, SCOPE_ALL, SCOPE_CHANGED, SCOPE_MIXED } from './headlineStats.js';
+import { buildHeadline, chipDeltas, dimensionHeadlineInput, dimensionOpenTypes, filterSinceBaseline, periodChipDeltas, runCounts, sumSinceBaseline, SCOPE_ALL, SCOPE_CHANGED, SCOPE_MIXED } from './headlineStats.js';
 
 const dim = (over = {}) => ({
   dimension: 'maintainability',
@@ -103,14 +103,6 @@ test('filterSinceBaseline keeps only the named dimensions, case-insensitively', 
   const kept = filterSinceBaseline({ Maintainability: entry(), security: entry() }, ['maintainability']);
   assert.deepEqual(Object.keys(kept), ['Maintainability']);
   assert.deepEqual(filterSinceBaseline(undefined, ['x']), {});
-});
-
-test('sinceBaselineFor gives the dimension entry only for the run the summary describes', () => {
-  const map = { maintainability: entry() };
-  assert.equal(sinceBaselineFor(map, 'Maintainability', { runId: 'r1', baselineRunId: 'r1' }), map.maintainability);
-  assert.equal(sinceBaselineFor(map, 'maintainability', { runId: 'r0', baselineRunId: 'r1' }), undefined);
-  assert.equal(sinceBaselineFor(map, 'maintainability', { runId: undefined, baselineRunId: 'r1' }), undefined);
-  assert.equal(sinceBaselineFor(undefined, 'maintainability', { runId: 'r1', baselineRunId: 'r1' }), undefined);
 });
 
 test('dimensionHeadlineInput shapes the dimension page data for buildHeadline', () => {

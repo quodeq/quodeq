@@ -1,4 +1,5 @@
 import { Stat, SevBadge } from '../../../components/terminal/index.js';
+import TrendBadge from '../../../components/TrendBadge.jsx';
 import { formatScoreDisplay } from '../../../utils/gradeFormatting.js';
 import StatGrid2x2 from './StatGrid2x2.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
@@ -8,15 +9,23 @@ import { HERO_CARD_KIND } from '../../dashboard/dashboardVocab.js';
 import { RatioDensityStat, ScoreStat, ratioDisplay } from '../../dashboard/components/heroSectionParts.jsx';
 
 /** The score/violations/compliance/ratio stat grid and the run-history bar
- * chart: the left column of the dimension page's top grid. */
+ * chart: the left column of the dimension page's top grid. `scoreDelta` and
+ * `deltas` are the dimension's change since the previous period of the
+ * chart's grouping (dimensionPeriodDeltas), shown the way the Overview
+ * hero shows its own. */
 export default function ExplorerStatsPanel({
   overallScoreNum, overallGrade, allViolations, totalCompliant, sev, onSeverityBadge,
-  onNavigate, onCardNavigate, trend, dimension, activeRunId, granularity, onGranularityChange, onBarClick, deltas = null, density = null,
+  onNavigate, onCardNavigate, trend, dimension, activeRunId, granularity, onGranularityChange, onBarClick,
+  scoreDelta = null, deltas = null, density = null,
 }) {
   return (
     <div className="qd-top-left">
       <StatGrid2x2>
-        <ScoreStat scoreDisplay={formatScoreDisplay(overallScoreNum)} grade={overallGrade?.grade} />
+        <ScoreStat
+          scoreDisplay={formatScoreDisplay(overallScoreNum)}
+          grade={overallGrade?.grade}
+          extraTrailing={scoreDelta !== null ? <TrendBadge delta={scoreDelta} showLabel={false} /> : null}
+        />
         <Stat
           label={t('overview.statViolations')}
           value={allViolations.length}
