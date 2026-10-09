@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterAccumulatedByVisibleStandards } from './scoreFiltering.js';
+import { filterAccumulatedByVisibleStandards, filterTrendByVisibleStandards } from './scoreFiltering.js';
 
 // The header SCORE normally uses the trend's accumulated average (to agree
 // with the History chart). But for an all-cancelled project the trend is
@@ -51,4 +51,15 @@ test('overallGrade is null when no average is computable', () => {
   const out = filterAccumulatedByVisibleStandards(acc, new Set(), [], null);
   assert.equal(out.summary.numericAverage, null);
   assert.equal(out.summary.overallGrade, null);
+});
+
+// quodeq-web on 2026-10-09: four dimensions averaging exactly 8.85. The
+// server (and so Compare) said 8.8, the Overview's recomputed trend 8.9.
+test('the recomputed trend average rounds like the server: 8.85 reads 8.8', () => {
+  const details = [['maintainability', 9.5], ['reliability', 7.8], ['security', 10.0], ['usability', 8.1]]
+    .map(([dimension, score]) => ({ dimension, score }));
+  const visible = new Set(details.map((d) => d.dimension));
+  const [entry] = filterTrendByVisibleStandards([{ runId: 'r1', dimensionDetails: details, dimensions: [] }], visible);
+  assert.equal(entry.numericAverage, 8.8);
+  assert.equal(entry.runNumericAverage, 8.8);
 });

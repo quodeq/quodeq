@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getGradeFormula } from '../api/index.js';
 import { setGradeThresholds } from '../utils/gradeThresholds.js';
+import { setDimensionWeights } from '../utils/dimensionWeights.js';
 import { hydrateVisibleStandardIds } from '../utils/visibleStandards.js';
 import { shouldRedirectToRepositories } from '../appGating.js';
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
@@ -62,15 +63,18 @@ export function useAssistantActionAppliedEffect({
 }
 
 /**
- * Sync the client-side grade-label thresholds with the server formula at
- * boot so every gauge/badge agrees with the applied Q² parameters. The
- * gradeThresholds store seeds with the Q² defaults, so a failed/absent
- * fetch leaves a sane fallback in place.
+ * Sync the client-side grade-label thresholds and dimension weights with
+ * the server formula at boot so every gauge/badge and recomputed average
+ * agrees with the applied Q² parameters. Both stores seed with the Q²
+ * defaults, so a failed/absent fetch leaves a sane fallback in place.
  */
 export function useGradeFormulaBootSyncEffect() {
   useEffect(() => {
     getGradeFormula()
-      .then((d) => setGradeThresholds(d?.current?.gradeThresholds))
+      .then((d) => {
+        setGradeThresholds(d?.current?.gradeThresholds);
+        setDimensionWeights(d?.current);
+      })
       .catch((err) => {
         console.warn('[useAppEffects] grade formula boot fetch failed:', err);
       });
