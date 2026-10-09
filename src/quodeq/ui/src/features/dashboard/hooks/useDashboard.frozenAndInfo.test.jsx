@@ -196,3 +196,39 @@ describe("useDashboard — scoring metadata crosses the whitelist", () => {
     expect(result.current.customFormula).toBe(false);
   });
 });
+
+describe("useDashboard — formulaUpdated", () => {
+  async function formulaUpdatedFor(runVersion, currentVersion) {
+    const fakeApi = makeFakeApi();
+    fakeApi.getDashboard = vi.fn(async (project, run) => {
+      const payload = makeDashboardPayload({ project, run: run || "latest" });
+      return { ...payload, selectedRun: { ...payload.selectedRun, gradeAlgoVersion: runVersion } };
+    });
+    fakeApi.getProjectScores = vi.fn(async () => ({
+      accumulated: { score: 90 }, trend: [], availableRuns: [],
+      scoring: { customFormula: false, formulaVersion: currentVersion },
+    }));
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null }),
+      { wrapper: withStableQueryApi(fakeApi) },
+    );
+    await waitFor(() => expect(result.current.accumulated).toBeTruthy());
+    await waitFor(() => expect(result.current.dashboard).toBeTruthy());
+    return result;
+  }
+
+  it("is true when the run was scanned with an older formula", async () => {
+    const result = await formulaUpdatedFor(3, 4);
+    expect(result.current.formulaUpdated).toBe(true);
+  });
+
+  it("is true for a run with no recorded version", async () => {
+    const result = await formulaUpdatedFor(null, 4);
+    expect(result.current.formulaUpdated).toBe(true);
+  });
+
+  it("is false when the run was scanned with the current formula", async () => {
+    const result = await formulaUpdatedFor(4, 4);
+    expect(result.current.formulaUpdated).toBe(false);
+  });
+});

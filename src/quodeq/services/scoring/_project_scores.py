@@ -15,6 +15,7 @@ from typing import Any
 
 from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.core.scoring.params import ScoringParams
+from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
 from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.grade_formula import is_custom, load_params
@@ -226,7 +227,10 @@ def get_project_scores_stamped(
     # How the numbers were produced, not what they are. A tuned formula moves
     # every score at once and leaves no other trace -- findings and runs are
     # unchanged -- so the Overview has to be able to say so next to the grade.
-    scoring_meta = {"customFormula": (d.is_custom_formula or is_custom)()}
+    scoring_meta = {
+        "customFormula": (d.is_custom_formula or is_custom)(),
+        "formulaVersion": GRADE_ALGO_VERSION,
+    }
     all_runs = list_runs(reports_root, project)
     if not all_runs:
         return _empty_project_scores(scoring_meta), None

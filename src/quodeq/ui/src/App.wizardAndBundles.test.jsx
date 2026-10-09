@@ -169,6 +169,11 @@ describe('buildDashboardDataBundle', () => {
     expect(bundle.scoresPending).toBe(true);
   });
 
+  it('forwards formulaUpdated (the run hero never says the scores were recomputed without it)', () => {
+    const bundle = buildDashboardDataBundle({ state: { ...stubState(), formulaUpdated: true }, sharedHasContent: false });
+    expect(bundle.formulaUpdated).toBe(true);
+  });
+
   it('forwards every key DashboardPage destructures off its data prop', () => {
     const bundle = buildDashboardDataBundle({ state: stubState(), sharedHasContent: true });
     // Mirrors the destructure at the top of DashboardPage.

@@ -20,6 +20,7 @@ export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
     dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
     onRetry: state.refreshDashboardActive,
     scoresPending: state.scoresPending,
+    formulaUpdated: state.formulaUpdated,
     sharedProjectInfo: state.sharedProjectInfo,
     availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
     selectedDisplayName: state.selectedDisplayName,

@@ -32,6 +32,7 @@ from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.run.origin import RunOrigin
 from quodeq.shared import cancellation
 from quodeq.core.run.state import RunState, RunStatus, TERMINAL_STATES
+from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
 from quodeq.data.fs.run_status_store import read_status
 from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
@@ -98,6 +99,7 @@ class StatusWriter:
             commit_sha=self.commit_sha,
             commit_dirty=self.commit_dirty,
             origin=self.origin,
+            grade_algo_version=GRADE_ALGO_VERSION,
         )
         self._write_status(self.run_dir, status)
 

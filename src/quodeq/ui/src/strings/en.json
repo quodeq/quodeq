@@ -1851,6 +1851,7 @@
   "violations.unknownPrinciple": "(no principle)",
   "violations.dismissTypeCountDiffers": "Dismissed {actual} of the {expected} findings shown; the rest were already dismissed or are not in this run.",
   "overview.customFormulaNote": "custom formula",
+  "overview.formulaUpdatedNote": "scores recomputed with the current grade formula; this run was scanned with an older one",
   "gradeFormula.tabFormula": "FORMULA",
   "gradeFormula.tabTypes": "TYPES",
   "gradeFormula.stage1Title": "Rules, weighted",

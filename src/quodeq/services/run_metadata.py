@@ -13,13 +13,14 @@ from quodeq.services.wiring import read_status
 from quodeq.shared.dim_estimates_io import read_dim_estimates
 
 _KEY_COMMIT_SHA = "commit_sha"
+_KEY_GRADE_ALGO_VERSION = "grade_algo_version"
 _ESTIMATE_MISSES = "count"
 _ESTIMATE_CACHED = "cached"
 _ESTIMATE_EXCLUDED = "excluded"
 
 
 def read_run_metadata(run_dir: Path) -> dict[str, Any]:
-    """Commit SHA from status.json and per-dimension cache hits / misses /
+    """Commit SHA and grade formula version from status.json and per-dimension cache hits / misses /
     provider-excluded counts from dim_estimates.json. Missing inputs yield
     None / empty, never an error."""
     status = read_status(run_dir) or {}
@@ -31,4 +32,8 @@ def read_run_metadata(run_dir: Path) -> dict[str, Any]:
         }
         for dim, estimate in read_dim_estimates(run_dir).items()
     }
-    return {"commitSha": status.get(_KEY_COMMIT_SHA), "cacheStats": cache_stats}
+    return {
+        "commitSha": status.get(_KEY_COMMIT_SHA),
+        "gradeAlgoVersion": status.get(_KEY_GRADE_ALGO_VERSION),
+        "cacheStats": cache_stats,
+    }

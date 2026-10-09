@@ -73,6 +73,8 @@ def _build_status_payload(status: RunStatus) -> dict[str, Any]:
         payload["commit_dirty"] = status.commit_dirty
     if status.origin is not None:
         payload["origin"] = status.origin.to_dict()
+    if status.grade_algo_version is not None:
+        payload["grade_algo_version"] = status.grade_algo_version
     return payload
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from quodeq.core.scoring.constants import MAX_SCORE
+from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
 from quodeq.core.types import ScoringResult
 from quodeq.core.evidence.model import Evidence, violations_per_100_files
 from quodeq.data.fs.dimension_report._report_taxonomy import unmapped_types
@@ -57,6 +58,8 @@ def assemble_report_dict(data: ReportData) -> dict:
             "scoring_prompt_version": raw_meta.get("scoring_prompt_version"),
             "mapping_file_hash": raw_meta.get("mapping_file_hash"),
             "quodeq_version": raw_meta.get("quodeq_version"),
+            # The grade formula this report's numbers were computed with.
+            "gradeAlgoVersion": GRADE_ALGO_VERSION,
             # Tags the taxonomy could not place (spec 2026-09-15, section 7).
             "unmappedTypes": unmapped_types(data.evidence.get("principles") or {}),
         },

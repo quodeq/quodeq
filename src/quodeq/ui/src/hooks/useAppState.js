@@ -235,7 +235,7 @@ export function useAppState() {
   } = projectBundle;
   const { settings, granularity, onGranularityChange } = useDisplaySettings();
   const dashboardState = useSelectedRunDashboard({ activePage, projectBundle, historySelectedRun, setHistorySelectedRun });
-  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, pending, isFetching, scoresPending, error, availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfo, handleRunDeleted } = dashboardState;
+  const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, pending, isFetching, scoresPending, formulaUpdated, error, availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfo, handleRunDeleted } = dashboardState;
   const { visibleDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useRunPeriods({ dashboardState, projectBundle, granularity });
   const { overviewRunIndex, currentOverviewRun, isRunSwitchPending, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers } = useOverviewRunNavigation({ projectBundle, visibleDailyRuns, onNavigate: handleNavigate });
   const { liveEvaluation, isEvaluating, evaluationDeps } = useAppEvaluation(nav);
@@ -247,7 +247,7 @@ export function useAppState() {
     serverConnected, setServerConnected, serverVersion, serverInstanceId, navStack, activePage, navPending, navPop, navGoTo, navSwapAt, navTab,
     projects, projectsLoaded, projectsLoadFailed, retryLoadProjects, selectedProject, selectedSource, selectedRun, loadProjects, handleProjectChange, handleNavigate, handleNavigateReplace,
     handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
-    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, pending, isFetching, isDataPending, scoresPending, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex, sharedProjectInfo,
+    dashboard, accumulated, latestAccumulated, rescoreLookup, loading, pending, isFetching, isDataPending, scoresPending, formulaUpdated, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex, sharedProjectInfo,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect, prefetchHandlers,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,

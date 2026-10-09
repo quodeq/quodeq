@@ -12,12 +12,12 @@ import { dashboardPageClassName } from './dashboardGate.jsx';
 // position in DashboardPage's render.
 
 function renderReadyContent({ data, callbacks, runMode, projectInfo, selectedRunId, accumulatedDimensions, focus, handlers, refreshing }) {
-  const { dashboard, accumulated, availableRuns = [], dailyRuns, overviewRunIndex = 0, selectedProject, granularity = 'day', selectedSource, scoresPending = false, customFormula = false, onGranularityChange } = data;
+  const { dashboard, accumulated, availableRuns = [], dailyRuns, overviewRunIndex = 0, selectedProject, granularity = 'day', selectedSource, scoresPending = false, customFormula = false, formulaUpdated = false, onGranularityChange } = data;
   const { onRunSelect, onRunHover, onRunHoverEnd, onNavigate } = callbacks;
   return (
     <DashboardContent
       runMode={runMode}
-      data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula, refreshing }}
+      data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula, formulaUpdated, refreshing }}
       focus={focus}
       callbacks={{ onRunSelect, onRunHover, onRunHoverEnd, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
     />

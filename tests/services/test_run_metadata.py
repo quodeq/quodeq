@@ -34,4 +34,4 @@ def test_read_run_metadata_joins_sources(tmp_path: Path) -> None:
 
 
 def test_read_run_metadata_tolerates_missing_files(tmp_path: Path) -> None:
-    assert read_run_metadata(tmp_path) == {"commitSha": None, "cacheStats": {}}
+    assert read_run_metadata(tmp_path) == {"commitSha": None, "gradeAlgoVersion": None, "cacheStats": {}}

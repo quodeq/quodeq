@@ -92,6 +92,7 @@ export default function DashboardContent({ runMode, data, focus, callbacks }) {
       <RunOverviewPanel
         dashboard={data.dashboard}
         refreshing={data.refreshing}
+        formulaUpdated={data.formulaUpdated}
         selectedRunId={data.selectedRunId}
         selectedProject={selectedProject}
         selectedSource={selectedSource}
