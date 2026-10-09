@@ -151,7 +151,7 @@ def test_graded_high_confidence_no_violations():
 
 
 def test_weighted_overall_weighs_by_observation():
-    """A principle with no findings carries no observation, so it does not move the overall."""
+    """A principle with no findings is Insufficient with no observation, so it does not move the overall."""
     pe_low = PrincipleEvidence(
         practice_id="p-low", display_name="Low Conf", dimension="security",
         severity="high", violations=[], compliance=[],
@@ -172,7 +172,8 @@ def test_weighted_overall_weighs_by_observation():
         principles={"p-low": pe_low, "p-high": pe_high},
     )
     scores = score_evidence(ev, mode="numerical")
-    assert scores.principles["p-low"].grade != "Insufficient"
+    assert scores.principles["p-low"].grade == "Insufficient"
+    assert scores.principles["p-low"].final_score is None
     assert scores.principles["p-low"].observation == 0.0
     # Overall should reflect only p-high, not be dragged down by p-low
     assert scores.overall.weighted_score == scores.principles["p-high"].final_score

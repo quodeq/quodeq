@@ -72,9 +72,17 @@ def _base_kwargs(ctx: _PrincipleContext) -> dict:
 def _score_numerical(
     ctx: _PrincipleContext, params: ScoringParams = DEFAULT_PARAMS,
 ) -> PrincipleScore:
-    """Score a single principle in numerical mode. Thin evidence is scored and marked, not gated."""
+    """Score a single principle in numerical mode. Thin evidence is scored and marked, not gated.
+
+    A principle with no violations and no compliance (every finding dismissed)
+    is Insufficient, as in ``compute_principle_grade``, so it never reads 10.
+    """
     kwargs = _base_kwargs(ctx)
-    rows = requirement_rows(ctx.pdata.get("violations", []), ctx.pdata.get("compliance", []))
+    violations = ctx.pdata.get("violations", [])
+    compliance = ctx.pdata.get("compliance", [])
+    if not violations and not compliance:
+        return PrincipleScore(**kwargs, final_score=None, grade=Grade.INSUFFICIENT, observation=0.0)
+    rows = requirement_rows(violations, compliance)
     mass = principle_mass(rows, ctx.source_file_count, ctx.classes, params=params)
     base, lift, _raw, final = principle_stages(mass, params=params)
     return PrincipleScore(
