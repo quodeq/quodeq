@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { resolveRequirementText } from '../resolveRequirementText.js';
 import { t } from '../../../strings/index.js';
-import { KEY } from '../../../vocab/keyboard.js';
+import { onActivateKeys } from '../../../utils/activateKeys.js';
 import { NODE_TYPE } from '../standardTreeModel.js';
 import { pluralKey } from '../../../utils/plural.js';
 
@@ -50,15 +50,7 @@ function TreeNodeRow({ node, actions, titles, expand }) {
       onClick={() => { onClick(); if (showExpand) setExpanded((v) => !v); }}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => {
-        // Keys from the nested add/remove buttons belong to those buttons.
-        if (e.target !== e.currentTarget) return;
-        if (e.key === KEY.ENTER || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-          if (showExpand) setExpanded((v) => !v);
-        }
-      }}
+      onKeyDown={onActivateKeys(() => { onClick(); if (showExpand) setExpanded((v) => !v); })}
     >
       <TreeExpandIcon showExpand={showExpand} expanded={expanded} />
 
