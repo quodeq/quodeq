@@ -1,7 +1,7 @@
 {
   "agent_spawn": {
     "evaluation_db_opens": 7,
-    "peak_kib": 427,
+    "peak_kib": 428,
     "response_bytes": 0,
     "standards_reads": 5
   },
@@ -43,7 +43,7 @@
   },
   "run_page_findings_warm": {
     "evaluation_db_opens": 5,
-    "peak_kib": 13,
+    "peak_kib": 18,
     "response_bytes": 2295,
     "score_cache_opens": 0
   },
@@ -67,7 +67,7 @@
   "scores_as_of_warm": {
     "eval_report_reads": 2,
     "evaluation_db_opens": 10,
-    "peak_kib": 178,
+    "peak_kib": 179,
     "response_bytes": 3891
   }
 }
