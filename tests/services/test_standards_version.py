@@ -72,6 +72,28 @@ class TestStandardsFingerprint:
             json.dumps({"overrides": {"R1": {"max": 3}}}), encoding="utf-8")
         assert standards_fingerprint(project_dir, compiled_dir=compiled) != before
 
+    def test_editing_the_overrides_file_changes_it(self, tmp_path):
+        compiled = _compiled(tmp_path)
+        repo = tmp_path / "repo"
+        project_dir = _project(tmp_path, repo)
+        (repo / ".quodeq").mkdir()
+        overrides = repo / ".quodeq" / "standards-overrides.json"
+        overrides.write_text(json.dumps({"overrides": {"S-AUT-3": {"severity": "minor"}}}), encoding="utf-8")
+        before = standards_fingerprint(project_dir, compiled_dir=compiled)
+        overrides.write_text(json.dumps({"overrides": {"S-AUT-3": {"severity": "critical"}}}), encoding="utf-8")
+        assert standards_fingerprint(project_dir, compiled_dir=compiled) != before
+
+    def test_added_custom_evaluator_changes_it(self, tmp_path, monkeypatch):
+        compiled = _compiled(tmp_path)
+        evaluators = tmp_path / "evaluators"
+        evaluators.mkdir()
+        monkeypatch.setattr(
+            "quodeq.services.standards_version.standard_dirs", lambda: (compiled, evaluators))
+        project_dir = _project(tmp_path)
+        before = standards_fingerprint(project_dir, compiled_dir=compiled)
+        (evaluators / "custom.json").write_text("{}", encoding="utf-8")
+        assert standards_fingerprint(project_dir, compiled_dir=compiled) != before
+
     def test_other_projects_overrides_do_not_change_it(self, tmp_path):
         compiled = _compiled(tmp_path)
         project_dir = _project(tmp_path, tmp_path / "repo")

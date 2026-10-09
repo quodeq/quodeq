@@ -19,6 +19,7 @@ from quodeq.services.standards_overrides import changed_dimensions, override_cou
 from quodeq.services.standards_prefs import (
     clear_project_overrides,
     collect_declared_params,
+    collect_requirement_ids,
     load_project_overrides,
     save_project_overrides,
 )
@@ -36,6 +37,13 @@ def _declared_params(app: Flask) -> dict:
     compiled_dir = standards_compiled_dir(app)
     evaluators_dir = Path(app.config["STANDARDS_EVALUATORS_DIR"])
     return {**collect_declared_params(evaluators_dir), **collect_declared_params(compiled_dir)}
+
+
+def _known_requirements(app: Flask) -> frozenset[str]:
+    """Every requirement id of the compiled and custom standards (severity is overridable on any)."""
+    compiled_dir = standards_compiled_dir(app)
+    evaluators_dir = Path(app.config["STANDARDS_EVALUATORS_DIR"])
+    return collect_requirement_ids(evaluators_dir) | collect_requirement_ids(compiled_dir)
 
 
 def _persist_overrides(root: Path, project_id: str, clean: dict) -> None:
@@ -67,7 +75,8 @@ def _put_standards_overrides(app: Flask, project_id: str) -> Response:
     raw = payload.get("overrides")
     if raw is None:
         return invalid_body('Body must be {"overrides": {...}}')
-    clean, errors = validate_overrides(raw, _declared_params(app))
+    clean, errors = validate_overrides(
+        raw, _declared_params(app), known_requirements=_known_requirements(app))
     if errors:
         return invalid_payload("Invalid overrides", "invalid_overrides", errors)
     compiled_dir = standards_compiled_dir(app)
