@@ -39,10 +39,11 @@ test('liveStages: stored and live rows for the picked principle', () => {
   assert.equal(out.live[6].value, '7.1 Adequate');
 });
 
-test('liveStages: an insufficient principle gives the insufficient note', () => {
+test('liveStages: a principle without stage rows gives the no-run note', () => {
   const out = liveStages({ stored, live, status: STAGE_STATUS.READY }, 'Weak');
   assert.equal(out.stored, null);
-  assert.match(out.note, /Weak/);
+  assert.equal(out.live, null);
+  assert.equal(out.note, liveStages({ stored: null, live: null, status: STAGE_STATUS.READY }, null).note);
 });
 
 test('liveStages: a run that cannot be read says so, not "no run"', () => {

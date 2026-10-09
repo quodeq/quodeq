@@ -9,8 +9,17 @@ test('stageRows lists the stages in scoring order with their values', () => {
   assert.deepEqual(rows.map((r) => r.key), ['rules', 'base', 'lift', 'raw', 'ceiling', 'floor', 'final']);
   assert.equal(rows[0].value, '2 rules weigh 6.40');
   assert.equal(rows[1].value, '6.6');
-  assert.equal(rows[2].value, '1 compliance rule(s) lift 0.10 of the gap');
+  assert.equal(rows[2].value, '1 compliance rule lifts 0.10 of the gap');
   assert.equal(rows[6].value, '6.9 Adequate');
+});
+
+test('stageRows words a single rule in the singular and any other count in the plural', () => {
+  const one = stageRows({ ...stages, violationRules: 1, complianceRules: 3 });
+  assert.equal(one[0].value, '1 rule weighs 6.40');
+  assert.equal(one[2].value, '3 compliance rules lift 0.10 of the gap');
+  const none = stageRows({ ...stages, violationRules: 0, complianceRules: 0 });
+  assert.equal(none[0].value, '0 rules weigh 6.40');
+  assert.equal(none[2].value, '0 compliance rules lift 0.10 of the gap');
 });
 
 test('stageSummary of an insufficient principle has no rows and no final', () => {

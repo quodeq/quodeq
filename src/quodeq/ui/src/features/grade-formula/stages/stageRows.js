@@ -16,12 +16,18 @@ function num(v, decimals = ONE_DECIMAL) {
  * @returns {Array<{key: string, label: string, value: string}>}
  */
 export function stageRows(stages) {
+  const mass = num(stages.violationMass, TWO_DECIMALS);
+  const lift = num(stages.lift, TWO_DECIMALS);
   return [
     { key: 'rules', label: t('helpFigure.stageRules'),
-      value: t('helpFigure.stageRulesValue', { rules: stages.violationRules, mass: num(stages.violationMass, TWO_DECIMALS) }) },
+      value: stages.violationRules === 1
+        ? t('helpFigure.stageRulesValueOne', { mass })
+        : t('helpFigure.stageRulesValue', { rules: stages.violationRules, mass }) },
     { key: 'base', label: t('helpFigure.stageBase'), value: num(stages.base) },
     { key: 'lift', label: t('helpFigure.stageLift'),
-      value: t('helpFigure.stageLiftValue', { rules: stages.complianceRules, lift: num(stages.lift, TWO_DECIMALS) }) },
+      value: stages.complianceRules === 1
+        ? t('helpFigure.stageLiftValueOne', { lift })
+        : t('helpFigure.stageLiftValue', { rules: stages.complianceRules, lift }) },
     { key: 'raw', label: t('helpFigure.stageRaw'), value: num(stages.raw) },
     { key: 'ceiling', label: t('helpFigure.stageCeiling'), value: num(stages.ceiling) },
     { key: 'floor', label: t('helpFigure.stageFloor'), value: num(stages.floor) },
