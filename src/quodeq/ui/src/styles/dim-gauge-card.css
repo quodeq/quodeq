@@ -97,6 +97,11 @@
   text-transform: uppercase;
 }
 
+.dim-gauge-card__grade--small { font-size: 0.45rem; }
+.dim-gauge-card--not-evaluated { font-size: inherit; text-align: inherit; width: 100%; }
+.dim-gauge-card--not-evaluated .dim-gauge-card__insuf-line { display: block; }
+.dim-gauge-card--not-evaluated .dim-gauge-card__name { color: var(--color-text-muted); }
+
 /* meta + severity */
 .dim-gauge-card__meta {
   font-size: var(--text-xs);

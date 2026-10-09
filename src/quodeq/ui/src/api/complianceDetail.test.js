@@ -97,6 +97,24 @@ test('selector: keeps the rows matching every field the items are unanimous on',
   assert.equal(byPrinciple(full('a.py', 1, 'P2')), false);
 });
 
+test('selector: a requirement\'s file keeps only that code, whatever its paths share', () => {
+  // A by-type file opened from Fix first: the items carry no principle, only
+  // their code. Without the code the shared path prefix let every other
+  // requirement under it onto the page.
+  const select = pageSelector([
+    slim('src/a/x.py', 1, undefined, { req: 'R-1' }),
+    slim('src/b/y.py', 2, undefined, { req: 'R-1' }),
+  ]);
+  assert.equal(select(full('src/c/z.py', 3, undefined, { req: 'R-1' })), true);
+  assert.equal(select(full('src/a/x.py', 9, undefined, { req: 'R-2' })), false);
+});
+
+test('selector: a folder\'s file keeps that folder, not its subfolders', () => {
+  const select = pageSelector([slim('src/svc/a.py', 1, 'P1'), slim('src/svc/b.py', 2, 'P2')]);
+  assert.equal(select(full('src/svc/c.py', 3, 'P3')), true);
+  assert.equal(select(full('src/svc/sub/d.py', 4, 'P1')), false);
+});
+
 test('selector: items that agree on nothing take every row', () => {
   const select = pageSelector([slim('a.py', 1, 'P1'), slim('b.py', 2, 'P2')]);
   assert.equal(select(full('zzz.py', 1, 'P9')), true);
