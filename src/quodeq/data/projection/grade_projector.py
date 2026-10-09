@@ -18,6 +18,7 @@ from quodeq.core.types.finding import Finding
 from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.grade_formula_store import load_params
 from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_reports
+from quodeq.data.fs.run_files import read_run_manifest
 from quodeq.data.fs.severity_classes_store import (
     load_severity_classes_for_run,
     severity_classes_fingerprint,
@@ -33,17 +34,19 @@ from quodeq.core.scoring.projector_scoring import (
     compute_principle_grade,
 )
 
+_MANIFEST_SOURCE_FILES_KEY = "source_files_count"
+
 
 def _read_source_file_count(run_dir: Path) -> int:
-    """Best-effort: pick up the run's ``sourceFileCount`` from any dim JSON.
+    """Best-effort: the run's project size, from a dim JSON or the scan manifest.
 
-    The projector needs this to apply the CLI's confidence-level thresholds
-    (which scale with project size). Every ``evaluation/<dim>.json`` in the
-    run carries the same value; we read the first one we find. Returns 0
-    when no JSON exists yet (early projection of a run-in-progress) — that
-    falls back to the unsclaed base thresholds in
-    ``classify_confidence_level``, matching the CLI's behaviour for runs
-    without a known file count.
+    The projector needs it for the confidence thresholds and the requirement
+    spread, both of which scale with project size. Every
+    ``evaluation/<dim>.json`` in the run carries the same ``sourceFileCount``;
+    the first one found wins. A live run has no dim JSON yet, so the count
+    the scan recorded in ``evidence/manifest.json`` (``source_files_count``)
+    stands in; without it the spread would score the run as if the size were
+    unknown. Returns 0 only when neither carries a count.
     """
     for _dimension, data in iter_readable_eval_reports(run_dir):
         if not isinstance(data, dict):
@@ -51,7 +54,9 @@ def _read_source_file_count(run_dir: Path) -> int:
         count = data.get("sourceFileCount")
         if isinstance(count, int) and count > 0:
             return count
-    return 0
+    manifest = read_run_manifest(run_dir) or {}
+    count = manifest.get(_MANIFEST_SOURCE_FILES_KEY)
+    return count if isinstance(count, int) and count > 0 else 0
 
 
 _SELECT_NON_DISMISSED = (

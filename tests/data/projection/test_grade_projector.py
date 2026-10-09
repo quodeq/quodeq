@@ -161,3 +161,35 @@ def test_recompute_grades_exit_reason_none_when_done_clean(tmp_path: Path) -> No
     rows = store.read_dimension_scores()
     sec = next(r for r in rows if r["dimension"] == "security")
     assert sec["exit_reason"] is None
+
+
+def _write_manifest(run_dir: Path, count: int) -> None:
+    (run_dir / "evidence").mkdir(parents=True, exist_ok=True)
+    (run_dir / "evidence" / "manifest.json").write_text(f'{{"source_files_count": {count}}}')
+
+
+def test_read_source_file_count_falls_back_to_the_manifest_on_a_live_run(tmp_path: Path) -> None:
+    """A live run has no dim JSON yet; the scan manifest's count stands in."""
+    _write_manifest(tmp_path, 2803)
+    assert _read_source_file_count(tmp_path) == 2803
+
+
+def test_read_source_file_count_prefers_the_dim_json_over_the_manifest(tmp_path: Path) -> None:
+    """Either order of arrival: the dim JSON wins once it exists, the manifest before it."""
+    _write_manifest(tmp_path, 40)
+    assert _read_source_file_count(tmp_path) == 40
+    (tmp_path / "evaluation").mkdir()
+    (tmp_path / "evaluation" / "security.json").write_text('{"sourceFileCount": 41}')
+    assert _read_source_file_count(tmp_path) == 41
+
+    other = tmp_path / "other"
+    (other / "evaluation").mkdir(parents=True)
+    (other / "evaluation" / "security.json").write_text('{"sourceFileCount": 41}')
+    _write_manifest(other, 40)
+    assert _read_source_file_count(other) == 41
+
+
+def test_read_source_file_count_is_zero_without_either(tmp_path: Path) -> None:
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "evidence" / "manifest.json").write_text('{"language_stats": {}}')
+    assert _read_source_file_count(tmp_path) == 0
