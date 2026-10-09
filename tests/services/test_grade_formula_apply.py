@@ -17,7 +17,7 @@ from quodeq.services import grade_formula
 from tests.services._grade_formula_fixtures import formula_path  # noqa: F401 -- pytest fixture
 
 _STRICT = dataclasses.replace(
-    DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 6.0, "minor": 0.25},
+    DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 3.5, "minor": 0.25},
 )
 
 

@@ -600,8 +600,6 @@ tests/core/test_finding_marker_persistence.py:40:private-module:quodeq.analysis.
 tests/core/test_finding_marker_persistence.py:41:private-module:quodeq.analysis._report_findings.flatten_findings
 tests/core/test_finding_marker_persistence.py:46:private-module:quodeq.data.fs.report_parser._report_parsing.build_finding
 tests/core/test_finding_marker_persistence.py:46:private-module:quodeq.data.fs.report_parser._report_parsing.parse_report_json
-tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring.principle._build_context
-tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring.principle._score_numerical
 tests/core/test_judgment_to_dict_taxonomy.py:11:private-module:quodeq.core.scoring._tallies.evidence_has_taxonomy
 tests/core/test_projector_scoring_custom.py:122:private-module:quodeq.services.scoring._summary.recompute_summary
 tests/core/test_projector_scoring_custom.py:142:private-module:quodeq.services.scoring._summary.recompute_summary

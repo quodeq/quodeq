@@ -164,7 +164,7 @@ def validate_params(params: ScoringParams) -> list[str]:
     weights = params.severity_weight
     try:
         climbs = weights["minor"] < weights["major"] < weights["critical"]
-    except KeyError:
+    except (KeyError, TypeError):
         climbs = False
     if not climbs:
         errors.append("severity weights must be strictly increasing: minor < major < critical")

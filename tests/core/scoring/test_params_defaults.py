@@ -20,3 +20,9 @@ def test_non_increasing_weights_are_rejected():
     params = dataclasses.replace(DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 4.0, "minor": 0.25})
     errors = validate_params(params)
     assert any("strictly increasing" in e for e in errors)
+
+
+def test_a_none_weight_is_an_error_not_a_crash():
+    params = dataclasses.replace(DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": None, "minor": 0.25})
+    errors = validate_params(params)
+    assert any("strictly increasing" in e for e in errors)
