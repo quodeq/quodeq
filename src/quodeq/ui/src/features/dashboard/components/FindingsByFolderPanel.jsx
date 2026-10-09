@@ -39,6 +39,9 @@ export default function FindingsByFolderPanel({ dimensions, onFolderClick }) {
           {prefix ? t('overview.foldersNoteIn', { prefix }) : t('overview.foldersNote')}
         </span>
       </div>
+      {/* Open, the list scrolls inside the panel: the panel keeps its
+          height, so the score history beside it never stretches. */}
+      <div className={`folders-panel__list${open ? ' folders-panel__list--open' : ''}`}>
       <GridTable columns="minmax(0, 1fr) auto 48px" dense>
         {list.map((r) => (
           <GridRow key={r.dir} onClick={onFolderClick ? () => onFolderClick(r) : undefined}>
@@ -47,6 +50,7 @@ export default function FindingsByFolderPanel({ dimensions, onFolderClick }) {
           </GridRow>
         ))}
       </GridTable>
+      </div>
       <div className="folders-panel__foot">
         {t('overview.foldersFoot', { folders: rows.length.toLocaleString(LOCALE), files: fileCount.toLocaleString(LOCALE) })}
       </div>
