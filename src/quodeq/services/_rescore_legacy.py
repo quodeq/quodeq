@@ -16,7 +16,7 @@ from quodeq.core.scoring.mass import principle_mass, requirement_rows
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.report import PrincipleGrade
-from quodeq.core.types.scoring import PrincipleScore
+from quodeq.core.types.scoring import ConfidenceLevel, PrincipleScore
 
 
 def _score_principle(
@@ -84,7 +84,7 @@ def score_all_principles(
 
         principle_scores[name] = PrincipleScore(
             display_name=name, weight="1", final_score=final_score, grade=grade,
-            confidence_level=confidence or "low", observation=observation,
+            confidence_level=confidence or ConfidenceLevel.LOW, observation=observation,
         )
         principle_grades.append(PrincipleGrade(principle=name, score=score_str, grade=grade))
     return principle_scores, principle_grades

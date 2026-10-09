@@ -95,10 +95,13 @@ def _recompute_metrics(evidence, source_file_count: int) -> None:
         pe.compute_metrics(source_file_count=source_file_count)
 
 
-def _parse_evidence_jsonl(jsonl: Path, run_dir: Path, dim_id: str, request: EvidenceScoreRequest):
+def _parse_evidence_jsonl(
+    jsonl: Path, run_dir: Path, dim_id: str, request: EvidenceScoreRequest,
+    dirs: tuple[Path | None, Path | None],
+):
     """Parse the evidence jsonl into an Evidence object, or None on any
     parse failure (logged at warning)."""
-    compiled_dir, evaluators_dir = (request.standard_dirs_fn or standard_dirs)()
+    compiled_dir, evaluators_dir = dirs
     try:
         return parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
@@ -183,7 +186,8 @@ def rescore_dimension_from_evidence(
     jsonl = _resolve_evidence_jsonl(run_dir, dim_id)
     if jsonl is None or evidence_file_size(jsonl) == 0:
         return EvidenceRescore(None, 0)
-    evidence = _parse_evidence_jsonl(jsonl, run_dir, dim_id, request)
+    dirs = (request.standard_dirs_fn or standard_dirs)()
+    evidence = _parse_evidence_jsonl(jsonl, run_dir, dim_id, request, dirs)
     if evidence is None:
         return EvidenceRescore(None, 0)
 
@@ -191,7 +195,9 @@ def rescore_dimension_from_evidence(
     if excluded == 0 and not score_when_nothing_excluded:
         return EvidenceRescore(None, 0)
     _recompute_metrics(evidence, request.source_file_count)
-    classes = request.classes if request.classes is not None else load_severity_classes_for_run(run_dir)
+    classes = request.classes
+    if classes is None:
+        classes = load_severity_classes_for_run(run_dir, standard_dirs_fn=lambda: dirs)
 
     # Broad catch on purpose (mirrors mutation_rescore and the CLI print
     # guard): the engine can throw on edge-case evidence, and every consumer
