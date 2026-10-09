@@ -181,6 +181,15 @@ describe('pure level compute functions', () => {
     }));
     expect(containsFunction(info)).toBe(false);
   });
+
+  it('computePrincipleLevelInfo carries the principle confidence into evalPrincipal', () => {
+    const scene = makeScene();
+    scene.principles[0][0].confidence = 'low';
+    const info = computePrincipleLevelInfo(scene, { depth: 2, dim: 0, prin: 0 });
+    expect(info.detailTarget.payload.evalPrincipal.confidence).toBe('low');
+    delete scene.principles[0][0].confidence;
+    expect(computePrincipleLevelInfo(scene, { depth: 2, dim: 0, prin: 0 }).detailTarget.payload.evalPrincipal.confidence).toBeNull();
+  });
 });
 
 describe('buildBreadcrumb', () => {
