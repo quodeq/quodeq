@@ -76,6 +76,11 @@ class PrincipleScore:
     grade: str = _DEFAULT_GRADE
     base_grade: str | None = None
     severity_drops: int | None = None
+    # Spread-based masses (core/scoring/mass.py); observation is this
+    # principle's weight in its dimension's mean.
+    observation: float = 0.0
+    violation_mass: float = 0.0
+    compliance_mass: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,7 +95,7 @@ class OverallScore:
     weighted_score: float | None = None
     weighted_grade: str | None = None
     grade: str | None = None
-    total_weight: int = 0
+    total_weight: float = 0.0
     confidence: str | None = None
     confidence_reason: str | None = None
 

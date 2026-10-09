@@ -1,28 +1,26 @@
 """Principle-level scoring logic (internal module)."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from quodeq.core.types import ConfidenceLevel, PrincipleScore
 from quodeq.core.evidence.model import DEFAULT_WEIGHT
 from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.overall import MODE_NUMERICAL
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
+from quodeq.core.scoring.mass import principle_mass, requirement_rows
 from quodeq.core.scoring.internals import (
     build_deductions,
-    clamp_principle_score,
     compliance_dampening,
-    compliance_lift,
     confidence_interval_for,
     count_grade_drops,
     drop_grade,
     evidence_has_taxonomy,
+    principle_stages,
     score_to_grade_label,
     tally_types,
-    violation_base,
 )
-
-_BASE_SCORE = 10
 
 
 @dataclass(frozen=True)
@@ -37,6 +35,8 @@ class _PrincipleContext:
     conf_level: str
     ci: dict
     scale_mult: int
+    source_file_count: int = 0
+    classes: Mapping[str, str] = field(default_factory=dict)
 
 
 def compute_tallies(
@@ -72,23 +72,18 @@ def _base_kwargs(ctx: _PrincipleContext) -> dict:
 def _score_numerical(
     ctx: _PrincipleContext, params: ScoringParams = DEFAULT_PARAMS,
 ) -> PrincipleScore:
-    """Score a single principle in numerical mode."""
+    """Score a single principle in numerical mode. Thin evidence is scored and marked, not gated."""
     kwargs = _base_kwargs(ctx)
-    if ctx.conf_level == ConfidenceLevel.LOW:
-        return PrincipleScore(
-            **kwargs, base_score=0,
-            deductions=build_deductions({}, scale_multiplier=ctx.scale_mult),
-            final_score=0.0, grade=Grade.INSUFFICIENT,
-        )
-    base = violation_base(ctx.vt_counts, params=params)
-    lift = compliance_lift(ctx.ct_counts, ctx.vt_counts, params=params)
-    raw = base + (_BASE_SCORE - base) * lift
-    final_pts = clamp_principle_score(raw, ctx.vt_counts, params=params)
+    rows = requirement_rows(ctx.pdata.get("violations", []), ctx.pdata.get("compliance", []))
+    mass = principle_mass(rows, ctx.source_file_count, ctx.classes, params=params)
+    base, lift, _raw, final = principle_stages(mass, params=params)
     return PrincipleScore(
         **kwargs, base_score=round(base, 1),
         deductions=build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult),
-        dampening_multiplier=lift, final_score=final_pts,
-        grade=score_to_grade_label(final_pts, params=params),
+        dampening_multiplier=lift, final_score=final,
+        grade=score_to_grade_label(final, params=params),
+        observation=mass.observation, violation_mass=mass.violation_mass,
+        compliance_mass=mass.compliance_mass,
     )
 
 
@@ -118,6 +113,7 @@ def _score_graded(
 
 def _build_context(
     key: str, pdata: dict, scale_mult: int, files_read: int,
+    source_file_count: int = 0, classes: Mapping[str, str] | None = None,
 ) -> _PrincipleContext:
     """Build scoring context for a single principle from its evidence data."""
     metrics = pdata.get("metrics", {})
@@ -136,17 +132,22 @@ def _build_context(
         key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
         ct_counts=ct_counts,
         using_taxonomy=using_taxonomy, conf_level=conf_level, ci=ci,
-        scale_mult=scale_mult,
+        scale_mult=scale_mult, source_file_count=source_file_count,
+        classes=classes or {},
     )
 
 
 def score_all_principles(
     raw_principles: dict, mode: str, scale_mult: int, files_read: int,
     params: ScoringParams = DEFAULT_PARAMS,
+    *, source_file_count: int = 0, classes: Mapping[str, str] | None = None,
 ) -> dict[str, PrincipleScore]:
     """Score every principle and return the per-principle dict."""
     scorer = _score_numerical if mode == MODE_NUMERICAL else _score_graded
     return {
-        key: scorer(_build_context(key, pdata, scale_mult, files_read), params)
+        key: scorer(
+            _build_context(key, pdata, scale_mult, files_read, source_file_count, classes),
+            params,
+        )
         for key, pdata in raw_principles.items()
     }
