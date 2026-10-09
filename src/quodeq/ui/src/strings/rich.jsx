@@ -9,6 +9,7 @@
 // pieces (see the impactBody keys in the standards sweep for that lesson).
 // One key per sentence, with the code spans marked inline, keeps the sentence
 // whole and the markup out of the translator's way.
+import { Fragment } from 'react';
 import { t } from './index.js';
 
 // Bold is tried first at each position, so a backtick inside **...** stays
@@ -34,4 +35,28 @@ export function renderRich(text) {
 
 export function tRich(key, vars) {
   return renderRich(t(key, vars));
+}
+
+const SLOT = /\{(\w+)\}/g;
+
+/**
+ * One catalog sentence whose placeholders are React nodes (a link, a
+ * coloured name), not strings: the sentence stays whole for translators,
+ * and each {name} is swapped for slots[name]. A placeholder with no slot is
+ * left as written, the same as t().
+ */
+export function tSlots(key, slots) {
+  const template = t(key);
+  const nodes = [];
+  let last = 0;
+  let match;
+  SLOT.lastIndex = 0;
+  while ((match = SLOT.exec(template)) !== null) {
+    if (!Object.hasOwn(slots, match[1])) continue;
+    if (match.index > last) nodes.push(template.slice(last, match.index));
+    nodes.push(<Fragment key={match.index}>{slots[match[1]]}</Fragment>);
+    last = match.index + match[0].length;
+  }
+  if (last < template.length) nodes.push(template.slice(last));
+  return <>{nodes}</>;
 }

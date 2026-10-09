@@ -3,9 +3,6 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import RadarPanelShell from './RadarPanelShell.jsx';
 import CompareRadarPanel from './CompareRadarPanel.jsx';
-import CompareDuelShapePanel from './CompareDuelShapePanel.jsx';
-
-const dim = (label, value) => ({ label, a: value, b: value - 1 });
 
 function radarView(count) {
   return {
@@ -80,30 +77,5 @@ describe('compare radar panels', () => {
     );
     expect(container.querySelector('.compare-panel__fallback')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: /radar chart/i })).toBeNull();
-  });
-
-  it('CompareDuelShapePanel draws both projects in the legend', () => {
-    const { container } = render(
-      <CompareDuelShapePanel
-        sharedDims={[dim('One', 8), dim('Two', 7), dim('Three', 6)]}
-        a={{ name: 'Proj A' }}
-        b={{ name: 'Proj B' }}
-      />
-    );
-    expect(screen.getByRole('img', { name: /radar chart/i })).toBeInTheDocument();
-    expect(container.querySelector('.compare-duel__legendItem--a')).toHaveTextContent('Proj A');
-    expect(container.querySelector('.compare-duel__legendItem--b')).toHaveTextContent('Proj B');
-  });
-
-  it('CompareDuelShapePanel shows the fallback with fewer than three shared dimensions', () => {
-    const { container } = render(
-      <CompareDuelShapePanel
-        sharedDims={[dim('One', 8), dim('Two', 7)]}
-        a={{ name: 'Proj A' }}
-        b={{ name: 'Proj B' }}
-      />
-    );
-    expect(container.querySelector('.compare-panel__fallback')).toBeInTheDocument();
-    expect(container.querySelector('.compare-duel__legendItem--a')).toBeNull();
   });
 });
