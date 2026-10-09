@@ -81,10 +81,9 @@ export function buildProjectSwitcherProps({ state, navigation, navTab, navStack 
   };
 }
 
-// The MainContent/route props bundle — extracted verbatim from App.jsx's
-// inline object literal. Pure: every field is either passed straight
-// through or built from an existing builder (buildDashboardDataBundle /
-// buildNavigationBundle), no new derivation.
+// The MainContent/route props bundle. Pure: every field is either passed
+// straight through or built from an existing builder
+// (buildDashboardDataBundle / buildNavigationBundle), no new derivation.
 export function buildContentProps({
   state, sharedSignal, navTab, navStackLength, isEvaluating, showToast, setWizardEntry,
   dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey,
