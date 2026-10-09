@@ -161,6 +161,13 @@ def validate_params(params: ScoringParams) -> list[str]:
                 f"severity_weight[{sev}] must be between "
                 f"{_SEVERITY_WEIGHT_RANGE[0]} and {_SEVERITY_WEIGHT_RANGE[1]}, got {w}"
             )
+    weights = params.severity_weight
+    try:
+        climbs = weights["minor"] < weights["major"] < weights["critical"]
+    except KeyError:
+        climbs = False
+    if not climbs:
+        errors.append("severity weights must be strictly increasing: minor < major < critical")
     labels = tuple(label for _, label in params.grade_thresholds)
     if labels != GRADE_LABELS:
         errors.append(f"grade threshold labels must be {GRADE_LABELS}, got {labels}")
