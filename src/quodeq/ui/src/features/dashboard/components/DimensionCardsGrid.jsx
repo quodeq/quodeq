@@ -1,5 +1,6 @@
 import DimensionGaugeCard from './DimensionGaugeCard.jsx';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
+import { EVIDENCE_CONFIDENCE } from '../../../vocab/evidenceConfidence.js';
 
 // Cards keep the incoming (alphabetical) order regardless of the selected
 // period: changing the day/week/month re-dims cards but never reorders them,
@@ -19,6 +20,7 @@ export default function DimensionCardsGrid({ sortedDimensions, onDimensionClick,
             delta={delta}
             onDimensionClick={onDimensionClick}
             evaluatedToday={isActive}
+            thinEvidence={item.confidence === EVIDENCE_CONFIDENCE.LOW}
           />
         );
       })}

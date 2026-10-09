@@ -16,6 +16,7 @@ import { useRunFindings } from '../hooks/useRunFindings.js';
 import { HERO_CARD_KIND } from '../dashboardVocab.js';
 import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { NAV_TAB } from '../../../vocab/navTab.js';
+import { EVIDENCE_CONFIDENCE } from '../../../vocab/evidenceConfidence.js';
 
 export { RunHeroSection };
 
@@ -38,6 +39,7 @@ function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionCl
           onDimensionClick={onDimensionClick}
           selectedRunId={selectedRunId}
           dateLabel={dateLabel}
+          thinEvidence={item.confidence === EVIDENCE_CONFIDENCE.LOW}
         />
       ))}
     </div>

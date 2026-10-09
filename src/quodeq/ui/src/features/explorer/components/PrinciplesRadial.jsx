@@ -30,6 +30,8 @@ const INSUFFICIENT_DOT_RADIUS_FRACTION = 0.2;
 const LABEL_OFFSET = 18;     // svg units beyond the outer ring (name baseline)
 const VERT_RADIUS = 3.2;
 const INSUF_RADIUS = 3.0;
+// Hollow ring around a scored vertex that rests on thin evidence.
+const THIN_HALO_RADIUS = VERT_RADIUS + 3;
 // Horizontal padding around the plot so long principle names don't clip.
 const VIEWBOX_PAD_X = 140;
 const VIEWBOX_PAD_Y = 24;
@@ -109,8 +111,8 @@ function RadialPolyline({ showPolyline, points, isClosed, polylineFill }) {
   );
 }
 
-/* Plotted vertices, plus a small dashed marker near centre for each
- * insufficient-evidence axis. */
+/* Plotted vertices (a hollow ring around those on thin evidence), plus a small
+ * dashed marker near centre for each insufficient-evidence axis. */
 function RadialVertices({ points, plotted, principles, angles, outerRadius, onPrincipleClick, handleClick, handleKey }) {
   return (
     <>
@@ -132,6 +134,17 @@ function RadialVertices({ points, plotted, principles, angles, outerRadius, onPr
           />
         );
       })}
+      {points.map(([x, y], idx) => (plotted[idx].thin ? (
+        <circle
+          key={`thin-${idx}`}
+          className="qd-radial__vert--insuf"
+          cx={x}
+          cy={y}
+          r={THIN_HALO_RADIUS}
+          fill="none"
+          pointerEvents="none"
+        />
+      ) : null))}
       {principles.map((p, i) => {
         if (p.hasEvidence) return null;
         const [x, y] = polar(angles[i], outerRadius * INSUFFICIENT_DOT_RADIUS_FRACTION);

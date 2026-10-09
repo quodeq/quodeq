@@ -157,6 +157,7 @@ function computeGaugeRing(overallScore) {
  * @param {boolean}  [props.evaluatedToday=true] - accumulated overview only: mutes the frame when false
  * @param {string}   [props.dateLabel]         - forwarded to children for run overview
  * @param {string}   [props.selectedRunId]     - forwarded to click handler for run overview
+ * @param {boolean}  [props.thinEvidence=false] - scored, but on few observations: adds the thin-evidence line
  */
 function computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunId }) {
   const violationCount = item.totals?.violationCount ?? 0;
@@ -183,6 +184,7 @@ export default function DimensionGaugeCard({
   dateLabel,
   selectedRunId,
   isInsufficient = false,
+  thinEvidence = false,
 }) {
   const {
     scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev,
@@ -220,6 +222,7 @@ export default function DimensionGaugeCard({
           summaryId={summaryId}
         />
       )}
+      {thinEvidence && !isInsufficient ? <div className="dim-gauge-card__insuf-line">{t('overview.thinEvidence')}</div> : null}
 
       <CoverageLine
         dateText={dateText}
