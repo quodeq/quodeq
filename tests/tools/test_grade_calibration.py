@@ -132,3 +132,15 @@ def test_names_are_cut_and_paths_never_printed(tmp_path: Path, capsys) -> None:
     assert long_name[:12] in out and "AnotherVeryL" in out
     for forbidden in (long_name, "AnotherVeryLongProjectName", "/Users/secret", str(tmp_path)):
         assert forbidden not in out
+
+
+def test_a_principle_stored_as_insufficient_is_still_scored(tmp_path: Path) -> None:
+    """Thin principles an older formula gated are scored by the current one, so the harness keeps them."""
+    found = [{"principle": "P", "req": "S-INT-2", "severity": "minor", "file": "a.java"}]
+    path = tmp_path / "proj" / "r1" / "evaluation" / "security.json"
+    _report(path, "security", "9.0/10", found)
+    data = json.loads(path.read_text())
+    data["principles"] = [{"name": "P", "score": None, "grade": "Insufficient"}, {"name": "Empty", "grade": "Insufficient"}]
+    path.write_text(json.dumps(data))
+    (report,) = load_reports([tmp_path])
+    assert set(report.principles) == {"P"}

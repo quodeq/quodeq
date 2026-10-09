@@ -19,7 +19,6 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from quodeq.core.scoring.mass import finding_key  # noqa: E402
-from quodeq.core.scoring.constants import Grade  # noqa: E402
 
 ENCODING = "utf-8"
 INDEX_FILE = "project_index.json"
@@ -83,11 +82,16 @@ def _reduce(item: dict) -> dict:
 
 
 def _principles(data: dict) -> dict[str, tuple[list[dict], list[dict]]]:
-    """``{principle: (violations, compliance)}`` for the principles that were graded and have findings."""
+    """``{principle: (violations, compliance)}`` for every listed principle with findings or compliance.
+
+    The stored grade does not filter: a principle an older formula gated to
+    Insufficient is scored by the current one, so dropping it would leave the
+    "current" column on a different principle set than production.
+    """
     graded = {
         str(p.get("name")): ([], [])
         for p in data.get("principles") or []
-        if isinstance(p, dict) and p.get("grade") != Grade.INSUFFICIENT
+        if isinstance(p, dict)
     }
     for slot, key in ((0, "violations"), (1, "compliance")):
         for item in data.get(key) or []:
