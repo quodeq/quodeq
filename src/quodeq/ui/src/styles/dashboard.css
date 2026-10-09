@@ -1266,15 +1266,23 @@
 .folder-path__tail { color: var(--color-text); transition: color 0.12s; }
 .term-grid__row--clickable:hover .folder-path__tail { color: var(--color-accent); }
 
-/* Open: the same height as the closed list (8 dense rows), scrolling. */
-.folders-panel__list--open {
-  max-height: 272px;
+/* The panel is a column; the list takes what the row gives it (the chart's
+   height beside the score history) and scrolls. On its own it asks for
+   about eight rows. */
+.folders-panel {
+  display: flex;
+  flex-direction: column;
+}
+.folders-panel__list {
+  flex: 1 1 272px;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .folders-panel__foot {
-  padding: var(--space-2) var(--space-4) 0;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-top: 1px solid var(--color-border);
   font-family: var(--term-font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
