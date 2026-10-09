@@ -1,85 +1,39 @@
 /**
- * CompareFleetView — the Compare tab's landing view, cut by information
- * priority (the "3a triage-first" design): scope-wide stat cards, the
- * needs-attention strip promoted to the top, a single-line projects table
- * with click-to-expand detail, and a compact dimensions board.
+ * CompareFleetView: the Compare tab's landing view, an overview of the
+ * projects in scope for a manager's first glance and an analyst's second:
  *
- * Everything trimmed from the v2 table (severity split, sparkline,
- * coverage, per-dimension chips) lives inside a row's expansion; projects
- * that were never evaluated collapse into a single line.
+ *   summary strip      where the fleet stands, in six numbers
+ *   projects table     ranked on a shared axis, exposure per size
+ *   score matrix       every project against every dimension
+ *   direction map      score against 30-day movement | needs attention
+ *   dimension health   grade mix per dimension, weakest first
+ *
+ * One hover state links the table, the map and the attention list: point
+ * at a project anywhere and it lights up everywhere.
  */
-import CompareMatrix from './CompareMatrix.jsx';
-import { t } from '../../../strings/index.js';
+import { useState } from 'react';
 import CompareFleetHeader from './CompareFleetHeader.jsx';
-import CompareFleetStatCards from './CompareFleetStatCards.jsx';
-import CompareAttentionStrip from './CompareAttentionStrip.jsx';
-import CompareDimensionsBoard from './CompareDimensionsBoard.jsx';
-import CompareProjectsTable from './CompareProjectsTable.jsx';
-import { nf, score1 } from '../compareFormatters.js';
-import { REASON_TYPE } from '../compareBoard.js';
+import CompareFleetKpis from './CompareFleetKpis.jsx';
+import CompareFleetTable from './CompareFleetTable.jsx';
+import CompareFleetMatrix from './CompareFleetMatrix.jsx';
+import CompareDirectionMap from './CompareDirectionMap.jsx';
+import CompareAttentionList from './CompareAttentionList.jsx';
+import CompareDimensionHealth from './CompareDimensionHealth.jsx';
+import ComparePanel from './ComparePanel.jsx';
+import { t } from '../../../strings/index.js';
 import { CONSEQUENCE_LEVEL } from '../compareFleet.js';
 
-// Top-N by consequence always shown in the attention strip; beyond that
-// only rows that actually flag ('watch'+) qualify (see partitionFleetRows).
+// Top-N by consequence always shown in the attention list; beyond that
+// only rows that actually flag ('watch'+) qualify.
 const ATTENTION_LEAD_COUNT = 3;
 
-function buildAttentionItems(attnAll, onOpenProject, openDimension) {
-  return attnAll.map(({ row, level, reasons, worstDim }) => ({
-    key: row.id,
-    level,
-    accentScore: row.score,
-    name: row.name,
-    onNameClick: () => onOpenProject(row.id),
-    why: reasons.map((r) => {
-      if (r.type === REASON_TYPE.WORST_DIM) return t('compare.reasonWorstDim', { dim: r.dim, score: score1(r.score) });
-      if (r.type === REASON_TYPE.DECLINING) return t('compare.reasonDeclining', { delta: r.delta });
-      if (r.type === REASON_TYPE.STALE) {
-        return r.commits != null
-          ? t('compare.reasonStaleCommits', { count: nf(r.commits) })
-          : t('compare.reasonStale');
-      }
-      if (r.type === REASON_TYPE.COVERAGE) return t('compare.reasonCoverage', { pct: r.pct });
-      return null;
-    }).filter(Boolean).join(' · '),
-    extra: worstDim && (
-      <button
-        type="button"
-        className="compare-attention__link"
-        onClick={() => openDimension(worstDim)}
-      >
-        {t('compare.openDimension', { dim: worstDim })} ›
-      </button>
-    ),
-  }));
-}
-
-function buildFleetMatrixRows(scoredRows, onOpenProject, onOpenProjectDimension) {
-  return scoredRows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    remote: row.remote,
-    overall: row.score,
-    onOpenRow: () => onOpenProject(row.id),
-    cells: Object.fromEntries(row.dims.map((dim) => [dim.key, {
-      score: dim.score,
-      title: t('compare.openDimensionIn', { dim: dim.label, project: row.name }),
-      onClick: () => (row.remote || !dim.fromRunId || !onOpenProjectDimension
-        ? onOpenProject(row.id)
-        : onOpenProjectDimension({ id: row.id, source: row.source, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel })),
-    }])),
-  }));
-}
-
 /**
- * Row partitioning shared by the render below:
- *   - scoredRows: what the score matrix grids (never-evaluated rows have no
- *     numbers to show).
- *   - attnAll: the attention strip's full list — top 3 by consequence
- *     always show (even a healthy fleet has a "most consequential" trio),
- *     beyond that only rows that actually flag ('watch'+) qualify.
- *   - mainRows / unevaluated: never-evaluated projects (settled, no data,
- *     no error) collapse into one line; pending/errored rows stay
- *     individually visible.
+ * Row partitioning:
+ *   - scoredRows: everything with numbers to show.
+ *   - attnAll: the attention list (top 3 by consequence, then flagged rows).
+ *   - pending: rows still computing or failed to load (listed, no numbers).
+ *   - unevaluated: never-evaluated projects (settled, no data, no error),
+ *     collapsed into one line.
  */
 function partitionFleetRows(orderedRows, attention, errorsById) {
   const scoredRows = orderedRows.filter((r) => r.hasData);
@@ -88,58 +42,53 @@ function partitionFleetRows(orderedRows, attention, errorsById) {
     ...attention.slice(ATTENTION_LEAD_COUNT).filter((a) => a.level !== CONSEQUENCE_LEVEL.CLEAR),
   ];
   const isUnevaluated = (row) => row.loaded && !row.hasData && !errorsById[row.id];
-  const mainRows = orderedRows.filter((row) => !isUnevaluated(row));
+  const pending = orderedRows.filter((row) => !row.hasData && !isUnevaluated(row));
   const unevaluated = orderedRows.filter(isUnevaluated);
-  return { scoredRows, attnAll, mainRows, unevaluated };
+  return { scoredRows, attnAll, pending, unevaluated };
 }
 
 export default function CompareFleetView({
   rows, orderedRows, fleet, board, attention, errorsById,
-  sortDir, toggleSortDir, pickerOpen, setPickerOpen, scopeIds, scopeCount,
+  pickerOpen, setPickerOpen, scopeIds, scopeCount,
   toggleProject, selectAll, selectFlagged, openDimension, openDuel, openDuelPair, onOpenProject,
   onOpenProjectDimension,
 }) {
-  const { scoredRows, attnAll, mainRows, unevaluated } = partitionFleetRows(orderedRows, attention, errorsById);
+  const [hover, setHover] = useState(null);
+  const { scoredRows, attnAll, pending, unevaluated } = partitionFleetRows(orderedRows, attention, errorsById);
+  const linked = { hover, setHover, onOpenProject };
 
   return (
     <>
       <CompareFleetHeader
         scopeCount={scopeCount} totalFiles={fleet.totalFiles} scoredRows={scoredRows}
         openDuelPair={openDuelPair} openDuel={openDuel} board={board} openDimension={openDimension}
-        sortDir={sortDir} toggleSortDir={toggleSortDir} rows={rows} scopeIds={scopeIds}
+        rows={rows} scopeIds={scopeIds}
         toggleProject={toggleProject} selectAll={selectAll} selectFlagged={selectFlagged}
         pickerOpen={pickerOpen} setPickerOpen={setPickerOpen}
       />
-
-      <CompareFleetStatCards fleet={fleet} />
-      {/* The actionable summary reads first: a slim strip, not a side panel. */}
-      <CompareAttentionStrip
-        ariaLabel={t('compare.attentionAria')}
-        noteText={t('compare.attentionNote')}
-        items={buildAttentionItems(attnAll, onOpenProject, openDimension)}
+      {scoredRows.length > 0 && <CompareFleetKpis rows={scoredRows} fleet={fleet} />}
+      <CompareFleetTable
+        scoredRows={scoredRows} pending={pending} unevaluated={unevaluated} errorsById={errorsById}
+        fleetScore={fleet.score} {...linked}
       />
-      {/* Every score at a glance — column headers SORT, a cell opens
-          that project's own dimension (remote rows open the shared project). */}
-      <CompareMatrix
-        ariaLabel={t('compare.matrixAria')}
-        header={t('compare.matrixHeader', { rows: scoredRows.length, cols: board.length })}
-        note={t('compare.matrixNote')}
-        footOverall={fleet.score}
-        columns={board.map((b) => ({ key: b.key, label: b.label, avg: b.avg }))}
-        matrixRows={buildFleetMatrixRows(scoredRows, onOpenProject, onOpenProjectDimension)}
-      />
-
-      <CompareDimensionsBoard board={board} openDimension={openDimension} />
-
-      <CompareProjectsTable
-        mainRows={mainRows}
-        unevaluated={unevaluated}
-        fleet={fleet}
-        sortDir={sortDir}
-        scopeCount={scopeCount}
-        onOpenProject={onOpenProject}
-        errorsById={errorsById}
-      />
+      {scoredRows.length > 0 && (
+        <>
+          <CompareFleetMatrix
+            rows={scoredRows} board={board} fleetScore={fleet.score}
+            onOpenProject={onOpenProject} onOpenProjectDimension={onOpenProjectDimension}
+          />
+          <div className="compare-fleet__pair">
+            {/* The map needs width and hover: a phone keeps the attention list. */}
+            <div className="compare-fleet__desktop">
+              <ComparePanel ariaLabel={t('compare.mapAria')} header={t('compare.mapHeader')} note={t('compare.mapNote')}>
+                <CompareDirectionMap rows={scoredRows} fleetScore={fleet.score} {...linked} />
+              </ComparePanel>
+            </div>
+            <CompareAttentionList items={attnAll} openDimension={openDimension} {...linked} />
+          </div>
+          <CompareDimensionHealth board={board} openDimension={openDimension} />
+        </>
+      )}
     </>
   );
 }

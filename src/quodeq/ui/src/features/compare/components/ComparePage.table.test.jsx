@@ -17,7 +17,7 @@ vi.mock('../../../api/shared.js', () => ({
 
 import { getDimensionEval, getFleetCompare, sharedGetFleetCompare } from '../../../api/index.js';
 import { sharedListProjects } from '../../../api/shared.js';
-import { PROJECTS, fleetOf, summary, renderPage, iso } from './_comparePage.fixtures.jsx';
+import { PROJECTS, fleetOf, summary, renderPage, iso, findTableName } from './_comparePage.fixtures.jsx';
 
 /**
  * Split from ComparePage.test.jsx: the local-fleet table, matrix, and
@@ -60,8 +60,8 @@ describe('ComparePage', () => {
 
   it('renders a row per project once summaries arrive', async () => {
     renderPage();
-    expect(await screen.findByText('alpha')).toBeInTheDocument();
-    expect(await screen.findByText('beta')).toBeInTheDocument();
+    expect(await findTableName('alpha')).toBeInTheDocument();
+    expect(await findTableName('beta')).toBeInTheDocument();
     expect((await screen.findAllByText('7.4')).length).toBeGreaterThan(0);
     expect((await screen.findAllByText('5.9')).length).toBeGreaterThan(0);
   });
@@ -69,43 +69,48 @@ describe('ComparePage', () => {
   it('a row name opens the project', async () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProject });
-    // Scope to the table: project names also appear in the attention strip.
-    const name = (await screen.findAllByText('alpha'))
-      .find((el) => el.classList.contains('compare-row__name'));
+    // Scope to the table: project names also appear in the matrix, the map and the attention list.
+    const name = await findTableName('alpha');
     await userEvent.click(name);
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('alpha', 'local'));
   });
 
-  it('rows carry the trend spark and severity split inline; the expansion is gone', async () => {
+  it('rows carry size and exposure per size, not raw counts', async () => {
     const { container } = renderPage();
-    await screen.findByText('alpha');
-    // One spark per scored row (both fixtures have a 2-point trend).
-    await waitFor(() => expect(
-      container.querySelectorAll('.compare-row .compare-trendline'),
-    ).toHaveLength(2));
-    // Severity split as colored counts (each fixture row carries 1 critical).
-    expect(screen.getAllByText('1 crit').length).toBeGreaterThan(1);
-    expect(container.querySelector('.compare-rowdetail')).toBeNull();
+    await findTableName('alpha');
+    const rows = container.querySelectorAll('.compare-fleettable__row:not(.compare-fleettable__row--head)');
+    expect(rows).toHaveLength(2);
+    // Columns: files, violations per 100 files, critical per 1,000 files.
+    const head = container.querySelector('.compare-fleettable__row--head');
+    for (const col of ['files', 'viol / 100', 'crit / 1k', 'last scan']) expect(head).toHaveTextContent(col);
+  });
+
+  it('a column header ranks the projects, and again reverses', async () => {
+    const { container } = renderPage();
+    await findTableName('alpha');
+    const order = () => [...container.querySelectorAll('.compare-fleettable__namebtn')].map((b) => b.textContent);
+    expect(order()).toEqual(['alpha', 'beta']);
+    const table = screen.getByRole('region', { name: 'Projects ranked' });
+    await userEvent.click(within(table).getByRole('button', { name: 'Rank by score' }));
+    expect(order()).toEqual(['beta', 'alpha']);
   });
 
   it('collapses never-evaluated projects into a single line', async () => {
     getFleetCompare.mockImplementation(fleetOf((id) => (id === 'alpha'
       ? summary(7.4, 7.0)
       : { summary: {}, dimensions: [], trend: [], runsCount: 0, lastRun: null })));
-    renderPage();
-    await screen.findByText('alpha');
-    // Once beta settles with no data it leaves the table for the collapsed
-    // line (it may briefly render as a pending row before that).
-    const toggle = await screen.findByText(/1 projects without evaluations/);
-    expect(screen.queryByText('beta')).toBeNull();
-    await userEvent.click(toggle);
-    expect(await screen.findByText('beta')).toBeInTheDocument();
+    const { container } = renderPage();
+    await findTableName('alpha');
+    // Once beta settles with no data it leaves the ranked rows for the
+    // collapsed line (it may briefly render as a pending row before that).
+    expect(await screen.findByText(/1 projects without evaluations/)).toBeInTheDocument();
+    await waitFor(() => expect([...container.querySelectorAll('.compare-fleettable__namebtn')].map((b) => b.textContent)).toEqual(['alpha']));
   });
 
   it('a matrix cell opens that project’s own dimension page, not the compare drill-down', async () => {
     const onOpenProjectDimension = vi.fn();
     renderPage({ onOpenProjectDimension });
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     const matrix = await screen.findByLabelText('Score matrix');
     await userEvent.click(within(matrix).getByTitle('open security in alpha'));
     expect(onOpenProjectDimension).toHaveBeenCalledWith({
@@ -116,7 +121,7 @@ describe('ComparePage', () => {
 
   it('score matrix grids every project; column headers rank by that column', async () => {
     renderPage();
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     const matrix = await screen.findByLabelText('Score matrix');
     // Both projects' Security scores appear as cells (7.0 and 5.5).
     expect(within(matrix).getByText('7.0')).toBeInTheDocument();
@@ -136,7 +141,7 @@ describe('ComparePage', () => {
 
   it('the dimension drill-down carries the principle matrix', async () => {
     renderPage();
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     const dimButtons = await screen.findAllByText('security');
     await userEvent.click(dimButtons[dimButtons.length - 1]);
     expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
@@ -145,7 +150,7 @@ describe('ComparePage', () => {
 
   it('the header dimension button lists the board and opens the pick', async () => {
     renderPage();
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     await userEvent.click(await screen.findByRole('button', { name: 'Open a dimension drill-down' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /security/ }));
     expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
@@ -153,7 +158,7 @@ describe('ComparePage', () => {
 
   it('drills into a dimension', async () => {
     renderPage();
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     const dimButtons = await screen.findAllByText('security');
     await userEvent.click(dimButtons[dimButtons.length - 1]);
     expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
@@ -165,7 +170,7 @@ describe('ComparePage', () => {
 
   it('the header launcher duels an exactly-two scope directly, no popover', async () => {
     renderPage();
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
     expect(await screen.findByText(/GAP_SOURCES/)).toBeInTheDocument();
     // Left minus right: +1.5 shows in the verdict and again as security's
@@ -181,7 +186,7 @@ describe('ComparePage', () => {
         id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
       }]),
     });
-    await screen.findByText('gamma');
+    await findTableName('gamma');
     await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
     // First pick pins side A and stays open; second pick navigates.
     await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
@@ -207,14 +212,14 @@ describe('ComparePage', () => {
     // screen's stars write) — the whole point of the shared source of truth.
     localStorage.setItem('quodeq-visible-standards', JSON.stringify(['security']));
     renderPage();
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     expect(await screen.findAllByText('security')).not.toHaveLength(0);
     expect(screen.queryByText('usability')).toBeNull();
   });
 
   it('closes the scope picker on outside click and on Escape', async () => {
     renderPage();
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     const toggle = screen.getByText(/all 2 projects/);
     await userEvent.click(toggle);
     expect(screen.getByText('Projects in scope')).toBeInTheDocument();
@@ -232,7 +237,7 @@ describe('ComparePage', () => {
     const onOpenProjectDimension = vi.fn();
     const onOpenProject = vi.fn();
     renderPage({ onOpenProjectDimension, onOpenProject });
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     await drillIntoSecurity();
     await userEvent.click(await screen.findByText('leads the scope'));
     expect(onOpenProjectDimension).toHaveBeenCalledWith(
@@ -251,7 +256,7 @@ describe('ComparePage', () => {
     });
     const onOpenEvalPrincipal = vi.fn();
     renderPage({ onOpenEvalPrincipal });
-    await screen.findByText('alpha');
+    await findTableName('alpha');
     await drillIntoSecurity();
     // beta leads security (5.5 vs... alpha 7.0 leads actually) — click the
     // integrity lead entry, whoever it is, via its accessible title.

@@ -9,7 +9,8 @@
  * fills its panel and the text never scales. Geometry lives in
  * duelTrendGeometry.js; this file only renders it.
  */
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { useMeasuredWidth } from '../hooks/useMeasuredWidth.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { buildTrendGeometry, DUEL_SIDE, toPoints } from '../duelTrendGeometry.js';
@@ -34,21 +35,6 @@ const TIP_OFFSET = 12;
 const TIP_WIDTH = 190;
 
 const shortDate = (ms) => new Date(ms).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' });
-
-function useWidth(ready) {
-  const ref = useRef(null);
-  const [width, setWidth] = useState(FALLBACK_WIDTH);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(([entry]) => {
-      if (entry.contentRect.width > 0) setWidth(Math.floor(entry.contentRect.width));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ready]);
-  return [ref, width];
-}
 
 /* End-of-line score labels, nudged apart when the lines finish close together. */
 function endLabels(sides) {
@@ -133,7 +119,7 @@ export default function CompareDuelTrend({ a, b, aName, bName, now = Date.now() 
   // Measured only while there is a chart to measure: an empty duel renders
   // nothing, and the observer attaches once runs arrive.
   const hasRuns = toPoints(a).length + toPoints(b).length > 0;
-  const [ref, width] = useWidth(hasRuns);
+  const [ref, width] = useMeasuredWidth(FALLBACK_WIDTH, hasRuns);
   const [hoverX, setHoverX] = useState(null);
   const right = width - PAD.right;
   const box = { left: PAD.left, top: PAD.top, width: right - PAD.left, height: HEIGHT - PAD.top - PAD.bottom };

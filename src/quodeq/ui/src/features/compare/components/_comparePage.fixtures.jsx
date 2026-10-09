@@ -96,3 +96,21 @@ export function NavHarness(props) {
 export function renderPage(props = {}) {
   return render(<NavHarness {...props} />, { wrapper: withQueryClient() });
 }
+
+/**
+ * A project's name button in the fleet's projects table. Names also show in
+ * the score matrix, the direction map and the attention list, so a bare
+ * findByText would match several nodes.
+ */
+export async function findTableName(name) {
+  const { screen, waitFor } = await import('@testing-library/react');
+  // Wait for the SCORED row: while summaries load, the same name renders in
+  // a "computing" row that the scored one then replaces.
+  let hit = null;
+  await waitFor(() => {
+    hit = screen.queryAllByText(name).find((el) => el.classList.contains('compare-fleettable__namebtn')
+      && el.closest('.compare-fleettable__row'));
+    if (!hit) throw new Error(`no scored projects-table row named ${name}`);
+  });
+  return hit;
+}

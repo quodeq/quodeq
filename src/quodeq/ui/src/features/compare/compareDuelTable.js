@@ -31,14 +31,13 @@ export function sortScoreRows(rows, key) {
 }
 
 /**
- * The shared axis: from just under the lowest score in the table (whole
- * point) to 10, integer ticks, and the grade zones that fall inside it
- * (ascending, each {from, to, label}). `at(v)` is the 0-100 position.
+ * A score axis fitted to `values`: from just under the lowest (whole point)
+ * to 10, integer ticks, and the grade zones that fall inside it (ascending,
+ * each {from, to, label}). `at(v)` is the 0-100 position. Shared by the
+ * duel's score table and the fleet's projects table.
  */
-export function scoreAxis(duel, tiers = getGradeThresholds()) {
-  const values = duel.dimensions.flatMap((d) => [d.a, d.b])
-    .concat(duel.principles.flatMap((g) => g.items.flatMap((p) => [p.a, p.b])))
-    .filter((v) => v != null);
+export function scoreAxisFor(scores, tiers = getGradeThresholds()) {
+  const values = scores.filter((v) => v != null);
   const lo = values.length ? Math.max(0, Math.floor(Math.min(...values) - AXIS_MARGIN)) : 0;
   const hi = SCORE_SCALE_MAX;
   const step = hi - lo > DENSE_SPAN ? 2 : 1;
@@ -49,6 +48,13 @@ export function scoreAxis(duel, tiers = getGradeThresholds()) {
     .map(([from, label], i) => ({ from: Math.max(from, lo), to: ascending[i + 1]?.[0] ?? hi, label }))
     .filter((z) => z.to > lo && z.to > z.from);
   return { lo, hi, ticks, zones, at: (v) => ((v - lo) / (hi - lo || 1)) * PERCENT };
+}
+
+/** The duel score table's axis: every dimension and principle score of both sides. */
+export function scoreAxis(duel, tiers = getGradeThresholds()) {
+  const values = duel.dimensions.flatMap((d) => [d.a, d.b])
+    .concat(duel.principles.flatMap((g) => g.items.flatMap((p) => [p.a, p.b])));
+  return scoreAxisFor(values, tiers);
 }
 
 /**
