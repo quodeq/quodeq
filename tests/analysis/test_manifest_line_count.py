@@ -83,3 +83,40 @@ def test_line_count_reaches_the_evidence_dict_and_the_report(tmp_path: Path) -> 
         principle_rows=[], flat_violations=[], flat_compliance=[], sev_tally={},
     ))
     assert report["sourceLineCount"] == 77
+
+
+def test_the_line_count_can_be_skipped(tmp_path: Path, monkeypatch) -> None:
+    """A caller that only counts files (the estimates endpoint) reads no file for lines."""
+    from quodeq.analysis.manifest import build_manifest
+
+    (tmp_path / "a.py").write_text("x\ny\n", encoding="utf-8")
+    detection = {"extensions": {".py": "python"}, "skip_dirs": [], "skip_patterns": []}
+
+    def boom(*_a, **_k):
+        raise AssertionError("line count ran")
+
+    monkeypatch.setattr("quodeq.analysis.manifest_build.count_source_lines", boom)
+    manifest = build_manifest(tmp_path, detection, count_lines=False)
+    assert manifest.total_files == 1
+    assert manifest.total_lines is None
+
+
+def test_estimates_build_the_manifest_without_the_line_count(tmp_path: Path, monkeypatch) -> None:
+    import quodeq.analysis.estimates as estimates
+
+    seen: list[bool] = []
+    real = estimates.build_manifest
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("count_lines", True))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(estimates, "build_manifest", spy)
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.py").write_text("x\n", encoding="utf-8")
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    (project_dir / "repository_info.json").write_text(f'{{"path": "{src}"}}', encoding="utf-8")
+    estimates.project_estimates_payload(project_dir, None, False)
+    assert seen == [False]

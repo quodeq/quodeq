@@ -28,6 +28,9 @@ class ManifestWalkSpec:
     skip_patterns: list[str]
     ignore_patterns: list[str] | None = None
     tracked_files: set[Path] | None = None
+    # Read every source file for the line count; a caller that only needs
+    # counts per dimension (the estimates endpoint) turns it off.
+    count_lines: bool = True
 
 
 @dataclass

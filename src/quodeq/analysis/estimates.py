@@ -64,7 +64,8 @@ def _build_estimate_config(
 
     detection = read_json(paths.detection_file)
     disciplines_conf = paths.disciplines_conf if paths.disciplines_conf.exists() else None
-    manifest = build_manifest(src, detection, disciplines_conf, scope_path=scope_path)
+    # Estimates count files per dimension; the line count would read every file.
+    manifest = build_manifest(src, detection, disciplines_conf, scope_path=scope_path, count_lines=False)
     if scope_path and manifest:
         # None (no files under scope) flows through: every dim then
         # estimates as {"count": 0, "reason": "empty"}.

@@ -175,5 +175,5 @@ def build_multi_scope_manifest(
     return SourceManifest(
         targets=targets, total_files=total, language_stats=dict(ext_counts_overall),
         skipped_untracked=skipped, unreadable_dirs=unreadable,
-        total_lines=count_target_lines(src, targets),
+        total_lines=count_target_lines(src, targets) if walk.count_lines else None,
     )
