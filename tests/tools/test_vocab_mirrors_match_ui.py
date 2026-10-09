@@ -26,6 +26,7 @@ from quodeq.core.types.dashboard_view import DashboardView
 from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.core.types.provider import Provider, ProviderType
+from quodeq.core.types.scoring import ConfidenceLevel
 from quodeq.core.types.severity import Severity
 from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.core.types.working_copy_refresh import RefreshOutcome
@@ -42,6 +43,7 @@ _MIRRORS = [
     ("vocab/jobStatus.js", "JOB_STATUS", JobStatus),
     ("vocab/exitReason.js", "EXIT_REASON", ExitReason),
     ("vocab/severity.js", "SEVERITY", Severity),
+    ("vocab/evidenceConfidence.js", "EVIDENCE_CONFIDENCE", ConfidenceLevel),
     ("vocab/grade.js", "GRADE", Grade),
     ("vocab/dimState.js", "DIM_STATE", DimState),
     ("vocab/findingType.js", "FINDING_TYPE", FindingType),

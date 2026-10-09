@@ -63,6 +63,9 @@ class RunStatus:
     commit_dirty: bool | None = None
     # Where the run came from (a CI workflow or the CLI), recorded at start.
     origin: RunOrigin | None = None
+    # The grade formula version (GRADE_ALGO_VERSION) the run was scanned with;
+    # None on a run written before the field existed.
+    grade_algo_version: int | None = None
 
     @classmethod
     def from_status_dict(cls, d: dict[str, Any]) -> "RunStatus":
@@ -84,6 +87,7 @@ class RunStatus:
             commit_sha=d.get("commit_sha"),
             commit_dirty=d.get("commit_dirty"),
             origin=RunOrigin.from_dict(d.get("origin")),
+            grade_algo_version=d.get("grade_algo_version"),
         )
 
 

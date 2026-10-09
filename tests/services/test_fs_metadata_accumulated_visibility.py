@@ -204,7 +204,7 @@ class TestReadAccumulatedSummary:
         }), encoding="utf-8")
 
         strict = dataclasses.replace(
-            DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 6.0, "minor": 0.25},
+            DEFAULT_PARAMS, severity_weight={"critical": 8.0, "major": 4.0, "minor": 0.5},
         )
         grade_formula.save_params(strict)
         grade_formula.apply_to_all_runs(reports_root)

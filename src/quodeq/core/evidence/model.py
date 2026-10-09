@@ -57,12 +57,9 @@ def classify_confidence_level(
     """Return ``"high" | "medium" | "low"`` for a principle's evidence size.
 
     Mirrors ``PrincipleEvidence.compute_metrics`` but exposed as a pure
-    function so the SQL projector can apply the same Insufficient rule
-    the CLI uses — keeping both engines on one formula. Without this,
-    the projector scored thin-evidence principles (e.g. 1 compliance,
-    0 violations) as ``10.0/Exemplary`` while the CLI marked them
-    ``Insufficient``, and the dashboard's overlaid SQL scores drifted
-    away from the CLI's own report.
+    function so the SQL projector and the CLI engine carry the same level:
+    it is the thin-evidence marker both attach to a scored principle, keeping
+    the dashboard's overlaid SQL grades and the CLI's report on one formula.
     """
     base_high = _HIGH_CONFIDENCE_THRESHOLD * scale_multiplier
     base_medium = _MEDIUM_CONFIDENCE_THRESHOLD * scale_multiplier
@@ -164,6 +161,9 @@ class Evidence:
     meta: dict = field(default_factory=dict)
     module: str = ""
     exit_reason: str | None = None
+    # Source lines in the project, recorded beside source_file_count as history
+    # for a later denominator study. Never read by scoring.
+    source_line_count: int | None = None
 
     def summary(self) -> dict:
         """Return an aggregate summary of findings, confidence, and balance across all principles."""
@@ -212,6 +212,7 @@ def evidence_to_scoring_dict(evidence: Evidence) -> dict:
         "discipline": evidence.language.title(),
         "date": evidence.date,
         "source_file_count": evidence.source_file_count,
+        "source_line_count": evidence.source_line_count,
         "files_read": evidence.files_read,
         "coverage_pct": evidence.coverage_pct,
         "quarantined_count": evidence.quarantined_count,

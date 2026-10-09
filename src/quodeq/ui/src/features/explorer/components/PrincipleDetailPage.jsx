@@ -13,6 +13,7 @@ import { useDashboardScrollElement } from './VirtualList.jsx';
 import DeferredViolationList from './DeferredViolationList.jsx';
 import { t } from '../../../strings/index.js';
 import { GRADE } from '../../../vocab/grade.js';
+import { EVIDENCE_CONFIDENCE } from '../../../vocab/evidenceConfidence.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
 import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 
@@ -65,7 +66,7 @@ function SevBadgeRow({ sevCounts }) {
 }
 
 function PrincipleHeader({ data }) {
-  const { principle, description, score, grade, violations, compliance, sevCounts, dateLabel, runId } = data;
+  const { principle, description, score, grade, confidence, violations, compliance, sevCounts, dateLabel, runId } = data;
   const scoreDisplay = score != null ? String(score).replace('/10', '') : '—';
   const ratioDisplay = (compliance.length > 0 && violations.length > 0)
     ? `1:${Math.round(compliance.length / violations.length)}`
@@ -73,7 +74,9 @@ function PrincipleHeader({ data }) {
 
   const scoreHint = grade === GRADE.INSUFFICIENT
     ? t('explorer.notEnoughEvidence')
-    : grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null;
+    : confidence === EVIDENCE_CONFIDENCE.LOW
+      ? t('explorer.thinEvidenceHint')
+      : grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null;
 
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
@@ -125,14 +128,14 @@ function renderPrincipleItem(item, { principle, cardDismiss }) {
 /** Header, context blurb, severity filter pills, and the deferred
  * virtualized item list. */
 function PrincipleDetailBody({
-  principle, principleDescription, liveScore, score, liveGrade, grade, filteredViolations, compliance,
+  principle, principleDescription, liveScore, score, liveGrade, grade, confidence, filteredViolations, compliance,
   liveSevCounts, dateLabel, runId, principleData, activeSevFilter, setActiveSevFilter, items, virtualKey,
   scrollElement, cardDismiss,
 }) {
   return (
     <>
       <PrincipleHeader
-        data={{ principle, description: principleDescription, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts, dateLabel, runId }}
+        data={{ principle, description: principleDescription, score: liveScore ?? score, grade: liveGrade ?? grade, confidence, violations: filteredViolations, compliance, sevCounts: liveSevCounts, dateLabel, runId }}
       />
       <PrincipleContext principleData={principleData} />
       {(filteredViolations.length > 0 || compliance.length > 0) && (
@@ -156,7 +159,7 @@ function PrincipleDetailBody({
 }
 
 export default memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
-  const { principleData, principle, score, grade, dimension, runId, dateLabel } = evalPrincipal;
+  const { principleData, principle, score, grade, confidence, dimension, runId, dateLabel } = evalPrincipal;
   const { principleDescriptions } = useStandardDescriptions(dimension);
   const principleDescription = principleDescriptions[principle] || '';
 
@@ -196,7 +199,7 @@ export default memo(function PrincipleDetailPage({ evalPrincipal, severityFilter
   return (
     <PrincipleDetailBody
       principle={principle} principleDescription={principleDescription} liveScore={liveScore} score={score}
-      liveGrade={liveGrade} grade={grade} filteredViolations={filteredViolations} compliance={compliance}
+      liveGrade={liveGrade} grade={grade} confidence={confidence} filteredViolations={filteredViolations} compliance={compliance}
       liveSevCounts={liveSevCounts} dateLabel={dateLabel} runId={runId} principleData={principleData}
       activeSevFilter={activeSevFilter} setActiveSevFilter={setActiveSevFilter} items={items}
       virtualKey={virtualKey} scrollElement={scrollElement} cardDismiss={cardDismiss}

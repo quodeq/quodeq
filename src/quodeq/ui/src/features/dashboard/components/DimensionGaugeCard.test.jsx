@@ -257,3 +257,43 @@ describe('DimensionGaugeCard', () => {
     });
   });
 });
+
+describe('DimensionGaugeCard thin evidence', () => {
+  const thinItem = {
+    dimension: 'security',
+    overallScore: '10.0/10',
+    totals: { violationCount: 0, complianceCount: 4, severity: {} },
+  };
+
+  it('a thin principle shows its score with the thin-evidence line, not dashes', () => {
+    render(<DimensionGaugeCard item={thinItem} thinEvidence />);
+    expect(screen.getByText('10.0')).toBeInTheDocument();
+    expect(screen.getByText('thin evidence')).toBeInTheDocument();
+    expect(screen.queryByText('INSUFFICIENT')).toBeNull();
+  });
+
+  it('shows no thin-evidence line by default', () => {
+    render(<DimensionGaugeCard item={thinItem} />);
+    expect(screen.queryByText('thin evidence')).toBeNull();
+  });
+
+  it('announces thin evidence through the aria-describedby summary, and only when set', () => {
+    const { container, rerender } = render(<DimensionGaugeCard item={thinItem} thinEvidence />);
+    const describedBy = () => document.getElementById(container.querySelector('article').getAttribute('aria-describedby'));
+    expect(describedBy().textContent).toContain('thin evidence');
+    rerender(<DimensionGaugeCard item={thinItem} />);
+    expect(describedBy().textContent).not.toContain('thin evidence');
+  });
+
+  it('renders only the Insufficient gauge when both thinEvidence and isInsufficient are set', () => {
+    render(<DimensionGaugeCard item={{ ...thinItem, overallScore: null }} isInsufficient thinEvidence />);
+    expect(screen.getByText('INSUFFICIENT')).toBeInTheDocument();
+    expect(screen.queryByText('thin evidence')).toBeNull();
+  });
+
+  it('a legacy Insufficient grade still renders the dashed gauge', () => {
+    render(<DimensionGaugeCard item={{ ...thinItem, overallScore: null }} isInsufficient />);
+    expect(screen.getByText('INSUFFICIENT')).toBeInTheDocument();
+    expect(screen.queryByText('thin evidence')).toBeNull();
+  });
+});

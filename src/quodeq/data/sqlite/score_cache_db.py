@@ -16,7 +16,7 @@ from typing import Iterator
 from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
 from quodeq.data.sqlite._score_cache_epoch import CACHE_WRITER_EPOCH
 from quodeq.data.sqlite.score_cache_schema import (
-    SCHEMA, ensure_run_scalars_columns, sync_cache_meta,
+    SCHEMA, ensure_principle_confidence_column, ensure_run_scalars_columns, sync_cache_meta,
 )
 from quodeq.shared.env import get_score_cache_path
 
@@ -54,6 +54,7 @@ def _init(path: Path) -> sqlite3.Connection:
         conn.executescript(SCHEMA)
         conn.commit()
         ensure_run_scalars_columns(conn)
+        ensure_principle_confidence_column(conn)
         sync_cache_meta(conn)
     except sqlite3.DatabaseError:
         # Close before re-raising so the caller's rebuild path can unlink the

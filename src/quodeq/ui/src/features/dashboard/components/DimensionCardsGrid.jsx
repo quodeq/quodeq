@@ -1,6 +1,7 @@
 import DimensionGaugeCard from './DimensionGaugeCard.jsx';
 import NotEvaluatedGaugeCard from './NotEvaluatedGaugeCard.jsx';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
+import { EVIDENCE_CONFIDENCE } from '../../../vocab/evidenceConfidence.js';
 import { useBalancedColumns } from '../hooks/useBalancedColumns.js';
 
 // Narrowest card that still fits a long name ("clean-architecture") on one
@@ -29,6 +30,7 @@ export default function DimensionCardsGrid({ sortedDimensions, onDimensionClick,
             delta={delta}
             onDimensionClick={onDimensionClick}
             evaluatedToday={isActive}
+            thinEvidence={item.confidence === EVIDENCE_CONFIDENCE.LOW}
           />
         );
       })}

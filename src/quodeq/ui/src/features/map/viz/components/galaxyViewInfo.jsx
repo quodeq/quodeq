@@ -151,6 +151,8 @@ function principleDetailTarget(p, d) {
         principle: p.name,
         score: p.rawScore ?? (p.score != null ? p.score.toFixed(1) : null),
         grade: p.grade,
+        // The thin-evidence marker, as every other principle target carries it.
+        confidence: p.confidence ?? null,
         dimension: d.name,
         // Carry the originating run id so PrincipleDetail's dismiss POST
         // sends a real run_id; without it the backend can't rescore and

@@ -12,6 +12,7 @@ from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
+from quodeq.analysis.manifest_lines import count_target_lines
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.analysis.manifest_targets import (
     MIN_FILES_PER_TARGET,
@@ -174,4 +175,5 @@ def build_multi_scope_manifest(
     return SourceManifest(
         targets=targets, total_files=total, language_stats=dict(ext_counts_overall),
         skipped_untracked=skipped, unreadable_dirs=unreadable,
+        total_lines=count_target_lines(src, targets) if walk.count_lines else None,
     )

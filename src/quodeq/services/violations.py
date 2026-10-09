@@ -125,16 +125,20 @@ def _apply_rescored_grades(
     if dim is None:
         return result
 
-    principle_grade = {p.get("principle"): (p.get("score"), p.get("grade")) for p in dim.get("principles") or []}
+    principle_grade = {
+        p.get("principle"): (p.get("score"), p.get("grade"), p.get("confidence"))
+        for p in dim.get("principles") or []
+    }
     for pg in result.get("principleGrades", []):
         if pg.get("isOverall") or pg.get("principle") == OVERALL_PRINCIPLE:
             pg["score"] = dim.get("overallScore")
             pg["grade"] = dim.get("overallGrade")
+            pg["confidence"] = dim.get("confidence")
         elif pg.get("principle") in principle_grade:
-            pg["score"], pg["grade"] = principle_grade[pg["principle"]]
+            pg["score"], pg["grade"], pg["confidence"] = principle_grade[pg["principle"]]
     for p in result.get("principles", []):
         if p.get("name") in principle_grade:
-            p["score"], p["grade"] = principle_grade[p["name"]]
+            p["score"], p["grade"], p["confidence"] = principle_grade[p["name"]]
     _adopt_rescored_rows(result, dim)
     return result
 

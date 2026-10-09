@@ -46,7 +46,7 @@ export function buildGradeLookup(dim) {
   const lookup = {};
   for (const p of (dim.principles || [])) {
     const key = p.name || p.principle || '';
-    if (key) lookup[key] = { grade: p.grade, score: p.score };
+    if (key) lookup[key] = { grade: p.grade, score: p.score, confidence: p.confidence ?? null };
   }
   return lookup;
 }
@@ -91,6 +91,7 @@ export function buildPrinciples(dimensions) {
       name,
       grade: gradeLookup[name]?.grade || null,
       score: gradeLookup[name]?.score ?? null,
+      confidence: gradeLookup[name]?.confidence ?? null,
       violations: g.violations,
       compliance: g.compliance,
     }));
@@ -106,6 +107,7 @@ export function buildPrinciples(dimensions) {
         grade: p.grade,
         score: pScore,
         rawScore: p.score,
+        confidence: p.confidence,
         violations: pv, compliance: pc,
         radius, col: scoreRGB(pScore),
         ba: (pi / (prinList.length || 1)) * TAU - Math.PI / 2,

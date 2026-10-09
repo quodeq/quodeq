@@ -33,6 +33,14 @@ def _empty_report_data(*, dimension: str = "security", evidence: dict) -> Report
 
 
 class TestAssembleReportDict:
+    def test_source_line_count_is_written_from_the_evidence_dict(self):
+        report = assemble_report_dict(_empty_report_data(evidence={"source_line_count": 1234}))
+        assert report["sourceLineCount"] == 1234
+
+    def test_source_line_count_is_none_when_absent(self):
+        report = assemble_report_dict(_empty_report_data(evidence={}))
+        assert report["sourceLineCount"] is None
+
     def test_basic_assembly(self):
         data = ReportData(
             dimension="security",

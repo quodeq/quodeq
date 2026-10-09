@@ -32,6 +32,7 @@ class EvidenceContext:
     files_read: int
     module: str = ""
     exit_reason: str | None = None
+    source_line_count: int | None = None
 
 
 def _build_principles(
@@ -63,6 +64,7 @@ def _build_evidence(
         coverage_pct=compute_coverage_pct(context.files_read, context.source_file_count),
         principles=principles, dismissed_count=0, quarantined_count=quarantined,
         module=context.module, exit_reason=context.exit_reason,
+        source_line_count=context.source_line_count,
     )
 
 

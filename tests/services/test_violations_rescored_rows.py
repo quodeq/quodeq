@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.core.types import DimensionResult, Finding
+from quodeq.core.types.report import PrincipleGrade
 from quodeq.services.violations import resolve_dimension_eval
 from quodeq.shared.serialization import to_camel_dict
 
@@ -50,3 +51,26 @@ def test_rows_are_kept_when_the_rescore_is_unavailable(tmp_path) -> None:
     with patch("quodeq.services.scoring.get_scores_raw", side_effect=FileNotFoundError):
         out = resolve_dimension_eval(base, "proj", "run", "security")
     assert [v["file"] for v in out["violations"]] == ["a.py"]
+
+
+def test_the_marker_follows_the_substituted_score(tmp_path) -> None:
+    base = _write_eval(tmp_path, {
+        "dimension": "security", "overallScore": "6.0/10", "overallGrade": "Adequate",
+        "principles": [{"name": "P1", "score": "6.0/10", "grade": "Adequate", "metrics": {"confidence_level": "high"}}],
+        "principleGrades": [
+            {"principle": "P1", "score": "6.0/10", "grade": "Adequate", "confidence": "high", "isOverall": False},
+            {"principle": "Overall", "score": "6.0/10", "grade": "Adequate", "confidence": None, "isOverall": True},
+        ],
+        "violations": [], "compliance": [],
+    })
+    rescored = {"dimensions": [to_camel_dict(DimensionResult(
+        dimension="security", overall_score="9.0/10", overall_grade="Good", confidence="low",
+        principles=[PrincipleGrade("P1", "9.0/10", "Good", "low")],
+    ))]}
+    with patch("quodeq.services.scoring.get_scores_raw", return_value=rescored):
+        out = resolve_dimension_eval(base, "proj", "run", "security")
+
+    by_name = {g["principle"]: g for g in out["principleGrades"]}
+    assert by_name["P1"]["confidence"] == "low"
+    assert by_name["Overall"]["confidence"] == "low"
+    assert out["principles"][0]["confidence"] == "low"

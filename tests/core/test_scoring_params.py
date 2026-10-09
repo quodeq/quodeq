@@ -18,12 +18,12 @@ from quodeq.core.scoring.params import (
 
 
 def test_defaults_match_q2_constants():
-    assert DEFAULT_PARAMS.severity_weight == {"critical": 4.0, "major": 1.5, "minor": 0.25}
-    assert DEFAULT_PARAMS.base_k == 0.12
-    assert DEFAULT_PARAMS.lift_compress == 1.8
+    assert DEFAULT_PARAMS.severity_weight == {"critical": 4.0, "major": 2.0, "minor": 0.25}
+    assert DEFAULT_PARAMS.base_k == 0.08
+    assert DEFAULT_PARAMS.lift_compress == 2.2
     assert DEFAULT_PARAMS.ceil_scale == 0.5
-    assert DEFAULT_PARAMS.floor_minor == 8.0
-    assert DEFAULT_PARAMS.floor_major == 5.0
+    assert DEFAULT_PARAMS.floor_minor == 5.0
+    assert DEFAULT_PARAMS.floor_major == 3.0
     assert DEFAULT_PARAMS.grade_thresholds == (
         (9.0, "Exemplary"), (7.0, "Good"), (5.0, "Adequate"), (3.0, "Poor"),
     )
@@ -43,7 +43,7 @@ def test_default_dimension_weights_stay_in_sync_with_dimensions_json():
 
 def test_round_trip_dict_serialization():
     d = params_to_dict(DEFAULT_PARAMS)
-    assert d["baseK"] == 0.12
+    assert d["baseK"] == 0.08
     assert d["gradeThresholds"][0] == [9.0, "Exemplary"]
     restored = params_from_dict(d)
     assert restored == DEFAULT_PARAMS

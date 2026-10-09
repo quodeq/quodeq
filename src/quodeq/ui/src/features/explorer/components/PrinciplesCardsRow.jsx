@@ -1,5 +1,6 @@
 import DimensionGaugeCard from '../../dashboard/components/DimensionGaugeCard.jsx';
 import { GRADE } from '../../../vocab/grade.js';
+import { EVIDENCE_CONFIDENCE } from '../../../vocab/evidenceConfidence.js';
 
 /**
  * Renders one DimensionGaugeCard per principle. Adapts a principleGrade-style
@@ -34,6 +35,7 @@ export default function PrinciplesCardsRow({ principles = [], onPrincipleClick }
             key={p.principle}
             item={item}
             isInsufficient={isInsufficient}
+            thinEvidence={p.confidence === EVIDENCE_CONFIDENCE.LOW}
             onDimensionClick={() => onPrincipleClick?.(p.principle)}
           />
         );

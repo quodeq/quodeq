@@ -16,6 +16,7 @@ import { useRunFindings } from '../hooks/useRunFindings.js';
 import { HERO_CARD_KIND } from '../dashboardVocab.js';
 import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { NAV_TAB } from '../../../vocab/navTab.js';
+import { EVIDENCE_CONFIDENCE } from '../../../vocab/evidenceConfidence.js';
 
 export { RunHeroSection };
 
@@ -38,6 +39,7 @@ function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionCl
           onDimensionClick={onDimensionClick}
           selectedRunId={selectedRunId}
           dateLabel={dateLabel}
+          thinEvidence={item.confidence === EVIDENCE_CONFIDENCE.LOW}
         />
       ))}
     </div>
@@ -109,7 +111,7 @@ function useRunOverviewModel({ dashboard, selectedRunId, selectedProject, select
 
 export default function RunOverviewPanel({
   dashboard, selectedRunId, selectedProject, selectedSource, availableRuns, projectName,
-  onDimensionClick, onFileClick, onNavigate, refreshing = false,
+  onDimensionClick, onFileClick, onNavigate, refreshing = false, formulaUpdated = false,
 }) {
   const { runSummary, runTopFiles, onCardNavigate, trendDeltas, since, headline } = useRunOverviewModel({
     dashboard, selectedRunId, selectedProject, selectedSource, availableRuns, projectName, onNavigate,
@@ -127,7 +129,7 @@ export default function RunOverviewPanel({
 
   return (
     <div className={withPending('run-overview-fade run-overview-ready', refreshing)} aria-busy={refreshing || undefined}>
-      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} onCardNavigate={onCardNavigate} deltas={chipDeltas(since)} density={headline.density} />
+      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} onCardNavigate={onCardNavigate} deltas={chipDeltas(since)} density={headline.density} formulaUpdated={formulaUpdated} />
       <section className="quality-dimensions" aria-label={t('overview.qualityDimensionsAria')}>
         <div className="quality-dimensions__head">
           <SectionLabel>{t('overview.qualityDimensionsLabel')} · {dimCount}</SectionLabel>

@@ -2,7 +2,7 @@ import { t } from '../../../../strings/index.js';
 import { severityLabel } from '../../../../strings/labels.js';
 
 // The built-in severity weights this figure illustrates.
-const DEFAULT_WEIGHTS = [['critical', '4.0'], ['major', '1.5'], ['minor', '0.25']];
+const DEFAULT_WEIGHTS = [['critical', '4.0'], ['major', '2.0'], ['minor', '0.25']];
 // Simplified Q2 score-curve illustration for the Grade Formula help section.
 // Solid line = base curve, dashed = violation ceiling. Colors come from
 // theme tokens so the figure adapts to every theme family.

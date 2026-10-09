@@ -17,6 +17,14 @@ const ONE_INSUFFICIENT = [
 ];
 
 describe('PrinciplesRadial', () => {
+  it('rings a thin-evidence vertex without hiding its score', () => {
+    const thin = FIVE_FULL.map((p, i) => ({ ...p, thin: i === 2 }));
+    const { container } = render(<PrinciplesRadial principles={thin} />);
+    expect(container.querySelectorAll('circle.qd-radial__vert')).toHaveLength(5);
+    expect(container.querySelectorAll('circle.qd-radial__vert--insuf')).toHaveLength(1);
+    expect(screen.getByText('10.0')).toBeInTheDocument();
+  });
+
   it('renders one axis label per principle (including insufficient ones)', () => {
     render(<PrinciplesRadial principles={ONE_INSUFFICIENT} />);
     for (const p of ONE_INSUFFICIENT) {

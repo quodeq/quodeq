@@ -245,3 +245,32 @@ describe('useAppState with a pending Overview', () => {
     expect(result.current.loading).toBe(true);
   });
 });
+
+// Same by-name pick: the scoring flags the dashboard hook derives only reach
+// the Overview if useAppState returns them.
+describe('useAppState with scoring flags from the scores payload', () => {
+  beforeEach(() => {
+    localStorage.setItem('quodeq_selected_project', 'project-a');
+    localStorage.setItem('quodeq_selected_source', 'local');
+  });
+  afterEach(() => {
+    localStorage.removeItem('quodeq_selected_project');
+    localStorage.removeItem('quodeq_selected_source');
+  });
+
+  it('exposes customFormula and formulaUpdated', async () => {
+    const fakeApi = makeAppStateFakeApi();
+    fakeApi.getDashboard = vi.fn(async (project, run) => ({
+      project, run: run || 'latest', trend: [], summary: { score: 75 }, dimensions: [],
+      selectedRun: { runId: run || 'latest', dateLabel: '2026-05-01', gradeAlgoVersion: 3, gradesAlgoVersion: 4 },
+    }));
+    fakeApi.getProjectScores = vi.fn(async () => ({
+      accumulated: { score: 90 }, trend: [], availableRuns: [],
+      scoring: { customFormula: true, formulaVersion: 4 },
+    }));
+    const { result } = renderAppState(fakeApi, makeTestClient());
+
+    await waitFor(() => expect(result.current.customFormula).toBe(true));
+    await waitFor(() => expect(result.current.formulaUpdated).toBe(true));
+  });
+});

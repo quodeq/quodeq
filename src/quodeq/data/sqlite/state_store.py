@@ -224,21 +224,22 @@ class SQLiteStateStore(StateStoreMetaMixin, UnmappedFindingsMixin):
             # round-trip per row; rows land in the order given.
             conn.executemany(
                 "INSERT INTO principle_grades "
-                "(dimension, principle_id, score, grade, finding_count, dismissed_count, completed_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+                "(dimension, principle_id, score, grade, finding_count, dismissed_count, confidence, "
+                "completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
                 [
                     (dim, p["principle_id"], p["score"], p["grade"],
-                     p["finding_count"], p["dismissed_count"])
+                     p["finding_count"], p["dismissed_count"], p.get("confidence"))
                     for dim, p in principle_rows
                 ],
             )
             conn.executemany(
                 "INSERT INTO dimension_scores "
                 "(dimension, score, grade, exit_reason, files_read, source_count, coverage_pct, "
-                "completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+                "confidence, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
                 [
                     (d["dimension"], d["score"], d["grade"], d.get("exit_reason"),
-                     d.get("files_read", 0), d.get("source_count", 0), d.get("coverage_pct", 0.0))
+                     d.get("files_read", 0), d.get("source_count", 0), d.get("coverage_pct", 0.0),
+                     d.get("confidence"))
                     for d in dimension_rows
                 ],
             )
@@ -254,12 +255,12 @@ class SQLiteStateStore(StateStoreMetaMixin, UnmappedFindingsMixin):
         """Return every ``dimension_scores`` row as a dict, ordered by dimension."""
         with self._db() as conn:
             rows = conn.execute(
-                "SELECT dimension, score, grade, exit_reason, files_read, source_count, coverage_pct "
+                "SELECT dimension, score, grade, exit_reason, files_read, source_count, coverage_pct, confidence "
                 "FROM dimension_scores ORDER BY dimension"
             ).fetchall()
         return [
             {"dimension": r[0], "score": r[1], "grade": r[2], "exit_reason": r[3],
-             "files_read": r[4], "source_count": r[5], "coverage_pct": r[6]}
+             "files_read": r[4], "source_count": r[5], "coverage_pct": r[6], "confidence": r[7]}
             for r in rows
         ]
 
@@ -267,13 +268,13 @@ class SQLiteStateStore(StateStoreMetaMixin, UnmappedFindingsMixin):
         """Return the ``principle_grades`` rows as dicts, ordered by dimension then id."""
         with self._db() as conn:
             rows = conn.execute(
-                "SELECT dimension, principle_id, score, grade, finding_count, dismissed_count "
+                "SELECT dimension, principle_id, score, grade, finding_count, dismissed_count, confidence "
                 "FROM principle_grades ORDER BY dimension, principle_id"
             ).fetchall()
         return [
             {
                 "dimension": r[0], "principle_id": r[1], "score": r[2], "grade": r[3],
-                "finding_count": r[4], "dismissed_count": r[5],
+                "finding_count": r[4], "dismissed_count": r[5], "confidence": r[6],
             }
             for r in rows
         ]

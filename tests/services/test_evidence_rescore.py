@@ -10,6 +10,7 @@ from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
+from quodeq.services.severity_classes import load_severity_classes
 
 DIM = "maintainability"
 
@@ -130,6 +131,7 @@ def test_quarantined_findings_stay_excluded_from_rescore(tmp_path, monkeypatch):
             ),
         ),
         mode="numerical", params=DEFAULT_PARAMS,
+        classes=load_severity_classes(tmp_path),
     )
     assert "NotInStandard" not in scan.principles  # fixture sanity
 

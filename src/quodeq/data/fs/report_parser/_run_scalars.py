@@ -33,6 +33,7 @@ def scalars_to_dimension_results(
             principle=r["principle_id"],
             score=f'{r["score"]}/10' if r.get("score") is not None else None,
             grade=r.get("grade"),
+            confidence=r.get("confidence"),
         ))
 
     dimensions = [
@@ -43,6 +44,7 @@ def scalars_to_dimension_results(
             principles=principles_by_dim.get(r["dimension"], []),
             files_read=r.get("files_read"),
             exit_reason=r.get("exit_reason"),
+            confidence=r.get("confidence"),
             source_file_count=meta.get("sourceFileCount"),
             discipline=meta.get("discipline"),
             **_scalar_counts((counts or {}).get(r["dimension"])),

@@ -600,8 +600,6 @@ tests/core/test_finding_marker_persistence.py:40:private-module:quodeq.analysis.
 tests/core/test_finding_marker_persistence.py:41:private-module:quodeq.analysis._report_findings.flatten_findings
 tests/core/test_finding_marker_persistence.py:46:private-module:quodeq.data.fs.report_parser._report_parsing.build_finding
 tests/core/test_finding_marker_persistence.py:46:private-module:quodeq.data.fs.report_parser._report_parsing.parse_report_json
-tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring.principle._build_context
-tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring.principle._score_numerical
 tests/core/test_judgment_to_dict_taxonomy.py:11:private-module:quodeq.core.scoring._tallies.evidence_has_taxonomy
 tests/core/test_projector_scoring_custom.py:122:private-module:quodeq.services.scoring._summary.recompute_summary
 tests/core/test_projector_scoring_custom.py:142:private-module:quodeq.services.scoring._summary.recompute_summary
@@ -967,6 +965,7 @@ tests/services/test_fs_scan_coverage.py:10:private-name:quodeq.services.fs_scan.
 tests/services/test_fs_scan_coverage.py:10:private-name:quodeq.services.fs_scan._list_modules
 tests/services/test_fs_scan_coverage.py:10:private-name:quodeq.services.fs_scan._walk_files
 tests/services/test_fs_scan_coverage.py:10:private-name:quodeq.services.fs_scan._write_scan_json
+tests/services/test_grade_explain_masses.py:4:private-name:quodeq.services.grade_explain._explain_one
 tests/services/test_grade_formula_event_log.py:59:private-name:quodeq.services.grade_formula._event_log_runs
 tests/services/test_grade_formula_event_log.py:72:private-name:quodeq.services.grade_formula._event_log_runs
 tests/services/test_import_validator.py:5:private-name:quodeq.services.import_validator._MAX_DESCRIPTION

@@ -1,7 +1,9 @@
 import { countBySeverity } from '../../../utils/severity.js';
+import { EVIDENCE_CONFIDENCE } from '../../../vocab/evidenceConfidence.js';
 
 // Grade the backend writes when a principle had no evidence to judge; the
-// radial dashes those points instead of plotting a score.
+// radial dashes those points instead of plotting a score. A low-confidence
+// principle is still scored: it is plotted and merely flagged `thin`.
 const INSUFFICIENT_GRADE = 'insufficient';
 
 /** Radial chart points: one per principle, score null (dashed on the
@@ -11,7 +13,12 @@ export function buildRadialPrinciples(principleGrades) {
     const score = parseFloat(pg.score);
     const hasEvidence = (pg.grade || '').toLowerCase() !== INSUFFICIENT_GRADE
       && !Number.isNaN(score);
-    return { name: pg.principle, score: hasEvidence ? score : null, hasEvidence };
+    return {
+      name: pg.principle,
+      score: hasEvidence ? score : null,
+      hasEvidence,
+      thin: pg.confidence === EVIDENCE_CONFIDENCE.LOW,
+    };
   });
 }
 

@@ -10,37 +10,39 @@ Output dicts are the neutral domain result contract; persistence adapters
 map them to their own schema (never the other way round):
 
 - principle grade (``compute_principle_grade``):
-  ``principle_id``, ``score``, ``grade``, ``finding_count``, ``dismissed_count``
+  ``principle_id``, ``score``, ``grade``, ``finding_count``, ``dismissed_count``,
+  ``confidence``, ``observation``
 - dimension score (``compute_dimension_score``):
-  ``dimension``, ``score``, ``grade``
+  ``dimension``, ``score``, ``grade``, ``confidence``
 - run score (``compute_run_score``):
   ``score``, ``grade``
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from quodeq.core.evidence.model import classify_confidence_level
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.scoring.constants import Grade
-from quodeq.core.scoring.principle import compute_tallies
 from quodeq.core.scoring.internals import (
     finding_to_scoring_dict,
     principle_score_and_grade,
     score_to_grade_label,
 )
-from quodeq.core.types.scoring import ConfidenceLevel
+from quodeq.core.scoring.mass import principle_mass, requirement_rows
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
     ScoringParams,
     dimension_weighted_average,
 )
+# Also re-exported: callers of the projector import the scale from here.
+from quodeq.core.scoring.scale import PrincipleGradeScale
 from quodeq.core.types.finding import Finding
+from quodeq.core.types.scoring import ConfidenceLevel
 
 # Version of the grade math projected into each run's SQLite grade tables.
 # Bump it whenever a change here (or in the scoring internals this module
-# calls) alters the numbers an ALREADY-SCANNED run would produce — the
+# calls) alters the numbers an ALREADY-SCANNED run would produce, the
 # projector re-derives that run's grades on next contact instead of serving
 # the old math forever. Without the stamp, the clamp-order fix (floor no
 # longer beats ceiling) left projected runs on the old ordering while fresh
@@ -49,7 +51,14 @@ from quodeq.core.types.finding import Finding
 #
 # 1: implicit pre-stamp state (any DB without the run_meta key).
 # 2: ceiling beats floor in the principle-score clamp.
-GRADE_ALGO_VERSION = 3  # v3: tally groups findings by req before vt (issue #1274)
+# 3: tally groups findings by req before vt (issue #1274).
+# 4: requirement spread, standard-owned severity classes, observation-weighted
+#    principles, thin evidence scored instead of gated (spec 2026-10-09).
+GRADE_ALGO_VERSION = 4
+
+# A dimension is flagged low confidence when more than this share of its
+# observation comes from low-confidence principles.
+_LOW_CONFIDENCE_SHARE = 0.5
 
 
 def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: int) -> dict[str, Any]:
@@ -59,22 +68,9 @@ def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: 
         "grade": Grade.INSUFFICIENT,
         "finding_count": finding_count,
         "dismissed_count": dismissed_count,
+        "confidence": None,
+        "observation": 0.0,
     }
-
-
-@dataclass(frozen=True)
-class PrincipleGradeScale:
-    """Confidence-scaling and formula inputs for one principle's grade.
-
-    ``source_file_count``/``scale_multiplier`` feed
-    ``classify_confidence_level`` (thin evidence relative to project size);
-    ``params`` is the scoring formula. Defaults reproduce the pre-object
-    call shape (no scaling, default formula).
-    """
-
-    source_file_count: int = 0
-    scale_multiplier: int = 1
-    params: ScoringParams = DEFAULT_PARAMS
 
 
 def compute_principle_grade(
@@ -87,42 +83,32 @@ def compute_principle_grade(
 ) -> dict[str, Any]:
     """Score a single principle. ``findings`` excludes dismissed.
 
-    Mirrors the CLI's ``core/scoring/principle._score_numerical``: low
-    confidence (thin evidence relative to project size) short-circuits to
-    ``Insufficient`` before any scoring math runs. Without this gate,
-    principles with one or two findings scored ``10.0/Exemplary`` here
-    but ``Insufficient`` in the CLI's evaluation JSON — and the
-    dashboard's overlaid SQL grades drifted away from the CLI's report.
-
-    Returns a principle-grade result dict (keys listed in the module
-    docstring).
+    Thin evidence is scored and carries ``confidence``; only a principle with
+    no findings and no compliance is Insufficient. Returns a principle-grade
+    result dict (keys listed in the module docstring).
     """
     if not findings and not compliance:
         return _insufficient_grade(principle_id, 0, dismissed_count)
 
-    confidence_level = classify_confidence_level(
+    confidence = classify_confidence_level(
         len(findings), len(compliance),
         scale_multiplier=scale.scale_multiplier,
         source_file_count=scale.source_file_count,
     )
-    if confidence_level == ConfidenceLevel.LOW:
-        return _insufficient_grade(principle_id, len(findings), dismissed_count)
-
-    v_dicts = [finding_to_scoring_dict(v) for v in findings]
-    c_dicts = [finding_to_scoring_dict(c) for c in compliance]
-    vt_counts, ct_counts, _ = compute_tallies(v_dicts, c_dicts)
-
-    if not any(vt_counts.values()) and not any(ct_counts.values()):
-        return _insufficient_grade(principle_id, len(findings), dismissed_count)
-
-    final, grade = principle_score_and_grade(vt_counts, ct_counts, params=scale.params)
-
+    rows = requirement_rows(
+        [finding_to_scoring_dict(v) for v in findings],
+        [finding_to_scoring_dict(c) for c in compliance],
+    )
+    mass = principle_mass(rows, scale.source_file_count, scale.classes, params=scale.params)
+    final, grade = principle_score_and_grade(mass, params=scale.params)
     return {
         "principle_id": principle_id,
         "score": final,
         "grade": grade,
         "finding_count": len(findings),
         "dismissed_count": dismissed_count,
+        "confidence": str(confidence),
+        "observation": mass.observation,
     }
 
 
@@ -132,16 +118,27 @@ def compute_dimension_score(
     principle_grades: list[dict[str, Any]],
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any]:
-    """Average non-Insufficient principle scores into a dimension-level score.
+    """Observation-weighted mean of the scored principles into a dimension score.
 
-    Averaging across PRINCIPLES is always a plain mean; per-dimension weights
-    apply across DIMENSIONS (see ``compute_run_score``), not principles.
+    Equal weights when no scored principle carries observation. ``confidence``
+    is ``"low"`` when more than half the weight is low-confidence, else ``None``.
+    Per-dimension weights apply across DIMENSIONS (see ``compute_run_score``).
     """
     scored = [p for p in principle_grades if p.get("score") is not None]
     if not scored:
-        return {"dimension": dimension, "score": None, "grade": Grade.INSUFFICIENT}
-    avg = round(sum(p["score"] for p in scored) / len(scored), 1)
-    return {"dimension": dimension, "score": avg, "grade": score_to_grade_label(avg, params=params)}
+        return {"dimension": dimension, "score": None, "grade": Grade.INSUFFICIENT, "confidence": None}
+    use_observation = any(float(p.get("observation") or 0.0) > 0 for p in scored)
+    weights = [float(p.get("observation") or 0.0) if use_observation else 1.0 for p in scored]
+    total = sum(weights)
+    avg = round(sum(p["score"] * w for p, w in zip(scored, weights)) / total, 1)
+    low = sum(w for p, w in zip(scored, weights) if p.get("confidence") == ConfidenceLevel.LOW)
+    confidence = str(ConfidenceLevel.LOW) if low > total * _LOW_CONFIDENCE_SHARE else None
+    return {
+        "dimension": dimension,
+        "score": avg,
+        "grade": score_to_grade_label(avg, params=params),
+        "confidence": confidence,
+    }
 
 
 def compute_run_score(

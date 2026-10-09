@@ -25,6 +25,7 @@ from quodeq.core.standards.visibility import (
     VISIBILITY_RELPATH,
     normalize_ids,
 )
+from quodeq.data.fs.compiled_standards import iter_compiled_standards
 from quodeq.shared.advisory_json import read_advisory_json
 
 _logger = logging.getLogger(__name__)
@@ -121,3 +122,14 @@ def collect_declared_params(compiled_dir: Path) -> dict[str, dict]:
                 if req.get("id") and req.get("params"):
                     declared[req["id"]] = req["params"]
     return declared
+
+
+def collect_requirement_ids(compiled_dir: Path) -> frozenset[str]:
+    """Every requirement id declared by the standards in *compiled_dir*."""
+    ids: set[str] = set()
+    for _stem, data in iter_compiled_standards(Path(compiled_dir)):
+        for principle in data.get("principles", []):
+            for req in principle.get("requirements", []) if isinstance(principle, dict) else []:
+                if isinstance(req, dict) and isinstance(req.get("id"), str):
+                    ids.add(req["id"])
+    return frozenset(ids)

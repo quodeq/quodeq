@@ -6,27 +6,27 @@ from enum import StrEnum
 from quodeq.core.types.severity import Severity
 
 # ---------------------------------------------------------------------------
-# Violation severity weights (for weighted violation count)
+# Violation severity weights (per requirement row, see core/scoring/mass.py)
 # ---------------------------------------------------------------------------
-SEVERITY_WEIGHT: dict[str, float] = {Severity.CRITICAL: 4.0, Severity.MAJOR: 1.5, Severity.MINOR: 0.25}
+SEVERITY_WEIGHT: dict[str, float] = {Severity.CRITICAL: 4.0, Severity.MAJOR: 2.0, Severity.MINOR: 0.25}
 
 # Top of the score scale; an int so caps built from it keep their type.
 MAX_SCORE = 10
 
-# Base score curve: base = 10 / (1 + K * weighted_violations)
-BASE_K: float = 0.12
+# Base score curve: base = 10 / (1 + K * violation_mass)
+BASE_K: float = 0.08
 
 # Compliance lift curve compress exponent
-LIFT_COMPRESS: float = 1.8
+LIFT_COMPRESS: float = 2.2
 
 # Violation ceiling scale factor
 CEIL_SCALE: float = 0.5
 
-# Severity grade floor: minimum score by worst severity present
+# Severity grade floor: minimum score by worst effective severity present
 SEVERITY_GRADE_FLOOR: dict[str, float] = {
     Severity.CRITICAL: 0.0,
-    Severity.MAJOR: 5.0,
-    Severity.MINOR: 8.0,
+    Severity.MAJOR: 3.0,
+    Severity.MINOR: 5.0,
 }
 
 # Legacy dampening constants

@@ -74,6 +74,10 @@ class TestDashboardSqlOverlayAfterConfidenceFix:
         run_dir.mkdir(parents=True)
         (run_dir / "events.jsonl").write_text("")  # marks an event-log run
 
+        # The eval JSON carries a deliberately different (stale) grade. It is
+        # written first because the grade depends on its sourceFileCount.
+        self._write_eval_json(run_dir, "security", "2.0/10", "Critical")
+
         # Bake real SQL grades from findings (mirrors the projector flow).
         store = SQLiteStateStore(run_dir)
         for i in range(6):
@@ -93,9 +97,6 @@ class TestDashboardSqlOverlayAfterConfidenceFix:
         sql_rows = {r["dimension"]: r for r in store.read_dimension_scores()}
         baked = sql_rows["security"]
         assert baked["grade"] is not None
-
-        # The eval JSON carries a deliberately different (stale) grade.
-        self._write_eval_json(run_dir, "security", "2.0/10", "Critical")
 
         with patch(
             "quodeq.services.dashboard.list_runs",

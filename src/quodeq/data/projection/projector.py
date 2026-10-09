@@ -60,6 +60,29 @@ def _mapping_stale(store: SQLiteStateStore) -> bool:
     return mapping_stamps(list(stored)) != stored
 
 
+def _grades_stale(store: SQLiteStateStore, run_dir: Path) -> bool:
+    """True when the grade tables were computed with other math than today's.
+
+    Grade tables embody the scoring math that computed them. When that math
+    changes (see GRADE_ALGO_VERSION), a run whose logs are untouched still
+    carries grades no fresh rescore would produce, so the same principle
+    reads differently depending on which screen's read path served it. The
+    severity classes are part of that math: an override or standard edit
+    changes the numbers without touching any log. Re-derive from the
+    already-projected findings; no event replay needed. The class loader is
+    memoized by stat signature, so the check costs stats, not reads.
+    """
+    from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION  # noqa: PLC0415
+    from quodeq.data.fs.severity_classes_store import (  # noqa: PLC0415
+        load_severity_classes_for_run,
+        severity_classes_fingerprint,
+    )
+    if store.get_grades_algo_version() != GRADE_ALGO_VERSION:
+        return True
+    classes_now = severity_classes_fingerprint(load_severity_classes_for_run(run_dir))
+    return store.get_grades_classes_fingerprint() != classes_now
+
+
 class EnsureLockRegistry:
     """Per-run-dir locks serializing ``ensure_projected``.
 
@@ -177,14 +200,7 @@ class Projector:
             current_actions_size = actions_log.stat().st_size if actions_log.is_file() else 0
             actions_changed = current_actions_size != last_actions_size
 
-        # Grade tables embody the scoring math that computed them. When
-        # that math changes (see GRADE_ALGO_VERSION), a run whose logs are
-        # untouched still carries grades no fresh rescore would produce —
-        # the same principle read differently depending on which screen's
-        # read path served it. Re-derive from the already-projected
-        # findings; no event replay needed.
-        from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION  # noqa: PLC0415
-        grades_stale = store.get_grades_algo_version() != GRADE_ALGO_VERSION
+        grades_stale = _grades_stale(store, events_path.parent)
 
         # The coverage columns come from the dimension reports, which the CLI
         # writes after the last event; a newer report than the one graded

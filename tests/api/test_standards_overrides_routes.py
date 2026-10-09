@@ -192,3 +192,33 @@ def test_put_rejects_traversal_project_id(client):
                       headers=_LOCALHOST)
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "bad_request"
+
+
+# ---------------------------------------------------------------------------
+# The severity key: any known requirement, ladder words only
+# ---------------------------------------------------------------------------
+
+def test_put_accepts_a_severity_override(client, project_root: Path):
+    resp = client.put(OVERRIDES_URL, json={"overrides": {"M-ANA-2": {"severity": "minor"}}},
+                      headers=_LOCALHOST)
+    assert resp.status_code == 200
+    saved = json.loads((project_root / ".quodeq" / "standards-overrides.json").read_text())
+    assert saved == {"version": 1, "overrides": {"M-ANA-2": {"severity": "minor"}}}
+
+
+def test_put_accepts_a_severity_override_for_an_evaluator_only_requirement(client_with_custom, project_root: Path):
+    resp = client_with_custom.put(OVERRIDES_URL, json={"overrides": {"CUST-1": {"severity": "critical"}}},
+                                  headers=_LOCALHOST)
+    assert resp.status_code == 200
+    saved = json.loads((project_root / ".quodeq" / "standards-overrides.json").read_text())
+    assert saved["overrides"] == {"CUST-1": {"severity": "critical"}}
+
+
+def test_put_rejects_a_bad_severity_with_a_code(client, project_root: Path):
+    resp = client.put(OVERRIDES_URL, json={"overrides": {"M-ANA-2": {"severity": "blocker"}}},
+                      headers=_LOCALHOST)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "invalid_overrides"
+    assert any("M-ANA-2.severity" in d for d in body["details"])
+    assert not (project_root / ".quodeq" / "standards-overrides.json").exists()

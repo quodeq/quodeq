@@ -17,7 +17,7 @@ _TEST_SNIPPET = "eval(x)"
 def test_balanced_ratio_lifts_score():
     """1 critical violation + 1 critical compliance: compliance lifts the base.
 
-    base = 10/(1+0.12*4.0) = 6.8, lift from 1 compliance type is small.
+    Violation mass 8.0, compliance mass 2.0.
     """
     violations = [
         {"file": _TEST_FILE, "line": 1, "snippet": _TEST_SNIPPET, "reason": "r",
@@ -36,13 +36,13 @@ def test_balanced_ratio_lifts_score():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.final_score == 6.9
+    assert ts001.final_score == 6.2
 
 
 def test_strong_compliance_lifts_toward_ceiling():
     """1 major violation + 3 major compliance types: strong lift.
 
-    base = 10/(1+0.12*1.5) = 8.5, lift pushes toward ceiling of 9.3.
+    Violation mass 4.0 against compliance mass 6.0 lifts the base toward the ceiling.
     """
     violations = [
         {"file": _TEST_FILE, "line": 1, "snippet": "x", "reason": "r",
@@ -62,7 +62,7 @@ def test_strong_compliance_lifts_toward_ceiling():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.final_score == 9.2
+    assert ts001.final_score == 8.4
 
 
 def test_no_compliance_gives_base_only():
@@ -81,7 +81,7 @@ def test_no_compliance_gives_base_only():
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
     assert ts001.dampening_multiplier == 0.0  # lift = 0 (no compliance)
-    assert ts001.final_score == 8.5
+    assert ts001.final_score == 7.6
 
 
 def test_weak_compliance_small_lift():
@@ -104,7 +104,7 @@ def test_weak_compliance_small_lift():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.final_score == 9.2
+    assert ts001.final_score == 8.9
 
 
 def test_dampening_in_graded_mode():
@@ -137,20 +137,18 @@ def test_dampening_in_graded_mode():
     assert ts001.grade == "Proficient"
 
 
-def test_overall_low_confidence_when_most_insufficient():
-    """Overall should be flagged low confidence when >50% principles are Insufficient."""
-    pe_low1 = PrincipleEvidence(
-        practice_id="p1", display_name="P1", dimension="security",
-        severity="high", violations=[], compliance=[],
-        metrics={"total_instances": 1, "compliant": 1, "violating": 0,
-                 "compliance_percentage": 100.0, "confidence_level": "low", "is_balanced": False},
-    )
-    pe_low2 = PrincipleEvidence(
-        practice_id="p2", display_name="P2", dimension="security",
-        severity="high", violations=[], compliance=[],
-        metrics={"total_instances": 1, "compliant": 1, "violating": 0,
-                 "compliance_percentage": 100.0, "confidence_level": "low", "is_balanced": False},
-    )
+def test_overall_low_confidence_when_most_observation_is_thin():
+    """Overall is flagged low confidence when most observation comes from thin principles."""
+    def _thin(pid):
+        return PrincipleEvidence(
+            practice_id=pid, display_name=pid.upper(), dimension="security",
+            severity="high", violations=[], compliance=[
+                {"file": _TEST_FILE, "line": 1, "snippet": "ok", "reason": "safe"},
+            ],
+            metrics={"total_instances": 1, "compliant": 1, "violating": 0,
+                     "compliance_percentage": 100.0, "confidence_level": "low", "is_balanced": False},
+        )
+
     pe_high = PrincipleEvidence(
         practice_id="p3", display_name="P3", dimension="security",
         severity="high", violations=[], compliance=[
@@ -162,8 +160,8 @@ def test_overall_low_confidence_when_most_insufficient():
     ev = Evidence(
         repository="test", language="ts", date="2026-03-03",
         source_file_count=100, files_read=50, coverage_pct=50.0,
-        principles={"p1": pe_low1, "p2": pe_low2, "p3": pe_high},
+        principles={"p1": _thin("p1"), "p2": _thin("p2"), "p3": pe_high},
     )
     scores = score_evidence(ev, mode="numerical")
     assert scores.overall.confidence == "low"
-    assert "1/3" in scores.overall.confidence_reason
+    assert "Thin evidence" in scores.overall.confidence_reason

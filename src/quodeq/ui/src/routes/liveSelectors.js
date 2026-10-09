@@ -54,6 +54,7 @@ export function buildEvalPrincipal(principleObj, principleGrade, runId) {
     principle: principleObj.principle,
     score: principleGrade?.score ?? null,
     grade: principleGrade?.grade || null,
+    confidence: principleGrade?.confidence,
     dimension: principleObj.dimension || '',
     runId: runId || '',
     principleData: {

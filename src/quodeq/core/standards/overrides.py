@@ -17,6 +17,8 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 
+from quodeq.core.standards.severity_classes import SEVERITY_KEY, is_severity_class
+
 _logger = logging.getLogger(__name__)
 
 OVERRIDES_RELPATH = Path(".quodeq") / "standards-overrides.json"
@@ -141,39 +143,59 @@ def non_default_from_effective(
     return non_default
 
 
-def validate_overrides(raw: object, declared: dict[str, dict]) -> tuple[dict, list[str]]:
-    """Validate a full overrides mapping; returns ``(clean, errors)``.
+def _range_error(req_id: str, name: str, spec: dict) -> str:
+    """The message for a param value outside its declared range."""
+    lo = spec.get("min")
+    hi = spec.get("max")
+    if lo is not None and hi is not None:
+        return f"{req_id}.{name}: must be an integer between {lo} and {hi}"
+    return f"{req_id}.{name}: must be a valid integer"
 
-    ``clean`` is empty whenever ``errors`` is non-empty — API writes are
-    all-or-nothing, unlike analysis-time loading which skips bad entries.
+
+def _validate_requirement(
+    req_id: str, values: dict, specs: dict | None, errors: list[str],
+) -> dict[str, object]:
+    """The valid entries of one requirement's overrides; problems are appended to *errors*."""
+    clean_values: dict[str, object] = {}
+    for name, value in values.items():
+        if name == SEVERITY_KEY:
+            if is_severity_class(value):
+                clean_values[name] = value
+            else:
+                errors.append(f"{req_id}.{name}: must be one of minor, major, critical")
+            continue
+        spec = (specs or {}).get(name)
+        if spec is None:
+            errors.append(f"{req_id}.{name}: unknown parameter")
+        elif not _is_valid(value, spec):
+            errors.append(_range_error(req_id, name, spec))
+        else:
+            clean_values[name] = value
+    return clean_values
+
+
+def validate_overrides(
+    raw: object, declared: dict[str, dict], *, known_requirements: frozenset[str] = frozenset(),
+) -> tuple[dict, list[str]]:
+    """Validate a full overrides mapping; ``clean`` is empty whenever ``errors`` is non-empty.
+
+    API writes are all-or-nothing, unlike analysis-time loading which skips bad
+    entries. A requirement may carry numeric params (declared) and a ``severity``
+    class (any known requirement, ladder values only).
     """
     if not isinstance(raw, dict):
         return {}, ["overrides must be an object"]
     clean: dict[str, dict] = {}
     errors: list[str] = []
-    for req_id, params in raw.items():
+    for req_id, values in raw.items():
         specs = declared.get(req_id)
-        if specs is None:
-            errors.append(f"{req_id}: unknown requirement or no declared params")
+        if specs is None and req_id not in known_requirements:
+            errors.append(f"{req_id}: unknown requirement")
             continue
-        if not isinstance(params, dict):
+        if not isinstance(values, dict):
             errors.append(f"{req_id}: value must be an object")
             continue
-        clean_params: dict[str, int] = {}
-        for name, value in params.items():
-            spec = specs.get(name)
-            if spec is None:
-                errors.append(f"{req_id}.{name}: unknown parameter")
-            elif not _is_valid(value, spec):
-                lo = spec.get("min")
-                hi = spec.get("max")
-                if lo is not None and hi is not None:
-                    errors.append(
-                        f"{req_id}.{name}: must be an integer between {lo} and {hi}")
-                else:
-                    errors.append(f"{req_id}.{name}: must be a valid integer")
-            else:
-                clean_params[name] = value
-        if clean_params:
-            clean[req_id] = clean_params
+        clean_values = _validate_requirement(req_id, values, specs, errors)
+        if clean_values:
+            clean[req_id] = clean_values
     return ({}, errors) if errors else (clean, errors)

@@ -33,7 +33,7 @@ def test_blank_principle_rows_move_to_unmapped_and_placed_rows_stay() -> None:
 
     apply_evaluation_schema(conn)
 
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 11
     assert [r[0] for r in conn.execute("SELECT dedup_key FROM findings")] == ["placed"]
     moved = conn.execute("SELECT requirement, unmapped_reason FROM unmapped_findings").fetchall()
     assert moved == [("ACC-PER-01", "missing_principle")]

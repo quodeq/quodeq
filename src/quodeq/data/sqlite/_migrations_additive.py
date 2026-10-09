@@ -129,3 +129,11 @@ def upgrade_v9_to_v10(conn: sqlite3.Connection) -> None:
     if table_exists(conn, FINDINGS_TABLE):
         conn.executescript(_MOVE_BLANK_PRINCIPLES_SQL)
         conn.executescript(PRINCIPLE_TRIGGERS_DDL)
+
+
+def upgrade_v10_to_v11(conn: sqlite3.Connection) -> None:
+    """Add ``confidence`` to principle_grades: the thin-evidence marker that replaced the
+    Insufficient gate (grade algorithm 4). Idempotent; a DB without the table only gets
+    the fresh DDL later."""
+    if table_exists(conn, "principle_grades"):
+        add_missing_column(conn, "principle_grades", "confidence", "TEXT")

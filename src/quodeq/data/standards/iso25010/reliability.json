@@ -14,35 +14,40 @@
           "text": "All public functions MUST have corresponding test files",
           "cwe": [
             1173
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-MAT-2",
           "text": "Edge cases (empty input, boundary values) MUST be tested explicitly",
           "cwe": [
             754
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-MAT-3",
           "text": "Error paths MUST be tested, not only happy paths",
           "cwe": [
             390
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-MAT-4",
           "text": "Deprecated APIs MUST NOT be used; use supported alternatives",
           "cwe": [
             477
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-MAT-5",
           "text": "Type annotations MUST be used on public function signatures",
           "cwe": [
             1076
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-MAT-6",
@@ -51,7 +56,8 @@
             456,
             665,
             908
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-MAT-7",
@@ -67,7 +73,8 @@
           "cert": [
             "THI03-J",
             "CON36-C"
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-MAT-8",
@@ -75,7 +82,8 @@
           "cwe": [
             682,
             758
-          ]
+          ],
+          "severity": "major"
         }
       ]
     },
@@ -88,35 +96,40 @@
           "text": "Health-check endpoints MUST be implemented for long-running services",
           "cwe": [
             1059
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-AVL-2",
           "text": "Circuit breakers MUST be used for external service calls",
           "cwe": [
             400
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-AVL-3",
           "text": "Retry logic MUST use exponential backoff with jitter",
           "cwe": [
             400
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-AVL-4",
           "text": "Timeouts MUST be set on all external HTTP and database calls",
           "cwe": [
             1088
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-AVL-5",
           "text": "Graceful shutdown handlers MUST be implemented for server processes",
           "cwe": [
             404
-          ]
+          ],
+          "severity": "major"
         }
       ]
     },
@@ -129,7 +142,8 @@
           "text": "Exceptions MUST be caught and handled; empty catch blocks are forbidden",
           "cwe": [
             390
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-2",
@@ -139,84 +153,96 @@
           ],
           "cert": [
             "ERR08-J"
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-3",
           "text": "Async operations MUST handle rejection/error paths explicitly",
           "cwe": [
             755
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-4",
           "text": "Input from external sources MUST be validated before processing",
           "cwe": [
             20
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-5",
           "text": "Fallback values MUST be provided for optional configuration",
           "cwe": [
             1188
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-FT-6",
           "text": "Return values from fallible operations MUST be checked",
           "cwe": [
             252
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-FT-7",
           "text": "Catch blocks MUST target specific exception types, not generic Exception. A generic catch is compliant only when it re-raises the caught exception (or checks its type and rethrows every other one), or at a fault-isolation boundary (a thread or task entry point, one iteration of an event loop or work queue, or a third-party or plugin callback) that records the error with its stack trace at warning level or above and does not continue with partially-updated state; a generic catch around ordinary logic is a violation",
           "cwe": [
             396
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-FT-8",
           "text": "Throw declarations MUST specify concrete exception types",
           "cwe": [
             397
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-9",
           "text": "Boundary and edge-case conditions MUST be checked explicitly",
           "cwe": [
             754
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-10",
           "text": "Control flow MUST be structured and predictable; no unreachable statements",
           "cwe": [
             691
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-FT-11",
           "text": "Recursive functions MUST have verifiable termination conditions",
           "cwe": [
             674
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-12",
           "text": "All loops MUST have reachable termination conditions",
           "cwe": [
             835
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-13",
           "text": "Temporary files MUST be created using secure APIs (mktemp) to prevent race conditions",
           "cwe": [
             377
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-FT-14",
@@ -234,7 +260,8 @@
             636,
             676,
             703
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-15",
@@ -242,7 +269,8 @@
           "cwe": [
             478,
             484
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-FT-16",
@@ -252,14 +280,16 @@
             595,
             681,
             704
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-FT-17",
           "text": "Custom error pages MUST be configured to prevent default framework error pages from being served",
           "cwe": [
             756
-          ]
+          ],
+          "severity": "major"
         }
       ]
     },
@@ -272,42 +302,48 @@
           "text": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns",
           "cwe": [
             772
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-REC-2",
           "text": "Database transactions MUST be rolled back on error",
           "cwe": [
             772
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-REC-3",
           "text": "Temporary files MUST be cleaned up in finally/defer blocks",
           "cwe": [
             459
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-REC-4",
           "text": "Persistent operations MUST be idempotent or use transaction guards",
           "cwe": [
             772
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "R-REC-5",
           "text": "Error messages MUST include enough context for diagnosis (operation, input, state)",
           "cwe": [
             755
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "R-REC-6",
           "text": "Resources MUST be properly released and cleaned up after use",
           "cwe": [
             672
-          ]
+          ],
+          "severity": "minor"
         }
       ]
     }

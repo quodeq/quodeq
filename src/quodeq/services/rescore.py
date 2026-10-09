@@ -5,6 +5,7 @@ run has no evidence basis to rescore from.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from quodeq.services.evidence_rescore import (
     EvidenceScoreRequest, score_dimension_from_evidence, standard_dirs,
 )
 from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
+from quodeq.services.severity_classes import load_severity_classes_for_run
 from quodeq.services.suppression_keys import SuppressionKeys
 
 
@@ -59,6 +61,7 @@ def _rescored(
         overall_score=(f"{overall.weighted_score}/10"
                        if overall.weighted_score is not None else None),
         overall_grade=overall.grade or overall.weighted_grade,
+        confidence=overall.confidence,
         totals=recount_totals(filtered_violations, compliance_count=_compliance_count(dim),
                               files_read=dim.files_read),
     )
@@ -67,6 +70,7 @@ def _rescored(
 def _rescore_from_evidence(
     dim: DimensionResult, filtered_violations: list[Finding],
     keys: SuppressionKeys, run_dir: Path, params: ScoringParams,
+    classes: Mapping[str, str],
 ) -> DimensionResult | None:
     """Recompute a dimension's score from its run evidence (single scoring
     basis, shared with the scan-time engine). Returns None when the run has
@@ -77,7 +81,7 @@ def _rescore_from_evidence(
             dismissed=keys.dismissed, deleted=keys.deleted,
             source_file_count=dim.source_file_count or 0,
             files_read=dim.files_read or 0, params=params,
-            standard_dirs_fn=standard_dirs,
+            standard_dirs_fn=standard_dirs, classes=classes,
         ),
     )
     if scores is None:
@@ -87,6 +91,7 @@ def _rescore_from_evidence(
             principle=ps.display_name,
             score=(f"{ps.final_score}/10" if ps.final_score is not None else None),
             grade=ps.grade,
+            confidence=ps.confidence_level,
         )
         for ps in scores.principles.values()
     ]
@@ -95,6 +100,7 @@ def _rescore_from_evidence(
 
 def _rescore_legacy_fallback(
     dim: DimensionResult, filtered_violations: list[Finding], params: ScoringParams,
+    classes: Mapping[str, str],
 ) -> DimensionResult:
     """In-place rescore for a run/dimension with no evidence basis."""
     principles_violations = group_by_principle(filtered_violations)
@@ -102,7 +108,7 @@ def _rescore_legacy_fallback(
     principle_scores, principle_grades = score_all_principles(
         principles_violations, principles_compliance,
         source_file_count=dim.source_file_count or 0,
-        params=params,
+        params=params, classes=classes,
     )
 
     overall = weighted_overall(principle_scores, MODE_NUMERICAL, params)
@@ -127,12 +133,14 @@ def rescore_dimension(
     if len(filtered_violations) == len(dim.violations):
         return dim
 
+    classes = load_severity_classes_for_run(run_dir) if run_dir is not None else {}
     if run_dir is not None:
-        rescored = _rescore_from_evidence(dim, filtered_violations, keys, run_dir, params)
+        rescored = _rescore_from_evidence(
+            dim, filtered_violations, keys, run_dir, params, classes)
         if rescored is not None:
             return rescored
 
-    return _rescore_legacy_fallback(dim, filtered_violations, params)
+    return _rescore_legacy_fallback(dim, filtered_violations, params, classes)
 
 
 def with_hidden_counts(

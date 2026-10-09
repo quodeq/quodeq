@@ -13,6 +13,8 @@ class PrincipleGrade:
     principle: str | None = None
     score: str | None = None
     grade: str | None = None
+    # The evidence confidence level ("low", "medium", "high"); low marks thin evidence.
+    confidence: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

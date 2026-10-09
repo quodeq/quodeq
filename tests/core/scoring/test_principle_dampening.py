@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from quodeq.core.scoring import principle
 from quodeq.core.scoring.overall import MODE_NUMERICAL
+from quodeq.core.scoring.scale import PrincipleGradeScale
 
 _GRADED = "graded"
 
@@ -30,12 +31,12 @@ def _count_dampening(monkeypatch) -> list[int]:
 
 def test_numerical_mode_never_computes_dampening(monkeypatch):
     calls = _count_dampening(monkeypatch)
-    principle.score_all_principles(_principles(3), MODE_NUMERICAL, 1, 10)
+    principle.score_all_principles(_principles(3), MODE_NUMERICAL, PrincipleGradeScale(), 10)
     assert calls == []
 
 
 def test_graded_mode_computes_dampening_once_per_principle(monkeypatch):
     calls = _count_dampening(monkeypatch)
-    scores = principle.score_all_principles(_principles(3), _GRADED, 1, 10)
+    scores = principle.score_all_principles(_principles(3), _GRADED, PrincipleGradeScale(), 10)
     assert len(calls) == 3
     assert all(s.dampening_multiplier is not None for s in scores.values())

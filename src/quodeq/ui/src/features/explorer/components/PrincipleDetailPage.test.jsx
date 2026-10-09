@@ -105,3 +105,30 @@ describe('PrincipleDetailPage score display', () => {
     expect(document.querySelector('.term-stat__value').textContent).toBe('0');
   });
 });
+
+describe('PrincipleDetailPage score hint precedence', () => {
+  const renderWith = (extra) => render(
+    <SidePaneProvider>
+      <PrincipleDetailPage evalPrincipal={{ ...EVAL_PRINCIPAL, ...extra }} severityFilter={null} onDismiss={vi.fn()} />
+    </SidePaneProvider>,
+    { wrapper: withQueryClient() },
+  );
+
+  it('Insufficient wins over low confidence', () => {
+    renderWith({ grade: 'Insufficient', confidence: 'low' });
+    expect(screen.getByText('not enough evidence')).toBeInTheDocument();
+    expect(screen.queryByText('few observations behind this score')).toBeNull();
+  });
+
+  it('low confidence shows the thin-evidence hint', () => {
+    renderWith({ grade: 'Exemplary', confidence: 'low' });
+    expect(screen.getByText('few observations behind this score')).toBeInTheDocument();
+    expect(screen.queryByText(/^grade /)).toBeNull();
+  });
+
+  it('no confidence falls back to the grade hint', () => {
+    renderWith({ grade: 'Exemplary' });
+    expect(screen.getByText(/^grade /)).toBeInTheDocument();
+    expect(screen.queryByText('few observations behind this score')).toBeNull();
+  });
+});

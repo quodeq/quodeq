@@ -15,22 +15,32 @@
           "cwe": [
             1121
           ],
-          "params": {"max_complexity": {"label": "Max cyclomatic complexity", "type": "int",
-                                        "default": 15, "min": 1, "max": 100}}
+          "params": {
+            "max_complexity": {
+              "label": "Max cyclomatic complexity",
+              "type": "int",
+              "default": 15,
+              "min": 1,
+              "max": 100
+            }
+          },
+          "severity": "minor"
         },
         {
           "id": "M-MOD-2",
           "text": "Each module MUST have a single clearly defined responsibility",
           "cwe": [
             1080
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-MOD-3",
           "text": "Package dependency cycles MUST be 0",
           "cwe": [
             1047
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-MOD-4",
@@ -38,15 +48,24 @@
           "cwe": [
             1064
           ],
-          "params": {"max_params": {"label": "Max function parameters", "type": "int",
-                                    "default": 6, "min": 1, "max": 30}}
+          "params": {
+            "max_params": {
+              "label": "Max function parameters",
+              "type": "int",
+              "default": 6,
+              "min": 1,
+              "max": 30
+            }
+          },
+          "severity": "minor"
         },
         {
           "id": "M-MOD-6",
           "text": "Functions MUST limit outward calls to ≤7 distinct callees to reduce coupling",
           "cwe": [
             1048
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MOD-7",
@@ -54,29 +73,40 @@
           "cwe": [
             1074
           ],
-          "params": {"max_inheritance_depth": {"label": "Max inheritance depth", "type": "int",
-                                               "default": 4, "min": 1, "max": 20}}
+          "params": {
+            "max_inheritance_depth": {
+              "label": "Max inheritance depth",
+              "type": "int",
+              "default": 4,
+              "min": 1,
+              "max": 20
+            }
+          },
+          "severity": "minor"
         },
         {
           "id": "M-MOD-8",
           "text": "Inheritance hierarchies MUST maintain consistent destructor/cleanup patterns",
           "cwe": [
             1045
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-MOD-9",
           "text": "Components MUST call peers or immediate dependencies, not skip layers",
           "cwe": [
             1054
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-MOD-10",
           "text": "Trust boundaries MUST be enforced between components of different privilege levels",
           "cwe": [
             1090
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-MOD-11",
@@ -89,7 +119,8 @@
             1079,
             1086,
             1087
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MOD-12",
@@ -99,7 +130,8 @@
             1060,
             1073,
             1084
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MOD-13",
@@ -107,7 +139,8 @@
           "cwe": [
             766,
             1092
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MOD-14",
@@ -118,7 +151,8 @@
             1102,
             1103,
             1105
-          ]
+          ],
+          "severity": "minor"
         }
       ]
     },
@@ -131,28 +165,32 @@
           "text": "Shared logic MUST be extracted into utility modules rather than duplicated",
           "cwe": [
             1041
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-REU-2",
           "text": "Public functions MUST NOT depend on global mutable state without an injectable override parameter or a documented reset mechanism for testing",
           "cwe": [
             1057
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-REU-3",
           "text": "Interfaces MUST be preferred over concrete types in function signatures",
           "cwe": [
             1061
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-REU-4",
           "text": "Configuration MUST be injectable — functions that read environment variables MUST accept an override parameter (e.g., env dict) so callers can provide values without relying on process environment",
           "cwe": [
             1188
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-REU-5",
@@ -160,7 +198,8 @@
           "cwe": [
             1066,
             1070
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-REU-6",
@@ -169,7 +208,8 @@
             1058,
             1063,
             1096
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-REU-7",
@@ -178,7 +218,8 @@
             1082,
             1097,
             1098
-          ]
+          ],
+          "severity": "major"
         }
       ]
     },
@@ -192,8 +233,16 @@
           "cwe": [
             1080
           ],
-          "params": {"max_file_lines": {"label": "Max source file lines", "type": "int",
-                                        "default": 300, "min": 50, "max": 5000}}
+          "params": {
+            "max_file_lines": {
+              "label": "Max source file lines",
+              "type": "int",
+              "default": 300,
+              "min": 50,
+              "max": 5000
+            }
+          },
+          "severity": "minor"
         },
         {
           "id": "M-ANA-2",
@@ -201,8 +250,16 @@
           "cwe": [
             1080
           ],
-          "params": {"max_lines": {"label": "Max function lines", "type": "int",
-                                   "default": 60, "min": 10, "max": 500}}
+          "params": {
+            "max_lines": {
+              "label": "Max function lines",
+              "type": "int",
+              "default": 60,
+              "min": 10,
+              "max": 500
+            }
+          },
+          "severity": "minor"
         },
         {
           "id": "M-ANA-3",
@@ -210,36 +267,48 @@
           "cwe": [
             1121
           ],
-          "params": {"max_depth": {"label": "Max nesting depth", "type": "int",
-                                   "default": 4, "min": 1, "max": 20}}
+          "params": {
+            "max_depth": {
+              "label": "Max nesting depth",
+              "type": "int",
+              "default": 4,
+              "min": 1,
+              "max": 20
+            }
+          },
+          "severity": "minor"
         },
         {
           "id": "M-ANA-4",
           "text": "Boolean expressions MUST NOT combine more than 3 conditions without extraction",
           "cwe": [
             1121
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-ANA-5",
           "text": "Public APIs MUST be documented with parameter and return descriptions",
           "cwe": [
             1053
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-ANA-6",
           "text": "Control flow MUST NOT use unconditional jumps out of deeply nested blocks",
           "cwe": [
             1075
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-ANA-7",
           "text": "Loop counter variables MUST NOT be modified inside the loop body",
           "cwe": [
             1095
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-ANA-8",
@@ -249,7 +318,8 @@
             1122,
             1124,
             1125
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-ANA-9",
@@ -262,7 +332,8 @@
             1113,
             1114,
             1115
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-ANA-10",
@@ -275,7 +346,8 @@
             1071,
             1119,
             1164
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-ANA-11",
@@ -288,7 +360,8 @@
             1116,
             1117,
             1118
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-ANA-12",
@@ -297,14 +370,16 @@
             563,
             1109,
             1126
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-ANA-13",
           "text": "Comments MUST follow appropriate style and MUST NOT contain suspicious markers",
           "cwe": [
             546
-          ]
+          ],
+          "severity": "minor"
         }
       ]
     },
@@ -317,35 +392,40 @@
           "text": "Magic numbers and strings MUST be replaced with named constants",
           "cwe": [
             1059
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MDF-2",
           "text": "Feature flags MUST be used for in-progress features rather than commented-out code",
           "cwe": [
             1059
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MDF-3",
           "text": "Wildcard imports (import *) MUST NOT be used",
           "cwe": [
             1061
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MDF-4",
           "text": "Dead code MUST be removed, not commented out",
           "cwe": [
             561
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MDF-5",
           "text": "Commented-out code MUST be removed; use version control for history",
           "cwe": [
             1085
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MDF-6",
@@ -358,7 +438,8 @@
             483,
             676,
             1177
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MDF-7",
@@ -367,14 +448,16 @@
             1052,
             1106,
             1107
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MDF-8",
           "text": "Global variables MUST NOT be used excessively; shared state MUST be minimized",
           "cwe": [
             1108
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-MDF-9",
@@ -382,7 +465,8 @@
           "cwe": [
             1093,
             1101
-          ]
+          ],
+          "severity": "minor"
         }
       ]
     },
@@ -395,56 +479,64 @@
           "text": "Test coverage MUST be ≥80% for business-critical modules",
           "cwe": [
             1059
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-TST-2",
           "text": "Functions with side effects MUST accept dependencies as parameters for test injection",
           "cwe": [
             1061
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-TST-3",
           "text": "All public functions MUST have corresponding test files",
           "cwe": [
             1059
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-TST-4",
           "text": "Test files MUST be co-located or mirror the source directory structure",
           "cwe": [
             1059
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-TST-5",
           "text": "Each test MUST verify a single behaviour with a descriptive name",
           "cwe": [
             1059
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-TST-6",
           "text": "Input validation frameworks MUST be properly used",
           "cwe": [
             1173
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "M-TST-7",
           "text": "Compilation MUST enable sufficient warnings and errors",
           "cwe": [
             1127
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-TST-8",
           "text": "Code MUST NOT rely on self-modifying techniques",
           "cwe": [
             1123
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "M-TST-9",
@@ -452,7 +544,8 @@
           "cwe": [
             459,
             772
-          ]
+          ],
+          "severity": "minor"
         }
       ]
     }

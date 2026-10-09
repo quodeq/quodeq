@@ -59,7 +59,7 @@ TOTALS = Totals(
     severity=SeverityTally(critical=1, major=2, minor=2, unknown=0),
 )
 
-PRINCIPLE = PrincipleGrade(principle="Naming", score="85", grade="B")
+PRINCIPLE = PrincipleGrade(principle="Naming", score="85", grade="B", confidence="medium")
 
 DIMENSION_RESULT = DimensionResult(
     dimension="maintainability",
@@ -80,6 +80,7 @@ DIMENSION_RESULT = DimensionResult(
     from_date_iso="2026-03-14",
     from_date_label="Mar 14",
     run_id="run-003",
+    confidence="low",
 )
 
 PARSED_REPORT = ParsedReport(

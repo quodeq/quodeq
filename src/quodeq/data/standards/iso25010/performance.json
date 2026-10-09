@@ -12,63 +12,72 @@
           "text": "Database queries inside loops are forbidden (N+1 problem)",
           "cwe": [
             1084
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-TIM-2",
           "text": "Sequential awaits on independent async calls MUST be parallelised",
           "cwe": [
             1088
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-TIM-3",
           "text": "Synchronous blocking I/O MUST NOT be used in async contexts",
           "cwe": [
             1088
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-TIM-4",
           "text": "String concatenation in loops MUST use a builder or join pattern",
           "cwe": [
             1084
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-TIM-5",
           "text": "Regular expressions MUST NOT use catastrophic backtracking patterns",
           "cwe": [
             1333
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-TIM-6",
           "text": "Hot-path code MUST NOT perform redundant computation; cache or memoize results",
           "cwe": [
             1084
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-TIM-8",
           "text": "Queries on large tables MUST use indexes and MUST NOT perform full table scans",
           "cwe": [
             1049
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-TIM-9",
           "text": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search",
           "cwe": [
             1067
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-TIM-10",
           "text": "CPU computation MUST NOT be unnecessarily inefficient",
           "cwe": [
             1176
-          ]
+          ],
+          "severity": "minor"
         }
       ]
     },
@@ -80,70 +89,80 @@
           "text": "Unbounded result sets MUST be paginated or limited",
           "cwe": [
             400
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-RES-2",
           "text": "Database connections MUST use connection pooling",
           "cwe": [
             1072
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-RES-3",
           "text": "Large collections MUST use lazy iteration (generators, streams) instead of full materialization",
           "cwe": [
             400
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-RES-4",
           "text": "Caches MUST have eviction policies; unbounded caches are forbidden",
           "cwe": [
             400
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-RES-5",
           "text": "File and network handles MUST be released promptly after use",
           "cwe": [
             772
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-RES-6",
           "text": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption",
           "cwe": [
             405
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-RES-7",
           "text": "Resource allocation MUST be throttled with configurable limits",
           "cwe": [
             770
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-RES-8",
           "text": "Resource allocation inside loops MUST be minimised; pre-allocate where possible",
           "cwe": [
             1050
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-RES-9",
           "text": "Mutable default arguments MUST NOT be used; create fresh instances per call",
           "cwe": [
             1057
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-RES-10",
           "text": "Memory allocation MUST NOT use excessively large size values from untrusted input",
           "cwe": [
             789
-          ]
+          ],
+          "severity": "major"
         }
       ]
     },
@@ -155,35 +174,40 @@
           "text": "Batch operations MUST be preferred over individual operations for bulk data",
           "cwe": [
             1084
-          ]
+          ],
+          "severity": "minor"
         },
         {
           "id": "P-CAP-2",
           "text": "Background tasks MUST be offloaded from request-handling threads",
           "cwe": [
             1088
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-CAP-3",
           "text": "Memory-intensive operations MUST use streaming instead of loading entire datasets",
           "cwe": [
             400
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-CAP-4",
           "text": "Thread/coroutine pools MUST have bounded sizes with configurable limits",
           "cwe": [
             400
-          ]
+          ],
+          "severity": "major"
         },
         {
           "id": "P-CAP-5",
           "text": "Recursive algorithms MUST have depth limits or use iterative alternatives",
           "cwe": [
             674
-          ]
+          ],
+          "severity": "major"
         }
       ]
     }

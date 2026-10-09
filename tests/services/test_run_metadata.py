@@ -34,4 +34,17 @@ def test_read_run_metadata_joins_sources(tmp_path: Path) -> None:
 
 
 def test_read_run_metadata_tolerates_missing_files(tmp_path: Path) -> None:
-    assert read_run_metadata(tmp_path) == {"commitSha": None, "cacheStats": {}}
+    assert read_run_metadata(tmp_path) == {
+        "commitSha": None, "gradeAlgoVersion": None, "gradesAlgoVersion": None, "cacheStats": {}}
+
+
+def test_grades_algo_version_is_the_stamp_on_the_sql_grade_tables(tmp_path: Path) -> None:
+    """A legacy run (no evaluation.db) has none, so the formula note never shows for it."""
+    from quodeq.data.sqlite.state_store import SQLiteStateStore
+
+    assert read_run_metadata(tmp_path)["gradesAlgoVersion"] is None
+    store = SQLiteStateStore(tmp_path)
+    store.save_projected_size(0)
+    assert read_run_metadata(tmp_path)["gradesAlgoVersion"] is None
+    store.save_grades_algo_version(4)
+    assert read_run_metadata(tmp_path)["gradesAlgoVersion"] == 4

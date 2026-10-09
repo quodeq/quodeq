@@ -56,6 +56,7 @@ def parse_evidence_file(
             language=config.language, repository=str(config.src),
             date_str=ctx.date_str, source_file_count=config.source_file_count,
             files_read=files_read, module=config.target.name if config.target else "",
+            source_line_count=config.source_line_count,
         ),
         resolved_options,
     )

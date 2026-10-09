@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from quodeq.core.types import OverallScore, PrincipleScore
+from quodeq.core.types.scoring import ConfidenceLevel
 from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import (
@@ -15,36 +16,46 @@ from quodeq.core.scoring.internals import (
 _GRADE_INDEX: dict[str, int] = {g: i for i, g in enumerate(GRADE_LADDER)}
 
 MODE_NUMERICAL = "numerical"
-_INSUFFICIENT_MAJORITY_RATIO = 0.5
+_LOW_CONFIDENCE_REASON = (
+    "Thin evidence: {pct}% of this dimension's observations come from principles with few findings"
+)
+_INSUFFICIENT_REASON = "Only {scored}/{total} principles had sufficient evidence"
+_LOW_CONFIDENCE_SHARE = 0.5
 
 
 def accumulate_weights(
     principles_scores: dict[str, PrincipleScore], mode: str,
-) -> tuple[int, float, int, int]:
-    """Sum weighted values across scorable principles.
+) -> tuple[float, float, int, float]:
+    """Sum weighted values. Returns (total_weight, total_value, total_count, low_confidence_weight).
 
-    Returns (total_weight, total_value, total_count, insufficient_count).
+    Numerical mode weighs a principle by its observation times the configured
+    multiplier; when no principle carries observation (legacy inputs) every
+    principle weighs its multiplier alone. Graded mode weighs by multiplier.
     """
-    total_count = len(principles_scores)
-    insufficient_count = sum(
-        1 for p in principles_scores.values() if p.grade == Grade.INSUFFICIENT
-    )
-    total_weight = 0
+    scorable = [
+        p for p in principles_scores.values()
+        if p.grade != Grade.INSUFFICIENT and (mode != MODE_NUMERICAL or p.final_score is not None)
+    ]
+    use_observation = mode == MODE_NUMERICAL and any(p.observation > 0 for p in scorable)
+    total_weight = 0.0
     total_value = 0.0
-    for pdata in principles_scores.values():
-        if pdata.grade == Grade.INSUFFICIENT:
-            continue
-        multiplier = weight_as_multiplier(pdata.weight)
-        total_weight += multiplier
+    low_weight = 0.0
+    for pdata in scorable:
+        weight = float(weight_as_multiplier(pdata.weight))
+        if use_observation:
+            weight *= pdata.observation
+        total_weight += weight
+        if pdata.confidence_level == ConfidenceLevel.LOW:
+            low_weight += weight
         if mode == MODE_NUMERICAL:
-            total_value += (pdata.final_score or 0.0) * multiplier
+            total_value += (pdata.final_score or 0.0) * weight
         else:
-            total_value += _GRADE_INDEX[pdata.grade] * multiplier
-    return total_weight, total_value, total_count, insufficient_count
+            total_value += _GRADE_INDEX[pdata.grade] * weight
+    return total_weight, total_value, len(principles_scores), low_weight
 
 
 def build_overall_result(
-    mode: str, total_weight: int, total_value: float,
+    mode: str, total_weight: float, total_value: float,
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> OverallScore:
     """Build the overall result from aggregated weights."""
@@ -65,7 +76,7 @@ def weighted_overall(
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> OverallScore:
     """Compute a weighted overall score or grade from per-principle results."""
-    tw, tv, total, insuff = accumulate_weights(principles_scores, mode)
+    tw, tv, total, low = accumulate_weights(principles_scores, mode)
 
     if tw == 0:
         if mode == MODE_NUMERICAL:
@@ -74,11 +85,18 @@ def weighted_overall(
 
     result = build_overall_result(mode, tw, tv, params)
 
-    if total > 0 and insuff > total * _INSUFFICIENT_MAJORITY_RATIO:
-        scored = total - insuff
+    if mode == MODE_NUMERICAL:
+        if total > 0 and low > tw * _LOW_CONFIDENCE_SHARE:
+            pct = round(100 * low / tw)
+            result = replace(
+                result, confidence="low",
+                confidence_reason=_LOW_CONFIDENCE_REASON.format(pct=pct),
+            )
+        return result
+    insufficient = sum(1 for p in principles_scores.values() if p.grade == Grade.INSUFFICIENT)
+    if total > 0 and insufficient > total * _LOW_CONFIDENCE_SHARE:
         result = replace(
-            result,
-            confidence="low",
-            confidence_reason=f"Only {scored}/{total} principles had sufficient evidence",
+            result, confidence="low",
+            confidence_reason=_INSUFFICIENT_REASON.format(scored=total - insufficient, total=total),
         )
     return result

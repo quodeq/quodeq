@@ -10,6 +10,7 @@ from quodeq.analysis.report import write_dimension_report
 from quodeq.analysis.runner import RunConfig, run_per_dimension
 from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.services.grade_formula import load_params
+from quodeq.services.severity_classes import load_severity_classes
 
 if TYPE_CHECKING:
     from quodeq.core.evidence.model import Evidence
@@ -29,9 +30,10 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
     work_dir = config.work_dir or config.src
     results: dict[str, str] = {}
     params = load_params()
+    classes = load_severity_classes(config.src)
 
     def _score_dimension(dimension: str, evidence: "Evidence") -> None:
-        scores = score_evidence(evidence, mode=mode, params=params)
+        scores = score_evidence(evidence, mode=mode, params=params, classes=classes)
         write_dimension_report(evidence, scores, dimension, output_dir)
         cleanup_stream(work_dir / f"{dimension}_live.stream")
         overall = scores.overall

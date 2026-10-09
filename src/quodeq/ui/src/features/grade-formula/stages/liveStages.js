@@ -47,9 +47,6 @@ export function liveStages(explain, principleId, { shared = false } = {}) {
     return { stored: null, live: null, note: noRowsNote(explain.status, shared) };
   }
   const stored = rowsOf(explain.stored, principleId);
-  if (!stored) {
-    const note = principleId ? t('gradeFormula.liveInsufficient', { principle: principleId }) : t('gradeFormula.liveNoRun');
-    return { stored: null, live: null, note };
-  }
+  if (!stored) return { stored: null, live: null, note: t('gradeFormula.liveNoRun') };
   return { stored, live: rowsOf(explain.live, principleId), note: null };
 }

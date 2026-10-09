@@ -32,9 +32,10 @@ def _make_compliance(practice_id="P1", req="C1", file="c.py", line=20):
 def _make_dimension(violations, compliance):
     return DimensionResult(
         dimension="performance",
-        overall_score="6.1/10",
-        overall_grade="Adequate",
-        principles=[PrincipleGrade(principle="P1", score="6.1/10", grade="Adequate")],
+        # 3.9/10 is what the spread formula gives the five violations at 100 source files.
+        overall_score="3.9/10",
+        overall_grade="Poor",
+        principles=[PrincipleGrade(principle="P1", score="3.9/10", grade="Poor")],
         violations=violations,
         compliance=compliance,
         totals=Totals(

@@ -9,6 +9,7 @@ bugs at the cost of a few ms per call.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +18,11 @@ from quodeq.core.types.finding import Finding
 from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.grade_formula_store import load_params
 from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_reports
+from quodeq.data.fs.run_files import read_run_manifest
+from quodeq.data.fs.severity_classes_store import (
+    load_severity_classes_for_run,
+    severity_classes_fingerprint,
+)
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
@@ -28,17 +34,19 @@ from quodeq.core.scoring.projector_scoring import (
     compute_principle_grade,
 )
 
+_MANIFEST_SOURCE_FILES_KEY = "source_files_count"
+
 
 def _read_source_file_count(run_dir: Path) -> int:
-    """Best-effort: pick up the run's ``sourceFileCount`` from any dim JSON.
+    """Best-effort: the run's project size, from a dim JSON or the scan manifest.
 
-    The projector needs this to apply the CLI's confidence-level thresholds
-    (which scale with project size). Every ``evaluation/<dim>.json`` in the
-    run carries the same value; we read the first one we find. Returns 0
-    when no JSON exists yet (early projection of a run-in-progress) — that
-    falls back to the unsclaed base thresholds in
-    ``classify_confidence_level``, matching the CLI's behaviour for runs
-    without a known file count.
+    The projector needs it for the confidence thresholds and the requirement
+    spread, both of which scale with project size. Every
+    ``evaluation/<dim>.json`` in the run carries the same ``sourceFileCount``;
+    the first one found wins. A live run has no dim JSON yet, so the count
+    the scan recorded in ``evidence/manifest.json`` (``source_files_count``)
+    stands in; without it the spread would score the run as if the size were
+    unknown. Returns 0 only when neither carries a count.
     """
     for _dimension, data in iter_readable_eval_reports(run_dir):
         if not isinstance(data, dict):
@@ -46,7 +54,9 @@ def _read_source_file_count(run_dir: Path) -> int:
         count = data.get("sourceFileCount")
         if isinstance(count, int) and count > 0:
             return count
-    return 0
+    manifest = read_run_manifest(run_dir) or {}
+    count = manifest.get(_MANIFEST_SOURCE_FILES_KEY)
+    return count if isinstance(count, int) and count > 0 else 0
 
 
 _SELECT_NON_DISMISSED = (
@@ -72,10 +82,12 @@ def _grade_all_principles(
     dismissed_counts: dict[tuple[str, str], int],
     source_file_count: int,
     params: ScoringParams,
+    classes: Mapping[str, str],
 ) -> tuple[list[tuple[str, dict]], dict[str, list[dict]]]:
     """Compute per-principle grades: flat rows (for persistence) plus the
     same grades grouped by dimension (for the dimension-score rollup)."""
-    scale = PrincipleGradeScale(source_file_count=source_file_count, params=params)
+    scale = PrincipleGradeScale(
+        source_file_count=source_file_count, params=params, classes=classes)
     principle_grades_by_dim: dict[str, list[dict]] = {}
     principle_rows: list[tuple[str, dict]] = []
     for dim, principle_id in sorted(set(violations_by) | set(compliance_by)):
@@ -128,7 +140,7 @@ def load_grade_inputs(run_dir: Path) -> GradeInputs:
 
 
 def compute_run_grades(
-    run_dir: Path, params: ScoringParams,
+    run_dir: Path, params: ScoringParams, classes: Mapping[str, str] | None = None,
 ) -> tuple[list[tuple[str, dict]], list[dict]]:
     """Compute (principle_rows, dimension_rows) from findings. Pure: no writes.
 
@@ -136,12 +148,15 @@ def compute_run_grades(
     dimension_rows: ``[{"dimension":..., "score":..., "grade":...}, ...]``
 
     ``recompute_grades`` layers persistence on top; ``preview_scores`` uses
-    the result directly.
+    the result directly. *classes* is the severity class per requirement; None
+    loads it for the run's project (standards plus the project's overrides).
     """
+    if classes is None:
+        classes = load_severity_classes_for_run(run_dir)
     inputs = load_grade_inputs(run_dir)
     principle_rows, principle_grades_by_dim = _grade_all_principles(
         inputs.violations_by, inputs.compliance_by, inputs.dismissed_counts,
-        inputs.source_file_count, params,
+        inputs.source_file_count, params, classes,
     )
     dimension_rows = [
         compute_dimension_score(dimension=dim, principle_grades=p_grades, params=params)
@@ -150,14 +165,19 @@ def compute_run_grades(
     return principle_rows, dimension_rows
 
 
-def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None:
+def recompute_grades(
+    run_dir: Path, params: ScoringParams | None = None,
+    classes: Mapping[str, str] | None = None,
+) -> None:
     """Full recompute of dimension_scores + principle_grades from findings.
 
     When *params* is None, the saved grade-formula params are loaded.
     """
     if params is None:
         params = load_params()
-    principle_rows, dimension_rows = compute_run_grades(run_dir, params)
+    if classes is None:
+        classes = load_severity_classes_for_run(run_dir)
+    principle_rows, dimension_rows = compute_run_grades(run_dir, params, classes)
 
     # Carry the per-dim exit_reason (failure_streak, time_limit, ...) from the
     # authoritative dim-state file so the grade layer can flag/exclude
@@ -194,8 +214,12 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     # run graded with older scoring apart from one that is merely unchanged,
     # and the reports the coverage came from, so a report written after the
     # last event re-derives the tables instead of leaving coverage at zero.
-    store.save_grades_algo_version(GRADE_ALGO_VERSION)
-    store.save_coverage_stamp(report_stamp(run_dir))
+    # The class fingerprint does the same for a standard or override edit.
+    # One held connection for the three stamps.
+    with store.connection():
+        store.save_grades_algo_version(GRADE_ALGO_VERSION)
+        store.save_grades_classes_fingerprint(severity_classes_fingerprint(classes))
+        store.save_coverage_stamp(report_stamp(run_dir))
 
 
 def report_stamp(run_dir: Path) -> str:

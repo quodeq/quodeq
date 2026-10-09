@@ -34,7 +34,10 @@ def test_explain_route_returns_stages(client) -> None:
     assert body["dimension"] == "Security"
     principle = body["principles"][0]
     assert principle["principleId"] == "P1"
-    assert set(principle["stages"]) >= {"types", "base", "lift", "ceiling", "floor", "final", "grade"}
+    assert set(principle["stages"]) >= {
+        "violationRules", "complianceRules", "violationMass", "complianceMass", "observation",
+        "requirements", "compliance", "base", "lift", "ceiling", "floor", "final", "grade"}
+    assert {"confidence", "files"} <= set(principle)
 
 
 def test_explain_route_unknown_dimension_is_404(client) -> None:

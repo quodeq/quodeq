@@ -19,7 +19,7 @@
           "id": "M-MOD-1",
           "source": "iso25010",
           "text": "Cyclomatic complexity MUST be \u2264{max_complexity} per function",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -49,7 +49,7 @@
           "id": "M-MOD-2",
           "source": "iso25010",
           "text": "Each module MUST have a single clearly defined responsibility",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -70,7 +70,7 @@
           "id": "M-MOD-3",
           "source": "iso25010",
           "text": "Package dependency cycles MUST be 0",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -91,7 +91,7 @@
           "id": "M-MOD-4",
           "source": "iso25010",
           "text": "Functions MUST have \u2264{max_params} parameters; use an options object for more",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -121,7 +121,7 @@
           "id": "M-MOD-6",
           "source": "iso25010",
           "text": "Functions MUST limit outward calls to \u22647 distinct callees to reduce coupling",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -142,7 +142,7 @@
           "id": "M-MOD-7",
           "source": "iso25010",
           "text": "Inheritance depth MUST NOT exceed {max_inheritance_depth} levels",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -172,7 +172,7 @@
           "id": "M-MOD-8",
           "source": "iso25010",
           "text": "Inheritance hierarchies MUST maintain consistent destructor/cleanup patterns",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -193,7 +193,7 @@
           "id": "M-MOD-9",
           "source": "iso25010",
           "text": "Components MUST call peers or immediate dependencies, not skip layers",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -214,7 +214,7 @@
           "id": "M-MOD-10",
           "source": "iso25010",
           "text": "Trust boundaries MUST be enforced between components of different privilege levels",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -235,7 +235,7 @@
           "id": "M-MOD-11",
           "source": "iso25010",
           "text": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -286,7 +286,7 @@
           "id": "M-MOD-12",
           "source": "iso25010",
           "text": "Functions MUST NOT have variadic parameters without type safety or excessive file/data access operations",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -319,7 +319,7 @@
           "id": "M-MOD-13",
           "source": "iso25010",
           "text": "Code MUST maintain proper encapsulation and data element visibility",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -340,7 +340,7 @@
           "id": "M-MOD-14",
           "source": "iso25010",
           "text": "Modules MUST NOT have hard-coded network configuration or platform-dependent components",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -386,7 +386,7 @@
           "id": "M-REU-1",
           "source": "iso25010",
           "text": "Shared logic MUST be extracted into utility modules rather than duplicated",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -407,7 +407,7 @@
           "id": "M-REU-2",
           "source": "iso25010",
           "text": "Public functions MUST NOT depend on global mutable state without an injectable override parameter or a documented reset mechanism for testing",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -428,7 +428,7 @@
           "id": "M-REU-3",
           "source": "iso25010",
           "text": "Interfaces MUST be preferred over concrete types in function signatures",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -449,7 +449,7 @@
           "id": "M-REU-4",
           "source": "iso25010",
           "text": "Configuration MUST be injectable \u2014 functions that read environment variables MUST accept an override parameter (e.g., env dict) so callers can provide values without relying on process environment",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -464,7 +464,7 @@
           "id": "M-REU-5",
           "source": "iso25010",
           "text": "Serialization control elements MUST be properly implemented",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -485,7 +485,7 @@
           "id": "M-REU-6",
           "source": "iso25010",
           "text": "Singleton classes MUST use proper locking and synchronization for instance creation",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -512,7 +512,7 @@
           "id": "M-REU-7",
           "source": "iso25010",
           "text": "Data elements containing pointers MUST implement proper copy control",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -546,7 +546,7 @@
           "id": "M-ANA-1",
           "source": "iso25010",
           "text": "Source files MUST NOT exceed {max_file_lines} lines",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -576,7 +576,7 @@
           "id": "M-ANA-2",
           "source": "iso25010",
           "text": "Functions MUST NOT exceed {max_lines} lines",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -606,7 +606,7 @@
           "id": "M-ANA-3",
           "source": "iso25010",
           "text": "Nesting depth MUST NOT exceed {max_depth} levels",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -636,7 +636,7 @@
           "id": "M-ANA-4",
           "source": "iso25010",
           "text": "Boolean expressions MUST NOT combine more than 3 conditions without extraction",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -657,7 +657,7 @@
           "id": "M-ANA-5",
           "source": "iso25010",
           "text": "Public APIs MUST be documented with parameter and return descriptions",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -678,7 +678,7 @@
           "id": "M-ANA-6",
           "source": "iso25010",
           "text": "Control flow MUST NOT use unconditional jumps out of deeply nested blocks",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -699,7 +699,7 @@
           "id": "M-ANA-7",
           "source": "iso25010",
           "text": "Loop counter variables MUST NOT be modified inside the loop body",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -720,7 +720,7 @@
           "id": "M-ANA-8",
           "source": "iso25010",
           "text": "Code complexity MUST remain within measurable thresholds (Halstead, nesting depth, attack surface)",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -753,7 +753,7 @@
           "id": "M-ANA-9",
           "source": "iso25010",
           "text": "Source code MUST follow consistent naming, formatting, and style conventions",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -804,7 +804,7 @@
           "id": "M-ANA-10",
           "source": "iso25010",
           "text": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -855,7 +855,7 @@
           "id": "M-ANA-11",
           "source": "iso25010",
           "text": "Documentation MUST be sufficient, accurate, and consistent with the implementation",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -906,7 +906,7 @@
           "id": "M-ANA-12",
           "source": "iso25010",
           "text": "Variables MUST be used for their declared purpose with appropriate scope",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -933,7 +933,7 @@
           "id": "M-ANA-13",
           "source": "iso25010",
           "text": "Comments MUST follow appropriate style and MUST NOT contain suspicious markers",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -955,7 +955,7 @@
           "id": "M-MDF-1",
           "source": "iso25010",
           "text": "Magic numbers and strings MUST be replaced with named constants",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -976,7 +976,7 @@
           "id": "M-MDF-2",
           "source": "iso25010",
           "text": "Feature flags MUST be used for in-progress features rather than commented-out code",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -997,7 +997,7 @@
           "id": "M-MDF-3",
           "source": "iso25010",
           "text": "Wildcard imports (import *) MUST NOT be used",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1018,7 +1018,7 @@
           "id": "M-MDF-4",
           "source": "iso25010",
           "text": "Dead code MUST be removed, not commented out",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1039,7 +1039,7 @@
           "id": "M-MDF-5",
           "source": "iso25010",
           "text": "Commented-out code MUST be removed; use version control for history",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1060,7 +1060,7 @@
           "id": "M-MDF-6",
           "source": "iso25010",
           "text": "Code MUST NOT use obsolete, dangerous, or prohibited functions",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1111,7 +1111,7 @@
           "id": "M-MDF-7",
           "source": "iso25010",
           "text": "Hard-coded literals and magic numbers MUST be replaced with symbolic constants",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1138,7 +1138,7 @@
           "id": "M-MDF-8",
           "source": "iso25010",
           "text": "Global variables MUST NOT be used excessively; shared state MUST be minimized",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1153,7 +1153,7 @@
           "id": "M-MDF-9",
           "source": "iso25010",
           "text": "Data representations MUST NOT be excessively complex or machine-dependent",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1181,7 +1181,7 @@
           "id": "M-TST-1",
           "source": "iso25010",
           "text": "Test coverage MUST be \u226580% for business-critical modules",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1202,7 +1202,7 @@
           "id": "M-TST-2",
           "source": "iso25010",
           "text": "Functions with side effects MUST accept dependencies as parameters for test injection",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1223,7 +1223,7 @@
           "id": "M-TST-3",
           "source": "iso25010",
           "text": "All public functions MUST have corresponding test files",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1244,7 +1244,7 @@
           "id": "M-TST-4",
           "source": "iso25010",
           "text": "Test files MUST be co-located or mirror the source directory structure",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1265,7 +1265,7 @@
           "id": "M-TST-5",
           "source": "iso25010",
           "text": "Each test MUST verify a single behaviour with a descriptive name",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1286,7 +1286,7 @@
           "id": "M-TST-6",
           "source": "iso25010",
           "text": "Input validation frameworks MUST be properly used",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1301,7 +1301,7 @@
           "id": "M-TST-7",
           "source": "iso25010",
           "text": "Compilation MUST enable sufficient warnings and errors",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1316,7 +1316,7 @@
           "id": "M-TST-8",
           "source": "iso25010",
           "text": "Code MUST NOT rely on self-modifying techniques",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1331,7 +1331,7 @@
           "id": "M-TST-9",
           "source": "iso25010",
           "text": "Test setup and teardown MUST clean up all side effects including database state and file system changes",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
