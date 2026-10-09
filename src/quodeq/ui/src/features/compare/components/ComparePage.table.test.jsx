@@ -167,11 +167,12 @@ describe('ComparePage', () => {
     renderPage();
     await screen.findByText('alpha');
     await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
-    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
-    // Left minus right: +1.5 shows as the overall gap card and again on the
-    // security dimension and principle rows (7.0 vs 5.5).
+    expect(await screen.findByText(/GAP_SOURCES/)).toBeInTheDocument();
+    // Left minus right: +1.5 shows in the verdict and again as security's
+    // share of the gap (the only dimension, so all of it: 7.0 vs 5.5).
     expect(screen.getAllByText('+1.5').length).toBeGreaterThan(1);
-    expect(screen.getByText('alpha leads by 1.5')).toBeInTheDocument();
+    const verdict = screen.getByRole('group', { name: 'Head-to-head comparison' });
+    expect(verdict).toHaveTextContent(/alpha leads beta by \+1\.5/);
   });
 
   it('the header launcher runs the two-pick flow on larger scopes', async () => {
@@ -186,7 +187,7 @@ describe('ComparePage', () => {
     await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
     expect(screen.getByLabelText('Clear the first pick')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('menuitem', { name: /beta/ }));
-    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
+    expect(await screen.findByText(/GAP_SOURCES/)).toBeInTheDocument();
   });
 
   it('hides dimensions the user has disabled, like the Overview', async () => {

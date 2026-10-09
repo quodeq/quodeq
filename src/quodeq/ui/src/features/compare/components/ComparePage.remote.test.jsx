@@ -68,7 +68,7 @@ describe('ComparePage remote projects', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /gamma/ }));
-    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
+    expect(await screen.findByText(/GAP_SOURCES/)).toBeInTheDocument();
   });
 
   it('a published copy of a local project is deduplicated, local prevailing', async () => {

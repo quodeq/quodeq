@@ -1,87 +1,58 @@
 /**
- * CompareDuelView — head-to-head between exactly two projects: overall
- * scores with the gap, per-dimension scores as mirrored bars, both trend
- * lines on one time axis, and per-principle diffs for the dimensions the
- * projects share. Reached from the fleet's "compare these two" action when
- * the scope holds exactly two projects.
+ * CompareDuelView: head-to-head between exactly two projects, laid out in
+ * the order an engineer or researcher asks the questions:
  *
- * Sides are fixed for the whole screen: A is always the left/first project
- * (accent), B the right/second (info), and every gap reads A minus B.
+ *   1. who leads, and is the gap bigger than run-to-run noise?  (verdict)
+ *   2. is this a fair comparison?                               (checks)
+ *   3. where does the gap come from? / exposure by size          (two panels)
+ *   4. how did they get here?                                    (trend)
+ *   5. systematic or a few outliers? what do both get wrong?     (principles)
+ *   6. every number, on one axis                                 (score table)
+ *
+ * Sides are fixed for the whole screen: A is always the first project
+ * (accent), B the second (sand), and every gap reads A minus B.
  */
 import { TermHeader } from '../../../components/terminal/index.js';
-import TrendBadge from '../../../components/TrendBadge.jsx';
-import { relativeTime } from '../../../components/LastFetchedLine.jsx';
-import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
-import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
 import ComparePanel from './ComparePanel.jsx';
+import CompareDuelVerdict from './CompareDuelVerdict.jsx';
+import CompareDuelChecks from './CompareDuelChecks.jsx';
+import CompareDuelContribution from './CompareDuelContribution.jsx';
+import CompareDuelExposure from './CompareDuelExposure.jsx';
 import CompareDuelTrend from './CompareDuelTrend.jsx';
-import CompareDuelDimensionsTable from './CompareDuelDimensionsTable.jsx';
-import CompareDuelShapePanel from './CompareDuelShapePanel.jsx';
-import CompareDuelPrinciples from './CompareDuelPrinciples.jsx';
-import { gapClass, score1, signed1 } from './compareDuelShared.jsx';
-import { nf } from '../compareFormatters.js';
+import CompareDuelPrincipleMap from './CompareDuelPrincipleMap.jsx';
+import CompareDuelTable from './CompareDuelTable.jsx';
+import { DUEL_SIDE } from '../duelTrendGeometry.js';
+import { signed1 } from './compareDuelShared.jsx';
 
-
-/* One half of the versus header: identity-coloured name, grade-coloured
-   score, and the side's vitals. */
-function VersusSide({ side, row, onOpenProject }) {
+function Movement({ row, side }) {
   return (
-    <div className={`compare-versus__side compare-versus__side--${side}`}>
-      <button
-        type="button"
-        className="compare-versus__name"
-        onClick={() => onOpenProject(row.id)}
-        title={t('compare.openProject')}
-      >
-        {row.name}
-        {row.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
-      </button>
-      <div className="compare-versus__scoreRow">
-        <span className={`compare-versus__score ${scoreColorClass(row.score)}`}>{score1(row.score)}</span>
-        <span className="compare-versus__tier">{scoreToGradeLabel(row.score) || t('compare.noRuns')}</span>
-        <TrendBadge delta={row.delta ?? row.lastDelta} />
-      </div>
-      <div className="compare-versus__meta">
-        <span>{t('compare.violCount', { count: nf(row.totalViolations) })}</span>
-        <span>{complianceRatio(row.totalViolations, row.totalCompliance)}</span>
-        <span className={row.stale ? 'compare-row__last--stale' : undefined}>
-          {relativeTime(row.lastISO) || '—'}
-        </span>
-        {row.commitsSince != null && row.commitsSince > 0 && (
-          <span className="compare-rowdetail__stale">
-            {t('compare.commitsSince', { count: nf(row.commitsSince) })}
-          </span>
-        )}
-      </div>
-    </div>
+    <span className="compare-duel-trendpanel__move">
+      <span className={`compare-duel__swatch compare-duel__swatch--${side}`} aria-hidden="true" />
+      {row.name}
+      {row.delta != null && <b>{t('compare.duelTrendMove', { delta: signed1(row.delta) })}</b>}
+    </span>
   );
 }
 
-function DuelTrendPanel({ trend, a, b, onOpenProject }) {
-  const trendPoints = trend.a.length + trend.b.length;
+function DuelTrendPanel({ duel }) {
+  const { a, b, trend } = duel;
   return (
-    <ComparePanel ariaLabel={t('compare.duelTrendAria')} header={t('compare.duelTrendHeader')} note={t('compare.duelTrendNote')}>
-      {trendPoints >= 2 ? (
-        <>
+    <ComparePanel
+      ariaLabel={t('compare.duelTrendAria')}
+      header={t('compare.duelTrendHeader')}
+      note={t('compare.duelTrendNote')}
+      headExtra={(
+        <span className="compare-duel-trendpanel__moves">
+          <Movement row={a} side={DUEL_SIDE.A} />
+          <Movement row={b} side={DUEL_SIDE.B} />
+        </span>
+      )}
+    >
+      {trend.a.length + trend.b.length >= 2 ? (
+        <div className="compare-duel-trendpanel__body">
           <CompareDuelTrend a={trend.a} b={trend.b} aName={a.name} bName={b.name} />
-          <div className="compare-radar__legend">
-            <button
-              type="button"
-              className="compare-duel__legendItem compare-duel__legendItem--a"
-              onClick={() => onOpenProject(a.id)}
-            >
-              {a.name}
-            </button>
-            <button
-              type="button"
-              className="compare-duel__legendItem compare-duel__legendItem--b"
-              onClick={() => onOpenProject(b.id)}
-            >
-              {b.name}
-            </button>
-          </div>
-        </>
+        </div>
       ) : (
         <p className="compare-panel__fallback">{t('compare.duelTrendTooFew')}</p>
       )}
@@ -89,21 +60,28 @@ function DuelTrendPanel({ trend, a, b, onOpenProject }) {
   );
 }
 
-function duelGapHint(duel, a, b) {
-  if (duel.gap == null) return '';
-  if (duel.gap === 0) return t('compare.duelEven');
-  return t('compare.duelLeads', {
-    name: duel.gap > 0 ? a.name : b.name,
-    gap: Math.abs(duel.gap).toFixed(1),
-  });
+function DuelBody({ duel, onOpenProject }) {
+  return (
+    <>
+      <CompareDuelVerdict duel={duel} onOpenProject={onOpenProject} />
+      <CompareDuelChecks duel={duel} />
+      <div className="compare-duel-pair">
+        <CompareDuelContribution duel={duel} />
+        <CompareDuelExposure duel={duel} />
+      </div>
+      <DuelTrendPanel duel={duel} />
+      <CompareDuelPrincipleMap duel={duel} />
+      <CompareDuelTable duel={duel} />
+    </>
+  );
 }
 
-/** Title + the versus header: both sides' vitals with the gap between them. */
-function CompareDuelHeader({ duel, a, b, onOpenProject }) {
+export default function CompareDuelView({ duel, onOpenProject }) {
+  const { a, b } = duel;
   return (
     <>
       <div className="term-page-top compare-page__top">
-        {/* No local back button — the app breadcrumb already walks back,
+        {/* No local back button: the app breadcrumb already walks back,
             same as the dimension screen. */}
         <div className="compare-page__titles">
           <TermHeader
@@ -112,50 +90,10 @@ function CompareDuelHeader({ duel, a, b, onOpenProject }) {
           />
         </div>
       </div>
-
-      <div className="compare-versus" role="group" aria-label={t('compare.duelAria')}>
-        <VersusSide side="a" row={a} onOpenProject={onOpenProject} />
-        <div className="compare-versus__gap">
-          <span className="compare-versus__gapLabel">{t('compare.duelCardGap')}</span>
-          <span className={`compare-versus__gapValue ${gapClass(duel.gap)}`}>
-            {duel.gap != null ? signed1(duel.gap) : '—'}
-          </span>
-          <span className="compare-versus__gapHint">{duelGapHint(duel, a, b)}</span>
-        </div>
-        <VersusSide side="b" row={b} onOpenProject={onOpenProject} />
-      </div>
-    </>
-  );
-}
-
-export default function CompareDuelView({ duel, onOpenProject }) {
-  const { a, b } = duel;
-  const sharedDims = duel.dimensions.filter((d) => d.shared);
-
-  return (
-    <>
-      <CompareDuelHeader duel={duel} a={a} b={b} onOpenProject={onOpenProject} />
-
-      {!duel.ready ? (
+      {duel.ready ? <DuelBody duel={duel} onOpenProject={onOpenProject} /> : (
         <section className="compare-panel" aria-label={t('compare.duelAria')}>
           <p className="compare-panel__fallback">{t('compare.duelNeedsBoth')}</p>
         </section>
-      ) : (
-        <>
-          <CompareDuelDimensionsTable dimensions={duel.dimensions} aName={a.name} bName={b.name} />
-
-          <div className="compare-lower compare-lower--duel">
-            <CompareDuelShapePanel sharedDims={sharedDims} a={a} b={b} />
-            <DuelTrendPanel trend={duel.trend} a={a} b={b} onOpenProject={onOpenProject} />
-          </div>
-
-          <CompareDuelPrinciples
-            principles={duel.principles}
-            dimensions={duel.dimensions}
-            aName={a.name}
-            bName={b.name}
-          />
-        </>
       )}
     </>
   );
