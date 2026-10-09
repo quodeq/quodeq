@@ -1114,7 +1114,6 @@
   "overview.sevCol": "SEV",
   "overview.showAll": "Show all",
   "overview.showAllFiles": "show all {count} files",
-  "overview.showAllFolders": "show all {count} folders",
   "overview.showAllRequirements": "show all {count} requirements",
   "overview.showAllViolationsAria": "Show all violations",
   "overview.showComplianceAria": "Show compliance entries",
