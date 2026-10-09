@@ -2,15 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { stageRows, stageSummary } from './stageRows.js';
 
-const stages = { types: { critical: 0, major: 1, minor: 3 }, complianceTypes: 4, weightedViolations: 2.25, base: 7.87, lift: 0.36, raw: 8.64, ceiling: 9.16, floor: 5, final: 8.6, grade: 'Good' };
+const stages = { violationRules: 2, complianceRules: 1, violationMass: 6.4, complianceMass: 2.6, observation: 9.3, requirements: [], compliance: [], base: 6.6, lift: 0.1, raw: 6.9, ceiling: 8.6, floor: 0, final: 6.9, grade: 'Adequate' };
 
 test('stageRows lists the stages in scoring order with their values', () => {
   const rows = stageRows(stages);
-  assert.deepEqual(rows.map((r) => r.key), ['types', 'base', 'lift', 'raw', 'ceiling', 'floor', 'final']);
-  assert.equal(rows[0].value, '0 critical, 1 major, 3 minor = 2.25');
-  assert.equal(rows[1].value, '7.9');
-  assert.equal(rows[2].value, '4 compliance types lift 0.36 of the gap');
-  assert.equal(rows[6].value, '8.6 Good');
+  assert.deepEqual(rows.map((r) => r.key), ['rules', 'base', 'lift', 'raw', 'ceiling', 'floor', 'final']);
+  assert.equal(rows[0].value, '2 rules weigh 6.40');
+  assert.equal(rows[1].value, '6.6');
+  assert.equal(rows[2].value, '1 compliance rule(s) lift 0.10 of the gap');
+  assert.equal(rows[6].value, '6.9 Adequate');
 });
 
 test('stageSummary of an insufficient principle has no rows and no final', () => {
@@ -24,5 +24,5 @@ test('stageSummary of a graded principle carries the seven rows and the final sc
   const summary = stageSummary({ principleId: 'P1', insufficient: false, stages });
   assert.equal(summary.insufficient, false);
   assert.equal(summary.rows.length, 7);
-  assert.equal(summary.final, '8.6 Good');
+  assert.equal(summary.final, '6.9 Adequate');
 });

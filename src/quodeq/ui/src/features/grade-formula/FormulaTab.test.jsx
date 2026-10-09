@@ -21,7 +21,7 @@ function row(key, value, label = key) {
   return { key, label, value, param: null, paramValue: null, tab: '' };
 }
 
-const ROWS = [row('types', '0 critical, 1 major, 3 minor = 2.25'), row('base', '7.9'), row('lift', '4 compliance types lift 0.36 of the gap'),
+const ROWS = [row('rules', '2 rules weigh 6.40'), row('base', '7.9'), row('lift', '1 compliance rule(s) lift 0.10 of the gap'),
   row('raw', '8.6'), row('ceiling', '9.2'), row('floor', '5.0'), row('final', '8.6 Good')];
 
 describe('FormulaTab knobs', () => {

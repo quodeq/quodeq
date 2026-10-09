@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { liveStages, pickPrincipleId } from './liveStages.js';
 import { STAGE_STATUS } from '../../../vocab/stageStatus.js';
 
-const stages = { types: { critical: 0, major: 1, minor: 3 }, complianceTypes: 4, weightedViolations: 2.25, base: 7.87, lift: 0.36, raw: 8.64, ceiling: 9.16, floor: 5, final: 8.6, grade: 'Good' };
+const stages = { violationRules: 2, complianceRules: 1, violationMass: 6.4, complianceMass: 2.6, observation: 9.3, requirements: [], compliance: [], base: 6.6, lift: 0.1, raw: 6.9, ceiling: 8.6, floor: 0, final: 6.9, grade: 'Adequate' };
 const params = { severityWeight: { critical: 4, major: 1.5, minor: 0.25 }, baseK: 0.12, liftCompress: 1.8, ceilScale: 0.5, floorMinor: 8, floorMajor: 5, gradeThresholds: [[9, 'Exemplary'], [7, 'Good']] };
 const principles = [
   { principleId: 'Weak', insufficient: true, stages: null },
@@ -35,8 +35,8 @@ test('liveStages: stored rows only while the draft is not computed yet', () => {
 
 test('liveStages: stored and live rows for the picked principle', () => {
   const out = liveStages({ stored, live, status: STAGE_STATUS.READY }, 'P1');
-  assert.equal(out.stored[6].value, '8.6 Good');
-  assert.equal(out.live[6].value, '7.1 Good');
+  assert.equal(out.stored[6].value, '6.9 Adequate');
+  assert.equal(out.live[6].value, '7.1 Adequate');
 });
 
 test('liveStages: an insufficient principle gives the insufficient note', () => {

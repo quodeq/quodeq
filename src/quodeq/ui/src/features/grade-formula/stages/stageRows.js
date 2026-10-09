@@ -17,11 +17,11 @@ function num(v, decimals = ONE_DECIMAL) {
  */
 export function stageRows(stages) {
   return [
-    { key: 'types', label: t('helpFigure.stageTypes'),
-      value: t('helpFigure.stageTypesValue', { ...stages.types, weighted: num(stages.weightedViolations, TWO_DECIMALS) }) },
+    { key: 'rules', label: t('helpFigure.stageRules'),
+      value: t('helpFigure.stageRulesValue', { rules: stages.violationRules, mass: num(stages.violationMass, TWO_DECIMALS) }) },
     { key: 'base', label: t('helpFigure.stageBase'), value: num(stages.base) },
     { key: 'lift', label: t('helpFigure.stageLift'),
-      value: t('helpFigure.stageLiftValue', { types: stages.complianceTypes, lift: num(stages.lift, TWO_DECIMALS) }) },
+      value: t('helpFigure.stageLiftValue', { rules: stages.complianceRules, lift: num(stages.lift, TWO_DECIMALS) }) },
     { key: 'raw', label: t('helpFigure.stageRaw'), value: num(stages.raw) },
     { key: 'ceiling', label: t('helpFigure.stageCeiling'), value: num(stages.ceiling) },
     { key: 'floor', label: t('helpFigure.stageFloor'), value: num(stages.floor) },
