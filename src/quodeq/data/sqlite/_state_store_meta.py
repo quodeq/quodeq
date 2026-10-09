@@ -8,6 +8,7 @@ _CHECKPOINT_KEY = "projection_checkpoint"
 _PROJECTED_SIZE_KEY = "projection_event_log_size"
 _ACTIONS_SIZE_KEY = "actions_log_projected_size"
 _GRADES_ALGO_KEY = "grades_algo_version"
+_GRADES_CLASSES_KEY = "grades_severity_classes"
 _COVERAGE_STAMP_KEY = "coverage_report_stamp"
 _MAPPING_STAMPS_KEY = "standard_mapping_stamps"
 
@@ -66,6 +67,14 @@ class StateStoreMetaMixin:
 
     def save_grades_algo_version(self, version: int) -> None:
         self._save_meta(_GRADES_ALGO_KEY, str(version))
+
+    def get_grades_classes_fingerprint(self) -> str | None:
+        """Fingerprint of the severity classes the stored grade tables were
+        computed with; None when the tables predate it (read as stale)."""
+        return self._get_meta(_GRADES_CLASSES_KEY, str)
+
+    def save_grades_classes_fingerprint(self, fingerprint: str) -> None:
+        self._save_meta(_GRADES_CLASSES_KEY, fingerprint)
 
     def get_coverage_stamp(self) -> str | None:
         """Report stamp (newest ``evaluation/*.json`` mtime) the coverage columns

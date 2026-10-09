@@ -18,7 +18,10 @@ from quodeq.core.types.finding import Finding
 from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.grade_formula_store import load_params
 from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_reports
-from quodeq.data.fs.severity_classes_store import load_severity_classes_for_run
+from quodeq.data.fs.severity_classes_store import (
+    load_severity_classes_for_run,
+    severity_classes_fingerprint,
+)
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
@@ -167,6 +170,8 @@ def recompute_grades(
     """
     if params is None:
         params = load_params()
+    if classes is None:
+        classes = load_severity_classes_for_run(run_dir)
     principle_rows, dimension_rows = compute_run_grades(run_dir, params, classes)
 
     # Carry the per-dim exit_reason (failure_streak, time_limit, ...) from the
@@ -204,8 +209,12 @@ def recompute_grades(
     # run graded with older scoring apart from one that is merely unchanged,
     # and the reports the coverage came from, so a report written after the
     # last event re-derives the tables instead of leaving coverage at zero.
-    store.save_grades_algo_version(GRADE_ALGO_VERSION)
-    store.save_coverage_stamp(report_stamp(run_dir))
+    # The class fingerprint does the same for a standard or override edit.
+    # One held connection for the three stamps.
+    with store.connection():
+        store.save_grades_algo_version(GRADE_ALGO_VERSION)
+        store.save_grades_classes_fingerprint(severity_classes_fingerprint(classes))
+        store.save_coverage_stamp(report_stamp(run_dir))
 
 
 def report_stamp(run_dir: Path) -> str:

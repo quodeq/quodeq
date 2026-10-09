@@ -59,7 +59,7 @@
   },
   "scores_as_of_cold": {
     "eval_report_reads": 10,
-    "evaluation_db_opens": 42,
+    "evaluation_db_opens": 41,
     "event_log_reads": 1,
     "response_bytes": 3891
   },

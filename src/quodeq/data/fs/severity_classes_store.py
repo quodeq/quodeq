@@ -1,8 +1,10 @@
 """Severity classes as a scoring path sees them: standards on disk plus the project's overrides."""
 from __future__ import annotations
 
+import hashlib
+import json
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -115,3 +117,8 @@ def load_severity_classes_for_run(
 ) -> dict[str, str]:
     """Classes for the project a run belongs to (``<reports root>/<project>/<run>``)."""
     return load_severity_classes(_repo_root_of(run_dir), standard_dirs_fn=standard_dirs_fn)
+
+
+def severity_classes_fingerprint(classes: Mapping[str, str]) -> str:
+    """A stable digest of a class map, so grade tables can tell which classes they embody."""
+    return hashlib.sha256(json.dumps(sorted(classes.items())).encode()).hexdigest()

@@ -4,7 +4,11 @@ import json
 import os
 from pathlib import Path
 
-from quodeq.data.fs.severity_classes_store import load_severity_classes, load_severity_classes_for_run
+from quodeq.data.fs.severity_classes_store import (
+    load_severity_classes,
+    load_severity_classes_for_run,
+    severity_classes_fingerprint,
+)
 from quodeq.data.fs.standards_loader import read_severity_classes
 
 
@@ -99,3 +103,10 @@ def test_an_online_location_has_no_repo_root(tmp_path: Path, monkeypatch) -> Non
     run.mkdir()
     monkeypatch.setattr("quodeq.data.fs.severity_classes_store._standard_dirs", lambda: (compiled, None))
     assert load_severity_classes_for_run(run) == {"S-1": "major"}
+
+
+def test_fingerprint_ignores_order_and_tracks_every_class() -> None:
+    a = severity_classes_fingerprint({"S-1": "major", "S-2": "minor"})
+    assert a == severity_classes_fingerprint({"S-2": "minor", "S-1": "major"})
+    assert a != severity_classes_fingerprint({"S-1": "critical", "S-2": "minor"})
+    assert a != severity_classes_fingerprint({"S-1": "major"})
