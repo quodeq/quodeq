@@ -19,7 +19,7 @@
           "id": "U-APR-1",
           "source": "iso25010",
           "text": "All user-facing error messages MUST be human-readable (no stack traces exposed)",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -34,7 +34,7 @@
           "id": "U-APR-2",
           "source": "iso25010",
           "text": "API responses MUST include machine-readable error codes alongside messages",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -49,7 +49,7 @@
           "id": "U-APR-3",
           "source": "iso25010",
           "text": "README MUST describe the project purpose, setup steps, and usage examples",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -71,7 +71,7 @@
           "id": "U-LRN-1",
           "source": "iso25010",
           "text": "CLI commands MUST provide --help output describing all flags",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -86,7 +86,7 @@
           "id": "U-LRN-2",
           "source": "iso25010",
           "text": "Public API functions MUST include usage examples in docstrings",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -101,7 +101,7 @@
           "id": "U-LRN-3",
           "source": "iso25010",
           "text": "Configuration options MUST have documented defaults and valid ranges",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -116,7 +116,7 @@
           "id": "U-LRN-4",
           "source": "iso25010",
           "text": "Error messages MUST suggest corrective actions when possible",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -138,7 +138,7 @@
           "id": "U-OPR-1",
           "source": "iso25010",
           "text": "Long-running operations MUST provide progress indication or logging",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -153,7 +153,7 @@
           "id": "U-OPR-2",
           "source": "iso25010",
           "text": "Destructive operations MUST require confirmation or use --force flags",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -168,7 +168,7 @@
           "id": "U-OPR-3",
           "source": "iso25010",
           "text": "Exit codes MUST be non-zero for error conditions in CLI tools",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -190,7 +190,7 @@
           "id": "U-UEP-1",
           "source": "iso25010",
           "text": "Input MUST be validated with clear error messages indicating what is wrong",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -205,7 +205,7 @@
           "id": "U-UEP-2",
           "source": "iso25010",
           "text": "Dangerous defaults MUST NOT exist; fail-safe defaults are required",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -220,7 +220,7 @@
           "id": "U-UEP-3",
           "source": "iso25010",
           "text": "Ambiguous string formats (dates, numbers) MUST be rejected with format hints",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -235,7 +235,7 @@
           "id": "U-UEP-4",
           "source": "iso25010",
           "text": "Required fields MUST be enforced at the type level, not just at runtime",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -257,7 +257,7 @@
           "id": "U-UIA-1",
           "source": "iso25010",
           "text": "Output format MUST be consistent across all commands (JSON or table, not mixed)",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -272,7 +272,7 @@
           "id": "U-UIA-2",
           "source": "iso25010",
           "text": "Log messages MUST use consistent severity levels and structured format",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -287,7 +287,7 @@
           "id": "U-UIA-3",
           "source": "iso25010",
           "text": "Terminal output MUST respect NO_COLOR and TERM environment variables",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -309,7 +309,7 @@
           "id": "U-ACC-1",
           "source": "iso25010",
           "text": "UI components MUST include ARIA labels or semantic HTML elements",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -336,7 +336,7 @@
           "id": "U-ACC-2",
           "source": "iso25010",
           "text": "Colour MUST NOT be the sole means of conveying information",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -363,7 +363,7 @@
           "id": "U-ACC-3",
           "source": "iso25010",
           "text": "Interactive elements MUST be keyboard-navigable",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -396,7 +396,7 @@
           "id": "U-ACC-4",
           "source": "iso25010",
           "text": "Images MUST include alt text descriptions",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {

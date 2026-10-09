@@ -19,7 +19,7 @@
           "id": "P-TIM-1",
           "source": "iso25010",
           "text": "Database queries inside loops are forbidden (N+1 problem)",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -40,7 +40,7 @@
           "id": "P-TIM-2",
           "source": "iso25010",
           "text": "Sequential awaits on independent async calls MUST be parallelised",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -61,7 +61,7 @@
           "id": "P-TIM-3",
           "source": "iso25010",
           "text": "Synchronous blocking I/O MUST NOT be used in async contexts",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -82,7 +82,7 @@
           "id": "P-TIM-4",
           "source": "iso25010",
           "text": "String concatenation in loops MUST use a builder or join pattern",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -103,7 +103,7 @@
           "id": "P-TIM-5",
           "source": "iso25010",
           "text": "Regular expressions MUST NOT use catastrophic backtracking patterns",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -124,7 +124,7 @@
           "id": "P-TIM-6",
           "source": "iso25010",
           "text": "Hot-path code MUST NOT perform redundant computation; cache or memoize results",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -145,7 +145,7 @@
           "id": "P-TIM-8",
           "source": "iso25010",
           "text": "Queries on large tables MUST use indexes and MUST NOT perform full table scans",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -166,7 +166,7 @@
           "id": "P-TIM-9",
           "source": "iso25010",
           "text": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -187,7 +187,7 @@
           "id": "P-TIM-10",
           "source": "iso25010",
           "text": "CPU computation MUST NOT be unnecessarily inefficient",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -209,7 +209,7 @@
           "id": "P-RES-1",
           "source": "iso25010",
           "text": "Unbounded result sets MUST be paginated or limited",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -230,7 +230,7 @@
           "id": "P-RES-2",
           "source": "iso25010",
           "text": "Database connections MUST use connection pooling",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -245,7 +245,7 @@
           "id": "P-RES-3",
           "source": "iso25010",
           "text": "Large collections MUST use lazy iteration (generators, streams) instead of full materialization",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -266,7 +266,7 @@
           "id": "P-RES-4",
           "source": "iso25010",
           "text": "Caches MUST have eviction policies; unbounded caches are forbidden",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -287,7 +287,7 @@
           "id": "P-RES-5",
           "source": "iso25010",
           "text": "File and network handles MUST be released promptly after use",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -308,7 +308,7 @@
           "id": "P-RES-6",
           "source": "iso25010",
           "text": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -329,7 +329,7 @@
           "id": "P-RES-7",
           "source": "iso25010",
           "text": "Resource allocation MUST be throttled with configurable limits",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -350,7 +350,7 @@
           "id": "P-RES-8",
           "source": "iso25010",
           "text": "Resource allocation inside loops MUST be minimised; pre-allocate where possible",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -371,7 +371,7 @@
           "id": "P-RES-9",
           "source": "iso25010",
           "text": "Mutable default arguments MUST NOT be used; create fresh instances per call",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -386,7 +386,7 @@
           "id": "P-RES-10",
           "source": "iso25010",
           "text": "Memory allocation MUST NOT use excessively large size values from untrusted input",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -408,7 +408,7 @@
           "id": "P-CAP-1",
           "source": "iso25010",
           "text": "Batch operations MUST be preferred over individual operations for bulk data",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -429,7 +429,7 @@
           "id": "P-CAP-2",
           "source": "iso25010",
           "text": "Background tasks MUST be offloaded from request-handling threads",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -450,7 +450,7 @@
           "id": "P-CAP-3",
           "source": "iso25010",
           "text": "Memory-intensive operations MUST use streaming instead of loading entire datasets",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -471,7 +471,7 @@
           "id": "P-CAP-4",
           "source": "iso25010",
           "text": "Thread/coroutine pools MUST have bounded sizes with configurable limits",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -492,7 +492,7 @@
           "id": "P-CAP-5",
           "source": "iso25010",
           "text": "Recursive algorithms MUST have depth limits or use iterative alternatives",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {

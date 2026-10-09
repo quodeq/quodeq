@@ -20,7 +20,7 @@
           "id": "S-CON-1",
           "source": "iso25010",
           "text": "Credentials and secrets MUST NOT be hardcoded in source files",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -41,7 +41,7 @@
           "id": "S-CON-2",
           "source": "iso25010",
           "text": "Sensitive data MUST NOT be logged (passwords, tokens, PII)",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -74,7 +74,7 @@
           "id": "S-CON-3",
           "source": "iso25010",
           "text": "Sensitive data MUST be stored using platform-specific secure storage (Keychain, Vault)",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -95,7 +95,7 @@
           "id": "S-CON-4",
           "source": "iso25010",
           "text": "Debug endpoints and verbose error details MUST be disabled in production builds",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -110,7 +110,7 @@
           "id": "S-CON-5",
           "source": "iso25010",
           "text": "File permissions MUST follow least-privilege; world-readable config files are forbidden",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -131,7 +131,7 @@
           "id": "S-CON-6",
           "source": "iso25010",
           "text": "Passwords MUST NOT appear as literals in source code",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -152,7 +152,7 @@
           "id": "S-CON-7",
           "source": "iso25010",
           "text": "Security-sensitive configuration defaults MUST be secure out of the box",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -191,7 +191,7 @@
           "id": "S-CON-8",
           "source": "iso25010",
           "text": "Sensitive information MUST NOT be exposed in error messages, stack traces, or system information disclosures",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -242,7 +242,7 @@
           "id": "S-CON-9",
           "source": "iso25010",
           "text": "Sensitive data MUST be removed or masked before storage or transfer to less-trusted environments",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -293,7 +293,7 @@
           "id": "S-CON-10",
           "source": "iso25010",
           "text": "Sensitive data MUST be transmitted only over encrypted channels; cleartext transmission of credentials is forbidden",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -338,7 +338,7 @@
           "id": "S-CON-11",
           "source": "iso25010",
           "text": "Cryptographic algorithms MUST use adequate key lengths, strong ciphers, and cryptographically secure random number generators",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -401,7 +401,7 @@
           "id": "S-CON-12",
           "source": "iso25010",
           "text": "Cookies containing sensitive data MUST set Secure, HttpOnly, and SameSite attributes and MUST NOT use persistent storage for sensitive values",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -458,7 +458,7 @@
           "id": "S-CON-13",
           "source": "iso25010",
           "text": "Directory listings MUST be disabled and files MUST NOT be accessible to unauthorized external parties",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -497,7 +497,7 @@
           "id": "S-CON-14",
           "source": "iso25010",
           "text": "Sensitive data MUST NOT be passed in URL query strings via GET requests",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -524,7 +524,7 @@
           "id": "S-CON-15",
           "source": "iso25010",
           "text": "Cryptographic algorithms and key management MUST use strong, current implementations",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -689,7 +689,7 @@
           "id": "S-CON-16",
           "source": "iso25010",
           "text": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -746,7 +746,7 @@
           "id": "S-CON-17",
           "source": "iso25010",
           "text": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -809,7 +809,7 @@
           "id": "S-CON-18",
           "source": "iso25010",
           "text": "File and resource permissions MUST follow the principle of least privilege",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -842,7 +842,7 @@
           "id": "S-CON-19",
           "source": "iso25010",
           "text": "Credentials MUST be protected during transport and storage",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -857,7 +857,7 @@
           "id": "S-CON-20",
           "source": "iso25010",
           "text": "Resources MUST NOT be exposed to wrong spheres",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -879,7 +879,7 @@
           "id": "S-INT-1",
           "source": "iso25010",
           "text": "All user input MUST be validated and sanitised before use",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -924,7 +924,7 @@
           "id": "S-INT-2",
           "source": "iso25010",
           "text": "SQL queries MUST use parameterised statements; string concatenation is forbidden",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -957,7 +957,7 @@
           "id": "S-INT-3",
           "source": "iso25010",
           "text": "HTML output MUST be escaped or rendered through a templating engine with auto-escaping",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -984,7 +984,7 @@
           "id": "S-INT-4",
           "source": "iso25010",
           "text": "Deserialization of untrusted data MUST use safe parsers (JSON, not pickle/yaml.load)",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -1017,7 +1017,7 @@
           "id": "S-INT-5",
           "source": "iso25010",
           "text": "Cryptographic algorithms MUST use current standards (AES-256, SHA-256+); MD5/SHA-1 are forbidden",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1038,7 +1038,7 @@
           "id": "S-INT-6",
           "source": "iso25010",
           "text": "XML parsers MUST disable external entity resolution",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -1065,7 +1065,7 @@
           "id": "S-INT-7",
           "source": "iso25010",
           "text": "Application MUST NOT be susceptible to LDAP, code, or XPath injection; all dynamic queries MUST use parameterised or sanitised inputs",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -1116,7 +1116,7 @@
           "id": "S-INT-8",
           "source": "iso25010",
           "text": "Special elements, input terminators, and invalid special element usage MUST be neutralised before processing",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1161,7 +1161,7 @@
           "id": "S-INT-9",
           "source": "iso25010",
           "text": "Output MUST be properly encoded or escaped, and alternate or Unicode encodings MUST be handled safely",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1191,7 +1191,7 @@
             {
               "source": "asvs",
               "id": "V5.3.1",
-              "name": "Verify that output encoding is relevant for the interpreter and context required. For example, use encoders specifically for HTML values, HTML attributes, JavaScript, URL parameters, HTTP headers, SMTP, and others as the context requires, especially from untrusted inputs (e.g. names with Unicode or apostrophes, such as \u306d\u3053 or O'Hara). ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))",
+              "name": "Verify that output encoding is relevant for the interpreter and context required. For example, use encoders specifically for HTML values, HTML attributes, JavaScript, URL parameters, HTTP headers, SMTP, and others as the context requires, especially from untrusted inputs (e.g. names with Unicode or apostrophes, such as ねこ or O'Hara). ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))",
               "url": "https://owasp.org/www-project-application-security-verification-standard/"
             },
             {
@@ -1236,7 +1236,7 @@
           "id": "S-INT-10",
           "source": "iso25010",
           "text": "File names and paths MUST NOT be controlled by external input; file uploads MUST restrict dangerous types and remote file inclusion MUST be prevented",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1293,7 +1293,7 @@
           "id": "S-INT-11",
           "source": "iso25010",
           "text": "Extra or unexpected parameters MUST be ignored or rejected, not silently processed",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1314,7 +1314,7 @@
           "id": "S-INT-12",
           "source": "iso25010",
           "text": "Data integrity MUST be verified using checksums or cryptographic signatures where applicable",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1335,7 +1335,7 @@
           "id": "S-INT-13",
           "source": "iso25010",
           "text": "Application MUST NOT include or execute self-replicating or malicious code patterns",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -1356,7 +1356,7 @@
           "id": "S-INT-14",
           "source": "iso25010",
           "text": "URL redirects MUST validate target URLs against an allowlist to prevent open redirect attacks",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1377,7 +1377,7 @@
           "id": "S-INT-15",
           "source": "iso25010",
           "text": "Mass assignment MUST be prevented by explicitly whitelisting allowed fields for binding",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1398,7 +1398,7 @@
           "id": "S-INT-16",
           "source": "iso25010",
           "text": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -1551,7 +1551,7 @@
           "id": "S-INT-17",
           "source": "iso25010",
           "text": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1638,7 +1638,7 @@
           "id": "S-INT-18",
           "source": "iso25010",
           "text": "Request and file interpretation MUST be consistent and resistant to smuggling or confusion attacks",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1665,7 +1665,7 @@
           "id": "S-INT-19",
           "source": "iso25010",
           "text": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1764,7 +1764,7 @@
           "id": "S-INT-20",
           "source": "iso25010",
           "text": "Input validation MUST use strict allowlists and verify boundary conditions",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1792,7 +1792,7 @@
           "id": "S-NRP-1",
           "source": "iso25010",
           "text": "Authentication events (login, logout, failure) MUST be logged with timestamps",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1807,7 +1807,7 @@
           "id": "S-NRP-2",
           "source": "iso25010",
           "text": "State-changing operations MUST be logged with actor identity",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1822,7 +1822,7 @@
           "id": "S-NRP-3",
           "source": "iso25010",
           "text": "Log entries MUST NOT be modifiable by application-level code",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1837,7 +1837,7 @@
           "id": "S-NRP-4",
           "source": "iso25010",
           "text": "Audit logs MUST include operation type, target resource, and outcome",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1852,7 +1852,7 @@
           "id": "S-NRP-5",
           "source": "iso25010",
           "text": "Web functionality MUST NOT be included from untrusted third-party sources without integrity verification",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1873,7 +1873,7 @@
           "id": "S-NRP-6",
           "source": "iso25010",
           "text": "Application MUST prevent clickjacking by restricting UI rendering in foreign frames (X-Frame-Options or CSP frame-ancestors)",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1900,7 +1900,7 @@
           "id": "S-NRP-7",
           "source": "iso25010",
           "text": "Third-party component versions MUST be tracked and kept free of known vulnerabilities per OWASP Top Ten guidance",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -1921,7 +1921,7 @@
           "id": "S-NRP-8",
           "source": "iso25010",
           "text": "Application MUST protect against UI redress and clickjacking through untrusted web content inclusion",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1943,7 +1943,7 @@
           "id": "S-ACC-1",
           "source": "iso25010",
           "text": "Authentication MUST be required for all non-public endpoints",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -1970,7 +1970,7 @@
           "id": "S-ACC-2",
           "source": "iso25010",
           "text": "Authorization checks MUST be enforced server-side, not client-side only",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -1991,7 +1991,7 @@
           "id": "S-ACC-3",
           "source": "iso25010",
           "text": "Session tokens MUST be invalidated on logout and password change",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2030,7 +2030,7 @@
           "id": "S-ACC-4",
           "source": "iso25010",
           "text": "Rate limiting MUST be applied to authentication endpoints",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2051,7 +2051,7 @@
           "id": "S-ACC-5",
           "source": "iso25010",
           "text": "Default credentials MUST NOT exist in any deployed configuration",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -2066,7 +2066,7 @@
           "id": "S-ACC-6",
           "source": "iso25010",
           "text": "Resource consumption MUST be bounded; rate limiting and allocation limits MUST prevent denial-of-service through resource exhaustion",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2117,7 +2117,7 @@
           "id": "S-ACC-7",
           "source": "iso25010",
           "text": "Application MUST NOT include functionality from untrusted control spheres without explicit verification",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2144,7 +2144,7 @@
           "id": "S-ACC-8",
           "source": "iso25010",
           "text": "Behavioral workflows MUST be enforced server-side to prevent step-skipping or out-of-order execution",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2171,7 +2171,7 @@
           "id": "S-ACC-9",
           "source": "iso25010",
           "text": "Security-relevant events MUST be logged with neutralized output and sufficient detail",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -2192,7 +2192,7 @@
           "id": "S-ACC-10",
           "source": "iso25010",
           "text": "Security configuration MUST disable debug features, restrict cross-domain policies, and limit recursive entity expansion in production",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2231,7 +2231,7 @@
           "id": "S-ACC-11",
           "source": "iso25010",
           "text": "Custom error pages MUST be used and MUST NOT reveal implementation details",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -2253,7 +2253,7 @@
           "id": "S-AUT-1",
           "source": "iso25010",
           "text": "Dynamic code evaluation (eval) MUST NOT be used with user-controlled input",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -2286,7 +2286,7 @@
           "id": "S-AUT-2",
           "source": "iso25010",
           "text": "Shell commands MUST NOT be constructed from user-controlled data",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -2319,7 +2319,7 @@
           "id": "S-AUT-3",
           "source": "iso25010",
           "text": "File paths MUST be validated against traversal attacks (../) before use",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2346,7 +2346,7 @@
           "id": "S-AUT-4",
           "source": "iso25010",
           "text": "CORS policies MUST not use wildcard origins for authenticated endpoints",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2379,7 +2379,7 @@
           "id": "S-AUT-5",
           "source": "iso25010",
           "text": "Dependencies MUST be pinned to exact versions and audited for known vulnerabilities",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -2400,7 +2400,7 @@
           "id": "S-AUT-6",
           "source": "iso25010",
           "text": "Server-side HTTP requests MUST validate target URLs against an allowlist",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2433,7 +2433,7 @@
           "id": "S-AUT-7",
           "source": "iso25010",
           "text": "TLS certificates MUST be validated; certificate validation MUST NOT be disabled",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2448,7 +2448,7 @@
           "id": "S-AUT-8",
           "source": "iso25010",
           "text": "Passwords MUST meet minimum complexity requirements and MUST NOT use long expiration without rotation; password changes MUST verify current credentials and recovery mechanisms MUST resist abuse",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2583,7 +2583,7 @@
           "id": "S-AUT-9",
           "source": "iso25010",
           "text": "Authentication MUST include all critical steps; multi-factor or challenge-response flows MUST NOT be bypassable",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -2634,7 +2634,7 @@
           "id": "S-AUT-10",
           "source": "iso25010",
           "text": "Authorization checks MUST be enforced on every request; user-controlled keys MUST NOT allow access to other users' resources (IDOR)",
-          "severity": null,
+          "severity": "critical",
           "scope": null,
           "refs": [
             {
@@ -2685,7 +2685,7 @@
           "id": "S-AUT-11",
           "source": "iso25010",
           "text": "Sessions MUST be protected against fixation attacks and cross-site request forgery (CSRF)",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2724,7 +2724,7 @@
           "id": "S-AUT-12",
           "source": "iso25010",
           "text": "Application MUST NOT rely on reverse DNS resolution for security decisions",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -2745,7 +2745,7 @@
           "id": "S-AUT-13",
           "source": "iso25010",
           "text": "Primary communication channels MUST be protected; unprotected channels MUST NOT carry authentication data",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -2766,7 +2766,7 @@
           "id": "S-AUT-14",
           "source": "iso25010",
           "text": "Security controls MUST be enforced server-side; client-side enforcement alone is insufficient",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2787,7 +2787,7 @@
           "id": "S-AUT-15",
           "source": "iso25010",
           "text": "HTTP method permissions MUST be validated server-side; trusting HTTP methods alone for access control is forbidden",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2808,7 +2808,7 @@
           "id": "S-AUT-16",
           "source": "iso25010",
           "text": "Dangerous methods or functions MUST NOT be exposed to unauthorized callers",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2829,7 +2829,7 @@
           "id": "S-AUT-17",
           "source": "iso25010",
           "text": "Application MUST NOT use broken or risky cryptographic algorithms for authentication or integrity verification",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2850,7 +2850,7 @@
           "id": "S-AUT-18",
           "source": "iso25010",
           "text": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2949,7 +2949,7 @@
           "id": "S-AUT-19",
           "source": "iso25010",
           "text": "Credentials MUST be unique, non-default, and sufficiently protected against disclosure",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -2994,7 +2994,7 @@
           "id": "S-AUT-20",
           "source": "iso25010",
           "text": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
