@@ -193,3 +193,19 @@ test('unavailable: the items of a failed group leave the deferred state and say 
   assert.equal(marked[1], waiting);
   assert.equal(markDetailUnavailable([waiting], []).length, 1);
 });
+
+test('deferred items are matched to their group by the ref content, not the ref object', () => {
+  const ref = { project: 'p', asOf: null, dimension: 'security', kind: 'violation' };
+  const again = { ...ref };
+  const items = [slim('a.py', 1, 'P1', { detailRef: ref }), slim('b.py', 2, 'P1', { detailRef: again })];
+
+  const groups = groupDeferredCompliance(items);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].items.map((i) => i.file), ['a.py', 'b.py']);
+
+  const loaded = [{ ref: again, items: [{ ...items[0], reason: 'why', detailDeferred: false }] }];
+  const out = replaceWithDetail(items, loaded, () => true);
+  assert.deepEqual(out.map((i) => [i.file, i.detailDeferred]), [['a.py', false]]);
+  assert.equal(missingFromDetail(items, loaded, () => true), true);
+  assert.equal(markDetailUnavailable(items, [again])[1].detailUnavailable, true);
+});

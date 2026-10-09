@@ -104,6 +104,38 @@ describe('useHydratedCompliance', () => {
     expect(result.current.map((i) => i.line)).toEqual([1]);
   });
 
+  // Every /scores payload builds its own ref objects
+  // (attachFindingDetailRefs), and react-query's structural sharing hands
+  // the combined detail result back with the PREVIOUS payload's objects
+  // whenever the new ones say the same thing. Matching refs by identity
+  // left every unchanged group's cards on their skeleton after a refetch
+  // until the page was left and reopened.
+  it('keeps hydrating after a refetched payload replaced the ref objects', async () => {
+    const get = vi.fn(async () => [{ ...slim('src/a.py', 1), reason: 'why', snippet: 'code', detailDeferred: false }]);
+    const { result, rerender } = renderHook(({ items }) => useHydratedCompliance(items), {
+      wrapper: setup(get), initialProps: { items: [slim('src/a.py', 1)] },
+    });
+    await waitFor(() => expect(result.current[0].snippet).toBe('code'));
+
+    rerender({ items: [{ ...slim('src/a.py', 1), detailRef: { ...ref } }] });
+
+    expect(result.current[0].detailDeferred).toBe(false);
+    expect(result.current[0].snippet).toBe('code');
+  });
+
+  it('marks a failed group unavailable after a refetched payload replaced the ref objects', async () => {
+    const get = vi.fn(async () => { throw new Error('down'); });
+    const { result, rerender } = renderHook(({ items }) => useHydratedCompliance(items), {
+      wrapper: setup(get), initialProps: { items: [slim('a.py', 1)] },
+    });
+    await waitFor(() => expect(result.current[0].detailUnavailable).toBe(true));
+
+    rerender({ items: [{ ...slim('a.py', 1), detailRef: { ...ref } }] });
+
+    expect(result.current[0].detailUnavailable).toBe(true);
+    expect(result.current[0].detailDeferred).toBe(false);
+  });
+
   it('does not fetch when nothing is deferred', () => {
     const get = vi.fn();
     const items = [{ file: 'a.py', line: 1, reason: 'why', detailDeferred: false }];

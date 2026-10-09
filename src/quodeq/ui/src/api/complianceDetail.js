@@ -80,6 +80,20 @@ export function attachEvalFindingDetailRefs(data, project, run, source = DEFAULT
   return data;
 }
 
+/**
+ * What a detail ref names, as a map key. Refs are matched by content, never
+ * by identity: every /scores payload builds its own ref objects
+ * (attachFindingDetailRefs), and react-query's structural sharing hands the
+ * hydration hook the previous payload's objects back whenever the new ones
+ * say the same thing. Matched by identity, an unchanged group's deferred
+ * items stayed deferred after a refetch until the page was reopened.
+ * @param {Object} ref
+ * @returns {string}
+ */
+export function detailRefKey(ref) {
+  return [ref.project, ref.source ?? '', ref.run ?? '', ref.asOf ?? '', ref.dimension, ref.kind].join('\u0000');
+}
+
 function commonPrefix(strings) {
   if (strings.length === 0) return '';
   let prefix = strings[0];
@@ -98,14 +112,15 @@ function commonPrefix(strings) {
  * @returns {Array<{ref: Object, scope: {principle: string|undefined, pathPrefix: string|undefined}, items: Array}>}
  */
 export function groupDeferredFindings(items) {
-  const byRef = new Map();
+  const byKey = new Map();
   for (const item of items || []) {
     if (!item?.detailDeferred || !item.detailRef) continue;
-    const group = byRef.get(item.detailRef) ?? [];
-    group.push(item);
-    byRef.set(item.detailRef, group);
+    const key = detailRefKey(item.detailRef);
+    const group = byKey.get(key) ?? { ref: item.detailRef, items: [] };
+    group.items.push(item);
+    byKey.set(key, group);
   }
-  return [...byRef].map(([ref, group]) => {
+  return [...byKey.values()].map(({ ref, items: group }) => {
     const principles = new Set(group.map((i) => i.principle));
     const prefix = commonPrefix(group.map((i) => i.file || ''));
     return {
@@ -158,12 +173,14 @@ export function pageSelector(items) {
 }
 
 function selectedRows(loaded, select) {
-  const byRef = new Map();
+  const byKey = new Map();
   for (const { ref, items: rows } of loaded) {
-    byRef.set(ref, (rows || []).filter(select).map((row) => ({ ...row, detailRef: ref, detailDeferred: false })));
+    byKey.set(detailRefKey(ref), (rows || []).filter(select).map((row) => ({ ...row, detailRef: ref, detailDeferred: false })));
   }
-  return byRef;
+  return byKey;
 }
+
+const deferredKey = (item) => (item?.detailDeferred && item.detailRef ? detailRefKey(item.detailRef) : null);
 
 /**
  * *items* with each loaded group's deferred items replaced, in the group's
@@ -177,16 +194,16 @@ function selectedRows(loaded, select) {
  */
 export function replaceWithDetail(items, loaded, select) {
   if (!loaded.length) return items;
-  const rowsByRef = selectedRows(loaded, select);
+  const rowsByKey = selectedRows(loaded, select);
   const placed = new Set();
   const out = [];
   for (const item of items) {
-    const ref = item?.detailDeferred ? item.detailRef : null;
-    if (!ref || !rowsByRef.has(ref)) {
+    const key = deferredKey(item);
+    if (key === null || !rowsByKey.has(key)) {
       out.push(item);
-    } else if (!placed.has(ref)) {
-      placed.add(ref);
-      out.push(...rowsByRef.get(ref));
+    } else if (!placed.has(key)) {
+      placed.add(key);
+      out.push(...rowsByKey.get(key));
     }
   }
   return out;
@@ -205,10 +222,11 @@ const place = (i) => `${i.file}\u0000${i.line}`;
  */
 export function missingFromDetail(items, loaded, select) {
   if (!loaded.length) return false;
-  const rowsByRef = selectedRows(loaded, select);
-  const placesByRef = new Map([...rowsByRef].map(([ref, rows]) => [ref, new Set(rows.map(place))]));
+  const rowsByKey = selectedRows(loaded, select);
+  const placesByKey = new Map([...rowsByKey].map(([key, rows]) => [key, new Set(rows.map(place))]));
   return items.some((item) => {
-    const places = item?.detailDeferred ? placesByRef.get(item.detailRef) : undefined;
+    const key = deferredKey(item);
+    const places = key === null ? undefined : placesByKey.get(key);
     return places !== undefined && !places.has(place(item));
   });
 }
@@ -223,8 +241,9 @@ export function missingFromDetail(items, loaded, select) {
  */
 export function markDetailUnavailable(items, failedRefs) {
   if (!failedRefs.length) return items;
+  const failed = new Set(failedRefs.map(detailRefKey));
   return items.map((item) => (
-    item?.detailDeferred && failedRefs.includes(item.detailRef)
+    failed.has(deferredKey(item))
       ? { ...item, detailDeferred: false, detailUnavailable: true }
       : item
   ));
