@@ -105,12 +105,13 @@
 .compare-heat__none { color: var(--color-text-muted); opacity: 0.6; }
 /* Hover: the row is marked on its name and overall score (the tiles keep
    their grade tint), the column on its header and footer, and the hovered
-   tile gets a ring in the text colour (an accent ring would look like the
-   "best" outline where the top grade is the accent), so the crossing is clear. */
+   tile gets an accent ring set off by a gap in the panel colour, so it never
+   reads as the "best" outline, which hugs the tile (where the top grade is
+   the accent, as in daruma dark). */
 .compare-heat tr.is-row > th, .compare-heat tr.is-row > .compare-heat__overall { background-color: var(--compare-hover-bg); }
 .compare-heat thead .is-col .compare-sortbtn { color: var(--color-accent); font-weight: 600; }
 .compare-heat tfoot .is-col > span:first-child { font-weight: 700; }
-.compare-heat__tile:hover { box-shadow: 0 0 0 2px var(--color-text); }
+.compare-heat__tile:hover { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent); }
 .compare-heat tbody tr.is-row th.compare-heat__lead { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-heat tfoot > tr > * { border-top: 1px solid var(--color-border); background: var(--color-surface-alt); }
 .compare-heat__foot { text-align: center; font-variant-numeric: tabular-nums; }
