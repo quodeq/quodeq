@@ -262,7 +262,7 @@ describe('useAppState with scoring flags from the scores payload', () => {
     const fakeApi = makeAppStateFakeApi();
     fakeApi.getDashboard = vi.fn(async (project, run) => ({
       project, run: run || 'latest', trend: [], summary: { score: 75 }, dimensions: [],
-      selectedRun: { runId: run || 'latest', dateLabel: '2026-05-01', gradeAlgoVersion: 3 },
+      selectedRun: { runId: run || 'latest', dateLabel: '2026-05-01', gradeAlgoVersion: 3, gradesAlgoVersion: 4 },
     }));
     fakeApi.getProjectScores = vi.fn(async () => ({
       accumulated: { score: 90 }, trend: [], availableRuns: [],
