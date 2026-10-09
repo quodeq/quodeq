@@ -223,8 +223,6 @@ tests/ci/test_cli_lifecycle_integration_status.py:3
 tests/context/test_precedent_corpus_match_many.py:2
 tests/core/_projector_scoring_fixtures.py:3
 tests/core/test_projector_scoring_custom.py:4
-tests/core/test_projector_scoring_parity.py:3
-tests/core/test_projector_scoring_principle.py:3
 tests/core/test_projector_scoring_run.py:4
 tests/dashboard/_runner_helpers.py:3
 tests/dashboard/test_server_serve_modes.py:3

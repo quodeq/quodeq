@@ -147,16 +147,16 @@ def test_pre_stamp_db_heals_on_first_contact(tmp_path: Path) -> None:
     assert len(store.read_dimension_scores()) == 1
 
 
-def test_grade_algo_version_is_three() -> None:
-    """v3: the tally groups findings by ``req`` before ``vt`` (issue #1274).
+def test_grade_algo_version_is_four() -> None:
+    """v4: requirement spread, standard-owned classes, observation weighting.
 
-    Grade tables stamped v2 were computed with vt-grouped tallies, so a
+    Grade tables stamped v3 were computed with the tally formula, so a
     run untouched since then must re-derive; the staleness test above proves
     the mechanism, this pins the version that triggers it.
     """
     from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
 
-    assert GRADE_ALGO_VERSION == 3
+    assert GRADE_ALGO_VERSION == 4
 
 
 def test_a_dismiss_that_touches_no_finding_keeps_the_grades(

@@ -1,41 +1,51 @@
-"""Parity tests: projector_scoring vs legacy rescore_dimensions.
+"""Parity tests: the projector's scoring vs the core engine.
 
-Split from test_projector_scoring.py. The parity tests compare
-projector_scoring output to legacy rescore_dimensions for known inputs.
-Both call the same scoring internals, so parity is structural -- the tests
-guard against drift.
-
-Both engines now apply the same confidence-level check (see
-``core.evidence.model.classify_confidence_level``) so they agree on which
-principles qualify for scoring vs Insufficient. Inputs below carry enough
-findings to clear the medium-confidence threshold (5 by default at
-source_file_count=0), so both engines score the principles instead of
-bailing out to Insufficient.
+Parity is core engine vs projector: the reference side runs the CLI's
+``core.scoring.principle.score_all_principles`` over evidence-dict
+principles built from the same findings, then ``weighted_overall``; the
+projector side runs ``compute_principle_grade`` + ``compute_dimension_score``.
+Both build requirement masses with the same primitives, so parity is
+structural and these tests guard against drift. Thin evidence is scored (and
+marked low confidence) by both rather than gated to Insufficient.
 
 Shared `_f` finding builder lives in tests/core/_projector_scoring_fixtures.py.
 """
 from __future__ import annotations
 
-from quodeq.core.scoring.projector_scoring import compute_dimension_score, compute_principle_grade
+from quodeq.core.evidence.model import classify_confidence_level
+from quodeq.core.scoring.internals import finding_to_scoring_dict
+from quodeq.core.scoring.overall import MODE_NUMERICAL, weighted_overall
+from quodeq.core.scoring.principle import score_all_principles
+from quodeq.core.scoring.projector_scoring import (
+    PrincipleGradeScale,
+    compute_dimension_score,
+    compute_principle_grade,
+)
 
 from tests.core._projector_scoring_fixtures import _f
 
 
+def _evidence_principles(violations, compliance) -> dict:
+    """Evidence-dict principles, the shape the CLI engine scores."""
+    principles: dict = {}
+    for key, rows in (("violations", violations), ("compliance", compliance)):
+        for f in rows:
+            principles.setdefault(f.practice_id, {"violations": [], "compliance": []})[key].append(
+                finding_to_scoring_dict(f),
+            )
+    for pdata in principles.values():
+        pdata["metrics"] = {"confidence_level": classify_confidence_level(
+            len(pdata["violations"]), len(pdata["compliance"]),
+        )}
+    return principles
+
+
 def _legacy_dim_score(violations, compliance) -> float | None:
-    """Compute a dimension score via the underlying legacy scoring path.
-
-    Calls _score_principle per principle and weighted_overall to aggregate,
-    mirroring exactly what rescore_dimension does after filtering dismissed
-    findings.
-    """
-    from quodeq.core.scoring.overall import MODE_NUMERICAL, weighted_overall
-    from quodeq.services.rescore import group_by_principle, score_all_principles
-
-    pv = group_by_principle(violations)
-    pc = group_by_principle(compliance)
-    principle_scores, _ = score_all_principles(pv, pc)
-    overall = weighted_overall(principle_scores, MODE_NUMERICAL)
-    return overall.weighted_score
+    """The dimension score the core engine gives the same findings."""
+    principle_scores = score_all_principles(
+        _evidence_principles(violations, compliance), MODE_NUMERICAL, 1, 0, source_file_count=0,
+    )
+    return weighted_overall(principle_scores, MODE_NUMERICAL).weighted_score
 
 
 def _new_dim_score(violations, compliance) -> float | None:
@@ -51,6 +61,7 @@ def _new_dim_score(violations, compliance) -> float | None:
             principle_id=p,
             findings=violations_by.get(p, []),
             compliance=comp_by.get(p, []),
+            scale=PrincipleGradeScale(source_file_count=0),
         )
         for p in sorted(set(violations_by) | set(comp_by))
     ]
@@ -85,28 +96,21 @@ def test_parity_multiple_principles() -> None:
     assert new == legacy, f"Parity broken: legacy={legacy}, new={new}"
 
 
-def test_parity_low_confidence_returns_insufficient_in_both() -> None:
-    """Thin evidence (1 finding) must yield Insufficient in both engines.
-
-    This is the contract that closed the dashboard-vs-CLI score split.
-    Score may be ``None`` (projector) or ``0.0`` (legacy weighted_overall
-    fallback), but the *grade* must be Insufficient.
-    """
-    from quodeq.core.scoring.overall import MODE_NUMERICAL, weighted_overall
-    from quodeq.services.rescore import group_by_principle, score_all_principles
-
-    violations = [_f("R1", "P1", "high")]
-    compliance = []
-
-    # Legacy
-    pv = group_by_principle(violations)
-    pc = group_by_principle(compliance)
-    legacy_principle_scores, _ = score_all_principles(pv, pc)
-    legacy_overall = weighted_overall(legacy_principle_scores, MODE_NUMERICAL)
-    assert legacy_overall.grade == "Insufficient"
-
-    # New
+def test_parity_thin_evidence_is_scored_in_both() -> None:
+    """One finding is scored (not gated) and marked low confidence by both engines."""
+    violations = [_f("R1", "P1", "critical")]
+    legacy = _legacy_dim_score(violations, [])
     p_grade = compute_principle_grade(principle_id="P1", findings=violations, compliance=[])
-    assert p_grade["grade"] == "Insufficient"
+    assert p_grade["grade"] != "Insufficient" and p_grade["confidence"] == "low"
     new_dim = compute_dimension_score(dimension="Security", principle_grades=[p_grade])
-    assert new_dim["grade"] == "Insufficient"
+    assert new_dim["score"] == legacy
+    assert new_dim["confidence"] == "low"
+
+
+def test_dimension_score_weighs_by_observation_and_flags_thin_dimensions() -> None:
+    heavy = {"principle_id": "a", "score": 4.6, "grade": "Poor", "observation": 400.0, "confidence": "high"}
+    thin = {"principle_id": "b", "score": 10.0, "grade": "Exemplary", "observation": 1.3, "confidence": "low"}
+    out = compute_dimension_score(dimension="Security", principle_grades=[heavy, thin])
+    assert 4.6 <= out["score"] <= 4.7 and out["confidence"] is None
+    thin_only = compute_dimension_score(dimension="Security", principle_grades=[thin, dict(thin, principle_id="c")])
+    assert thin_only["confidence"] == "low"
