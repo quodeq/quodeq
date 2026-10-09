@@ -161,19 +161,21 @@
 
 /* ── attention list ── */
 .compare-attnlist { list-style: none; margin: 0; padding: 6px 0; }
-.compare-attnlist__item { display: grid; grid-template-columns: 10px minmax(0, 1fr) 34px; gap: 4px 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--color-border); }
+.compare-attnlist__item { border-bottom: 1px solid var(--color-border); }
+.compare-attnlist__row { display: grid; grid-template-columns: 10px minmax(0, 1fr) 34px; gap: 4px 10px; align-items: center; width: 100%; padding: 8px 16px; font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
+.compare-attnlist__row:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 .compare-attnlist__item:last-child { border-bottom: none; }
 .compare-attnlist__item.is-on { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-attnlist__level { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-muted); }
 .compare-attnlist__level--severe { background: var(--color-danger); }
 .compare-attnlist__level--elevated { background: color-mix(in srgb, var(--color-danger) 60%, transparent); }
 .compare-attnlist__level--clear { background: transparent; border: 1.5px solid var(--color-text-muted); }
-.compare-attnlist__name { font: inherit; font-size: 13px; text-align: left; color: var(--color-text); background: none; border: none; padding: 0; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.compare-attnlist__name:hover { text-decoration: underline; }
+.compare-attnlist__name { font-size: 13px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-attnlist__item.is-on .compare-attnlist__link { text-decoration: underline; }
 .compare-attnlist__score { text-align: right; font-variant-numeric: tabular-nums; }
 .compare-attnlist__tags { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .compare-attnlist__tag { padding: 1px 7px; font-size: 10.5px; color: var(--color-text-muted); white-space: nowrap; border: 1px solid var(--color-border); border-radius: 999px; }
-.compare-attnlist__link { margin-left: auto; font: inherit; font-size: 11px; color: var(--color-accent); background: none; border: none; padding: 0; cursor: pointer; }
+.compare-attnlist__link { margin-left: auto; font-size: 11px; color: var(--color-accent); }
 
 /* ── dimension health ── */
 .compare-health { list-style: none; margin: 0; padding: 0; }

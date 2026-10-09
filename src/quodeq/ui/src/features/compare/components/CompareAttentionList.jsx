@@ -1,8 +1,8 @@
 /**
  * Needs attention, as a ranked to-do list beside the direction map: each
  * project with its level, score, short reason tags (weakest dimension,
- * decline, staleness, coverage) and a link to that project's own page for
- * its weakest dimension (not the fleet's dimension view).
+ * decline, staleness, coverage). The whole row opens that project's own
+ * page for its weakest dimension (not the fleet's dimension view).
  * Ranked by consequence (low score x size x staleness, buildAttention).
  * Hovering a row lights the project up across the page.
  */
@@ -39,18 +39,21 @@ export default function CompareAttentionList({ items, hover, setHover, onOpenPro
               onMouseEnter={() => setHover(row.id)}
               onMouseLeave={() => setHover(null)}
             >
-              <span className={`compare-attnlist__level compare-attnlist__level--${level}`} title={t(`compare.level${level.charAt(0).toUpperCase()}${level.slice(1)}`)} />
-              <button type="button" className="compare-attnlist__name" onClick={() => onOpenProject(row.id)}>{row.name}</button>
-              <span className={`compare-attnlist__score ${scoreColorClass(row.score)}`}>{score1(row.score)}</span>
-              {/* Reasons and the way in share one line: what is wrong, then where to fix it. */}
-              <span className="compare-attnlist__tags">
-                {reasons.map((r) => reasonText(r)).filter(Boolean).map((text) => <span key={text} className="compare-attnlist__tag">{text}</span>)}
-                {worstDim && (
-                  <button type="button" className="compare-attnlist__link" onClick={() => openProjectDimension(row, row.dims?.find((d) => d.key === worstDim), onOpenProject, onOpenProjectDimension)}>
-                    {t('compare.openDimensionGo', { dim: worstDim })}
-                  </button>
-                )}
-              </span>
+              {/* The whole row is the way in: that project's weakest dimension,
+                  the project itself when there is none. "open <dim> ›" says where. */}
+              <button
+                type="button"
+                className="compare-attnlist__row"
+                onClick={() => openProjectDimension(row, row.dims?.find((d) => d.key === worstDim), onOpenProject, onOpenProjectDimension)}
+              >
+                <span className={`compare-attnlist__level compare-attnlist__level--${level}`} title={t(`compare.level${level.charAt(0).toUpperCase()}${level.slice(1)}`)} />
+                <span className="compare-attnlist__name">{row.name}</span>
+                <span className={`compare-attnlist__score ${scoreColorClass(row.score)}`}>{score1(row.score)}</span>
+                <span className="compare-attnlist__tags">
+                  {reasons.map((r) => reasonText(r)).filter(Boolean).map((text) => <span key={text} className="compare-attnlist__tag">{text}</span>)}
+                  {worstDim && <span className="compare-attnlist__link">{t('compare.openDimensionGo', { dim: worstDim })}</span>}
+                </span>
+              </button>
             </li>
           ))}
         </ol>
