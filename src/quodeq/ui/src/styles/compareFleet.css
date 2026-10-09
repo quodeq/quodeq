@@ -84,24 +84,28 @@
 .compare-heat tbody tr + tr > * { border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); }
 .compare-heat tbody th.compare-heat__lead { display: flex; align-items: center; gap: 8px; height: 38px; }
 .compare-heat__rank { width: 16px; font-size: 11px; color: var(--color-text-muted); }
-.compare-heat__name { font: inherit; font-size: 13px; color: var(--color-text); background: none; border: none; padding: 0; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-heat__name { font: inherit; font-family: var(--term-font-mono); font-size: 12.5px; color: var(--color-text); background: none; border: none; padding: 0; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .compare-heat__name:hover { text-decoration: underline; }
 .compare-heat__overall { text-align: center; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; border-right: 1px solid var(--color-border); }
 .compare-heat__cell { padding: 3px !important; text-align: center; }
 .compare-heat__tile {
-  width: 100%;
-  height: 30px;
-  font: inherit;
+  /* A chip around the number, like the severity badges: the number in its
+     grade colour, a faint box in the same colour. No tile fill, so the
+     grid stays a table of numbers rather than a block of colour. */
+  display: inline-block;
+  min-width: 44px;
+  padding: 2px 8px;
+  font-family: var(--term-font-mono);
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
-  border: 1.5px solid transparent;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--tile) 14%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: var(--term-radius, 2px);
+  background: color-mix(in srgb, currentColor 7%, transparent);
   cursor: pointer;
 }
-.compare-heat__tile:hover { background: color-mix(in srgb, var(--tile) 26%, transparent); }
-.compare-heat__tile--best { border-color: var(--tile); font-weight: 600; }
-.compare-heat__tile--worst { border-color: var(--tile); border-style: dashed; font-weight: 600; }
+.compare-heat__tile:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
+.compare-heat__tile--best { border-color: color-mix(in srgb, currentColor 80%, transparent); font-weight: 600; }
+.compare-heat__tile--worst { border-color: color-mix(in srgb, currentColor 70%, transparent); border-style: dashed; font-weight: 600; }
 .compare-heat__none { color: var(--color-text-muted); opacity: 0.6; }
 /* Hover: the row is marked on its name and overall score (the tiles keep
    their grade tint), the column on its header and footer, and the hovered
@@ -110,7 +114,7 @@
 .compare-heat tr.is-row > th, .compare-heat tr.is-row > .compare-heat__overall { background-color: var(--compare-hover-bg); }
 .compare-heat thead .is-col .compare-sortbtn { color: var(--color-accent); font-weight: 600; }
 .compare-heat tfoot .is-col > span:first-child { font-weight: 700; }
-.compare-heat__tile:hover { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--tile); }
+.compare-heat__tile:hover { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 3px currentColor; }
 .compare-heat tbody tr.is-row th.compare-heat__lead { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-heat tfoot > tr > * { border-top: 1px solid var(--color-border); background: var(--color-surface-alt); }
 .compare-heat__foot { text-align: center; font-variant-numeric: tabular-nums; }

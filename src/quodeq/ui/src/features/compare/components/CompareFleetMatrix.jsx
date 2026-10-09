@@ -1,7 +1,8 @@
 /**
- * The score matrix: every project against every dimension, as a heatmap.
- * Tiles are tinted by grade; only the best (solid outline) and the worst
- * (dashed) of each dimension carry an outline, so they stand out. A header
+ * The score matrix: every project against every dimension, a table of
+ * numbers. Each score sits in a small square chip in its grade colour, like
+ * the severity badges; the best of each dimension gets a strong outline and
+ * the worst a dashed one, so they stand out against the quiet rest. A header
  * ranks the rows by its column (again reverses); a tile opens that
  * project's own dimension screen (remote rows open the shared project).
  * Hovering a tile lights its row and column. Every dimension column has
@@ -9,7 +10,7 @@
  */
 import { useState } from 'react';
 import { t } from '../../../strings/index.js';
-import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
+import { scoreColorClass } from '../../../utils/formatters.js';
 import ComparePanel from './ComparePanel.jsx';
 import CompareSortButton from './CompareSortButton.jsx';
 import { score1 } from '../compareFormatters.js';
@@ -44,7 +45,6 @@ function Tile({ dim, ext, onOpen, row }) {
     <button
       type="button"
       className={`compare-heat__tile ${scoreColorClass(dim.score)}${mark}`}
-      style={{ '--tile': scoreGradeColorVar(dim.score) }}
       title={t('compare.openDimensionIn', { dim: dim.label, project: row.name })}
       onClick={onOpen}
     >
