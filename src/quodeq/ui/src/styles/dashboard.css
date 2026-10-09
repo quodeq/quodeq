@@ -1296,6 +1296,9 @@
   cursor: pointer;
 }
 .panel-foot__link:hover { text-decoration: underline; }
+/* The strip's rule is the line under the last row: the row drops its own,
+   or the two sit one pixel apart as a double line. */
+.term-grid:has(+ .panel-foot) > .term-grid__row:last-child { border-bottom: 0; }
 
 /* "Show all": the whole strip is the button, its label centred. */
 .list-show-more {
