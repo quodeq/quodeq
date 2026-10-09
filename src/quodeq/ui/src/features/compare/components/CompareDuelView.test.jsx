@@ -101,16 +101,42 @@ describe('CompareDuelView: principles', () => {
   });
 });
 
-describe('CompareDuelView: full table', () => {
-  it('stays hidden until asked for, then opens a dimension into its principles', async () => {
+describe('CompareDuelView: score table', () => {
+  const table = () => screen.getByRole('region', { name: /Every dimension and principle score/ });
+
+  it('is always on screen, with the tally a manager reads first', () => {
     renderDuel();
-    expect(screen.queryByRole('region', { name: /Every dimension and principle score/ })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'every score, side by side' }));
-    const table = screen.getByRole('region', { name: /Every dimension and principle score/ });
-    const toggle = within(table).getByRole('button', { name: /security/ });
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(within(table).getByText('auth')).toBeInTheDocument();
-    await userEvent.click(toggle);
+    expect(table()).toHaveTextContent(/alpha ahead on 1 of 1 shared dimensions, beta on 0, 0 even/);
+    expect(table()).toHaveTextContent(/widest gap: security/);
+  });
+
+  it('opens one dimension into its principles, or all of them with the principles switch', async () => {
+    renderDuel();
+    const toggle = within(table()).getByRole('button', { name: /security/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(within(table()).queryByText('auth')).toBeNull();
+    await userEvent.click(toggle);
+    expect(within(table()).getByText('auth')).toBeInTheDocument();
+    await userEvent.click(toggle);
+    await userEvent.click(within(table()).getByRole('button', { name: 'principles' }));
+    expect(within(table()).getByText('auth')).toBeInTheDocument();
+  });
+
+  it('sorts by gap first, by name on request', async () => {
+    const duel = makeDuel();
+    duel.dimensions = [...duel.dimensions, { key: 'apis', label: 'apis', a: 7, b: 6.8, gap: 0.2, shared: true }];
+    renderDuel(duel);
+    const order = () => [...table().querySelectorAll('.compare-duel-table__group > ul > li:first-child .compare-duel-table__label')]
+      .map((n) => n.textContent.replace(/^[▸▾]/, ''));
+    expect(order()).toEqual(['security', 'apis', 'usability']);
+    await userEvent.click(within(table()).getByRole('button', { name: 'name' }));
+    expect(within(table()).getByRole('button', { name: 'name' })).toHaveAttribute('aria-pressed', 'true');
+    expect(order()).toEqual(['apis', 'security', 'usability']);
+  });
+
+  it('spells out whose score each number is', () => {
+    renderDuel();
+    expect(within(table()).getByText('alpha: 7.0')).toHaveClass('sr-only');
+    expect(within(table()).getByText('beta: 6.0')).toHaveClass('sr-only');
   });
 });

@@ -211,52 +211,111 @@
 .compare-duel-scatter__dot--even { fill: var(--color-text-muted); }
 .compare-duel-scatter__dot--dim { opacity: 0.25; }
 
-/* ── full table (on demand) ── */
+/* ── score table: dot plot on one shared axis ── */
 
-.compare-duel-tabletoggle {
-  align-self: center;
+.compare-duel-table__controls { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; text-transform: none; letter-spacing: 0; }
+.compare-duel-table__seg { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--color-border); border-radius: 999px; }
+.compare-duel-table__segLabel { padding: 0 6px 0 8px; font-size: 10.5px; color: var(--color-text-muted); }
+.compare-duel-table__segBtn {
   font: inherit;
   font-size: 11px;
-  padding: 4px 14px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 10px;
+  border: none;
   border-radius: 999px;
+  background: none;
+  color: var(--color-text-muted);
   cursor: pointer;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
 }
-.compare-duel-tabletoggle:hover { border-color: var(--color-text-muted); }
+.compare-duel-table__segBtn:hover { color: var(--color-text); }
+.compare-duel-table__segBtn[aria-pressed="true"] { background: var(--color-text); color: var(--color-surface); }
+.compare-duel-table__principlesBtn { border: 1px solid var(--color-border); }
 
-.compare-duel-table__cols,
+.compare-duel-table__summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 0; padding: 12px 16px 4px; font-size: 13px; }
+.compare-duel-table__legend { display: inline-flex; gap: 14px; margin-right: 8px; font-size: 12px; }
+.compare-duel-table__legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.compare-duel-plot__key { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.compare-duel-table__widest { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); }
+
+.compare-duel-table__axisRow,
 .compare-duel-table__row {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) 110px minmax(160px, 2fr) 110px 64px;
+  grid-template-columns: minmax(150px, 220px) 64px minmax(200px, 1fr) 64px 60px;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 0 16px;
 }
-.compare-duel-table__cols {
-  height: 34px;
+.compare-duel-table__axisRow {
+  height: 44px;
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-text-muted);
   border-bottom: 1px solid var(--color-border);
 }
-.compare-duel-table__cols > :nth-child(2) { text-align: right; }
-.compare-duel-table__cols > :last-child { text-align: right; }
-.compare-duel-table, .compare-duel-table__principles { list-style: none; margin: 0; padding: 0; }
+.compare-duel-table__colName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-duel-table__axisRow > .compare-duel-table__colName:nth-child(2) { text-align: right; }
+.compare-duel-table__colName .compare-duel-plot__key { vertical-align: middle; }
+.compare-duel-table__gapHead { text-align: right; }
+.compare-duel-table__axis { position: relative; align-self: stretch; }
+.compare-duel-table__zone {
+  position: absolute;
+  top: 6px;
+  overflow: hidden;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-left: 1px solid var(--color-border);
+}
+.compare-duel-table__zone:first-child { border-left: none; }
+.compare-duel-table__tick { position: absolute; bottom: 4px; transform: translateX(-50%); font-size: 10px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+
+.compare-duel-table, .compare-duel-table__rows { list-style: none; margin: 0; padding: 0; }
 .compare-duel-table__group + .compare-duel-table__group { border-top: 1px solid var(--color-border); }
-.compare-duel-table__row { width: 100%; min-height: 38px; font: inherit; font-size: 13px; color: inherit; text-align: left; background: none; border: none; }
-.compare-duel-table__row .compare-duel__gap { justify-self: end; }
-.compare-duel-table__row--toggle { cursor: pointer; }
-.compare-duel-table__row--toggle:hover { background: var(--color-overlay-light); }
-.compare-duel-table__row--sub { min-height: 30px; font-size: 12px; color: var(--color-text-muted); }
+.compare-duel-table__row { min-height: 36px; font-size: 13px; }
+.compare-duel-table__row--sub { min-height: 28px; font-size: 12px; color: var(--color-text-muted); }
 .compare-duel-table__row--sub .compare-duel-table__label { padding-left: 22px; }
-.compare-duel-table__row--sub .compare-duel__bars { height: 6px; }
-.compare-duel-table__label { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.compare-duel-table__label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+button.compare-duel-table__label { cursor: pointer; }
+button.compare-duel-table__label:hover { text-decoration: underline; }
 .compare-duel-table__chev { width: 10px; font-size: 10px; color: var(--color-text-muted); }
 .compare-duel-table__score { font-size: 12.5px; text-align: right; font-variant-numeric: tabular-nums; }
+.compare-duel-table__score--b { text-align: left; }
+.compare-duel-table__gap { justify-self: end; }
+
+/* The plot cell: a faint baseline, grade-zone dividers, the gap segment
+   in the leader's colour, and the two dots on top (A above B). */
+.compare-duel-plot { position: relative; align-self: stretch; }
+.compare-duel-plot::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dotted var(--color-border); }
+.compare-duel-plot__zoneLine { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--color-border); opacity: 0.6; }
+.compare-duel-plot__span { position: absolute; top: calc(50% - 2px); height: 4px; border-radius: 2px; background: var(--color-text-muted); opacity: 0.45; }
+.compare-duel-plot__span--a { background: var(--color-duel-a); }
+.compare-duel-plot__span--b { background: var(--color-duel-b); }
+.compare-duel-plot__dot { position: absolute; top: 50%; width: 11px; height: 11px; border-radius: 50%; transform: translate(-50%, -50%); border: 2px solid var(--color-surface); }
+.compare-duel-table__row--sub .compare-duel-plot__dot { width: 8px; height: 8px; border-width: 1.5px; }
+.compare-duel-plot__dot--a { background: var(--color-duel-a); }
+.compare-duel-plot__dot--b { background: var(--color-duel-b); }
+
 @media (max-width: 640px) {
-  .compare-duel-table__cols, .compare-duel-table__row { grid-template-columns: 1fr 44px 44px 52px; }
-  .compare-duel-table__cols > :nth-child(3), .compare-duel__bars { display: none; }
+  .compare-duel-table__axisRow, .compare-duel-table__row { grid-template-columns: 1fr 40px 40px 52px; }
+  .compare-duel-table__axis, .compare-duel-plot { display: none; }
 }

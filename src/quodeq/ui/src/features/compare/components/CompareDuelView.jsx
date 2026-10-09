@@ -7,12 +7,11 @@
  *   3. where does the gap come from? / exposure by size          (two panels)
  *   4. how did they get here?                                    (trend)
  *   5. systematic or a few outliers? what do both get wrong?     (principles)
- *   6. every number, for lookup                                  (table, on demand)
+ *   6. every number, on one axis                                 (score table)
  *
  * Sides are fixed for the whole screen: A is always the first project
  * (accent), B the second (sand), and every gap reads A minus B.
  */
-import { useState } from 'react';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 import ComparePanel from './ComparePanel.jsx';
@@ -62,7 +61,6 @@ function DuelTrendPanel({ duel }) {
 }
 
 function DuelBody({ duel, onOpenProject }) {
-  const [showTable, setShowTable] = useState(false);
   return (
     <>
       <CompareDuelVerdict duel={duel} onOpenProject={onOpenProject} />
@@ -73,10 +71,7 @@ function DuelBody({ duel, onOpenProject }) {
       </div>
       <DuelTrendPanel duel={duel} />
       <CompareDuelPrincipleMap duel={duel} />
-      <button type="button" className="compare-duel-tabletoggle" aria-expanded={showTable} onClick={() => setShowTable(!showTable)}>
-        {showTable ? t('compare.duelTableHide') : t('compare.duelTableShow')}
-      </button>
-      {showTable && <CompareDuelTable duel={duel} />}
+      <CompareDuelTable duel={duel} />
     </>
   );
 }
