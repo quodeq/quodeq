@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 
@@ -38,5 +38,15 @@ describe('DimensionCardsGrid', () => {
     );
     const names = [...document.querySelectorAll('.dim-gauge-card__name')].map((el) => el.textContent);
     expect(names).toEqual(['flexibility', 'reliability', 'security']);
+  });
+});
+
+describe('DimensionCardsGrid, standards not evaluated yet', () => {
+  it('adds an empty card per standard switched on without results, opening Evaluate', () => {
+    const onEvaluate = vi.fn();
+    render(<DimensionCardsGrid sortedDimensions={DIMS} notEvaluated={['accessibility']} onEvaluate={onEvaluate} />);
+    const card = screen.getByRole('button', { name: /accessibility: switched on, not evaluated yet/i });
+    fireEvent.click(card);
+    expect(onEvaluate).toHaveBeenCalled();
   });
 });

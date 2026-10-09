@@ -35,6 +35,22 @@ test('liveFileFor: a type selector rebuilds the requirement file from the live p
   assert.equal(file.total, 2);
 });
 
+test('liveFileFor: a folder selector rebuilds that folder\'s findings across its dimensions', () => {
+  const acc = accumulated();
+  acc.dimensions[0].violations.push(violation('src/x/e.py', 5, 'S-3', 'P1'));
+  acc.dimensions[1].violations.push(violation('src/x/f.py', 6, 'P-1', 'P9'));
+  const file = liveFileFor({ fileSelector: { kind: 'folder', dir: 'src/x', dimensions: ['security', 'perf'], label: 'src/x/' } }, acc);
+  assert.equal(file.file, 'src/x/');
+  assert.equal(file.total, 2);
+  const onlySecurity = liveFileFor({ fileSelector: { kind: 'folder', dir: 'src/x', dimensions: ['security'] } }, acc);
+  assert.equal(onlySecurity.total, 1);
+});
+
+test('liveFileFor: a folder with no findings left, or no payload, yields null', () => {
+  assert.equal(liveFileFor({ fileSelector: { kind: 'folder', dir: 'gone', dimensions: ['security'] } }, accumulated()), null);
+  assert.equal(liveFileFor({ fileSelector: { kind: 'folder', dir: '', dimensions: ['security'] } }, null), null);
+});
+
 test('liveFileFor: no selector, no payload or an unknown dimension yields null so the snapshot is used', () => {
   assert.equal(liveFileFor({ file: { file: 'snap' } }, accumulated()), null);
   assert.equal(liveFileFor({ fileSelector: { kind: 'dimension', dimension: 'security' } }, null), null);

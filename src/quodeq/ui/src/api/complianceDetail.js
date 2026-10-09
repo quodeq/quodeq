@@ -124,10 +124,22 @@ export const groupDeferredCompliance = groupDeferredFindings;
 
 // The fields a page's items can agree on. A row the server sends belongs on
 // the page when it matches every field the page's items are unanimous about:
-// one file (the File page), one principle (the Principle page), one type (a
-// by-type file). A dimension's synthetic file agrees on none and takes the
-// dimension whole.
-const SELECTION_FIELDS = ['file', 'principle', 'violationType'];
+// one file (the File page), one principle (the Principle page), one type or
+// requirement code (a by-type file), one folder (a folder's synthetic file).
+// A dimension's synthetic file agrees on none and takes the dimension whole.
+const folderOf = (row) => {
+  const file = row?.file;
+  if (typeof file !== 'string') return null;
+  const idx = file.lastIndexOf('/');
+  return idx >= 0 ? file.slice(0, idx) : '';
+};
+const SELECTION_FIELDS = [
+  ['file', (row) => row?.file],
+  ['principle', (row) => row?.principle],
+  ['violationType', (row) => row?.violationType],
+  ['req', (row) => row?.req],
+  ['folder', folderOf],
+];
 
 /**
  * The predicate that picks, among the rows the server sends for *items*'
@@ -137,12 +149,12 @@ const SELECTION_FIELDS = ['file', 'principle', 'violationType'];
  */
 export function pageSelector(items) {
   const wanted = [];
-  for (const field of SELECTION_FIELDS) {
-    const values = new Set((items || []).map((i) => i?.[field] ?? null));
-    if (values.size === 1 && !values.has(null)) wanted.push([field, [...values][0]]);
+  for (const [, read] of SELECTION_FIELDS) {
+    const values = new Set((items || []).map((i) => read(i) ?? null));
+    if (values.size === 1 && !values.has(null)) wanted.push([read, [...values][0]]);
   }
   if (!wanted.length) return () => true;
-  return (row) => wanted.every(([field, value]) => row?.[field] === value);
+  return (row) => wanted.every(([read, value]) => read(row) === value);
 }
 
 function selectedRows(loaded, select) {

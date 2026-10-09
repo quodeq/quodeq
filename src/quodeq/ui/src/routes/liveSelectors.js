@@ -14,9 +14,13 @@
  */
 import { buildProjectRootFile } from '../utils/explorerUtils.js';
 import { typeFile } from '../features/violations/byTypeModel.js';
+import { folderDimensions } from '../features/dashboard/findingsGrouping.js';
 
-/** What a `fileSelector` points at: a whole dimension, or one requirement code of it. */
-export const FILE_SELECTOR_KIND = Object.freeze({ DIMENSION: 'dimension', TYPE: 'type' });
+/**
+ * What a `fileSelector` points at: a whole dimension, one requirement code of
+ * it, or one folder across the dimensions on show.
+ */
+export const FILE_SELECTOR_KIND = Object.freeze({ DIMENSION: 'dimension', TYPE: 'type', FOLDER: 'folder' });
 
 /**
  * The accumulated payload the routes render from: the latest one when the
@@ -65,15 +69,28 @@ export function buildEvalPrincipal(principleObj, principleGrade, runId) {
 }
 
 /**
+ * One folder's findings across the selector's dimensions, or null when the
+ * payload is missing or the folder no longer has any.
+ */
+function liveFolderFile(selector, accumulated) {
+  if (!accumulated) return null;
+  const wanted = new Set(selector.dimensions || []);
+  const dims = (accumulated.dimensions || []).filter((d) => wanted.has(d.dimension));
+  const parts = folderDimensions(dims, selector.dir);
+  return parts.length ? buildProjectRootFile(parts, selector.label || selector.dir) : null;
+}
+
+/**
  * The File page's file rebuilt from the live payload, or null when the nav
  * params carry no selector, there is no payload, or the dimension is gone
  * (the caller then renders the snapshot).
- * @param {{ fileSelector?: { kind: string, dimension: string, req?: string, text?: string } }} params
+ * @param {{ fileSelector?: { kind: string, dimension?: string, req?: string, text?: string, dir?: string, dimensions?: string[], label?: string } }} params
  * @param {Object|null} accumulated
  * @returns {Object|null}
  */
 export function liveFileFor(params, accumulated) {
   const selector = params?.fileSelector;
+  if (selector?.kind === FILE_SELECTOR_KIND.FOLDER) return liveFolderFile(selector, accumulated);
   const dim = selector ? dimensionNamed(accumulated, selector.dimension) : null;
   if (!dim) return null;
   if (selector.kind === FILE_SELECTOR_KIND.TYPE) {

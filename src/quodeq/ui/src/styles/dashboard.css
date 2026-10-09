@@ -1242,6 +1242,75 @@
   gap: 4px;
 }
 
+/* Fix first + where the findings live (Overview). */
+.fix-first__req {
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+/* A folder path: muted lead, bright last two folders. Long paths trim from
+   the left (rtl box, ltr text) so the end always shows. */
+.folder-path {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  font-family: var(--term-font-mono);
+  font-size: 12px;
+}
+.folder-path__inner { direction: ltr; unicode-bidi: isolate; }
+.folder-path__lead { color: var(--color-text-muted); }
+.folder-path__tail { color: var(--color-text); transition: color 0.12s; }
+.term-grid__row--clickable:hover .folder-path__tail { color: var(--color-accent); }
+
+.folders-panel__foot {
+  padding: var(--space-2) var(--space-4) 0;
+  font-family: var(--term-font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+/* Centred footer that opens a capped list. */
+.list-show-more {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 24px 14px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--term-font-mono);
+  color: var(--color-text-muted);
+}
+.list-show-more__rule { flex: 1; height: 1px; background: var(--color-border); transition: background 0.12s; }
+.list-show-more__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.list-show-more__hint { text-transform: none; letter-spacing: 0; }
+.list-show-more__chev { font-size: 10px; }
+.list-show-more:hover .list-show-more__label {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text) 6%, var(--color-surface));
+}
+.list-show-more:hover .list-show-more__rule { background: var(--color-text-muted); }
+.list-show-more:focus-visible { outline: none; }
+.list-show-more:focus-visible .list-show-more__label { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
 /* Diff summary section */
 .diff-summary {
   border-left: 3px solid var(--color-accent);
