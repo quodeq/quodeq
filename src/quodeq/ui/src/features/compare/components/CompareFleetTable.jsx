@@ -40,10 +40,10 @@ function ScoreDot({ score, axis, fleetScore }) {
   );
 }
 
-function Head({ axis, sort, onSort, hasCoverage }) {
+function Head({ axis, sort, onSort, hasCoverage, showLastScan }) {
   const col = (key, label) => <CompareSortButton sortKey={key} label={label} sort={sort} onSort={onSort} className="compare-fleettable__num" />;
   return (
-    <div className={`compare-fleettable__row compare-fleettable__row--head${hasCoverage ? ' compare-fleettable__row--cov' : ''}`}>
+    <div className={`compare-fleettable__row compare-fleettable__row--head${hasCoverage ? ' compare-fleettable__row--cov' : ''}${showLastScan ? '' : ' compare-fleettable__row--nolast'}`}>
       <span aria-hidden="true">{t('compare.colRank')}</span>
       <span>{t('compare.colProject')}</span>
       <span className="compare-fleettable__axis" aria-hidden="true">
@@ -58,7 +58,7 @@ function Head({ axis, sort, onSort, hasCoverage }) {
       {hasCoverage && <span className="compare-fleettable__num">{t('compare.colAnalysed')}</span>}
       {col(FLEET_SORT.DENSITY, t('compare.colDensity'))}
       {col(FLEET_SORT.CRITICAL, t('compare.colCriticalK'))}
-      {col(FLEET_SORT.FRESH, t('compare.colLastScan'))}
+      {showLastScan && col(FLEET_SORT.FRESH, t('compare.colLastScan'))}
     </div>
   );
 }
@@ -74,12 +74,12 @@ function Name({ row, onOpenProject }) {
   );
 }
 
-function Row({ row, rank, axis, fleetScore, hasCoverage, hover, setHover, onOpenProject }) {
+function Row({ row, rank, axis, fleetScore, hasCoverage, showLastScan, hover, setHover, onOpenProject }) {
   const e = exposureOf(row);
   const caution = (on) => (on ? ' compare-fleettable__warn' : '');
   return (
     <li
-      className={`compare-fleettable__row${hasCoverage ? ' compare-fleettable__row--cov' : ''}${hover === row.id ? ' is-hovered' : ''}`}
+      className={`compare-fleettable__row${hasCoverage ? ' compare-fleettable__row--cov' : ''}${showLastScan ? '' : ' compare-fleettable__row--nolast'}${hover === row.id ? ' is-hovered' : ''}`}
       onMouseEnter={() => setHover(row.id)}
       onMouseLeave={() => setHover(null)}
     >
@@ -98,10 +98,12 @@ function Row({ row, rank, axis, fleetScore, hasCoverage, hover, setHover, onOpen
       )}
       <span className="compare-fleettable__num">{fixed1(e.per100)}</span>
       <span className={`compare-fleettable__num${caution(e.critical > 0)}`}>{fixed1(e.criticalPerK)}</span>
-      <span className={`compare-fleettable__num compare-fleettable__last${caution(row.stale)}`}>
-        {relativeTime(row.lastISO) || NONE}
-        {row.commitsSince > 0 && <span className="compare-fleettable__behind">{t('compare.behindShort', { count: nf(row.commitsSince) })}</span>}
-      </span>
+      {showLastScan && (
+        <span className={`compare-fleettable__num compare-fleettable__last${caution(row.stale)}`}>
+          {relativeTime(row.lastISO) || NONE}
+          {row.commitsSince > 0 && <span className="compare-fleettable__behind">{t('compare.behindShort', { count: nf(row.commitsSince) })}</span>}
+        </span>
+      )}
     </li>
   );
 }
@@ -126,15 +128,27 @@ function PendingRows({ pending, unevaluated, errorsById, onOpenProject }) {
   );
 }
 
-export default function CompareFleetTable({ scoredRows, pending, unevaluated, errorsById, fleetScore, hover, setHover, onOpenProject }) {
+/**
+ * `header`/`note`/`ariaLabel` default to the fleet's; the dimension
+ * drill-down passes its own and drops the last-scan column (freshness is a
+ * project fact the fleet page already shows) to make room for its radar.
+ */
+export default function CompareFleetTable({
+  scoredRows, pending = [], unevaluated = [], errorsById = {}, fleetScore, hover, setHover, onOpenProject,
+  ariaLabel = null, header = null, note = null, showLastScan = true,
+}) {
   const [sort, setSort] = useState({ key: FLEET_SORT.SCORE, desc: true });
   const axis = scoreAxisFor(scoredRows.map((r) => r.score));
   // Analysed-file counts are optional per project: no column when none report them.
   const hasCoverage = scoredRows.some((r) => r.coveragePct != null);
-  const rowProps = { axis, fleetScore, hasCoverage, hover, setHover, onOpenProject };
+  const rowProps = { axis, fleetScore, hasCoverage, showLastScan, hover, setHover, onOpenProject };
   return (
-    <ComparePanel ariaLabel={t('compare.fleetTableAria')} header={t('compare.fleetTableHeader', { count: scoredRows.length })} note={t('compare.fleetTableNote')}>
-      <Head axis={axis} sort={sort} onSort={setSort} hasCoverage={hasCoverage} />
+    <ComparePanel
+      ariaLabel={ariaLabel ?? t('compare.fleetTableAria')}
+      header={header ?? t('compare.fleetTableHeader', { count: scoredRows.length })}
+      note={note ?? t('compare.fleetTableNote')}
+    >
+      <Head axis={axis} sort={sort} onSort={setSort} hasCoverage={hasCoverage} showLastScan={showLastScan} />
       <ol className="compare-fleettable">
         {sortFleet(scoredRows, sort.key, sort.desc).map((row, i) => <Row key={row.id} row={row} rank={i + 1} {...rowProps} />)}
         <PendingRows pending={pending} unevaluated={unevaluated} errorsById={errorsById} onOpenProject={onOpenProject} />

@@ -17,13 +17,13 @@ import { nf, score1 } from '../compareFormatters.js';
 const LOWEST_TIER_SAMPLE = 1;
 
 /* Each tier's colour: the grade colour of the tier's own threshold. */
-function tierColours() {
+export function tierColours() {
   const map = new Map(getGradeThresholds().map(([threshold, label]) => [label, scoreGradeColorVar(threshold)]));
   map.set(LOWEST_TIER_LABEL, scoreGradeColorVar(LOWEST_TIER_SAMPLE));
   return map;
 }
 
-function GradeMix({ mix, colours }) {
+export function GradeMix({ mix, colours }) {
   return (
     <span className="compare-health__mix" title={mix.map((m) => t('compare.healthMixPart', { count: m.count, grade: m.label.toLowerCase() })).join(' · ')}>
       {mix.map((m) => (

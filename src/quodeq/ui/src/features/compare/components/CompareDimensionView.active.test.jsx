@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import CompareDimensionView from './CompareDimensionView.jsx';
 import { buildRow, buildDimensionView } from '../compareModel.js';
@@ -42,61 +42,34 @@ const renderView = (selectedProject) => render(
   />,
 );
 
-const activeStandingName = (container) => container.querySelector('.compare-standings__row.is-active .compare-standings__name')?.textContent;
-const activeMatrixName = (container) => container.querySelector('.compare-matrix tbody tr.is-active .compare-matrix__rowbtn')?.textContent;
 const legendProject = (container) => container.querySelector('.compare-radar__legendItem--project')?.textContent;
-const activeSlots = (container) => container.querySelectorAll('.compare-principle__slot.is-active');
+const tableRow = (container, name) => [...container.querySelectorAll('.compare-fleettable__row')].find((r) => r.textContent.includes(name));
+const matrixTile = (container, name) => [...container.querySelectorAll('.compare-heat tbody tr')]
+  .find((r) => r.textContent.includes(name))?.querySelector('.compare-heat__cell');
 
 describe('CompareDimensionView active project', () => {
-  it('highlights the selected project everywhere by default', () => {
+  it('draws the selected project on the radar by default', () => {
     const { container } = renderView('a');
-    expect(activeStandingName(container)).toBe('proj-a');
-    expect(activeMatrixName(container)).toBe('proj-a');
     expect(legendProject(container)).toBe('proj-a');
-    expect(container.querySelectorAll('.compare-radar__poly--project')).toHaveLength(1);
-    expect(container.querySelectorAll('.compare-radar__poly--average')).toHaveLength(1);
-    // One active bar per principle card, and the card names its score.
-    expect(activeSlots(container)).toHaveLength(3);
-    expect(container.querySelectorAll('.compare-principle__activeName')[0]).toHaveTextContent('proj-a');
-    expect(container.querySelectorAll('.compare-principle__activeScore')[0]).toHaveTextContent('4.0');
   });
 
   it('falls back to the leader when the selection is outside the scope', () => {
-    const { container } = renderView('elsewhere');
-    expect(activeStandingName(container)).toBe('proj-b');
+    const { container } = renderView('zzz');
     expect(legendProject(container)).toBe('proj-b');
   });
 
-  it('moves the highlight to a hovered standings row and back on leave', () => {
+  it('a hovered projects-table row redraws the radar, and leaving restores the selection', () => {
     const { container } = renderView('a');
-    const rows = container.querySelectorAll('.compare-standings__row');
-    const rowC = Array.from(rows).find((r) => r.textContent.includes('proj-c'));
-    fireEvent.mouseEnter(rowC);
-    expect(activeStandingName(container)).toBe('proj-c');
-    expect(activeMatrixName(container)).toBe('proj-c');
+    fireEvent.mouseEnter(tableRow(container, 'proj-c'));
     expect(legendProject(container)).toBe('proj-c');
-    expect(container.querySelectorAll('.compare-standings__row.is-active')).toHaveLength(1);
-    fireEvent.mouseLeave(rowC);
-    expect(activeStandingName(container)).toBe('proj-a');
+    expect(tableRow(container, 'proj-c')).toHaveClass('is-hovered');
+    fireEvent.mouseLeave(tableRow(container, 'proj-c'));
+    expect(legendProject(container)).toBe('proj-a');
   });
 
-  it('a hovered matrix row drives the same highlight', () => {
+  it('a hovered principle-matrix row drives the same radar', () => {
     const { container } = renderView('a');
-    const trs = container.querySelectorAll('.compare-matrix tbody tr');
-    const trB = Array.from(trs).find((r) => r.textContent.includes('proj-b'));
-    fireEvent.mouseEnter(trB);
-    expect(activeStandingName(container)).toBe('proj-b');
+    fireEvent.mouseEnter(matrixTile(container, 'proj-b'));
     expect(legendProject(container)).toBe('proj-b');
-    fireEvent.mouseLeave(trB.closest('table'));
-    expect(activeStandingName(container)).toBe('proj-a');
-  });
-
-  it('a hovered principle bar drives the same highlight', () => {
-    const { container } = renderView('a');
-    const slot = Array.from(container.querySelectorAll('.compare-principle__slot'))
-      .find((s) => s.getAttribute('aria-label').includes('proj-c'));
-    fireEvent.mouseEnter(slot);
-    expect(activeStandingName(container)).toBe('proj-c');
-    expect(screen.getAllByText('proj-c').length).toBeGreaterThan(1);
   });
 });

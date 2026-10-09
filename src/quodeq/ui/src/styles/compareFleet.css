@@ -44,7 +44,7 @@
   border-bottom: 1px solid var(--color-border);
 }
 .compare-fleettable__row--cov { grid-template-columns: 22px minmax(150px, 1.3fr) minmax(180px, 2fr) 58px 64px 62px 62px 76px 70px 110px; }
-.compare-fleettable__row.is-hovered { background: var(--color-overlay-light); }
+.compare-fleettable__row.is-hovered { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-fleettable__row--head { min-height: 42px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
 .compare-fleettable__rank { font-size: 11px; color: var(--color-text-muted); }
 .compare-fleettable__name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
@@ -103,8 +103,15 @@
 .compare-heat__tile--best { border-color: var(--tile); font-weight: 600; }
 .compare-heat__tile--worst { border-color: var(--tile); border-style: dashed; font-weight: 600; }
 .compare-heat__none { color: var(--color-text-muted); opacity: 0.6; }
-.compare-heat tr.is-row > *, .compare-heat .is-col { background-color: var(--color-overlay-light); }
-.compare-heat tbody tr.is-row th.compare-heat__lead { background: color-mix(in srgb, var(--color-text) 4%, var(--color-surface)); }
+/* Hover: the row is marked on its name and overall score (the tiles keep
+   their grade tint), the column on its header and footer, and the hovered
+   tile gets a ring in its own grade colour, set off by a gap in the panel
+   colour so it never reads as the "best" outline, which hugs the tile. */
+.compare-heat tr.is-row > th, .compare-heat tr.is-row > .compare-heat__overall { background-color: var(--compare-hover-bg); }
+.compare-heat thead .is-col .compare-sortbtn { color: var(--color-accent); font-weight: 600; }
+.compare-heat tfoot .is-col > span:first-child { font-weight: 700; }
+.compare-heat__tile:hover { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--tile); }
+.compare-heat tbody tr.is-row th.compare-heat__lead { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-heat tfoot > tr > * { border-top: 1px solid var(--color-border); background: var(--color-surface-alt); }
 .compare-heat__foot { text-align: center; font-variant-numeric: tabular-nums; }
 .compare-heat__foot > span { display: block; line-height: 1.2; }
@@ -130,7 +137,7 @@
 .compare-dirmap__still { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 0 2px; }
 .compare-dirmap__stillLabel { margin-right: 4px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
 .compare-dirmap__chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; font: inherit; font-size: 11.5px; color: var(--color-text); background: none; border: 1px solid var(--color-border); border-radius: 999px; cursor: pointer; }
-.compare-dirmap__chip:hover, .compare-dirmap__chip.is-on { background: var(--color-overlay-light); }
+.compare-dirmap__chip:hover, .compare-dirmap__chip.is-on { background: var(--compare-hover-bg); border-color: var(--color-accent); }
 .compare-dirmap__chipDot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot); }
 .compare-dirmap__legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 4px; padding: 10px 0 2px; font-size: 11px; color: var(--color-text-muted); border-top: 1px solid var(--color-border); }
 .compare-dirmap__legend > span { display: inline-flex; align-items: center; gap: 6px; }
@@ -144,7 +151,7 @@
 .compare-attnlist { list-style: none; margin: 0; padding: 6px 0; }
 .compare-attnlist__item { display: grid; grid-template-columns: 10px minmax(0, 1fr) 34px; gap: 4px 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--color-border); }
 .compare-attnlist__item:last-child { border-bottom: none; }
-.compare-attnlist__item.is-on { background: var(--color-overlay-light); }
+.compare-attnlist__item.is-on { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-attnlist__level { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-muted); }
 .compare-attnlist__level--severe { background: var(--color-danger); }
 .compare-attnlist__level--elevated { background: color-mix(in srgb, var(--color-danger) 60%, transparent); }
@@ -176,7 +183,7 @@
   cursor: pointer;
 }
 .compare-health li:last-child .compare-health__row { border-bottom: none; }
-button.compare-health__row:hover { background: var(--color-overlay-light); }
+button.compare-health__row:hover { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-health__row--head { min-height: 34px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); cursor: default; }
 .compare-health__num { text-align: right; font-variant-numeric: tabular-nums; }
 .compare-health__label { font-size: 13px; }
@@ -215,4 +222,55 @@ button.compare-health__row:hover { background: var(--color-overlay-light); }
   .compare-health__row { grid-template-columns: minmax(0, 1fr) 36px minmax(90px, 1.4fr) 48px; gap: 8px; padding: 0 12px; }
   .compare-health__row > :nth-child(3), .compare-health__row > :nth-child(6), .compare-health__row > :nth-child(7), .compare-health__row > :nth-child(8) { display: none; }
   .compare-health__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Without the last-scan column (the dimension drill-down, beside its radar). */
+.compare-fleettable__row--nolast { grid-template-columns: 22px minmax(150px, 1.4fr) minmax(110px, 1.2fr) 52px 58px 60px 70px 62px; gap: 10px; }
+
+/* ── dimension drill-down: projects table beside the principles radar ── */
+.compare-dim__pair { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 14px; align-items: stretch; }
+@media (max-width: 1200px) { .compare-dim__pair { grid-template-columns: 1fr; } }
+/* The radar fills the height beside the table: the panel stretches, the
+   chart (fixed proportions) centres, the legend stays at the bottom. */
+.compare-dim__pair > .compare-panel:last-child { display: flex; flex-direction: column; }
+.compare-dim__pair > .compare-panel:last-child .compare-radar { margin: auto 0; padding: 4px 14px 0; }
+.compare-dim__pair > .compare-panel:last-child .compare-radar__labels { inset: 4px 14px 0; }
+.compare-dim__pair > .compare-panel:last-child .compare-radar__legend { padding-bottom: 14px; }
+
+/* ── principle health ── */
+.compare-ph__list { list-style: none; margin: 0; padding: 0; }
+.compare-ph {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 48px minmax(180px, 2fr) 84px 84px minmax(140px, 1fr) minmax(140px, 1fr);
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 12.5px;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+}
+.compare-ph__list li:last-child .compare-ph { border-bottom: none; }
+button.compare-ph:hover { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
+.compare-ph--head { min-height: 34px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); cursor: default; }
+.compare-ph__num { text-align: right; font-variant-numeric: tabular-nums; }
+.compare-ph__label { font-size: 13px; }
+.compare-ph__avg { font-size: 15px; font-weight: 500; }
+.compare-ph__warn { color: var(--color-danger); }
+.compare-ph__who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-muted); }
+.compare-ph__who b { font-weight: 500; }
+
+@media (max-width: 640px) {
+  .compare-dim__pair > .compare-panel:last-child { display: none; }
+  .compare-ph { grid-template-columns: minmax(0, 1fr) 36px minmax(90px, 1.4fr) 48px; gap: 8px; padding: 0 12px; }
+  .compare-ph > :nth-child(n + 5) { display: none; }
+}
+@media (max-width: 640px) {
+  .compare-fleettable__row--nolast { grid-template-columns: 18px minmax(0, 1fr) 46px 62px; gap: 8px; }
 }

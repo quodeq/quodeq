@@ -5,6 +5,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--term-space-3);
+  /* One hover for every Compare table and list: a neutral ink tint over the
+     panel (an accent tint turns pink in crimson themes, where red means a bad
+     score) plus an accent bar on the row's leading edge. Mixed from tokens,
+     so it reads in light and dark and in every theme family. */
+  --compare-hover-bg: color-mix(in srgb, var(--color-text) 6%, var(--color-surface));
+  --compare-hover-bar: inset 2px 0 0 var(--color-accent);
 }
 
 /* The page's uniform flex gap owns vertical rhythm here; without this the
@@ -162,162 +168,6 @@
   color: var(--color-text-muted);
 }
 
-.compare-lower {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 400px);
-  gap: 14px;
-  align-items: start;
-}
-
-@media (max-width: 1100px) {
-  .compare-lower { grid-template-columns: 1fr; }
-}
-
-/* Grade text colours come from the global .grade-* rules in base.css. */
-
-/* ── score matrix (v4a) ──────────────────────────────────────────────────
-   Numbers-only grid: projects x dimensions on the fleet, projects x
-   principles on the dimension screen. Scores wear grade colors; per
-   column, the max wears an accent ring and the min a danger ring. */
-
-.compare-matrix { overflow-x: auto; }
-
-.compare-matrix table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Wrapped column groups stack; each after the first opens with its own
-   header band, so the seam reads as a continuation, not a new panel. */
-.compare-matrix table + table { margin-top: 0; }
-.compare-matrix table + table thead th { border-top: 1px solid var(--color-border); }
-
-/* Header band matches the projects table's head row exactly (same
-   background, size, tracking), so the two tables read as one family. */
-.compare-matrix th {
-  background: var(--color-surface-alt);
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  /* lowercase, per review: the caps band doubled the shouting the panel
-     banner already does; column names read calmer in the terminal voice. */
-  text-transform: lowercase;
-  color: var(--color-text-muted);
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--color-border);
-  /* Center, per review: header, chip and foot average stack on one axis;
-     only the project lead reads flush-left. */
-  text-align: center;
-  max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.compare-matrix td { padding: 7px 10px; border-top: 1px solid var(--color-border); }
-.compare-matrix__num { text-align: center; }
-
-/* The "project" title sits flush-left over the project names, and the
-   whole lead column takes the SAME inset as the ranked table's name
-   position (stripe 3 + gap 12 + rank 26 + gap 12), so the two stacked
-   tables' project names align down the page. The column is STICKY: under
-   horizontal scroll the names stay put, so no number goes anonymous —
-   which is also why every lead cell needs an opaque background. */
-.compare-matrix th.compare-matrix__project,
-.compare-matrix td.compare-matrix__project {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  text-align: left;
-  white-space: nowrap;
-  background: var(--color-surface);
-}
-.compare-matrix th.compare-matrix__project { padding-left: 53px; }
-.compare-matrix td.compare-matrix__project { position: sticky; padding-left: 16px; }
-.compare-matrix tbody td.compare-matrix__project { position: relative; position: sticky; }
-
-.compare-matrix__stripe {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-}
-
-.compare-matrix__rank {
-  display: inline-block;
-  width: 26px;
-  margin-right: 12px;
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.compare-matrix th.compare-matrix__project { max-width: none; background: var(--color-surface-alt); }
-.compare-matrix tfoot td.compare-matrix__project { background: var(--color-surface-alt); padding-left: 53px; }
-.compare-matrix tbody tr:hover td.compare-matrix__project,
-.compare-matrix tbody tr.is-active td.compare-matrix__project { background: var(--color-surface-alt); }
-
-/* Crosshair: the hovered cell's whole column tints (the component sets
-   the class), and the row tint below intersects it. */
-.compare-matrix__hovercol { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
-.compare-matrix th.compare-matrix__sorted { color: var(--color-accent); }
-.compare-matrix__overall { font-weight: 600; }
-.compare-matrix__none { color: var(--color-text-subtle); }
-/* .is-active: the dimension view's active project (hovered in either
-   table, else the app's selection) wears the hover tint while idle. */
-.compare-matrix tbody tr:hover,
-.compare-matrix tbody tr.is-active { background: var(--color-surface-alt); }
-.compare-matrix tfoot td {
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
-  font-size: 12px;
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-
-.compare-matrix__colbtn,
-.compare-matrix__rowbtn,
-.compare-matrix__cell {
-  font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-/* color: inherit stays OFF the score cells — their grade-* class is the
-   color source, and an equal-specificity inherit later in the cascade
-   would flatten every number to plain text. */
-.compare-matrix__colbtn,
-.compare-matrix__rowbtn { color: inherit; }
-
-.compare-matrix__colbtn:hover,
-.compare-matrix__rowbtn:hover { color: var(--color-accent); }
-
-/* Every cell is a chip in the SCORE'S OWN grade color (currentColor:
-   the text is already grade-colored): tinted background, matching
-   border — the expansion-chip look, without the little bar. Never a
-   fixed accent or danger: a column's lowest score can still be a good
-   one, and the styling must mark position, not pass judgement. The
-   extremes live in the border alone — the column's best turns its
-   border solid-strong, the worst dashed. */
-button.compare-matrix__cell,
-span.compare-matrix__cell {
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: color-mix(in srgb, currentColor 8%, transparent);
-  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-}
-
-button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
-
-.compare-matrix .compare-matrix__cell--max { border-color: color-mix(in srgb, currentColor 72%, transparent); }
-.compare-matrix .compare-matrix__cell--min { border-style: dashed; border-color: color-mix(in srgb, currentColor 62%, transparent); }
-
 /* ── shared row pieces (scope picker, attention, duel, severity cells) ── */
 
 /* Remote (shared-repo) rows carry a small origin chip wherever the project
@@ -335,20 +185,9 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   vertical-align: middle;
 }
 
-/* Violation total, then the severity split as plain coloured text (the
-   design's "7c 275m 984n"). */
-.compare-row__violTotal { color: var(--color-text); }
-.compare-row__sev { display: flex; gap: 8px; flex-wrap: nowrap; white-space: nowrap; }
-.compare-row__sev .term-sev-badge { border: none; background: transparent; padding: 0; }
-.compare-row__sev .term-sev-badge--count-abbr { font-size: 10.5px; }
-
 /* Delta shown from outside the 30-day window (change at the last
    evaluation, however old): present but visibly secondary. */
 .compare-delta--old { display: inline-flex; opacity: 0.55; }
-
-/* ── stat card severity row ─────────────────────────────────────────── */
-
-.compare-card__sev { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 
 /* ── attention list ─────────────────────────────────────────────────── */
 
@@ -517,74 +356,6 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   padding: 2px 8px;
 }
 
-/* standings */
-
-.compare-standings { list-style: none; margin: 0; padding: 0; }
-
-.compare-standings__row {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 92px 64px 64px 52px 110px;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  font: inherit;
-  text-align: left;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  padding: 11px 16px;
-  cursor: pointer;
-}
-
-.compare-standings__row:hover,
-.compare-standings__row.is-active { background: var(--color-surface-alt); }
-
-.compare-standings__rank { font-size: 11px; color: var(--color-text-subtle); text-align: center; }
-
-.compare-standings__project { min-width: 0; }
-
-.compare-standings__name {
-  display: block;
-  font-size: 12.5px;
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.compare-standings__tag {
-  display: block;
-  font-size: 10px;
-  color: var(--color-text-muted);
-  margin-top: 3px;
-}
-
-.compare-standings__score { display: flex; align-items: baseline; gap: 7px; font-size: 14px; }
-
-.compare-standings__tier {
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-subtle);
-}
-
-.compare-standings__viol { font-size: 11px; color: var(--color-text-muted); }
-
-.compare-standings__ratio {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.compare-standings__pbars {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 22px;
-}
-
-.compare-standings__pbar { display: block; width: 14px; border-radius: 2px; }
-
 /* radar */
 
 .compare-radar { position: relative; padding: 10px 12px 0; }
@@ -660,165 +431,6 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 }
 
 .compare-radar__legendItem--project::before { background: var(--color-accent); }
-
-/* principle cards */
-
-.compare-principles {
-  display: grid;
-  /* auto-FIT, matching the Explorer's principle cards row: empty tracks
-     collapse, so four cards stretch across the panel instead of leaving a
-     dead column on the right. */
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-}
-
-.compare-principle {
-  padding: 16px 18px 18px;
-  border-right: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.compare-principle__name {
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.compare-principle__body {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 14px;
-}
-
-.compare-donut { position: relative; display: block; width: 62px; height: 62px; flex-shrink: 0; }
-
-.compare-donut__track { fill: none; stroke: var(--color-overlay-light); stroke-width: 5; }
-.compare-donut__fill { fill: none; stroke-width: 5; stroke-linecap: round; }
-
-.compare-donut__value {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  color: var(--color-text);
-}
-
-.compare-principle__facts { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-
-/* Lead/trail and the ranked bars are navigation: they open that project's
-   own view of this principle. */
-.compare-principle__lead,
-.compare-principle__trail {
-  font: inherit;
-  font-size: 11px;
-  background: transparent;
-  border: none;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.compare-principle__lead:hover,
-.compare-principle__trail:hover { text-decoration: underline; }
-
-.compare-principle__lead { color: var(--color-accent); }
-.compare-principle__trail { color: var(--color-sev-critical-text); }
-
-/* Bars follow the STANDINGS order (same slot = same project in every card),
-   each numbered with its standings rank and separated by a faint hairline
-   so a bar can be traced back to the ranked list above. The view's active
-   project keeps full colour while the other bars fade; a dashed tick at
-   the scope average runs across every slot. */
-.compare-principle__bars {
-  display: flex;
-  align-items: stretch;
-  margin-top: 14px;
-}
-
-.compare-principle__slot {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font: inherit;
-  background: transparent;
-  border: none;
-  padding: 0 3px;
-  cursor: pointer;
-  border-right: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
-}
-
-.compare-principle__slot:hover,
-.compare-principle__slot.is-active { background: var(--color-surface-alt); }
-
-.compare-principle__slot:last-child { border-right: none; }
-
-.compare-principle__barTrack {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  height: 36px;
-}
-
-.compare-principle__bar {
-  display: block;
-  width: 100%;
-  border-radius: 2px 2px 0 0;
-  transition: opacity 120ms ease;
-}
-
-.compare-principle__bars.has-active .compare-principle__slot:not(.is-active) .compare-principle__bar { opacity: 0.4; }
-
-.compare-principle__avgTick {
-  position: absolute;
-  left: -3px;
-  right: -3px;
-  border-top: 1px dashed var(--color-text-subtle);
-  pointer-events: none;
-}
-
-.compare-principle__rank {
-  font-size: 9px;
-  color: var(--color-text-muted);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.compare-principle__slot.is-active .compare-principle__rank {
-  color: var(--color-accent);
-  font-weight: 600;
-}
-
-/* The active project's score on this principle, under the bars. */
-.compare-principle__active {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--color-text-muted);
-}
-
-.compare-principle__activeName {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--color-accent);
-}
-
-.compare-principle__activeScore {
-  flex-shrink: 0;
-  color: var(--color-text);
-  font-variant-numeric: tabular-nums;
-}
 
 /* ── duel (head to head) ──────────────────────────────────────────────
    Side identity is fixed and colour-coded everywhere: project A (left)
@@ -920,23 +532,5 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   /* Origin chips are secondary metadata; on small screens the name needs
      the room more. */
   .compare-row__remote { display: none; }
-  /* The matrix shrinks a step instead of shedding columns: every number
-     still fits more often, and past that the panel scrolls sideways. The
-     lead inset drops with the rank-less small layout. */
-  .compare-matrix table { font-size: 11px; }
-  .compare-matrix th { font-size: 9px; padding: 5px 7px; max-width: 76px; }
-  .compare-matrix td { padding: 4px 7px; }
-  button.compare-matrix__cell,
-  span.compare-matrix__cell { padding: 1px 4px; }
-  .compare-matrix th.compare-matrix__project,
-  .compare-matrix tfoot td.compare-matrix__project { padding-left: 38px; }
-  .compare-matrix tbody td.compare-matrix__project { padding-left: 11px; }
-  .compare-matrix__rank { width: 20px; margin-right: 8px; font-size: 10px; }
 }
 
-@media (max-width: 800px) {
-  .compare-standings__row { grid-template-columns: 26px minmax(0, 1fr) 92px 64px; }
-  .compare-standings__pbars,
-  .compare-standings__ratio,
-  .compare-standings__delta { display: none; }
-}

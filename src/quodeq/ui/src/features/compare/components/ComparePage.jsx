@@ -158,6 +158,7 @@ function ComparePageBody({ duelView, dimensionView, board, selectedProject, open
         onOpenProject={openProject}
         onOpenPrinciple={openPrinciple}
         onOpenProjectDimension={onOpenProjectDimension}
+        scopeCount={shared.scopeCount}
       />
     );
   }
