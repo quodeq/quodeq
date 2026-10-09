@@ -40,18 +40,21 @@
   "dimensions": [
     {
       "compliance": [],
+      "confidence": "low",
       "dimension": "security",
       "dismissedCount": 1,
       "evidenceDate": "<timestamp>",
       "filesRead": 10,
-      "overallGrade": "Insufficient",
-      "overallScore": "0.0/10",
-      "previousRunId": "20260200T000000",
-      "previousScore": "9.4/10",
+      "overallGrade": "Good",
+      "overallScore": "8.3/10",
+      "previousRunId": "20260201T000000",
+      "previousScore": "7.4/10",
       "principles": [
         {
-          "grade": "Insufficient",
-          "principle": "Confidentiality"
+          "confidence": "low",
+          "grade": "Good",
+          "principle": "Confidentiality",
+          "score": "8.3/10"
         }
       ],
       "quarantinedCount": 0,
@@ -68,7 +71,7 @@
         "violationCount": 3,
         "violationsPer100Files": 30.0
       },
-      "trend": "down",
+      "trend": "up",
       "violations": [
         {
           "carriedForward": false,
@@ -117,12 +120,13 @@
     "security": {
       "compliance": [],
       "dimension": "security",
-      "openTypes": 5,
-      "overallGrade": "Exemplary",
-      "overallScore": "9.4/10",
+      "evidenceDate": "<timestamp>",
+      "openTypes": 4,
+      "overallGrade": "Good",
+      "overallScore": "7.4/10",
       "principles": [],
       "quarantinedCount": 0,
-      "runId": "20260200T000000",
+      "runId": "20260201T000000",
       "stale": false,
       "totals": {
         "complianceCount": 0,
@@ -130,9 +134,10 @@
           "critical": 0,
           "major": 0,
           "minor": 0,
-          "unknown": 5
+          "unknown": 4
         },
-        "violationCount": 5
+        "violationCount": 4,
+        "violationsPer100Files": 40.0
       },
       "violations": []
     }
@@ -144,6 +149,7 @@
     "dateISO": "<timestamp>",
     "dateLabel": "2 Feb 2026",
     "exitReason": null,
+    "gradeAlgoVersion": null,
     "runId": "20260202T000000"
   },
   "sinceBaseline": {
@@ -191,11 +197,11 @@
     "gradeBreakdown": [
       {
         "count": 1,
-        "grade": "Insufficient"
+        "grade": "Good"
       }
     ],
-    "numericAverage": 0.0,
-    "overallGrade": "Critical"
+    "numericAverage": 8.3,
+    "overallGrade": "Good"
   },
   "trend": [
     {
@@ -206,12 +212,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.0,
+          "delta": -1.4,
           "dimension": "security",
-          "grade": "Insufficient",
+          "grade": "Good",
           "majors": 0,
           "openTypes": 3,
-          "score": 0.0,
+          "score": 7.8,
           "violations": 3
         }
       ],
@@ -220,12 +226,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 0.0,
+      "numericAverage": 7.8,
       "openTypes": 3,
-      "overallGrade": "Critical",
+      "overallGrade": "Good",
       "runId": "20260205T000000",
-      "runNumericAverage": 0.0,
-      "runOverallGrade": "Critical",
+      "runNumericAverage": 7.8,
+      "runOverallGrade": "Good",
       "status": "done",
       "violations": 3
     },
@@ -237,12 +243,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.0,
+          "delta": 0.9,
           "dimension": "security",
-          "grade": "Insufficient",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 2,
-          "score": 0.0,
+          "score": 9.2,
           "violations": 2
         }
       ],
@@ -251,12 +257,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 0.0,
+      "numericAverage": 9.2,
       "openTypes": 2,
-      "overallGrade": "Critical",
+      "overallGrade": "Exemplary",
       "runId": "20260204T000000",
-      "runNumericAverage": 0.0,
-      "runOverallGrade": "Critical",
+      "runNumericAverage": 9.2,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 2
     },
@@ -268,12 +274,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.0,
+          "delta": 0.9,
           "dimension": "security",
-          "grade": "Insufficient",
+          "grade": "Good",
           "majors": 0,
           "openTypes": 3,
-          "score": 0.0,
+          "score": 8.3,
           "violations": 3
         }
       ],
@@ -282,12 +288,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 0.0,
+      "numericAverage": 8.3,
       "openTypes": 3,
-      "overallGrade": "Critical",
+      "overallGrade": "Good",
       "runId": "20260202T000000",
-      "runNumericAverage": 0.0,
-      "runOverallGrade": "Critical",
+      "runNumericAverage": 8.3,
+      "runOverallGrade": "Good",
       "status": "done",
       "violations": 3
     },
@@ -299,12 +305,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": -9.4,
+          "delta": 1.4,
           "dimension": "security",
-          "grade": "Insufficient",
+          "grade": "Good",
           "majors": 0,
           "openTypes": 4,
-          "score": 0.0,
+          "score": 7.4,
           "violations": 4
         }
       ],
@@ -313,12 +319,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 0.0,
+      "numericAverage": 7.4,
       "openTypes": 4,
-      "overallGrade": "Critical",
+      "overallGrade": "Good",
       "runId": "20260201T000000",
-      "runNumericAverage": 0.0,
-      "runOverallGrade": "Critical",
+      "runNumericAverage": 7.4,
+      "runOverallGrade": "Good",
       "status": "done",
       "violations": 4
     },
@@ -332,10 +338,10 @@
           "critical": 0,
           "delta": null,
           "dimension": "security",
-          "grade": "Exemplary",
+          "grade": "Adequate",
           "majors": 0,
           "openTypes": 5,
-          "score": 9.4,
+          "score": 6.0,
           "violations": 5
         }
       ],
@@ -344,12 +350,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 9.4,
+      "numericAverage": 6.0,
       "openTypes": 5,
-      "overallGrade": "Exemplary",
+      "overallGrade": "Adequate",
       "runId": "20260200T000000",
-      "runNumericAverage": 9.4,
-      "runOverallGrade": "Exemplary",
+      "runNumericAverage": 6.0,
+      "runOverallGrade": "Adequate",
       "status": "done",
       "violations": 5
     }

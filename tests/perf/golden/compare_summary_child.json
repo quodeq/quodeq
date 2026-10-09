@@ -9,13 +9,14 @@
       "fromDateLabel": "10 Feb 2026",
       "fromRunId": "20260210T000000",
       "openTypes": 5,
-      "overallGrade": "Exemplary",
-      "overallScore": "9.4/10",
+      "overallGrade": "Adequate",
+      "overallScore": "6.0/10",
       "principles": [
         {
-          "grade": "Exemplary",
+          "confidence": "medium",
+          "grade": "Adequate",
           "principle": "Confidentiality",
-          "score": "9.4/10"
+          "score": "6.0/10"
         }
       ],
       "quarantinedCount": 0,
@@ -45,8 +46,8 @@
   },
   "summary": {
     "dimensionCount": 1,
-    "numericAverage": 9.4,
-    "overallGrade": "Exemplary",
+    "numericAverage": 6.0,
+    "overallGrade": "Adequate",
     "previousNumericAverage": null,
     "severity": {
       "critical": 0,
@@ -65,7 +66,7 @@
       "dimensionDetails": [
         {
           "dimension": "security",
-          "score": 9.4
+          "score": 6.0
         }
       ],
       "dimensions": [
@@ -73,12 +74,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 5,
-      "numericAverage": 9.4,
+      "numericAverage": 6.0,
       "openTypes": 5,
-      "overallGrade": "Exemplary",
+      "overallGrade": "Adequate",
       "runId": "20260210T000000",
-      "runNumericAverage": 9.4,
-      "runOverallGrade": "Exemplary",
+      "runNumericAverage": 6.0,
+      "runOverallGrade": "Adequate",
       "status": "done",
       "violations": 5
     }
