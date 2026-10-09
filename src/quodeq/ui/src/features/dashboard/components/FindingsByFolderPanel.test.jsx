@@ -9,7 +9,7 @@ describe('FindingsByFolderPanel', () => {
   it('shows the shared prefix once and each folder below it', () => {
     const dims = [{ dimension: 'a', violations: [v('src/main/app/Views/A.swift', 'major'), v('src/main/lib/Views/B.swift')] }];
     render(<FindingsByFolderPanel dimensions={dims} />);
-    expect(screen.getByText(/IN src\/main\//)).toBeInTheDocument();
+    expect(screen.getByText('IN src/main/ · CLICK TO OPEN')).toBeInTheDocument();
     const rows = screen.getAllByRole('row');
     expect(rows[0]).toHaveTextContent('app/Views/');
     expect(rows[1]).toHaveTextContent('lib/Views/');
@@ -27,7 +27,7 @@ describe('FindingsByFolderPanel', () => {
     const dims = [{ dimension: 'a', violations: [v('src/x/a.py'), v('src/y/b.py')] }];
     render(<FindingsByFolderPanel dimensions={dims} onFolderClick={onFolderClick} />);
     fireEvent.click(screen.getAllByRole('row')[0]);
-    expect(onFolderClick).toHaveBeenCalledWith(expect.objectContaining({ dir: expect.stringMatching(/^src\//) }));
+    expect(onFolderClick.mock.calls[0][0].dir.startsWith('src/')).toBe(true);
   });
 });
 
