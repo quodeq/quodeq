@@ -1,6 +1,7 @@
 """Tests for the four-stage curve on requirement masses."""
 from __future__ import annotations
 
+import dataclasses
 import math
 
 from quodeq.core.scoring.internals import (
@@ -56,7 +57,7 @@ class TestCeilingAndFloor:
         assert severity_grade_floor("critical", params=DEFAULT_PARAMS) == 0.0
 
     def test_clamp_ceiling_beats_floor(self):
-        # 400 minor rules in every file of a 100-file project: ceiling well under the minor floor
+        # a violation mass of 2000, far past any floor: the ceiling is well under the minor floor
         assert clamp_principle_score(9.0, 2000.0, "minor", params=DEFAULT_PARAMS) == round(violation_ceiling(2000.0, params=DEFAULT_PARAMS), 1)
 
 
@@ -83,6 +84,18 @@ class TestStages:
         unclassed, _ = principle_score_and_grade(_mass(rows, files=2803), params=DEFAULT_PARAMS)
         classed, _ = principle_score_and_grade(_mass(rows, files=2803, classes={"S-INT-2": "critical"}), params=DEFAULT_PARAMS)
         assert classed < unclassed and classed < 5.0  # one critical rule over 294 files: 4.1, not under 3.0
+
+
+class TestNonDefaultParams:
+    def test_params_thread_through_the_score(self):
+        params = dataclasses.replace(DEFAULT_PARAMS, base_k=0.2, floor_minor=6.0)
+        rows = [{"req": f"R-{j}", "file": f"f{i}", "severity": "minor"} for j in range(10) for i in range(20)]
+        mass = _mass(rows, files=1000)
+        base_default, _, _, _ = principle_stages(mass, params=DEFAULT_PARAMS)
+        base_tuned, _, raw, _ = principle_stages(mass, params=params)
+        assert base_tuned < base_default
+        assert raw < 6.0
+        assert principle_score_and_grade(mass, params=params)[0] == 6.0
 
 
 class TestLegacyHelpers:
