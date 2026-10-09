@@ -29,10 +29,37 @@ def test_low_confidence_note_when_most_observation_is_thin():
     b = _p(9.0, 1.0, confidence="low")
     c = _p(5.0, 1.5, confidence="high")
     out = weighted_overall({"a": a, "b": b, "c": c}, MODE_NUMERICAL)
-    assert out.confidence == "low" and "Thin evidence" in (out.confidence_reason or "")
+    # a and b weigh 1.0 x 2 each, c weighs 1.5 x 2: the low share is 4/7, which rounds to 57%.
+    assert out.confidence == "low"
+    assert out.confidence_reason == (
+        "Thin evidence: 57% of this dimension's observations come from principles with few findings"
+    )
     assert weighted_overall({"c": c}, MODE_NUMERICAL).confidence is None
 
 
 def test_zero_observation_everywhere_falls_back_to_equal_weights():
     out = weighted_overall({"a": _p(4.0, 0.0), "b": _p(8.0, 0.0)}, MODE_NUMERICAL)
     assert out.weighted_score == 6.0
+
+
+_MODE_GRADED = "non-numerical"
+
+
+def _g(grade):
+    return PrincipleScore(display_name="p", weight="Medium (x2)", grade=grade)
+
+
+def test_graded_mode_flags_low_confidence_when_most_principles_are_insufficient():
+    out = weighted_overall(
+        {"a": _g("Insufficient"), "b": _g("Insufficient"), "c": _g("Proficient")}, _MODE_GRADED,
+    )
+    assert out.confidence == "low"
+    assert "sufficient evidence" in (out.confidence_reason or "")
+    assert out.confidence_reason == "Only 1/3 principles had sufficient evidence"
+
+
+def test_graded_mode_does_not_flag_when_only_a_minority_is_insufficient():
+    out = weighted_overall(
+        {"a": _g("Insufficient"), "b": _g("Proficient"), "c": _g("Proficient")}, _MODE_GRADED,
+    )
+    assert out.confidence is None

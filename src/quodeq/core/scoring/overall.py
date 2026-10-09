@@ -19,6 +19,7 @@ MODE_NUMERICAL = "numerical"
 _LOW_CONFIDENCE_REASON = (
     "Thin evidence: {pct}% of this dimension's observations come from principles with few findings"
 )
+_INSUFFICIENT_REASON = "Only {scored}/{total} principles had sufficient evidence"
 _LOW_CONFIDENCE_SHARE = 0.5
 
 
@@ -84,10 +85,18 @@ def weighted_overall(
 
     result = build_overall_result(mode, tw, tv, params)
 
-    if total > 0 and low > tw * _LOW_CONFIDENCE_SHARE:
-        pct = round(100 * low / tw)
+    if mode == MODE_NUMERICAL:
+        if total > 0 and low > tw * _LOW_CONFIDENCE_SHARE:
+            pct = round(100 * low / tw)
+            result = replace(
+                result, confidence="low",
+                confidence_reason=_LOW_CONFIDENCE_REASON.format(pct=pct),
+            )
+        return result
+    insufficient = sum(1 for p in principles_scores.values() if p.grade == Grade.INSUFFICIENT)
+    if total > 0 and insufficient > total * _LOW_CONFIDENCE_SHARE:
         result = replace(
             result, confidence="low",
-            confidence_reason=_LOW_CONFIDENCE_REASON.format(pct=pct),
+            confidence_reason=_INSUFFICIENT_REASON.format(scored=total - insufficient, total=total),
         )
     return result
