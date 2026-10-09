@@ -97,6 +97,20 @@ describe('CompareAttentionList', () => {
     expect(onOpenProjectDimension).toHaveBeenCalledWith({ id: 'beta', source: 'local', runId: 'r1', dimName: 'security', dateLabel: '1 Oct' });
   });
 
+  it('opens the dimension from anywhere on the row, the project when it has no weakest dimension', async () => {
+    const onOpenProject = vi.fn();
+    const onOpenProjectDimension = vi.fn();
+    const items = [
+      { row: ROWS[1], level: 'severe', worstDim: 'security', reasons: [] },
+      { row: ROWS[0], level: 'clear', worstDim: null, reasons: [] },
+    ];
+    render(<CompareAttentionList items={items} hover={null} setHover={vi.fn()} onOpenProject={onOpenProject} onOpenProjectDimension={onOpenProjectDimension} />);
+    await userEvent.click(screen.getByText('beta'));
+    expect(onOpenProjectDimension).toHaveBeenCalledWith(expect.objectContaining({ id: 'beta', dimName: 'security' }));
+    await userEvent.click(screen.getByText('alpha'));
+    expect(onOpenProject).toHaveBeenCalledWith('alpha');
+  });
+
   it('opens a remote project itself, its dimension page being out of reach', async () => {
     const onOpenProject = vi.fn();
     const onOpenProjectDimension = vi.fn();
