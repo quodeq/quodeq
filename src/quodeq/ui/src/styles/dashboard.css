@@ -1249,9 +1249,10 @@
   color: var(--color-text-muted);
 }
 
-/* A folder path: muted lead, bright last two folders. Long paths trim from
-   the left (rtl box, ltr text) so the end always shows. */
-.folder-path {
+/* A folder row reads like a file row: last two folders on top, the folders
+   above them underneath, quieter than a file's path. Long leads trim from
+   the left (rtl box, ltr text) so the nearest folders stay visible. */
+.folder-path__lead {
   display: block;
   overflow: hidden;
   white-space: nowrap;
@@ -1259,12 +1260,11 @@
   direction: rtl;
   text-align: left;
   font-family: var(--term-font-mono);
-  font-size: 12px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  opacity: 0.7;
 }
 .folder-path__inner { direction: ltr; unicode-bidi: isolate; }
-.folder-path__lead { color: var(--color-text-muted); }
-.folder-path__tail { color: var(--color-text); transition: color 0.12s; }
-.term-grid__row--clickable:hover .folder-path__tail { color: var(--color-accent); }
 
 /* The panel is a column; the list takes what the row gives it (the chart's
    height beside the score history) and scrolls. On its own it asks for
