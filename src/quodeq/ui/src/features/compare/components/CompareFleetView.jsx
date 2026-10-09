@@ -89,7 +89,7 @@ export default function CompareFleetView({
                 <CompareDirectionMap rows={scoredRows} fleetScore={fleet.score} {...linked} />
               </ComparePanel>
             </div>
-            <CompareAttentionList items={attnAll} openDimension={openDimension} {...linked} />
+            <CompareAttentionList items={attnAll} onOpenProjectDimension={onOpenProjectDimension} {...linked} />
           </div>
           <CompareDimensionHealth board={board} openDimension={openDimension} />
         </>

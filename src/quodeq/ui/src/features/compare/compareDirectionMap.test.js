@@ -4,17 +4,29 @@ import { STEADY, buildDirectionMap } from './compareDirectionMap.js';
 
 const box = { left: 16, top: 18, width: 600, height: 280 };
 const row = (name, score, delta, totalFiles = 100, stale = false) => ({ name, score, delta, totalFiles, stale });
+const inside = (v, lo, hi) => v >= lo - 1e-9 && v <= hi + 1e-9;
 
-test('buildDirectionMap: 0 movement is the exact horizontal centre, the fleet average the vertical one', () => {
-  const m = buildDirectionMap({ rows: [row('a', 9, 1.2), row('b', 6, -0.4)], fleetScore: 7.5, box });
-  assert.ok(Math.abs(m.center.x - (box.left + box.width / 2)) < 1e-9);
-  assert.ok(Math.abs(m.center.y - (box.top + box.height / 2)) < 1e-9);
+test('buildDirectionMap: the view fits the projects, so an all-improving fleet puts "no change" near the left edge', () => {
+  const m = buildDirectionMap({ rows: [row('a', 9, 1.2), row('b', 8, 2.4), row('c', 7, 1.8)], fleetScore: 8, box });
+  const xs = m.points.map((p) => p.cx);
+  assert.ok(xs.every((x) => inside(x, box.left, box.left + box.width)));
+  assert.ok(m.zeroX < box.left + box.width * 0.2, `zeroX ${m.zeroX}`);
+  // The projects, not 0, fill the plot: their spread covers most of the width.
+  assert.ok(Math.max(...xs) - Math.min(...xs) > box.width * 0.4);
 });
 
-test('buildDirectionMap: projects with no runs in the window are listed, not plotted', () => {
+test('buildDirectionMap: both references stay inside the plot', () => {
+  const m = buildDirectionMap({ rows: [row('a', 9.5, -1.5), row('b', 6.5, -0.4)], fleetScore: 8.1, box });
+  assert.ok(inside(m.zeroX, box.left, box.left + box.width));
+  assert.ok(inside(m.fleetY, box.top, box.top + box.height));
+});
+
+test('buildDirectionMap: projects with no runs in the window are plotted on "no change", marked still', () => {
   const m = buildDirectionMap({ rows: [row('a', 9, 0.5), row('quiet', 8, null)], fleetScore: 8.5, box });
-  assert.deepEqual(m.points.map((p) => p.row.name), ['a']);
-  assert.deepEqual(m.still.map((r) => r.name), ['quiet']);
+  const quiet = m.points.find((p) => p.row.name === 'quiet');
+  assert.equal(quiet.still, true);
+  assert.ok(Math.abs(quiet.cx - m.zeroX) < 1e-9);
+  assert.equal(m.points.find((p) => p.row.name === 'a').still, false);
 });
 
 test('buildDirectionMap: bigger projects get bigger dots and paint first', () => {
@@ -23,10 +35,19 @@ test('buildDirectionMap: bigger projects get bigger dots and paint first', () =>
   assert.ok(m.points[0].r > m.points[1].r);
 });
 
-test('buildDirectionMap: the steady band spans ±STEADY around the centre', () => {
-  const m = buildDirectionMap({ rows: [row('a', 9, 1)], fleetScore: 8, box });
-  assert.ok(Math.abs((m.center.x - m.steady.x1) - (m.steady.x2 - m.center.x)) < 1e-9);
+test('buildDirectionMap: the steady band spans ±STEADY around "no change", clipped to the plot', () => {
+  const m = buildDirectionMap({ rows: [row('a', 9, -1), row('b', 8, 1)], fleetScore: 8, box });
+  assert.ok(Math.abs((m.zeroX - m.steady.x1) - (m.steady.x2 - m.zeroX)) < 1e-9);
   assert.ok(STEADY > 0);
+  const edge = buildDirectionMap({ rows: [row('a', 9, 2), row('b', 8, 3)], fleetScore: 8, box });
+  assert.ok(edge.steady.x1 >= box.left);
+});
+
+test('buildDirectionMap: ticks are round steps inside the range', () => {
+  const m = buildDirectionMap({ rows: [row('a', 9.5, 1), row('b', 6.5, -1)], fleetScore: 8.1, box });
+  assert.ok(m.ticks.move.some((tk) => tk.d === 0));
+  assert.ok(m.ticks.move.every((tk) => inside(tk.x, box.left, box.left + box.width)));
+  assert.ok(m.ticks.score.every((tk) => Number.isInteger(tk.v * 2)));
 });
 
 test('buildDirectionMap: labels of neighbouring dots never overlap', () => {
@@ -41,9 +62,4 @@ test('buildDirectionMap: labels of neighbouring dots never overlap', () => {
       assert.equal(overlap, false, `${m.points[i].row.name} vs ${m.points[j].row.name}`);
     }
   }
-});
-
-test('buildDirectionMap: no score tick sits on the fleet-average axis', () => {
-  const m = buildDirectionMap({ rows: [row('a', 9.5, 1), row('b', 6.5, -1)], fleetScore: 8.1, box });
-  assert.ok(m.ticks.score.every((t) => Math.abs(t.v - 8.1) > 0.3));
 });

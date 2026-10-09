@@ -73,27 +73,38 @@ describe('CompareFleetMatrix', () => {
 });
 
 describe('CompareDirectionMap', () => {
-  it('plots moving projects and lists the ones with no runs in 30 days', () => {
+  it('plots every project, the ones with no runs in 30 days hollow', () => {
     const { container } = render(<CompareDirectionMap rows={ROWS} fleetScore={7.5} hover={null} setHover={vi.fn()} onOpenProject={vi.fn()} />);
     expect(screen.getByRole('img', { name: /Direction map/ })).toBeInTheDocument();
-    expect(container.querySelectorAll('.compare-dirmap__pt')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /gamma/ })).toHaveClass('compare-dirmap__chip');
+    expect(container.querySelectorAll('.compare-dirmap__pt')).toHaveLength(3);
+    expect(container.querySelectorAll('.compare-dirmap__pt.is-still')).toHaveLength(1);
+    expect(container.querySelector('.compare-dirmap__pt.is-still')).toHaveTextContent('gamma');
     expect(container.querySelector('.compare-dirmap__stale')).toHaveTextContent('stale');
   });
 });
 
 describe('CompareAttentionList', () => {
-  it('turns reasons into tags and links the weakest dimension', async () => {
-    const openDimension = vi.fn();
+  it('turns reasons into tags and opens that project\'s own weakest dimension', async () => {
+    const onOpenProjectDimension = vi.fn();
     const items = [{ row: ROWS[1], level: 'severe', worstDim: 'security', reasons: [
       { type: REASON_TYPE.WORST_DIM, dim: 'security', score: 5 },
       { type: REASON_TYPE.STALE, commits: 12 },
     ] }];
-    render(<CompareAttentionList items={items} hover={null} setHover={vi.fn()} onOpenProject={vi.fn()} openDimension={openDimension} />);
+    render(<CompareAttentionList items={items} hover={null} setHover={vi.fn()} onOpenProject={vi.fn()} onOpenProjectDimension={onOpenProjectDimension} />);
     expect(screen.getByText('security at 5.0')).toBeInTheDocument();
     expect(screen.getByText('12 commits behind')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /open security/ }));
-    expect(openDimension).toHaveBeenCalledWith('security');
+    expect(onOpenProjectDimension).toHaveBeenCalledWith({ id: 'beta', source: 'local', runId: 'r1', dimName: 'security', dateLabel: '1 Oct' });
+  });
+
+  it('opens a remote project itself, its dimension page being out of reach', async () => {
+    const onOpenProject = vi.fn();
+    const onOpenProjectDimension = vi.fn();
+    const items = [{ row: { ...ROWS[1], remote: true }, level: 'severe', worstDim: 'security', reasons: [] }];
+    render(<CompareAttentionList items={items} hover={null} setHover={vi.fn()} onOpenProject={onOpenProject} onOpenProjectDimension={onOpenProjectDimension} />);
+    await userEvent.click(screen.getByRole('button', { name: /open security/ }));
+    expect(onOpenProject).toHaveBeenCalledWith('beta');
+    expect(onOpenProjectDimension).not.toHaveBeenCalled();
   });
 });
 
