@@ -4,6 +4,9 @@ Reads ``<root>/<project>/<run>/evaluation/<dimension>.json`` plus the run's
 ``status.json`` (model) and the root's ``project_index.json`` (project names).
 Each finding is reduced to its rule, severity and file: no snippet and no
 message survives loading, so nothing downstream can print one.
+
+The project size is ``sourceFileCount`` alone, as in production: a report
+without one keeps ``files=0``, which the spread reads as an unknown size.
 """
 from __future__ import annotations
 
@@ -115,7 +118,7 @@ def _load_one(path: Path, names: dict[str, str]) -> Report | None:
         date=str(data.get("date") or "")[:10],
         model=_model(run_dir),
         run=run_dir.name,
-        files=max(_as_int(data.get("filesRead")), _as_int(data.get("sourceFileCount"))),
+        files=_as_int(data.get("sourceFileCount")),
         cur=cur,
         principles=principles,
     )

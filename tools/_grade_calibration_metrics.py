@@ -51,6 +51,8 @@ def score_report(
     graded = []
     for violations, compliance in report.principles.values():
         kept = [v for v in violations if v["req"] not in drop]
+        if not kept and not compliance:
+            continue
         mass = principle_mass(requirement_rows(kept, compliance), report.files, classes, params=params)
         score, _grade = principle_score_and_grade(mass, params=params)
         graded.append({"score": score, "observation": mass.observation, "confidence": None})
@@ -102,6 +104,14 @@ def _real_model(report: Report) -> bool:
     return bool(report.model) and NO_MODEL not in report.model
 
 
+def _dated(report: Report) -> bool:
+    try:
+        date.fromisoformat(report.date)
+    except ValueError:
+        return False
+    return True
+
+
 def _latest(pairs: list[tuple[Report, float]]) -> dict[tuple[str, str], tuple[Report, float]]:
     latest: dict[tuple[str, str], tuple[Report, float]] = {}
     for report, score in pairs:
@@ -115,7 +125,7 @@ def _model_gaps(pairs: list[tuple[Report, float]]) -> list[float]:
     """|score gap| between each project and dimension's latest runs of two models within the window."""
     groups: dict[tuple[str, str], dict[str, tuple[Report, float]]] = {}
     for report, score in pairs:
-        if not _real_model(report):
+        if not (_real_model(report) and _dated(report)):
             continue
         slot = groups.setdefault((report.project, report.dimension), {})
         if report.model not in slot or report.date > slot[report.model][0].date:
@@ -133,7 +143,7 @@ def _temporal_deltas(pairs: list[tuple[Report, float]]) -> list[float]:
     """|score change| between consecutive runs of the same model on one project and dimension."""
     series: dict[tuple[str, str, str], list[tuple[Report, float]]] = {}
     for report, score in pairs:
-        if _real_model(report):
+        if _real_model(report) and _dated(report):
             series.setdefault((report.project, report.dimension, report.model), []).append((report, score))
     deltas = []
     for runs in series.values():
@@ -171,7 +181,7 @@ def motion_rows(
         after = score_report(report, params, classes, drop=frozenset(rules))
         rows.append({
             "project": short(report.project), "dimension": report.dimension, "run": report.run[:RUN_WIDTH],
-            "before": before, "after": after, "delta": round(after - before, 1),
+            "before": before, "after": after, "delta": None if after is None else round(after - before, 1),
         })
     return rows
 

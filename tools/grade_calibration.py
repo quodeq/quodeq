@@ -73,7 +73,8 @@ def _print_table(stored: dict, current: dict) -> None:
 
 def _print_motion(rows: list[dict]) -> None:
     for row in rows:
-        print(f"motion {row['project']} {row['dimension']} run {row['run']}: {row['before']:.1f} -> {row['after']:.1f} ({row['delta']:+.1f})")
+        change = "no findings left" if row["after"] is None else f"{row['after']:.1f} ({row['delta']:+.1f})"
+        print(f"motion {row['project']} {row['dimension']} run {row['run']}: {row['before']:.1f} -> {change}")
 
 
 def _print_labels(rows: list[dict]) -> None:
