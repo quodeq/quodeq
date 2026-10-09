@@ -112,11 +112,14 @@ function ScoreGauge({ scoreDisplay, gradeWord, ringColor, dashOffset }) {
   );
 }
 
-function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev, summaryId }) {
+function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev, summaryId, thinEvidence }) {
   return (
     <>
       <ScoreGauge scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset} />
-      <span id={summaryId} className="sr-only">{t('overview.gaugeSummaryAria', { score: scoreDisplay, grade: gradeWord })}</span>
+      <span id={summaryId} className="sr-only">
+        {t('overview.gaugeSummaryAria', { score: scoreDisplay, grade: gradeWord })}
+        {thinEvidence ? `, ${t('overview.thinEvidence')}` : ''}
+      </span>
 
       <div className="dim-gauge-card__meta">
         {t('overview.violAbbrev')} · {violationCount} · {ratio}
@@ -157,7 +160,6 @@ function computeGaugeRing(overallScore) {
  * @param {boolean}  [props.evaluatedToday=true] - accumulated overview only: mutes the frame when false
  * @param {string}   [props.dateLabel]         - forwarded to children for run overview
  * @param {string}   [props.selectedRunId]     - forwarded to click handler for run overview
- * @param {boolean}  [props.thinEvidence=false] - scored, but on few observations: adds the thin-evidence line
  */
 function computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunId }) {
   const violationCount = item.totals?.violationCount ?? 0;
@@ -176,6 +178,13 @@ function computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunI
   };
 }
 
+/**
+ * @param {object}   props
+ * @param {boolean}  [props.isInsufficient=false] - legacy no-evidence state: dashed gauge, wins over thinEvidence
+ * @param {boolean}  [props.thinEvidence=false] - scored, but on few observations: adds the thin-evidence line
+ *   (also appended to the sr-only summary, the only text assistive tech reads from this button)
+ * See computeGaugeCardDerived above for the remaining props.
+ */
 export default function DimensionGaugeCard({
   item,
   delta = null,
@@ -219,7 +228,7 @@ export default function DimensionGaugeCard({
         <DimensionScoreBody
           scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset}
           violationCount={violationCount} ratio={ratio} sev={sev}
-          summaryId={summaryId}
+          summaryId={summaryId} thinEvidence={thinEvidence}
         />
       )}
       {thinEvidence && !isInsufficient ? <div className="dim-gauge-card__insuf-line">{t('overview.thinEvidence')}</div> : null}
