@@ -169,19 +169,6 @@ export function filterSinceBaseline(sinceBaseline, dimensionNames) {
 }
 
 /**
- * One dimension's entry, only when the page shows the run the summary
- * describes; any other run (an older one, another project's) gets none.
- * @param {Object|undefined} sinceBaseline the dashboard map
- * @param {string} dimension
- * @param {{runId: string|undefined, baselineRunId: string|undefined}} ids
- */
-export function sinceBaselineFor(sinceBaseline, dimension, { runId, baselineRunId }) {
-  if (!sinceBaseline || !runId || runId !== baselineRunId) return undefined;
-  const key = Object.keys(sinceBaseline).find((k) => k.toLowerCase() === String(dimension).toLowerCase());
-  return key ? sinceBaseline[key] : undefined;
-}
-
-/**
  * One dimension as `buildHeadline` expects it, from what the dimension page
  * holds: its own violation list, severity counts and the eval report's file
  * counts.
