@@ -15,6 +15,6 @@ The grade label is the threshold band the final score falls in. A principle with
 
 > **What moves the score**
 >
-> Fixing a rule in every file moves the score most; fixing it in one file of many moves it a little. Dismissing a finding or fixing it never lowers the score, and a model repeating itself changes nothing.
+> Fixing a rule in every file moves the score most; fixing it in one file of many moves it a little. Dismissing a finding or fixing it never lowers that principle's score; a dimension re-weights its principles by how much was observed, so it can move either way by a little. A model repeating itself changes nothing.
 
 The dimension score is the mean of its principles, each weighted by its observation. The project score is the weighted mean of dimension scores (*DIMENSIONS* tab).

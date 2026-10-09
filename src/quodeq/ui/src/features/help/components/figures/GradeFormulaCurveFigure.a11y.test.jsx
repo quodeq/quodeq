@@ -16,4 +16,13 @@ describe('GradeFormulaCurveFigure svg a11y', () => {
       'Grade curve: the solid line is the base score curve, the dashed line is the violation ceiling',
     );
   });
+
+  it('shows the built-in severity weights of the current formula', () => {
+    const { container } = render(<GradeFormulaCurveFigure />);
+    const chips = [...container.querySelectorAll('.severity-tag')].map((el) => el.textContent);
+    expect(chips).toHaveLength(3);
+    expect(chips[0]).toContain('4.0');
+    expect(chips[1]).toContain('2.0');
+    expect(chips[2]).toContain('0.25');
+  });
 });
