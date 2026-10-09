@@ -198,15 +198,18 @@ describe("useDashboard — scoring metadata crosses the whitelist", () => {
 });
 
 describe("useDashboard — formulaUpdated", () => {
-  async function formulaUpdatedFor(runVersion, currentVersion) {
+  async function formulaUpdatedFor(runVersion, gradesVersion) {
     const fakeApi = makeFakeApi();
     fakeApi.getDashboard = vi.fn(async (project, run) => {
       const payload = makeDashboardPayload({ project, run: run || "latest" });
-      return { ...payload, selectedRun: { ...payload.selectedRun, gradeAlgoVersion: runVersion } };
+      return {
+        ...payload,
+        selectedRun: { ...payload.selectedRun, gradeAlgoVersion: runVersion, gradesAlgoVersion: gradesVersion },
+      };
     });
     fakeApi.getProjectScores = vi.fn(async () => ({
       accumulated: { score: 90 }, trend: [], availableRuns: [],
-      scoring: { customFormula: false, formulaVersion: currentVersion },
+      scoring: { customFormula: false, formulaVersion: 4 },
     }));
     const { result } = renderHook(
       () => useDashboard({ selectedProject: "p1", selectedRun: null }),
@@ -217,18 +220,23 @@ describe("useDashboard — formulaUpdated", () => {
     return result;
   }
 
-  it("is true when the run was scanned with an older formula", async () => {
+  it("is true when the run was scanned with an older formula than its grade tables carry", async () => {
     const result = await formulaUpdatedFor(3, 4);
     expect(result.current.formulaUpdated).toBe(true);
   });
 
-  it("is true for a run with no recorded version", async () => {
+  it("is true for a run with no recorded version whose tables were regraded", async () => {
     const result = await formulaUpdatedFor(null, 4);
     expect(result.current.formulaUpdated).toBe(true);
   });
 
-  it("is false when the run was scanned with the current formula", async () => {
+  it("is false when the run was scanned with the formula its tables carry", async () => {
     const result = await formulaUpdatedFor(4, 4);
     expect(result.current.formulaUpdated).toBe(false);
+  });
+
+  it("is false for a legacy run without grade tables, which keeps its stored grade", async () => {
+    expect((await formulaUpdatedFor(null, null)).current.formulaUpdated).toBe(false);
+    expect((await formulaUpdatedFor(3, undefined)).current.formulaUpdated).toBe(false);
   });
 });

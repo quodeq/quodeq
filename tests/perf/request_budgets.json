@@ -5,7 +5,7 @@
   },
   "overview_cold": {
     "eval_report_reads": 9,
-    "evaluation_db_opens": 35
+    "evaluation_db_opens": 36
   },
   "overview_warm": {}
 }
