@@ -1,0 +1,157 @@
+# src/quodeq/core/scoring/mass.py
+"""Per-requirement mass: the unit the grade is built from.
+
+One row per broken requirement, weighted by how many of the project's files it
+touches. Severity is cumulative over per-file worst severities, so a rule that
+is minor in 100 files and major in 20 adds the spread of 120 files at the minor
+weight plus the spread of 20 files at the major increment. A rule the standard
+classes takes the class in every file; the model's rating is not used for it.
+"""
+from __future__ import annotations
+
+import math
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, replace
+
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
+from quodeq.core.types.severity import Severity, parse_severity
+
+SPREAD_PER_FILES = 100     # density is "files hit per 100 project files"
+DENOMINATOR_FLOOR = 100    # a 6-file project is not destroyed by one finding
+_KEY_FIELDS = ("req", "vt", "reason")
+_UNKNOWN_KEY = "unknown"
+_NO_FILE = ""
+LADDER: tuple[str, ...] = (Severity.MINOR, Severity.MAJOR, Severity.CRITICAL)
+_RANK = {sev: i for i, sev in enumerate(LADDER)}
+
+
+def spread(files_hit: int, project_files: int) -> float:
+    """``1 + log2(1 + 100 · n / files)`` for n ≥ 1, 0 for n = 0; 1 when the size is unknown."""
+    if files_hit <= 0:
+        return 0.0
+    if project_files <= 0:
+        return 1.0
+    denominator = max(project_files, DENOMINATOR_FLOOR)
+    return 1.0 + math.log2(1.0 + SPREAD_PER_FILES * files_hit / denominator)
+
+
+def finding_key(item: Mapping) -> str:
+    """The rule a finding is filed under: ``req``, else ``vt``, else ``reason``."""
+    return next((str(item[k]) for k in _KEY_FIELDS if item.get(k)), _UNKNOWN_KEY)
+
+
+@dataclass(frozen=True, slots=True)
+class RequirementRows:
+    """Violations as ``{req: {file: worst model severity}}``, compliance as ``{req: files}``."""
+
+    violations: Mapping[str, Mapping[str, str]]
+    compliance: Mapping[str, frozenset[str]]
+
+
+def requirement_rows(violations: Iterable[Mapping], compliance: Iterable[Mapping]) -> RequirementRows:
+    """Group findings per rule and file; repeats in one file collapse to the worst."""
+    worst: dict[str, dict[str, str]] = {}
+    for item in violations:
+        sev = parse_severity(item.get("severity"))
+        files = worst.setdefault(finding_key(item), {})
+        file = str(item.get("file") or _NO_FILE)
+        if file not in files or _RANK[sev] > _RANK[files[file]]:
+            files[file] = sev
+    ok: dict[str, set[str]] = {}
+    for item in compliance:
+        ok.setdefault(finding_key(item), set()).add(str(item.get("file") or _NO_FILE))
+    return RequirementRows(
+        violations={req: dict(files) for req, files in worst.items()},
+        compliance={req: frozenset(files) for req, files in ok.items()},
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ViolationRow:
+    """One broken requirement: files reached at each severity level and the resulting weight."""
+
+    req: str
+    severity_class: str | None
+    files_at_least: Mapping[str, int]
+    spread_at_least: Mapping[str, float]
+    weight: float
+    worst: str
+
+
+@dataclass(frozen=True, slots=True)
+class ComplianceRow:
+    """One requirement the code satisfies, with the spread of the files that satisfy it."""
+
+    req: str
+    files_ok: int
+    spread: float
+
+
+@dataclass(frozen=True, slots=True)
+class PrincipleMass:
+    """The summed rows of one principle, ready for the grade formula."""
+
+    violation_mass: float
+    compliance_mass: float
+    observation: float
+    worst: str | None
+    violations: tuple[ViolationRow, ...]
+    compliance: tuple[ComplianceRow, ...]
+
+
+def _increments(params: ScoringParams) -> dict[str, float]:
+    """Weight added at each level: minor, then major minus minor, then critical minus major."""
+    w = params.severity_weight
+    incs = {
+        Severity.MINOR: float(w[Severity.MINOR]),
+        Severity.MAJOR: float(w[Severity.MAJOR]) - float(w[Severity.MINOR]),
+        Severity.CRITICAL: float(w[Severity.CRITICAL]) - float(w[Severity.MAJOR]),
+    }
+    if any(v <= 0 for v in incs.values()):
+        raise ValueError("severity weights must be strictly increasing on the ladder")
+    return incs
+
+
+def requirement_mass(
+    file_severities: Mapping[str, str], severity_class: str | None, project_files: int,
+    *, params: ScoringParams = DEFAULT_PARAMS,
+) -> ViolationRow:
+    """Cumulative mass of one rule from its per-file severities (or its class)."""
+    incs = _increments(params)
+    effective = {f: (severity_class if severity_class in _RANK else s) for f, s in file_severities.items()}
+    files_at_least = {lvl: sum(1 for s in effective.values() if _RANK[s] >= _RANK[lvl]) for lvl in LADDER}
+    spread_at_least = {lvl: spread(n, project_files) for lvl, n in files_at_least.items()}
+    weight = sum(incs[lvl] * spread_at_least[lvl] for lvl in LADDER)
+    worst = max(effective.values(), key=lambda s: _RANK[s], default=Severity.MINOR)
+    return ViolationRow(
+        req="", severity_class=severity_class if severity_class in _RANK else None,
+        files_at_least=files_at_least, spread_at_least=spread_at_least, weight=weight, worst=worst,
+    )
+
+
+def principle_mass(
+    rows: RequirementRows, project_files: int, classes: Mapping[str, str],
+    *, params: ScoringParams = DEFAULT_PARAMS,
+) -> PrincipleMass:
+    """Sum the rule masses of a principle; observation is the spread of every observed rule."""
+    violations: list[ViolationRow] = []
+    worst: str | None = None
+    for req in sorted(rows.violations):
+        row = requirement_mass(rows.violations[req], classes.get(req), project_files, params=params)
+        violations.append(replace(row, req=req))
+        if worst is None or _RANK[row.worst] > _RANK[worst]:
+            worst = row.worst
+    compliance = tuple(
+        ComplianceRow(req=req, files_ok=len(files), spread=spread(len(files), project_files))
+        for req, files in sorted(rows.compliance.items())
+    )
+    observation = sum(spread(len(rows.violations[r.req]), project_files) for r in violations)
+    observation += sum(c.spread for c in compliance)
+    return PrincipleMass(
+        violation_mass=sum(r.weight for r in violations),
+        compliance_mass=sum(c.spread for c in compliance),
+        observation=observation,
+        worst=worst,
+        violations=tuple(violations),
+        compliance=compliance,
+    )
