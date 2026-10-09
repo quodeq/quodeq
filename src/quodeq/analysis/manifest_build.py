@@ -9,6 +9,7 @@ from typing import TypeVar
 
 from quodeq.analysis._ignore import load_ignore_patterns
 from quodeq.analysis.manifest_build_scope import build_multi_scope_manifest
+from quodeq.analysis.manifest_lines import count_source_lines
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.analysis.manifest_targets import (
     MIN_FILES_PER_TARGET,
@@ -133,6 +134,9 @@ def _build_single_scope_manifest(
         language_stats=dict(ext_counts),
         skipped_untracked=skipped,
         unreadable_dirs=unreadable,
+        total_lines=count_source_lines(
+            src, (rel for lang_files in files_by_lang.values() for rel in lang_files),
+        ),
     )
 
 

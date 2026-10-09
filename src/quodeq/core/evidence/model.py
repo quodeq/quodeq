@@ -161,6 +161,9 @@ class Evidence:
     meta: dict = field(default_factory=dict)
     module: str = ""
     exit_reason: str | None = None
+    # Source lines in the project, recorded beside source_file_count as history
+    # for a later denominator study. Never read by scoring.
+    source_line_count: int | None = None
 
     def summary(self) -> dict:
         """Return an aggregate summary of findings, confidence, and balance across all principles."""
@@ -209,6 +212,7 @@ def evidence_to_scoring_dict(evidence: Evidence) -> dict:
         "discipline": evidence.language.title(),
         "date": evidence.date,
         "source_file_count": evidence.source_file_count,
+        "source_line_count": evidence.source_line_count,
         "files_read": evidence.files_read,
         "coverage_pct": evidence.coverage_pct,
         "quarantined_count": evidence.quarantined_count,

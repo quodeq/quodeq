@@ -13,6 +13,18 @@ from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.core.observability import NULL_LOG, LogSink
 
 
+def _carried_total_lines(manifest: SourceManifest, scoped: list[AnalysisTarget]) -> int | None:
+    """The line count survives the filter only when the filter dropped no file.
+
+    A manifest built for a scope already walked just that subtree, so the
+    filter usually keeps everything; when it did drop files the old count no
+    longer describes the result and is reported as unmeasured instead.
+    """
+    before = sum(len(t.source_files) for t in manifest.targets)
+    after = sum(len(t.source_files) for t in scoped)
+    return manifest.total_lines if before == after else None
+
+
 def filter_manifest_by_scope(
     manifest: SourceManifest | None, scope_path: str, *, log: LogSink = NULL_LOG,
 ) -> SourceManifest | None:
@@ -55,6 +67,7 @@ def filter_manifest_by_scope(
             targets=scoped_targets, total_files=total, language_stats=all_stats,
             skipped_untracked=manifest.skipped_untracked,
             unreadable_dirs=manifest.unreadable_dirs,
+            total_lines=_carried_total_lines(manifest, scoped_targets),
         )
 
     log.warning(

@@ -77,6 +77,11 @@ class SourceManifest:
     language_stats: dict[str, int] = field(default_factory=dict)
     skipped_untracked: int = 0
     unreadable_dirs: int = 0
+    # Newline count over the manifest's source files, recorded beside
+    # ``total_files`` as history for a later denominator study. None when it
+    # was not measured (a scope-filtered or single-file manifest). Scoring
+    # never reads it.
+    total_lines: int | None = None
 
     # --- backward-compat properties (delegate to primary target) ---
 

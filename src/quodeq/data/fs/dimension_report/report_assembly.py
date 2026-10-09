@@ -47,6 +47,7 @@ def assemble_report_dict(data: ReportData) -> dict:
         "discipline": data.evidence.get("discipline", ""),
         "date": data.evidence.get("date", ""),
         "sourceFileCount": data.evidence.get("source_file_count"),
+        "sourceLineCount": data.evidence.get("source_line_count"),
         "filesRead": data.evidence.get("files_read", 0),
         "coveragePct": data.evidence.get("coverage_pct", 0.0),
         # Trust metadata, not a findings bucket: how many findings never reached

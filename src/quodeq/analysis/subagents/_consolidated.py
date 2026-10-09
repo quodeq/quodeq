@@ -103,6 +103,7 @@ def _collect_consolidated_results(
         files_read=total_files_read,
         module=config.target.name if config.target else "",
         exit_reason=run_ctx.exit_reason,
+        source_line_count=config.source_line_count,
     )
 
     return parse_jsonl_to_evidence_by_dimension(

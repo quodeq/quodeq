@@ -52,6 +52,7 @@ def collect_evidence(
             files_read=total_files_read,
             module=config.target.name if config.target else "",
             exit_reason=collection.exit_reason,
+            source_line_count=config.source_line_count,
         ),
         EvidenceParseOptions(
             compiled_dir=compiled_dir,

@@ -61,6 +61,7 @@ def _dry_run_dimension(
         language=config.language,
         date=scope.date_str,
         source_file_count=config.source_file_count,
+        source_line_count=config.source_line_count,
         files_read=0,
         coverage_pct=0.0,
     )
@@ -287,6 +288,7 @@ def run(config: RunConfig) -> Evidence:
         source_file_count=config.source_file_count,
         src=str(config.src),
         language=config.language,
+        source_line_count=config.source_line_count,
     )
 
 
