@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildRadarSeries, buildDimensionMatrixRows, resolveActiveStanding } from './CompareDimensionView.jsx';
+import { buildRadarSeries, resolveActiveStanding } from './CompareDimensionView.jsx';
 import { buildRow, buildDimensionView } from '../compareModel.js';
 import { NOW, makeSummary, makeProject, DIM_SEC } from '../_compareModel.fixtures.js';
 
@@ -59,45 +59,5 @@ describe('buildRadarSeries', () => {
     expect(view.principles.map((p) => p.key)).toEqual(['error handling']);
     const project = buildRadarSeries(view, view.lead).find((s) => s.variant === 'project');
     expect(project.values).toEqual([8]);
-  });
-});
-
-describe('buildDimensionMatrixRows', () => {
-  it('fills one cell per principle key, empty where the project has no score, clicks opening that cell', () => {
-    const view = makeView();
-    const opened = [];
-    const rows = buildDimensionMatrixRows(view, () => {}, (cell) => opened.push(cell));
-    expect(rows.map((r) => r.id)).toEqual(['b', 'c', 'a']);
-    const c = rows.find((r) => r.id === 'c');
-    expect(c.cells.confidentiality).toEqual({ score: null });
-    expect(c.cells.integrity.score).toBe(7);
-    c.cells.integrity.onClick();
-    expect(opened).toHaveLength(1);
-    expect(opened[0]).toMatchObject({ id: 'c', score: 7 });
-    const b = rows.find((r) => r.id === 'b');
-    expect(b.cells.confidentiality.score).toBe(7);
-    expect(b.cells.integrity.score).toBe(8);
-  });
-
-  it('leaves cells unclickable without an onOpenPrinciple handler', () => {
-    const rows = buildDimensionMatrixRows(makeView(), () => {}, undefined);
-    expect(rows[0].cells.integrity.onClick).toBeUndefined();
-  });
-
-  it('fills a cell from the first perProject entry when a project appears twice', () => {
-    // Defensive first-wins: a payload that slipped two entries for one
-    // project past the board builder must not flip the cell to the later one.
-    const row = { id: 'a', name: 'proj-a', remote: false };
-    const view = {
-      standings: [{ row, score: 6 }],
-      principles: [{
-        key: 'error handling',
-        label: 'error handling',
-        perProject: [{ id: 'a', score: 6 }, { id: 'a', score: 3 }],
-      }],
-    };
-    const rows = buildDimensionMatrixRows(view, () => {}, undefined);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].cells['error handling'].score).toBe(6);
   });
 });

@@ -116,7 +116,7 @@ describe('ComparePage', () => {
     expect(onOpenProjectDimension).toHaveBeenCalledWith({
       id: 'alpha', source: 'local', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
     });
-    expect(screen.queryByText(/PROJECT_STANDINGS/)).toBeNull();
+    expect(screen.queryByText(/PRINCIPLE_MATRIX/)).toBeNull();
   });
 
   it('score matrix grids every project; column headers rank by that column', async () => {
@@ -144,7 +144,7 @@ describe('ComparePage', () => {
     await findTableName('alpha');
     const dimButtons = await screen.findAllByText('security');
     await userEvent.click(dimButtons[dimButtons.length - 1]);
-    expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'security summary' })).toBeInTheDocument();
     expect(screen.getByText(/PRINCIPLE_MATRIX/)).toBeInTheDocument();
   });
 
@@ -153,7 +153,7 @@ describe('ComparePage', () => {
     await findTableName('alpha');
     await userEvent.click(await screen.findByRole('button', { name: 'Open a dimension drill-down' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /security/ }));
-    expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'security summary' })).toBeInTheDocument();
   });
 
   it('drills into a dimension', async () => {
@@ -161,9 +161,10 @@ describe('ComparePage', () => {
     await findTableName('alpha');
     const dimButtons = await screen.findAllByText('security');
     await userEvent.click(dimButtons[dimButtons.length - 1]);
-    expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
-    expect(screen.getByText('leads the scope')).toBeInTheDocument();
-    expect(screen.getByText('trails the scope')).toBeInTheDocument();
+    // The projects ranked on the dimension, beside its principles radar.
+    const table = await screen.findByRole('region', { name: 'Projects ranked on security' });
+    expect(within(table).getAllByRole('button', { name: /alpha|beta/ }).length).toBeGreaterThan(1);
+    expect(screen.getByRole('img', { name: /radar/i })).toBeInTheDocument();
     // No local back button: the app breadcrumb owns the way back.
     expect(screen.queryByText(/ALL DIMENSIONS/)).toBeNull();
   });
@@ -233,13 +234,14 @@ describe('ComparePage', () => {
     expect(screen.queryByText('Projects in scope')).toBeNull();
   });
 
-  it('standings rows open that project view of the same dimension', async () => {
+  it('a project in the dimension table opens that project’s view of the same dimension', async () => {
     const onOpenProjectDimension = vi.fn();
     const onOpenProject = vi.fn();
     renderPage({ onOpenProjectDimension, onOpenProject });
     await findTableName('alpha');
     await drillIntoSecurity();
-    await userEvent.click(await screen.findByText('leads the scope'));
+    const table = await screen.findByRole('region', { name: 'Projects ranked on security' });
+    await userEvent.click(within(table).getByRole('button', { name: 'alpha' }));
     expect(onOpenProjectDimension).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'r2', dimName: 'Security' }),
     );
@@ -258,8 +260,7 @@ describe('ComparePage', () => {
     renderPage({ onOpenEvalPrincipal });
     await findTableName('alpha');
     await drillIntoSecurity();
-    // beta leads security (5.5 vs... alpha 7.0 leads actually) — click the
-    // integrity lead entry, whoever it is, via its accessible title.
+    // Any integrity tile in the principle matrix opens that project's principle.
     const leads = await screen.findAllByTitle(/open integrity in/);
     await userEvent.click(leads[0]);
     await waitFor(() => expect(onOpenEvalPrincipal).toHaveBeenCalled());

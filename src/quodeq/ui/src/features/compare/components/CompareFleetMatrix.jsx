@@ -53,6 +53,35 @@ function Tile({ dim, ext, onOpen, row }) {
   );
 }
 
+function MatrixBody({ rows, board, ext, colClass, hoverRow, setHover, openTile, onOpenProject }) {
+  return (
+    <tbody>
+      {rows.map((row, i) => (
+        <tr key={row.id} className={hoverRow === row.id ? 'is-row' : undefined}>
+          <th scope="row" className="compare-heat__lead">
+            <span className="compare-heat__rank">{i + 1}</span>
+            <button type="button" className="compare-heat__name" title={row.name} onClick={() => onOpenProject(row.id)}>{row.name}</button>
+            {row.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
+          </th>
+          <td className={`compare-heat__overall ${scoreColorClass(row.score)}${colClass(OVERALL)}`} onMouseEnter={() => setHover({ row: row.id, col: OVERALL })}>
+            {score1(row.score)}
+          </td>
+          {board.map((b) => {
+            const dim = row.dims.find((d) => d.key === b.key);
+            return (
+              <td key={b.key} className={`compare-heat__cell${colClass(b.key)}`} onMouseEnter={() => setHover({ row: row.id, col: b.key })}>
+                {dim?.score == null ? <span className="compare-heat__none">{NONE}</span> : (
+                  <Tile dim={dim} ext={ext[b.key]} row={row} onOpen={() => openTile(row, dim)} />
+                )}
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
 function Foot({ board, rows, fleetScore, hoverCol }) {
   return (
     <tfoot>
@@ -73,9 +102,18 @@ function Foot({ board, rows, fleetScore, hoverCol }) {
   );
 }
 
-export default function CompareFleetMatrix({ rows, board, fleetScore, onOpenProject, onOpenProjectDimension }) {
+/**
+ * `ariaLabel`/`header`/`note` default to the fleet's. `onOpenCell(row, dim)`
+ * overrides what a tile opens (the dimension drill-down opens principle
+ * pages); `onHoverRow(id | null)` reports the hovered row to the page.
+ */
+export default function CompareFleetMatrix({
+  rows, board, fleetScore, onOpenProject, onOpenProjectDimension,
+  ariaLabel = null, header = null, note = null, onOpenCell = null, onHoverRow = null,
+}) {
   const [sort, setSort] = useState({ key: OVERALL, desc: true });
-  const [hover, setHover] = useState(NO_HOVER);
+  const [hover, setHoverState] = useState(NO_HOVER);
+  const setHover = (h) => { setHoverState(h); onHoverRow?.(h.row); };
   const ext = Object.fromEntries(board.map((b) => [b.key, extremes(rows, b.key)]));
   const colClass = (key) => (hover.col === key ? ' is-col' : '');
   const head = (key, label) => (
@@ -85,9 +123,9 @@ export default function CompareFleetMatrix({ rows, board, fleetScore, onOpenProj
   );
   return (
     <ComparePanel
-      ariaLabel={t('compare.matrixAria')}
-      header={t('compare.matrixHeader', { rows: rows.length, cols: board.length })}
-      note={t('compare.matrixNoteFleet')}
+      ariaLabel={ariaLabel ?? t('compare.matrixAria')}
+      header={header ?? t('compare.matrixHeader', { rows: rows.length, cols: board.length })}
+      note={note ?? t('compare.matrixNoteFleet')}
     >
       <div className="compare-heat__scroll">
         <table className="compare-heat" onMouseLeave={() => setHover(NO_HOVER)}>
@@ -103,30 +141,11 @@ export default function CompareFleetMatrix({ rows, board, fleetScore, onOpenProj
               {board.map((b) => head(b.key, b.label))}
             </tr>
           </thead>
-          <tbody>
-            {sortRows(rows, sort).map((row, i) => (
-              <tr key={row.id} className={hover.row === row.id ? 'is-row' : undefined}>
-                <th scope="row" className="compare-heat__lead">
-                  <span className="compare-heat__rank">{i + 1}</span>
-                  <button type="button" className="compare-heat__name" title={row.name} onClick={() => onOpenProject(row.id)}>{row.name}</button>
-                  {row.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
-                </th>
-                <td className={`compare-heat__overall ${scoreColorClass(row.score)}${colClass(OVERALL)}`} onMouseEnter={() => setHover({ row: row.id, col: OVERALL })}>
-                  {score1(row.score)}
-                </td>
-                {board.map((b) => {
-                  const dim = row.dims.find((d) => d.key === b.key);
-                  return (
-                    <td key={b.key} className={`compare-heat__cell${colClass(b.key)}`} onMouseEnter={() => setHover({ row: row.id, col: b.key })}>
-                      {dim?.score == null ? <span className="compare-heat__none">{NONE}</span> : (
-                        <Tile dim={dim} ext={ext[b.key]} row={row} onOpen={() => openCell(row, dim, onOpenProject, onOpenProjectDimension)} />
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
+          <MatrixBody
+            rows={sortRows(rows, sort)} board={board} ext={ext} colClass={colClass} hoverRow={hover.row} setHover={setHover}
+            openTile={(row, dim) => (onOpenCell ? onOpenCell(row, dim) : openCell(row, dim, onOpenProject, onOpenProjectDimension))}
+            onOpenProject={onOpenProject}
+          />
           <Foot board={board} rows={rows} fleetScore={fleetScore} hoverCol={hover.col} />
         </table>
       </div>

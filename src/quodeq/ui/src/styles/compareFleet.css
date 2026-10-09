@@ -223,3 +223,54 @@ button.compare-health__row:hover { background: var(--compare-hover-bg); box-shad
   .compare-health__row > :nth-child(3), .compare-health__row > :nth-child(6), .compare-health__row > :nth-child(7), .compare-health__row > :nth-child(8) { display: none; }
   .compare-health__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* Without the last-scan column (the dimension drill-down, beside its radar). */
+.compare-fleettable__row--nolast { grid-template-columns: 22px minmax(150px, 1.4fr) minmax(110px, 1.2fr) 52px 58px 60px 70px 62px; gap: 10px; }
+
+/* ── dimension drill-down: projects table beside the principles radar ── */
+.compare-dim__pair { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 14px; align-items: stretch; }
+@media (max-width: 1200px) { .compare-dim__pair { grid-template-columns: 1fr; } }
+/* The radar fills the height beside the table: the panel stretches, the
+   chart (fixed proportions) centres, the legend stays at the bottom. */
+.compare-dim__pair > .compare-panel:last-child { display: flex; flex-direction: column; }
+.compare-dim__pair > .compare-panel:last-child .compare-radar { margin: auto 0; padding: 4px 14px 0; }
+.compare-dim__pair > .compare-panel:last-child .compare-radar__labels { inset: 4px 14px 0; }
+.compare-dim__pair > .compare-panel:last-child .compare-radar__legend { padding-bottom: 14px; }
+
+/* ── principle health ── */
+.compare-ph__list { list-style: none; margin: 0; padding: 0; }
+.compare-ph {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 48px minmax(180px, 2fr) 84px 84px minmax(140px, 1fr) minmax(140px, 1fr);
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 12.5px;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+}
+.compare-ph__list li:last-child .compare-ph { border-bottom: none; }
+button.compare-ph:hover { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
+.compare-ph--head { min-height: 34px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); cursor: default; }
+.compare-ph__num { text-align: right; font-variant-numeric: tabular-nums; }
+.compare-ph__label { font-size: 13px; }
+.compare-ph__avg { font-size: 15px; font-weight: 500; }
+.compare-ph__warn { color: var(--color-danger); }
+.compare-ph__who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-muted); }
+.compare-ph__who b { font-weight: 500; }
+
+@media (max-width: 640px) {
+  .compare-dim__pair > .compare-panel:last-child { display: none; }
+  .compare-ph { grid-template-columns: minmax(0, 1fr) 36px minmax(90px, 1.4fr) 48px; gap: 8px; padding: 0 12px; }
+  .compare-ph > :nth-child(n + 5) { display: none; }
+}
+@media (max-width: 640px) {
+  .compare-fleettable__row--nolast { grid-template-columns: 18px minmax(0, 1fr) 46px 62px; gap: 8px; }
+}

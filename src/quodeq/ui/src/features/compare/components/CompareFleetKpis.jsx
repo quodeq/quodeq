@@ -15,13 +15,25 @@ import { nf, score1 } from '../compareFormatters.js';
 const NONE = '·';
 const fixed1 = (v) => (v == null ? NONE : v.toFixed(1));
 
-function Kpi({ label, value, valueClass = '', sub, desktopOnly = false, children = null }) {
+export function Kpi({ label, value, valueClass = '', sub, desktopOnly = false, children = null }) {
   return (
     <div className={`compare-kpi${desktopOnly ? ' compare-fleet__desktop' : ''}`}>
       <span className="compare-kpi__label">{label}</span>
       <span className={`compare-kpi__value ${valueClass}`}>{value}{children}</span>
       <span className="compare-kpi__sub">{sub}</span>
     </div>
+  );
+}
+
+/** Critical findings, alarmed when any, with the count per 1,000 files. */
+export function CriticalKpi({ critical, criticalPerK }) {
+  return (
+    <Kpi
+      label={t('compare.kpiCritical')}
+      value={nf(critical)}
+      valueClass={critical ? 'compare-kpi__value--alarm' : ''}
+      sub={t('compare.kpiCriticalSub', { value: fixed1(criticalPerK) })}
+    />
   );
 }
 
@@ -51,12 +63,7 @@ export default function CompareFleetKpis({ rows, fleet }) {
           : t('compare.kpiFilesSub', { count: k.projects })}
       />
       <Kpi label={t('compare.kpiDensity')} value={fixed1(k.density)} sub={t('compare.kpiDensitySub')} />
-      <Kpi
-        label={t('compare.kpiCritical')}
-        value={nf(k.critical)}
-        valueClass={k.critical ? 'compare-kpi__value--alarm' : ''}
-        sub={t('compare.kpiCriticalSub', { value: fixed1(k.criticalPerK) })}
-      />
+      <CriticalKpi critical={k.critical} criticalPerK={k.criticalPerK} />
       <Kpi
         label={t('compare.kpiFresh')}
         value={`${k.fresh}/${k.projects}`}
