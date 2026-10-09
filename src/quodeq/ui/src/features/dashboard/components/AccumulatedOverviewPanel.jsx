@@ -73,7 +73,7 @@ function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, sele
 
 function HistoryPanelsRow({
   chartMountable, filteredPeriodTrend, currentOverviewRun, onRunClick, onRunHover, onRunHoverEnd, granularity, onGranularityChange,
-  filteredDimensions, onFolderClick, pending,
+  filteredDimensions, onFolderClick, onOpenMap, pending,
 }) {
   return (
     <div className={withPending('history-panels-row', pending)} aria-busy={pending || undefined}>
@@ -90,7 +90,7 @@ function HistoryPanelsRow({
           />
         )}
       </Suspense>
-      <FindingsByFolderPanel dimensions={filteredDimensions} onFolderClick={onFolderClick} />
+      <FindingsByFolderPanel dimensions={filteredDimensions} onFolderClick={onFolderClick} onOpenMap={onOpenMap} />
     </div>
   );
 }
@@ -196,6 +196,7 @@ function AccumulatedOverviewSections({
         onGranularityChange={callbacks.onGranularityChange}
         filteredDimensions={filteredDimensions}
         onFolderClick={onFolderClick}
+        onOpenMap={onNavigate ? () => onNavigate(NAV_TAB.MAP) : undefined}
       />
 
       <AccumulatedDimensionsSection
