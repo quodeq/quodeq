@@ -5,6 +5,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--term-space-3);
+  /* One hover for every Compare table and list: a neutral ink tint over the
+     panel (an accent tint turns pink in crimson themes, where red means a bad
+     score) plus an accent bar on the row's leading edge. Mixed from tokens,
+     so it reads in light and dark and in every theme family. */
+  --compare-hover-bg: color-mix(in srgb, var(--color-text) 6%, var(--color-surface));
+  --compare-hover-bar: inset 2px 0 0 var(--color-accent);
 }
 
 /* The page's uniform flex gap owns vertical rhythm here; without this the

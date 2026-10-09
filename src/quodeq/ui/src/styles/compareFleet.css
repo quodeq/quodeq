@@ -44,7 +44,7 @@
   border-bottom: 1px solid var(--color-border);
 }
 .compare-fleettable__row--cov { grid-template-columns: 22px minmax(150px, 1.3fr) minmax(180px, 2fr) 58px 64px 62px 62px 76px 70px 110px; }
-.compare-fleettable__row.is-hovered { background: var(--color-overlay-light); }
+.compare-fleettable__row.is-hovered { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-fleettable__row--head { min-height: 42px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
 .compare-fleettable__rank { font-size: 11px; color: var(--color-text-muted); }
 .compare-fleettable__name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
@@ -103,8 +103,15 @@
 .compare-heat__tile--best { border-color: var(--tile); font-weight: 600; }
 .compare-heat__tile--worst { border-color: var(--tile); border-style: dashed; font-weight: 600; }
 .compare-heat__none { color: var(--color-text-muted); opacity: 0.6; }
-.compare-heat tr.is-row > *, .compare-heat .is-col { background-color: var(--color-overlay-light); }
-.compare-heat tbody tr.is-row th.compare-heat__lead { background: color-mix(in srgb, var(--color-text) 4%, var(--color-surface)); }
+/* Hover: the row is marked on its name and overall score (the tiles keep
+   their grade tint), the column on its header and footer, and the hovered
+   tile gets a ring in the text colour (an accent ring would look like the
+   "best" outline where the top grade is the accent), so the crossing is clear. */
+.compare-heat tr.is-row > th, .compare-heat tr.is-row > .compare-heat__overall { background-color: var(--compare-hover-bg); }
+.compare-heat thead .is-col .compare-sortbtn { color: var(--color-accent); font-weight: 600; }
+.compare-heat tfoot .is-col > span:first-child { font-weight: 700; }
+.compare-heat__tile:hover { box-shadow: 0 0 0 2px var(--color-text); }
+.compare-heat tbody tr.is-row th.compare-heat__lead { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-heat tfoot > tr > * { border-top: 1px solid var(--color-border); background: var(--color-surface-alt); }
 .compare-heat__foot { text-align: center; font-variant-numeric: tabular-nums; }
 .compare-heat__foot > span { display: block; line-height: 1.2; }
@@ -130,7 +137,7 @@
 .compare-dirmap__still { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 0 2px; }
 .compare-dirmap__stillLabel { margin-right: 4px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
 .compare-dirmap__chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; font: inherit; font-size: 11.5px; color: var(--color-text); background: none; border: 1px solid var(--color-border); border-radius: 999px; cursor: pointer; }
-.compare-dirmap__chip:hover, .compare-dirmap__chip.is-on { background: var(--color-overlay-light); }
+.compare-dirmap__chip:hover, .compare-dirmap__chip.is-on { background: var(--compare-hover-bg); border-color: var(--color-accent); }
 .compare-dirmap__chipDot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot); }
 .compare-dirmap__legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 4px; padding: 10px 0 2px; font-size: 11px; color: var(--color-text-muted); border-top: 1px solid var(--color-border); }
 .compare-dirmap__legend > span { display: inline-flex; align-items: center; gap: 6px; }
@@ -144,7 +151,7 @@
 .compare-attnlist { list-style: none; margin: 0; padding: 6px 0; }
 .compare-attnlist__item { display: grid; grid-template-columns: 10px minmax(0, 1fr) 34px; gap: 4px 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--color-border); }
 .compare-attnlist__item:last-child { border-bottom: none; }
-.compare-attnlist__item.is-on { background: var(--color-overlay-light); }
+.compare-attnlist__item.is-on { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-attnlist__level { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-muted); }
 .compare-attnlist__level--severe { background: var(--color-danger); }
 .compare-attnlist__level--elevated { background: color-mix(in srgb, var(--color-danger) 60%, transparent); }
@@ -176,7 +183,7 @@
   cursor: pointer;
 }
 .compare-health li:last-child .compare-health__row { border-bottom: none; }
-button.compare-health__row:hover { background: var(--color-overlay-light); }
+button.compare-health__row:hover { background: var(--compare-hover-bg); box-shadow: var(--compare-hover-bar); }
 .compare-health__row--head { min-height: 34px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); cursor: default; }
 .compare-health__num { text-align: right; font-variant-numeric: tabular-nums; }
 .compare-health__label { font-size: 13px; }
