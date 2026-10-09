@@ -1,9 +1,12 @@
-import { Fragment, useRef, useState } from 'react';
-import { collapseCrumbs, isRunDateEntry, ELLIPSIS_OPEN_KEY } from './crumbModel.js';
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
+import { collapseCrumbs, isRunDateEntry, ELLIPSIS_OPEN_KEY, SWITCHER_OPEN_KEY } from './crumbModel.js';
 import { useBreadcrumbDismiss } from './useBreadcrumbDismiss.js';
 import { useHoldToOpen } from './useHoldToOpen.js';
 import NavBreadcrumbEllipsisMenu from './NavBreadcrumbEllipsisMenu.jsx';
 import NavBreadcrumbSegmentMenu from './NavBreadcrumbSegmentMenu.jsx';
+import ProjectSwitcherCrumb from './ProjectSwitcher.jsx';
+import { buildSwitcherRows } from './projectSwitcherModel.js';
+import { useProjectSwitcherHotkey } from '../../../hooks/useProjectSwitcherHotkey.js';
 import { t } from '../../../strings/index.js';
 import { NAV_TAB } from '../../../vocab/navTab.js';
 
@@ -73,7 +76,7 @@ function buildCrumbs(stack, projectName) {
 
 /** One rendered segment: the ellipsis chip, a sibling-menu segment, or a
  * plain (possibly clickable) crumb. */
-function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey, goTo, onGoTo, holder, onSelectProject }) {
+function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey, goTo, onGoTo, holder, onSelectProject, switcher }) {
   if (seg.ellipsis) {
     return (
       <NavBreadcrumbEllipsisMenu
@@ -87,6 +90,18 @@ function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey,
   const crumbClass = `nav-breadcrumb__crumb${isLast ? ' is-current' : ''}${
     seg.isProject ? ' nav-breadcrumb__crumb--project' : ''
   }${hasMenu ? ' nav-breadcrumb__crumb--menu' : ''}`;
+
+  // With projects to switch between, the project root opens the switcher;
+  // with none it keeps navigating to Repositories (below).
+  if (seg.isProject && switcher) {
+    return (
+      <ProjectSwitcherCrumb
+        seg={seg} sep={sep} crumbClass={crumbClass} switcher={switcher}
+        open={openKey === SWITCHER_OPEN_KEY}
+        setOpen={(next) => setOpenKey(next ? SWITCHER_OPEN_KEY : null)}
+      />
+    );
+  }
 
   if (hasMenu) {
     const menuKey = `seg-${seg.index}`;
@@ -120,6 +135,22 @@ function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey,
   );
 }
 
+/** The switcher's rows and handlers, or null when there is no project crumb
+ * or no project to list (the crumb then keeps its plain navigation). */
+function useSwitcher(projectSwitcher, hasProjectCrumb) {
+  const projects = projectSwitcher?.projects;
+  const rows = useMemo(() => buildSwitcherRows(projects), [projects]);
+  if (!projectSwitcher || !hasProjectCrumb || rows.length === 0) return null;
+  const { selectedProject, onPick, onAllRepositories, onAddProject } = projectSwitcher;
+  return {
+    rows,
+    currentId: selectedProject ?? null,
+    onPick: (row) => onPick(row.id),
+    onAllRepositories,
+    onAddProject,
+  };
+}
+
 /**
  * NavBreadcrumb — the app's address bar, in the TopBar on desktop.
  *
@@ -139,13 +170,20 @@ function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey,
  * Ancestor menus are a path, sibling menus are a choice — they're styled
  * differently on purpose.
  *
+ * Project switcher: given `projectSwitcher` and at least one local project,
+ * the project root opens a searchable project list (also on Cmd/Ctrl+P)
+ * instead of navigating to Repositories; see ProjectSwitcher.jsx.
+ *
  * Segments never wrap; only the current (last) segment may shrink.
  */
-export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelectProject, siblingsFor }) {
+export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelectProject, siblingsFor, projectSwitcher }) {
   const [openKey, setOpenKey] = useState(null);
   const rootRef = useRef(null);
   useBreadcrumbDismiss(openKey, setOpenKey, rootRef);
   const holder = useHoldToOpen(setOpenKey);
+  const switcher = useSwitcher(projectSwitcher, !!projectName);
+  const openSwitcher = useCallback(() => setOpenKey(SWITCHER_OPEN_KEY), []);
+  useProjectSwitcherHotkey(!!switcher, openSwitcher);
 
   const crumbs = buildCrumbs(stack, projectName);
   if (crumbs.length === 0) return null;
@@ -169,7 +207,7 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
               <BreadcrumbSegment
                 seg={seg} sep={sep} isLast={seg === lastCrumb} siblingsFor={siblingsFor}
                 openKey={openKey} setOpenKey={setOpenKey} goTo={goTo} onGoTo={onGoTo}
-                holder={holder} onSelectProject={onSelectProject}
+                holder={holder} onSelectProject={onSelectProject} switcher={switcher}
               />
             </Fragment>
           );

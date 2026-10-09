@@ -17,6 +17,7 @@ import { historyRoute } from './historyRoute.jsx';
 import { compareRoute } from './compareRoute.jsx';
 import { buildDashboardDataBundle } from './dashboardDataBundle.js';
 import { buildNavigationBundle } from './navigationBundle.js';
+import { switchProject } from './switchProject.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 import {
@@ -216,10 +217,7 @@ export const ROUTE_RENDERERS = {
       isEvaluating={props.navigation.isEvaluating}
       filters={params.filters}
       actions={{
-        onSelect: (id, source) => {
-          props.navigation.handleProjectChange(id, source);
-          props.navigation.navTab(NAV_TAB.OVERVIEW);
-        },
+        onSelect: (id, source) => switchProject(props.navigation, id, source),
         onDelete: props.navigation.handleDeleteProject,
         onExport: props.navigation.handleExportProject,
         onRelocate: props.navigation.handleRelocateProject,
