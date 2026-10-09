@@ -9,7 +9,7 @@
  * fills its panel and the text never scales. Geometry lives in
  * duelTrendGeometry.js; this file only renders it.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMeasuredWidth } from '../hooks/useMeasuredWidth.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { scoreColorClass } from '../../../utils/formatters.js';
@@ -115,15 +115,21 @@ function HoverTip({ g, hoverX, width, aName, bName }) {
   );
 }
 
-export default function CompareDuelTrend({ a, b, aName, bName, now = Date.now() }) {
+export default function CompareDuelTrend({ a, b, aName, bName, now: nowProp }) {
+  // "Today" is pinned once per mount: a fresh Date.now() on every render
+  // would change the geometry's input each time and defeat the memo below.
+  const [mountedAt] = useState(() => Date.now());
+  const now = nowProp ?? mountedAt;
   // Measured only while there is a chart to measure: an empty duel renders
   // nothing, and the observer attaches once runs arrive.
-  const hasRuns = toPoints(a).length + toPoints(b).length > 0;
+  const hasRuns = useMemo(() => toPoints(a).length + toPoints(b).length > 0, [a, b]);
   const [ref, width] = useMeasuredWidth(FALLBACK_WIDTH, hasRuns);
   const [hoverX, setHoverX] = useState(null);
   const right = width - PAD.right;
-  const box = { left: PAD.left, top: PAD.top, width: right - PAD.left, height: HEIGHT - PAD.top - PAD.bottom };
-  const g = buildTrendGeometry({ a, b, box, now });
+  const box = useMemo(() => ({ left: PAD.left, top: PAD.top, width: right - PAD.left, height: HEIGHT - PAD.top - PAD.bottom }), [right]);
+  // The geometry samples both curves every few pixels: rebuild it only when
+  // the data, the size or "today" change, never on a hover re-render.
+  const g = useMemo(() => buildTrendGeometry({ a, b, box, now }), [a, b, box, now]);
   if (!g) return null;
 
   const onMove = (e) => {

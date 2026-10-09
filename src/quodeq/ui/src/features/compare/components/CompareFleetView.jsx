@@ -11,7 +11,7 @@
  * One hover state links the table, the map and the attention list: point
  * at a project anywhere and it lights up everywhere.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import CompareFleetHeader from './CompareFleetHeader.jsx';
 import CompareFleetKpis from './CompareFleetKpis.jsx';
 import CompareFleetTable from './CompareFleetTable.jsx';
@@ -54,7 +54,12 @@ export default function CompareFleetView({
   onOpenProjectDimension,
 }) {
   const [hover, setHover] = useState(null);
-  const { scoredRows, attnAll, pending, unevaluated } = partitionFleetRows(orderedRows, attention, errorsById);
+  // Memoised so a hover (a re-render of this view) hands the charts the
+  // same row arrays, and their own memoised geometry is not rebuilt.
+  const { scoredRows, attnAll, pending, unevaluated } = useMemo(
+    () => partitionFleetRows(orderedRows, attention, errorsById),
+    [orderedRows, attention, errorsById],
+  );
   const linked = { hover, setHover, onOpenProject };
 
   return (

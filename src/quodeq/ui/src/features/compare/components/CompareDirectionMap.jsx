@@ -8,6 +8,7 @@
  * reaction are labelled. Projects with no runs in 30 days are listed as
  * chips under the chart, not parked on 0. Geometry: compareDirectionMap.js.
  */
+import { useMemo } from 'react';
 import { t } from '../../../strings/index.js';
 import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
 import { buildDirectionMap } from '../compareDirectionMap.js';
@@ -121,8 +122,10 @@ function Legend() {
 
 export default function CompareDirectionMap({ rows, fleetScore, hover, setHover, onOpenProject }) {
   const [ref, width] = useMeasuredWidth(FALLBACK_WIDTH);
-  const box = { left: PAD.left, top: PAD.top, width: width - PAD.left - PAD.right, height: HEIGHT - PAD.top - PAD.bottom };
-  const m = buildDirectionMap({ rows, fleetScore, box });
+  const box = useMemo(() => ({ left: PAD.left, top: PAD.top, width: width - PAD.left - PAD.right, height: HEIGHT - PAD.top - PAD.bottom }), [width]);
+  // Hovering anywhere on the page re-renders the map (the hover state is
+  // shared): rebuild the geometry only when its inputs change.
+  const m = useMemo(() => buildDirectionMap({ rows, fleetScore, box }), [rows, fleetScore, box]);
   const pointProps = { hover, setHover, onOpenProject };
   return (
     <div ref={ref} className="compare-dirmap">
