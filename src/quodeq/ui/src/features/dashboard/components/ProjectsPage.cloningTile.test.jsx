@@ -67,8 +67,8 @@ describe('ProjectsPage ghost tile', () => {
 
   it('the tile heads the list of existing projects', async () => {
     setup(running);
-    const tile = (await screen.findByText('billing')).closest('article');
-    const cards = document.querySelector('.projects-cards');
+    const tile = (await screen.findByText('billing')).closest('.projects-row--ghost');
+    const cards = document.querySelector('.projects-row-group');
     expect(tile.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -97,7 +97,7 @@ describe('ProjectsPage ghost tile', () => {
     expect(screen.queryByText(/download failed · /)).not.toBeInTheDocument();
 
     const again = remount();
-    await waitFor(() => expect(again.container.querySelector('.projects-cards')).not.toBeNull());
+    await waitFor(() => expect(again.container.querySelector('.projects-row-group')).not.toBeNull());
     expect(screen.queryByText(/download failed · /)).not.toBeInTheDocument();
 
     server.slot = { ...failed, finishedAt: 9 };

@@ -145,7 +145,8 @@ describe('ProjectsPage — published-age on originUrl-matched cards', () => {
           id: 'local-1',
           name: 'app',
           originUrl: 'https://github.com/org/app',
-          latestDate: '2026-07-19T00:00:00Z',
+          // Evaluated before the publish, so the server copy is current, not behind.
+          latestDate: '2026-07-01T00:00:00Z',
         }]}
         actions={{}}
       />,
