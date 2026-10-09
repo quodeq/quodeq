@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import ProjectsPage from './ProjectsPage.jsx';
@@ -196,7 +196,7 @@ describe('ProjectsPage — merged list, no tabs', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /sort: recent activity/ }));
     await user.click(screen.getByRole('menuitemradio', { name: 'score' }));
-    expect(onFiltersChange).toHaveBeenCalledWith({ query: '', location: 'all', sort: 'score' });
+    expect(onFiltersChange).toHaveBeenCalledWith({ query: '', location: 'all', sort: 'score', dir: 'desc' });
   });
 
   it('hides provenance badges and the location pill when no shared repo is configured', async () => {
@@ -208,8 +208,9 @@ describe('ProjectsPage — merged list, no tabs', () => {
       fakeApi,
     );
     await waitFor(() => expect(screen.getByText('solo')).toBeInTheDocument());
-    // Without a shared repo every card would read LOCAL -- pure noise.
-    expect(screen.queryByText('LOCAL')).toBeNull();
+    // Without a shared repo every row would read local: no location or sync column.
+    expect(screen.queryByRole('columnheader', { name: 'location' })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'sync' })).toBeNull();
     expect(screen.queryByRole('button', { name: /location:/ })).toBeNull();
     // Search and sort remain.
     expect(screen.getByLabelText('filter projects by name')).toBeInTheDocument();
@@ -233,7 +234,7 @@ describe('ProjectsPage — merged list, no tabs', () => {
     await waitFor(() => expect(screen.getByText('solo')).toBeInTheDocument());
   });
 
-  it('shows LOCAL / PUBLISHED / REMOTE state badges on the cards', async () => {
+  it('shows where each project lives and how it stands with the server', async () => {
     const fakeApi = makeFakeApi({
       getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://x/r.git', publish: { state: 'idle' } })),
       sharedListProjects: vi.fn(async () => ({
@@ -254,13 +255,15 @@ describe('ProjectsPage — merged list, no tabs', () => {
       />,
       fakeApi,
     );
-    await waitFor(() => {
-      expect(screen.getByText('PUBLISHED')).toBeInTheDocument();
-      expect(screen.getByText('LOCAL')).toBeInTheDocument();
-      expect(screen.getByText('REMOTE')).toBeInTheDocument();
-    });
-    expect(screen.getByText('LOCAL')).toHaveClass('badge', 'badge--pill', 'badge--neutral');
-    expect(screen.getByText('PUBLISHED')).toHaveClass('badge--success');
-    expect(screen.getByText('REMOTE')).toHaveClass('badge--info');
+    await waitFor(() => expect(screen.getByText('remote')).toBeInTheDocument());
+    expect(screen.getByRole('columnheader', { name: 'location' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'sync' })).toBeInTheDocument();
+    // app (local, evaluated after its publish) and tool (local only) live here; lib only on the server.
+    expect(screen.getAllByText('local')).toHaveLength(2);
+    // app's local run is newer than the published one: the server copy is behind.
+    expect(screen.getByText('behind')).toBeInTheDocument();
+    const rowOf = (name) => screen.getByRole('button', { name }).closest('[role="row"]');
+    expect(within(rowOf('lib')).getByText(/^published/)).toBeInTheDocument();
+    expect(within(rowOf('tool')).getByRole('button', { name: 'publish' })).toBeInTheDocument();
   });
 });

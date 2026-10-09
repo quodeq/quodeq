@@ -10,7 +10,7 @@ afterEach(() => { vi.clearAllMocks(); });
 // counts the rest in `warmup`. One dashed placeholder per card still being
 // warmed heads the list, so the team's results arrive one by one.
 const listing = (projects, warmup) => vi.fn(async () => ({ projects, warmup, lastSynced: null, stale: false }));
-const placeholders = () => document.querySelectorAll('.project-card--placeholder');
+const placeholders = () => document.querySelectorAll('.projects-row--placeholder');
 
 describe('ProjectsPage — shared cards still being warmed', () => {
   it('shows one placeholder per card the server has not shown yet, next to the cards it has', async () => {

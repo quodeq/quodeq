@@ -5,7 +5,7 @@ import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigati
 import Icon from '../../../components/Icon.jsx';
 import { DownloadGlyph, TrashGlyph } from '../../../components/glyphs.jsx';
 import { t } from '../../../strings/index.js';
-import { KEY } from '../../../vocab/keyboard.js';
+import { onActivateKeys } from '../../../utils/activateKeys.js';
 import { pluralKey } from '../../../utils/plural.js';
 import StandardsModal from './StandardsModal.jsx';
 
@@ -117,11 +117,7 @@ function StandardRowMain({
       tabIndex={0}
       aria-pressed={isVisible}
       onClick={() => onToggleVisibility(standard.id)}
-      onKeyDown={(e) => {
-        // Keys from the nested action buttons bubble here; leave them to the button.
-        if (e.target !== e.currentTarget) return;
-        if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggleVisibility(standard.id); }
-      }}
+      onKeyDown={onActivateKeys(() => onToggleVisibility(standard.id))}
     >
       <div className="standards-cell standards-cell--name">
         <span className="standards-row-name">{standard.name}</span>

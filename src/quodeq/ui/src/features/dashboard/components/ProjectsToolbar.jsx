@@ -1,6 +1,7 @@
 import { useCallback, useState, useRef } from 'react';
 import { t } from '../../../strings/index.js';
 import { useDismissOnOutside } from '../../../hooks/useDismissOnOutside.js';
+import { naturalDirection } from '../projectsSort.js';
 
 // -- Toolbar: name search, filter pills ------------------------------------
 // The team repository's sync status lives in the strip above (SyncStrip).
@@ -46,9 +47,11 @@ function FilterPill({ label, value, options, valueLabels = {}, onChange }) {
   );
 }
 
+// On a wide screen the table's column headers are the sort; the sort pill
+// only shows on a narrow one, where the headers are hidden (dashboard.css).
 export function ProjectsToolbar({ filters = {}, onFiltersChange, configured }) {
-  const { query = '', location = 'all', sort = 'activity' } = filters;
-  const set = (patch) => onFiltersChange?.({ query, location, sort, ...patch });
+  const { query = '', location = 'all', sort = 'activity', dir } = filters;
+  const set = (patch) => onFiltersChange?.({ query, location, sort, dir, ...patch });
   return (
     <div className="projects-toolbar">
       <input
@@ -68,13 +71,15 @@ export function ProjectsToolbar({ filters = {}, onFiltersChange, configured }) {
           onChange={(loc) => set({ location: loc })}
         />
       )}
-      <FilterPill
-        label={t('projects.filterSort')}
-        value={sort}
-        options={['activity', 'name', 'score']}
-        valueLabels={{ activity: t('projects.optActivity'), name: t('projects.optName'), score: t('projects.optScore') }}
-        onChange={(s) => set({ sort: s })}
-      />
+      <span className="projects-toolbar__narrow-sort">
+        <FilterPill
+          label={t('projects.filterSort')}
+          value={sort}
+          options={['activity', 'name', 'score', 'files']}
+          valueLabels={{ activity: t('projects.optActivity'), name: t('projects.optName'), score: t('projects.optScore'), files: t('projects.optFiles') }}
+          onChange={(s) => set({ sort: s, dir: naturalDirection(s) })}
+        />
+      </span>
     </div>
   );
 }

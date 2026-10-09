@@ -5,9 +5,9 @@ import { useMenuToggle } from '../hooks/useMenuToggle.js';
 import { SyncBar } from './SyncBar.jsx';
 import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel, barPercent, warmingLabel } from './syncStripState.js';
 
-function StripButton({ onClick, label, children }) {
+function StripButton({ onClick, label, children, className = '' }) {
   return (
-    <button type="button" className="projects-page__import-btn sync-strip__btn" onClick={onClick} aria-label={label}>
+    <button type="button" className={`projects-page__import-btn sync-strip__btn ${className}`.trim()} onClick={onClick} aria-label={label}>
       {children ?? label}
     </button>
   );
@@ -46,7 +46,7 @@ function StripMenu({ onChange, onDisconnect, disconnecting = false }) {
 function InviteControl({ invite, onCopyInvite }) {
   return (
     <>
-      <StripButton onClick={onCopyInvite} label={invite?.copied ? t('sync.copied') : t('sync.copyInvite')} />
+      <StripButton onClick={onCopyInvite} label={invite?.copied ? t('sync.copied') : t('sync.copyInvite')} className="sync-strip__invite-btn" />
       {invite?.fallbackText && (
         <input
           type="text"
@@ -138,6 +138,13 @@ function StripTail({ state, working, invite, onUpdate, onCopyInvite, onChange, o
   );
 }
 
+// The band's status dot: green when synced, accent and pulsing while a job
+// runs or the server warms, warning when something failed or is offline.
+function dotTone(kind, working) {
+  if (working) return 'working';
+  return kind === STRIP_STATE.SYNCED ? 'ok' : 'warn';
+}
+
 export default function SyncStrip({
   status, offline = false, updateFailed = false, loadFailed = false, lastSynced, projectsCount = 0, invite, warming = null,
   onUpdate, onCopyInvite, onChange, onDisconnect, disconnecting = false,
@@ -151,7 +158,7 @@ export default function SyncStrip({
   const when = relativeTimeFine(lastSynced ?? status.lastSynced);
   return (
     <div className={`sync-strip${working ? ' sync-strip--working' : ''}`}>
-      <span className="sync-strip__cloud" aria-hidden="true">☁</span>
+      <span className={`sync-strip__dot sync-strip__dot--${dotTone(state.kind, working)}`} aria-hidden="true" />
       {url && <span className="sync-strip__repo">{repoLabel(url)}</span>}
       <StripAnnouncement state={state} status={status}>
         <StripLabel state={state} status={status} when={when} projectsCount={projectsCount} onUpdate={onUpdate} />
