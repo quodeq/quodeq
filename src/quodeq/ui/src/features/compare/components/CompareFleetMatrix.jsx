@@ -13,6 +13,7 @@ import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.j
 import ComparePanel from './ComparePanel.jsx';
 import CompareSortButton from './CompareSortButton.jsx';
 import { score1 } from '../compareFormatters.js';
+import { openProjectDimension } from '../compareOpenDimension.js';
 
 const OVERALL = 'overall';
 const NONE = '·';
@@ -29,11 +30,6 @@ function sortRows(rows, sort) {
   const known = rows.filter((r) => value(r) != null).sort((a, b) => value(b) - value(a) || a.name.localeCompare(b.name));
   const unknown = rows.filter((r) => value(r) == null);
   return (sort.desc ? known : known.reverse()).concat(unknown);
-}
-
-function openCell(row, dim, onOpenProject, onOpenProjectDimension) {
-  if (row.remote || !dim.fromRunId || !onOpenProjectDimension) return onOpenProject(row.id);
-  return onOpenProjectDimension({ id: row.id, source: row.source, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel });
 }
 
 function Tile({ dim, ext, onOpen, row }) {
@@ -143,7 +139,7 @@ export default function CompareFleetMatrix({
           </thead>
           <MatrixBody
             rows={sortRows(rows, sort)} board={board} ext={ext} colClass={colClass} hoverRow={hover.row} setHover={setHover}
-            openTile={(row, dim) => (onOpenCell ? onOpenCell(row, dim) : openCell(row, dim, onOpenProject, onOpenProjectDimension))}
+            openTile={(row, dim) => (onOpenCell ? onOpenCell(row, dim) : openProjectDimension(row, dim, onOpenProject, onOpenProjectDimension))}
             onOpenProject={onOpenProject}
           />
           <Foot board={board} rows={rows} fleetScore={fleetScore} hoverCol={hover.col} />
