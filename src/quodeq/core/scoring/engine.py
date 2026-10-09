@@ -9,6 +9,7 @@ from quodeq.core.scoring.overall import weighted_overall
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import SCALE_TIER_NAMES, scale_multiplier, score_to_grade_label
 from quodeq.core.scoring.principle import score_all_principles
+from quodeq.core.scoring.scale import PrincipleGradeScale
 
 
 def grade_for_score(score: float) -> str:
@@ -25,10 +26,11 @@ def run_scoring(
     files_read = evidence.get("files_read", 0)
     scale_mult = scale_multiplier(source_file_count)
 
-    per_principle = score_all_principles(
-        evidence.get("principles", {}), mode, scale_mult, files_read, params,
-        source_file_count=source_file_count, classes=classes or {},
+    scale = PrincipleGradeScale(
+        source_file_count=source_file_count, scale_multiplier=scale_mult,
+        params=params, classes=classes or {},
     )
+    per_principle = score_all_principles(evidence.get("principles", {}), mode, scale, files_read)
     return ScoringResult(
         repository=evidence.get("repository", ""),
         discipline=evidence.get("discipline", ""),

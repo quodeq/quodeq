@@ -19,8 +19,6 @@ map them to their own schema (never the other way round):
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
 from typing import Any
 
 from quodeq.core.evidence.model import classify_confidence_level
@@ -37,6 +35,8 @@ from quodeq.core.scoring.params import (
     ScoringParams,
     dimension_weighted_average,
 )
+# Also re-exported: callers of the projector import the scale from here.
+from quodeq.core.scoring.scale import PrincipleGradeScale
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.scoring import ConfidenceLevel
 
@@ -71,23 +71,6 @@ def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: 
         "confidence": None,
         "observation": 0.0,
     }
-
-
-@dataclass(frozen=True)
-class PrincipleGradeScale:
-    """Confidence-scaling and formula inputs for one principle's grade.
-
-    ``source_file_count``/``scale_multiplier`` feed
-    ``classify_confidence_level`` (thin evidence relative to project size) and
-    the requirement spread; ``params`` is the scoring formula; ``classes``
-    maps a requirement id to the severity class its standard pins. Defaults
-    reproduce the pre-object call shape (no scaling, default formula).
-    """
-
-    source_file_count: int = 0
-    scale_multiplier: int = 1
-    params: ScoringParams = DEFAULT_PARAMS
-    classes: Mapping[str, str] = field(default_factory=dict)
 
 
 def compute_principle_grade(

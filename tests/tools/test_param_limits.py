@@ -16,7 +16,7 @@ def test_no_new_param_violations():
 
 # Revise DOWNWARD as maintainability workstreams burn entries; NEVER raise
 # without a justification reviewed in the PR that raises it.
-BASELINE_CEILING = 1  # score_all_principles: the grade-formula v4 signature is binding (7 parameters)
+BASELINE_CEILING = 0  # burned down to zero; every function now fits the limit
 
 
 def test_baseline_only_shrinks():

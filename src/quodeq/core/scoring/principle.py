@@ -1,14 +1,13 @@
 """Principle-level scoring logic (internal module)."""
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from quodeq.core.types import ConfidenceLevel, PrincipleScore
 from quodeq.core.evidence.model import DEFAULT_WEIGHT
 from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.overall import MODE_NUMERICAL
-from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
+from quodeq.core.scoring.scale import PrincipleGradeScale
 from quodeq.core.scoring.mass import principle_mass, requirement_rows
 from quodeq.core.scoring.internals import (
     build_deductions,
@@ -34,9 +33,7 @@ class _PrincipleContext:
     using_taxonomy: bool
     conf_level: str
     ci: dict
-    scale_mult: int
-    source_file_count: int = 0
-    classes: Mapping[str, str] = field(default_factory=dict)
+    scale: PrincipleGradeScale
 
 
 def compute_tallies(
@@ -69,9 +66,7 @@ def _base_kwargs(ctx: _PrincipleContext) -> dict:
     }
 
 
-def _score_numerical(
-    ctx: _PrincipleContext, params: ScoringParams = DEFAULT_PARAMS,
-) -> PrincipleScore:
+def _score_numerical(ctx: _PrincipleContext) -> PrincipleScore:
     """Score a single principle in numerical mode. Thin evidence is scored and marked, not gated.
 
     A principle with no violations and no compliance (every finding dismissed)
@@ -83,11 +78,12 @@ def _score_numerical(
     if not violations and not compliance:
         return PrincipleScore(**kwargs, final_score=None, grade=Grade.INSUFFICIENT, observation=0.0)
     rows = requirement_rows(violations, compliance)
-    mass = principle_mass(rows, ctx.source_file_count, ctx.classes, params=params)
+    params = ctx.scale.params
+    mass = principle_mass(rows, ctx.scale.source_file_count, ctx.scale.classes, params=params)
     base, lift, _raw, final = principle_stages(mass, params=params)
     return PrincipleScore(
         **kwargs, base_score=round(base, 1),
-        deductions=build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult),
+        deductions=build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale.scale_multiplier),
         dampening_multiplier=lift, final_score=final,
         grade=score_to_grade_label(final, params=params),
         observation=mass.observation, violation_mass=mass.violation_mass,
@@ -95,13 +91,11 @@ def _score_numerical(
     )
 
 
-def _score_graded(
-    ctx: _PrincipleContext, params: ScoringParams = DEFAULT_PARAMS,  # noqa: ARG001
-) -> PrincipleScore:
+def _score_graded(ctx: _PrincipleContext) -> PrincipleScore:
     """Score a single principle in non-numerical (graded) mode.
 
-    Accepts params only for scorer-signature symmetry with
-    ``_score_numerical``; the legacy graded ladder is not user-tunable.
+    The legacy graded ladder is not user-tunable, so ``ctx.scale.params`` is
+    not read here.
     """
     kwargs = _base_kwargs(ctx)
     if ctx.conf_level == ConfidenceLevel.LOW:
@@ -109,7 +103,7 @@ def _score_graded(
             **kwargs, base_grade=Grade.INSUFFICIENT, severity_drops=0,
             grade=Grade.INSUFFICIENT,
         )
-    drops = count_grade_drops(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
+    drops = count_grade_drops(ctx.vt_counts, scale_multiplier=ctx.scale.scale_multiplier)
     # Graded mode is the only reader of the legacy dampening multiplier.
     dampening = compliance_dampening(ctx.ct_counts, ctx.vt_counts)
     return PrincipleScore(
@@ -120,8 +114,7 @@ def _score_graded(
 
 
 def _build_context(
-    key: str, pdata: dict, scale_mult: int, files_read: int,
-    source_file_count: int = 0, classes: Mapping[str, str] | None = None,
+    key: str, pdata: dict, scale: PrincipleGradeScale, files_read: int,
 ) -> _PrincipleContext:
     """Build scoring context for a single principle from its evidence data."""
     metrics = pdata.get("metrics", {})
@@ -139,23 +132,21 @@ def _build_context(
     return _PrincipleContext(
         key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
         ct_counts=ct_counts,
-        using_taxonomy=using_taxonomy, conf_level=conf_level, ci=ci,
-        scale_mult=scale_mult, source_file_count=source_file_count,
-        classes=classes or {},
+        using_taxonomy=using_taxonomy, conf_level=conf_level, ci=ci, scale=scale,
     )
 
 
 def score_all_principles(
-    raw_principles: dict, mode: str, scale_mult: int, files_read: int,
-    params: ScoringParams = DEFAULT_PARAMS,
-    *, source_file_count: int = 0, classes: Mapping[str, str] | None = None,
+    raw_principles: dict, mode: str, scale: PrincipleGradeScale, files_read: int,
 ) -> dict[str, PrincipleScore]:
-    """Score every principle and return the per-principle dict."""
+    """Score every principle and return the per-principle dict.
+
+    ``scale`` carries the project size, the confidence scale multiplier, the
+    scoring formula and the standard's severity classes, the same object the
+    projector's ``compute_principle_grade`` takes.
+    """
     scorer = _score_numerical if mode == MODE_NUMERICAL else _score_graded
     return {
-        key: scorer(
-            _build_context(key, pdata, scale_mult, files_read, source_file_count, classes),
-            params,
-        )
+        key: scorer(_build_context(key, pdata, scale, files_read))
         for key, pdata in raw_principles.items()
     }
