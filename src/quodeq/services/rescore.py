@@ -90,6 +90,7 @@ def _rescore_from_evidence(
             principle=ps.display_name,
             score=(f"{ps.final_score}/10" if ps.final_score is not None else None),
             grade=ps.grade,
+            confidence=ps.confidence_level,
         )
         for ps in scores.principles.values()
     ]

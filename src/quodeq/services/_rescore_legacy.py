@@ -86,5 +86,7 @@ def score_all_principles(
             display_name=name, weight="1", final_score=final_score, grade=grade,
             confidence_level=confidence or ConfidenceLevel.LOW, observation=observation,
         )
-        principle_grades.append(PrincipleGrade(principle=name, score=score_str, grade=grade))
+        principle_grades.append(PrincipleGrade(
+            principle=name, score=score_str, grade=grade, confidence=confidence,
+        ))
     return principle_scores, principle_grades

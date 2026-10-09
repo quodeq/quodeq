@@ -59,12 +59,16 @@ class TestBuildPrincipleRow:
         row = build_principle_row("log", pdata, lookup)
         assert row["score"] == "7.0/10"
 
-    def test_insufficient_grade_null_score(self):
+    def test_score_kept_whatever_the_grade_label(self):
         pdata = {"display_name": "Crypto"}
         lookup = {"Crypto": {"finalScore": 3.0, "grade": Grade.INSUFFICIENT}}
         row = build_principle_row("crypto", pdata, lookup)
-        assert row["score"] is None
-        assert row["grade"] == Grade.INSUFFICIENT
+        assert row["score"] == "3.0/10"
+
+    def test_confidence_level_from_metrics_lands_on_the_row(self):
+        pdata = {"display_name": "Crypto", "metrics": {"confidence_level": "low"}}
+        row = build_principle_row("crypto", pdata, {"Crypto": {"finalScore": 3.0, "grade": "C"}})
+        assert row["confidence"] == "low"
 
     def test_no_matching_score_computes_grade(self):
         pdata = {"display_name": "Auth"}

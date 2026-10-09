@@ -1,7 +1,7 @@
 """SQL strings for evaluation.db. Constants only — no logic."""
 from __future__ import annotations
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 _DDL_BODY = """
 CREATE TABLE findings (
@@ -100,6 +100,7 @@ CREATE TABLE principle_grades (
     grade            TEXT,
     finding_count    INTEGER NOT NULL DEFAULT 0,
     dismissed_count  INTEGER NOT NULL DEFAULT 0,
+    confidence       TEXT,
     completed_at     TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (dimension, principle_id)
 );

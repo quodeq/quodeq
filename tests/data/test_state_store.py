@@ -6,7 +6,7 @@ from pathlib import Path
 from quodeq.core.events.models import Judgment, JudgmentPayload
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import PrincipleGradeRow, SQLiteStateStore
-_NO_COVERAGE = {"files_read": 0, "source_count": 0, "coverage_pct": 0.0}  # row written without a report
+_NO_COVERAGE = {"files_read": 0, "source_count": 0, "coverage_pct": 0.0, "confidence": None}  # row written without a report
 
 
 def _payload(**kw) -> JudgmentPayload:

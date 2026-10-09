@@ -55,6 +55,7 @@ def _overlay_principles(
             p,
             score=f"{score_val}/10" if score_val is not None else p.score,
             grade=row.get("grade") or p.grade,
+            confidence=row.get("confidence") or p.confidence,
         ))
     return overlaid
 
@@ -131,6 +132,7 @@ def overlay_sql_grades(
             d,
             overall_score=f"{score_val}/10" if score_val is not None else d.overall_score,
             overall_grade=row.get("grade") or d.overall_grade,
+            confidence=row.get("confidence") or d.confidence,
             principles=_overlay_principles(d.principles, principles_by_dim.get(d.dimension, [])),
         ))
     return overlaid

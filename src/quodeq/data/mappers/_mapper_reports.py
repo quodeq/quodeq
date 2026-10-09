@@ -26,6 +26,8 @@ def parse_principle_grade(raw: dict[str, object]) -> PrincipleGrade:
         principle=get_opt_str(raw.get("name")) or get_opt_str(raw.get("principle")),
         score=get_opt_str(raw.get("score")),
         grade=get_opt_str(raw.get("grade")),
+        confidence=get_opt_str(raw.get("confidence"))
+        or get_opt_str((raw.get("metrics") or {}).get("confidence_level")),
     )
 
 

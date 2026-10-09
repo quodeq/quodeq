@@ -36,6 +36,7 @@ def _build_principle_grades(
             "principle": p.get("name"),
             "score": p.get("score"),
             "grade": p.get("grade"),
+            "confidence": (p.get("metrics") or {}).get("confidence_level"),
             "isOverall": False,
         }
         for p in data.get("principles", [])
@@ -46,6 +47,7 @@ def _build_principle_grades(
             "principle": OVERALL_PRINCIPLE,
             "score": data.get("overallScore"),
             "grade": data.get("overallGrade"),
+            "confidence": None,
             "isOverall": True,
         }
     )
