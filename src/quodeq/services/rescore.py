@@ -61,6 +61,7 @@ def _rescored(
         overall_score=(f"{overall.weighted_score}/10"
                        if overall.weighted_score is not None else None),
         overall_grade=overall.grade or overall.weighted_grade,
+        confidence=overall.confidence,
         totals=recount_totals(filtered_violations, compliance_count=_compliance_count(dim),
                               files_read=dim.files_read),
     )

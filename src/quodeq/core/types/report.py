@@ -13,7 +13,7 @@ class PrincipleGrade:
     principle: str | None = None
     score: str | None = None
     grade: str | None = None
-    # Thin-evidence marker: "low" when the score rests on little evidence, else None.
+    # The evidence confidence level ("low", "medium", "high"); low marks thin evidence.
     confidence: str | None = None
 
 

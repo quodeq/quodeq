@@ -73,3 +73,10 @@ class TestRoundTrip:
         raw = to_camel_dict(VIOLATION_SUMMARY)
         assert isinstance(raw, dict)
         assert parse_violation_summary(raw) == VIOLATION_SUMMARY
+
+
+def test_principle_grade_reads_confidence_from_metrics_and_survives_bad_metrics() -> None:
+    from quodeq.data.mappers import parse_principle_grade
+
+    assert parse_principle_grade({"name": "P", "metrics": {"confidence_level": "low"}}).confidence == "low"
+    assert parse_principle_grade({"name": "P", "metrics": "oops"}).confidence is None
