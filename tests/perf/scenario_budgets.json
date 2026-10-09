@@ -15,7 +15,7 @@
   },
   "dimension_eval_warm": {
     "eval_report_reads": 1,
-    "peak_kib": 671,
+    "peak_kib": 408,
     "response_bytes": 1986,
     "score_cache_opens": 0,
     "standards_reads": 1

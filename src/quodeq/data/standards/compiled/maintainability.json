@@ -18,7 +18,7 @@
         {
           "id": "M-MOD-1",
           "source": "iso25010",
-          "text": "Cyclomatic complexity MUST be ≤{max_complexity} per function",
+          "text": "Cyclomatic complexity MUST be \u2264{max_complexity} per function",
           "severity": "minor",
           "scope": null,
           "refs": [
@@ -90,7 +90,7 @@
         {
           "id": "M-MOD-4",
           "source": "iso25010",
-          "text": "Functions MUST have ≤{max_params} parameters; use an options object for more",
+          "text": "Functions MUST have \u2264{max_params} parameters; use an options object for more",
           "severity": "minor",
           "scope": null,
           "refs": [
@@ -120,7 +120,7 @@
         {
           "id": "M-MOD-6",
           "source": "iso25010",
-          "text": "Functions MUST limit outward calls to ≤7 distinct callees to reduce coupling",
+          "text": "Functions MUST limit outward calls to \u22647 distinct callees to reduce coupling",
           "severity": "minor",
           "scope": null,
           "refs": [
@@ -133,7 +133,7 @@
             {
               "source": "cisq",
               "id": null,
-              "name": "Functions MUST limit outward calls to ≤7 distinct callees to reduce coupling",
+              "name": "Functions MUST limit outward calls to \u22647 distinct callees to reduce coupling",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
@@ -1180,7 +1180,7 @@
         {
           "id": "M-TST-1",
           "source": "iso25010",
-          "text": "Test coverage MUST be ≥80% for business-critical modules",
+          "text": "Test coverage MUST be \u226580% for business-critical modules",
           "severity": "minor",
           "scope": null,
           "refs": [
