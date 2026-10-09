@@ -31,7 +31,8 @@ const LABEL_OFFSET = 18;     // svg units beyond the outer ring (name baseline)
 const VERT_RADIUS = 3.2;
 const INSUF_RADIUS = 3.0;
 // Hollow ring around a scored vertex that rests on thin evidence.
-const THIN_HALO_RADIUS = VERT_RADIUS + 3;
+const THIN_HALO_GAP = 3; // svg units between the vertex dot and its ring
+const THIN_HALO_RADIUS = VERT_RADIUS + THIN_HALO_GAP;
 // Horizontal padding around the plot so long principle names don't clip.
 const VIEWBOX_PAD_X = 140;
 const VIEWBOX_PAD_Y = 24;

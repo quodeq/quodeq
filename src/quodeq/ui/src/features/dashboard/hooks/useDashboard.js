@@ -83,6 +83,14 @@ function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fe
   };
 }
 
+// The selected run was scanned with an older grade formula than the one its
+// numbers are now computed with. selectedRun lives on the dashboard payload,
+// the current version on the scores payload. A run with no recorded version
+// counts as older.
+function isFormulaUpdated(dashboard, scores) {
+  return (dashboard?.selectedRun?.gradeAlgoVersion ?? 0) < (scores?.scoring?.formulaVersion ?? 0);
+}
+
 function buildDashboardResult({
   dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresPendingBody, scoresError,
   availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, dropRunFromCache, sharedProjectInfoQuery,
@@ -96,11 +104,7 @@ function buildDashboardResult({
     // so next to the number. This return is an explicit whitelist -- dropping
     // the key here silently removes the warning.
     customFormula: Boolean(scores?.scoring?.customFormula),
-    // The selected run was scanned with an older grade formula than the one
-    // its numbers are now computed with. selectedRun lives on the dashboard
-    // payload, the current version on the scores payload. A run with no
-    // recorded version counts as older.
-    formulaUpdated: (dashboardWithTrend?.selectedRun?.gradeAlgoVersion ?? 0) < (scores?.scoring?.formulaVersion ?? 0),
+    formulaUpdated: isFormulaUpdated(dashboardWithTrend, scores),
     rescoreLookup: {},
     // A pending body is "not yet", never an empty project: it keeps the
     // loading state up until the real payload lands.
