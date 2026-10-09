@@ -57,12 +57,9 @@ def classify_confidence_level(
     """Return ``"high" | "medium" | "low"`` for a principle's evidence size.
 
     Mirrors ``PrincipleEvidence.compute_metrics`` but exposed as a pure
-    function so the SQL projector can apply the same Insufficient rule
-    the CLI uses — keeping both engines on one formula. Without this,
-    the projector scored thin-evidence principles (e.g. 1 compliance,
-    0 violations) as ``10.0/Exemplary`` while the CLI marked them
-    ``Insufficient``, and the dashboard's overlaid SQL scores drifted
-    away from the CLI's own report.
+    function so the SQL projector and the CLI engine carry the same level:
+    it is the thin-evidence marker both attach to a scored principle, keeping
+    the dashboard's overlaid SQL grades and the CLI's report on one formula.
     """
     base_high = _HIGH_CONFIDENCE_THRESHOLD * scale_multiplier
     base_medium = _MEDIUM_CONFIDENCE_THRESHOLD * scale_multiplier
