@@ -1067,6 +1067,7 @@
   "overview.foldersAria": "Where the findings live, by folder",
   "overview.foldersFoot": "{folders} folders · {files} files with findings",
   "overview.foldersLabel": "where_the_findings_live",
+  "overview.foldersOpenMap": "all folders in Map ›",
   "overview.foldersNote": "FOLDERS · CLICK TO OPEN",
   "overview.foldersNoteIn": "IN {prefix}/ · CLICK TO OPEN",
   "overview.gradeHint": "grade {letter}",

@@ -30,3 +30,21 @@ describe('FindingsByFolderPanel', () => {
     expect(onFolderClick).toHaveBeenCalledWith(expect.objectContaining({ dir: expect.stringMatching(/^src\//) }));
   });
 });
+
+describe('FindingsByFolderPanel, beyond the top folders', () => {
+  const many = [{ dimension: 'a', violations: Array.from({ length: 7 }, (_, i) => v(`src/m${i}/f.py`)) }];
+
+  it('shows the top five and hands the rest to the Map', () => {
+    const onOpenMap = vi.fn();
+    render(<FindingsByFolderPanel dimensions={many} onOpenMap={onOpenMap} />);
+    expect(screen.getAllByRole('row')).toHaveLength(5);
+    fireEvent.click(screen.getByRole('button', { name: /all folders in Map/ }));
+    expect(onOpenMap).toHaveBeenCalled();
+  });
+
+  it('has no Map link when every folder already shows', () => {
+    const few = [{ dimension: 'a', violations: [v('src/x/a.py'), v('src/y/b.py')] }];
+    render(<FindingsByFolderPanel dimensions={few} onOpenMap={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /all folders in Map/ })).not.toBeInTheDocument();
+  });
+});

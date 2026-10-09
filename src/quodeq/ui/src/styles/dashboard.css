@@ -1266,65 +1266,57 @@
 }
 .folder-path__inner { direction: ltr; unicode-bidi: isolate; }
 
-/* The panel is a column; the list takes what the row gives it (the chart's
-   height beside the score history) and scrolls. On its own it asks for
-   about eight rows. */
+/* The panel is a column: the top folders, then the footer pinned to the
+   bottom of whatever height the row gives it (the chart beside it). */
 .folders-panel {
   display: flex;
   flex-direction: column;
 }
-.folders-panel__list {
-  flex: 1 1 272px;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
 
-.folders-panel__foot {
-  padding: var(--space-2) var(--space-4) var(--space-3);
+/* A panel's footer strip: a rule on top, mono, muted. The folders panel
+   holds its counts and the Map link; the capped lists' "show all" is one. */
+.panel-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding: 10px var(--space-4);
   border-top: 1px solid var(--color-border);
   font-family: var(--term-font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
 }
-
-/* Centred footer that opens a capped list. */
-.list-show-more {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 12px 24px 14px;
+.panel-foot__link {
+  margin-left: auto;
+  padding: 0;
+  font: inherit;
+  color: var(--color-accent);
   background: none;
   border: 0;
   cursor: pointer;
-  font-family: var(--term-font-mono);
-  color: var(--color-text-muted);
 }
-.list-show-more__rule { flex: 1; height: 1px; background: var(--color-border); transition: background 0.12s; }
-.list-show-more__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-size: 11px;
+.panel-foot__link:hover { text-decoration: underline; }
+
+/* "Show all": the whole strip is the button, its label centred. */
+.list-show-more {
+  justify-content: center;
+  width: 100%;
+  background: none;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  cursor: pointer;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  white-space: nowrap;
-  transition: color 0.12s, border-color 0.12s, background 0.12s;
+  transition: color 0.12s, background 0.12s;
 }
 .list-show-more__hint { text-transform: none; letter-spacing: 0; }
 .list-show-more__chev { font-size: 10px; }
-.list-show-more:hover .list-show-more__label {
+.list-show-more:hover {
   color: var(--color-text);
-  border-color: var(--color-text-muted);
   background: color-mix(in srgb, var(--color-text) 6%, var(--color-surface));
 }
-.list-show-more:hover .list-show-more__rule { background: var(--color-text-muted); }
-.list-show-more:focus-visible { outline: none; }
-.list-show-more:focus-visible .list-show-more__label { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.list-show-more:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 
 /* Diff summary section */
 .diff-summary {
