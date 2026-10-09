@@ -1089,16 +1089,19 @@ button.term-sev-badge--clickable:focus-visible {
   gap: var(--term-space-3) !important;
 }
 .history-panels-row > .run-history-panel,
-.history-panels-row > .dim-score-panel {
+.history-panels-row > .dim-score-panel,
+.history-panels-row > .folders-panel {
   flex: 1 1 0 !important;
   min-width: 0 !important;
 }
+.history-panels-row > .folders-panel { margin-top: 0; }
 @media (max-width: 1120px) {
   .history-panels-row {
     flex-direction: column !important;
   }
   .history-panels-row > .run-history-panel,
-  .history-panels-row > .dim-score-panel {
+  .history-panels-row > .dim-score-panel,
+  .history-panels-row > .folders-panel {
     flex-basis: auto !important;
     width: 100% !important;
   }
