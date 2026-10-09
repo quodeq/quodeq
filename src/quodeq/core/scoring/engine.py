@@ -1,4 +1,4 @@
-"""Public scoring API — delegates principle-level work to principle."""
+"""Public scoring API, delegates principle-level work to principle."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -12,7 +12,7 @@ from quodeq.core.scoring.principle import score_all_principles
 
 
 def grade_for_score(score: float) -> str:
-    """Alias for score_to_grade_label — kept for public API compatibility."""
+    """Alias for score_to_grade_label, kept for public API compatibility."""
     return score_to_grade_label(score)
 
 
