@@ -169,6 +169,11 @@ describe('buildDashboardDataBundle', () => {
     expect(bundle.scoresPending).toBe(true);
   });
 
+  it('forwards customFormula (the accumulated hero never flags a tuned formula without it)', () => {
+    const bundle = buildDashboardDataBundle({ state: { ...stubState(), customFormula: true }, sharedHasContent: false });
+    expect(bundle.customFormula).toBe(true);
+  });
+
   it('forwards formulaUpdated (the run hero never says the scores were recomputed without it)', () => {
     const bundle = buildDashboardDataBundle({ state: { ...stubState(), formulaUpdated: true }, sharedHasContent: false });
     expect(bundle.formulaUpdated).toBe(true);

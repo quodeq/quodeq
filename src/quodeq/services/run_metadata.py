@@ -20,9 +20,9 @@ _ESTIMATE_EXCLUDED = "excluded"
 
 
 def read_run_metadata(run_dir: Path) -> dict[str, Any]:
-    """Commit SHA and grade formula version from status.json and per-dimension cache hits / misses /
-    provider-excluded counts from dim_estimates.json. Missing inputs yield
-    None / empty, never an error."""
+    """Commit SHA and grade formula version from status.json, and per-dimension
+    cache hits / misses / provider-excluded counts from dim_estimates.json.
+    Missing inputs yield None / empty, never an error."""
     status = read_status(run_dir) or {}
     cache_stats = {
         dim: {
