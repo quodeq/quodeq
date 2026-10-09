@@ -17,7 +17,7 @@ vi.mock('../../../api/shared.js', () => ({
 
 import { getFleetCompare, sharedGetFleetCompare } from '../../../api/index.js';
 import { sharedListProjects } from '../../../api/shared.js';
-import { fleetOf, summary, renderPage, iso } from './_comparePage.fixtures.jsx';
+import { fleetOf, summary, renderPage, iso, findTableName } from './_comparePage.fixtures.jsx';
 
 /**
  * Split from ComparePage.test.jsx: remote/shared-fleet projects.
@@ -46,7 +46,7 @@ describe('ComparePage remote projects', () => {
 
   it('remote rows join the fleet through the shared route, tagged', async () => {
     renderPage();
-    expect(await screen.findByText('gamma')).toBeInTheDocument();
+    expect(await findTableName('gamma')).toBeInTheDocument();
     expect((await screen.findAllByText('remote')).length).toBeGreaterThan(0);
     await waitFor(() => expect(sharedGetFleetCompare).toHaveBeenCalledWith(['gamma']));
     // The local endpoint is never asked for the remote project.
@@ -56,15 +56,14 @@ describe('ComparePage remote projects', () => {
   it('opening a remote row switches to the shared source', async () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProject });
-    const rowName = (await screen.findAllByText('gamma'))
-      .find((el) => el.classList.contains('compare-row__name'));
+    const rowName = await findTableName('gamma');
     await userEvent.click(rowName);
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('gamma', 'shared'));
   });
 
   it('duels a local project against a remote one', async () => {
     renderPage();
-    await screen.findByText('gamma');
+    await findTableName('gamma');
     await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /gamma/ }));
@@ -83,9 +82,9 @@ describe('ComparePage remote projects', () => {
       stale: false,
     });
     renderPage();
-    await screen.findByText('gamma');
+    await findTableName('gamma');
     const alphaRows = screen.getAllByText('alpha')
-      .filter((el) => el.classList.contains('compare-row__name'));
+      .filter((el) => el.classList.contains('compare-fleettable__namebtn'));
     expect(alphaRows).toHaveLength(1);
     // The local endpoint serves alpha; the shared route is only asked for
     // the genuinely remote project.
@@ -96,7 +95,7 @@ describe('ComparePage remote projects', () => {
   it('leaves the fleet local-only when no shared repository is configured', async () => {
     sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
     renderPage();
-    expect(await screen.findByText('alpha')).toBeInTheDocument();
+    expect(await findTableName('alpha')).toBeInTheDocument();
     expect(screen.queryByText('gamma')).toBeNull();
     expect(screen.queryByText('remote')).toBeNull();
   });
@@ -118,7 +117,7 @@ describe('ComparePage with published projects only', () => {
 
   it('ranks the published rows and never shows the empty state', async () => {
     renderPage({ projects: [] });
-    expect(await screen.findByText('gamma')).toBeInTheDocument();
+    expect(await findTableName('gamma')).toBeInTheDocument();
     // The leader is named in the table and again in the attention strip.
     expect(screen.getAllByText('delta').length).toBeGreaterThan(0);
     expect(screen.queryByText('Nothing to compare yet')).toBeNull();

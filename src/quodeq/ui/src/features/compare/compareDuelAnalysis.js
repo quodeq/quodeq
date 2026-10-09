@@ -160,12 +160,19 @@ export function principleMap(duel, good = goodThreshold()) {
   };
 }
 
-/** Violations per 100 analysed files (raw counts favour small projects) and pass rate. */
+// Critical findings are rarer than violations: count them per 1,000 files.
+const PER_THOUSAND = 1000;
+
+/**
+ * Exposure normalised by size (raw counts favour small projects):
+ * violations per 100 analysed files, critical per 1,000, and pass rate.
+ */
 export function exposureOf(row) {
   const base = row.analyzedFiles || row.totalFiles;
   const checks = row.totalViolations + row.totalCompliance;
   return {
     per100: base ? (row.totalViolations / base) * PERCENT : null,
+    criticalPerK: base ? ((row.severity?.critical ?? 0) / base) * PER_THOUSAND : null,
     passPct: checks ? Math.round((row.totalCompliance / checks) * PERCENT) : null,
     critical: row.severity?.critical ?? 0,
     major: row.severity?.major ?? 0,

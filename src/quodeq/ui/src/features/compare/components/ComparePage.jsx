@@ -31,13 +31,12 @@ import { COMPARE_VIEW_FLEET } from '../compareModel.js';
 import { projectId } from '../../../utils/projectIdentity.js';
 
 function buildSharedProps({
-  rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir, setSortDir,
+  rows, orderedRows, scopeRows, fleet, board, attention, errorsById,
   hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount, toggleProject, selectAll,
   selectFlagged, openDimension, onOpenProjectDimension, onOpenDuel, openProject, now,
 }) {
   return {
-    rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir,
-    toggleSortDir: () => setSortDir((d) => (d === SORT_DIR.DESC ? SORT_DIR.ASC : SORT_DIR.DESC)),
+    rows, orderedRows, scopeRows, fleet, board, attention, errorsById,
     hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount, toggleProject,
     selectAll, selectFlagged, openDimension,
     // Expanded-row dimension chips jump to that project's own dimension
@@ -95,9 +94,8 @@ function useComparePageState({
   onSwitchDimension, onOpenEvalPrincipal,
 }) {
   const view = dimension || COMPARE_VIEW_FLEET;
-  // Score is the only table ordering (consequence ranked near-inverse of it
-  // on real fleets); the toggle flips best-first / worst-first.
-  const [sortDir, setSortDir] = useState(SORT_DIR.DESC);
+  // Rows arrive best-first; the fleet tables re-rank by their own column headers.
+  const sortDir = SORT_DIR.DESC;
   const [pickerOpen, setPickerOpen] = useState(false);
   // null scope = everything (including projects added later); an array is an
   // explicit selection.
@@ -116,7 +114,7 @@ function useComparePageState({
   }, [dimension, onOpenDimension, onSwitchDimension]);
 
   return {
-    view, sortDir, setSortDir, pickerOpen, setPickerOpen, scopeIds, now,
+    view, pickerOpen, setPickerOpen, scopeIds, now,
     ...rowsState, toggleProject, selectAll, selectFlagged, openPrinciple, openDimension,
   };
 }
@@ -180,7 +178,7 @@ export default function ComparePage({
   const { fleetProjects } = useFleetProjects(projects);
   const { summariesById, errorsById } = useCompareData(fleetProjects);
   const {
-    view, sortDir, setSortDir, pickerOpen, setPickerOpen, scopeIds, now,
+    view, pickerOpen, setPickerOpen, scopeIds, now,
     rows, openProject, scopeSet, scopeRows, fleet, board, attention,
     orderedRows, dimensionView, duelView,
     toggleProject, selectAll, selectFlagged, openPrinciple, openDimension,
@@ -201,7 +199,7 @@ export default function ComparePage({
 
   const scopeCount = scopeSet && scopeSet.size ? scopeRows.length : rows.length;
   const shared = buildSharedProps({
-    rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir, setSortDir,
+    rows, orderedRows, scopeRows, fleet, board, attention, errorsById,
     hasCoverage: scopeRows.some((r) => r.coveragePct != null),
     pickerOpen, setPickerOpen, scopeIds, scopeCount, toggleProject, selectAll, selectFlagged,
     openDimension, onOpenProjectDimension, onOpenDuel, openProject, now,
