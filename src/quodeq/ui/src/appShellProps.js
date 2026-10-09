@@ -4,6 +4,8 @@ import {
 } from './appGating.js';
 import { buildDashboardDataBundle, buildNavigationBundle } from './routes/renderers.jsx';
 import { NAV_TAB } from './vocab/navTab.js';
+import { PROJECT_SOURCE } from './vocab/projectSource.js';
+import { switchProject } from './routes/switchProject.js';
 
 // Pure prop-builders for App.jsx's Sidebar/TopBar wiring, extracted
 // verbatim from the inline JSX props so App.jsx itself stays a thin
@@ -58,6 +60,24 @@ export function buildTopBarProps({
     onBack: navPop,
     effectiveDark,
     onToggleTheme: toggleTheme,
+  };
+}
+
+// The breadcrumb's project switcher (NavBreadcrumb `projectSwitcher`). Picking
+// a project runs the same switchProject a Repositories card click does, told
+// where the user is so a project-scoped page stays put. "add project" is the
+// navigation bundle's guarded add action, so a running evaluation still
+// blocks it with its toast. Only a LOCAL selection marks a row current: the
+// list holds local projects alone.
+export function buildProjectSwitcherProps({ state, navigation, navTab, navStack }) {
+  return {
+    projects: state.projects ?? [],
+    selectedProject: state.selectedSource === PROJECT_SOURCE.SHARED ? null : state.selectedProject,
+    onPick: (id) => switchProject(navigation, id, PROJECT_SOURCE.LOCAL, {
+      rootTab: navStack[0]?.page, depth: navStack.length,
+    }),
+    onAllRepositories: () => navTab(NAV_TAB.PROJECTS),
+    onAddProject: navigation.onAddProject,
   };
 }
 
