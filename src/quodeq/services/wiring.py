@@ -294,3 +294,7 @@ from quodeq.data.fs.grade_formula_store import (  # noqa: F401
 from quodeq.data.projection.grade_projector import (  # noqa: F401
     GradeInputs, compute_run_grades, load_grade_inputs, recompute_grades,
 )
+# Severity classes (compiled standards + project overrides) for the scoring paths.
+from quodeq.data.fs.severity_classes_store import (  # noqa: F401
+    load_severity_classes, load_severity_classes_for_run,
+)

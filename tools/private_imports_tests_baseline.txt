@@ -965,6 +965,7 @@ tests/services/test_fs_scan_coverage.py:10:private-name:quodeq.services.fs_scan.
 tests/services/test_fs_scan_coverage.py:10:private-name:quodeq.services.fs_scan._list_modules
 tests/services/test_fs_scan_coverage.py:10:private-name:quodeq.services.fs_scan._walk_files
 tests/services/test_fs_scan_coverage.py:10:private-name:quodeq.services.fs_scan._write_scan_json
+tests/services/test_grade_explain_masses.py:4:private-name:quodeq.services.grade_explain._explain_one
 tests/services/test_grade_formula_event_log.py:59:private-name:quodeq.services.grade_formula._event_log_runs
 tests/services/test_grade_formula_event_log.py:72:private-name:quodeq.services.grade_formula._event_log_runs
 tests/services/test_import_validator.py:5:private-name:quodeq.services.import_validator._MAX_DESCRIPTION

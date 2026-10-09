@@ -14,7 +14,7 @@ from quodeq.services.grade_explain import explain_dimension
 _PROJECT = "proj"
 _RUN = "run-1"
 _DIM = "Security"
-_SCORABLE = 5  # clears the medium-confidence floor so P1 is graded, not Insufficient
+_SCORABLE = 5  # the first principle carries five distinct rules
 
 
 def _finding(i: int, *, practice: str, verdict: str = "violation") -> dict:
@@ -46,14 +46,16 @@ def test_explain_matches_the_grade_table(seeded: Path) -> None:
     rows = {r["principle_id"]: r for r in SQLiteStateStore(seeded / _PROJECT / _RUN).read_principle_grades()}
     assert graded["P1"]["stages"]["final"] == rows["P1"]["score"]
     assert graded["P1"]["stages"]["grade"] == rows["P1"]["grade"]
-    assert graded["P1"]["stages"]["types"]["major"] == _SCORABLE
-    assert out["params"]["baseK"] == pytest.approx(0.12)
+    assert graded["P1"]["stages"]["violationRules"] == _SCORABLE
+    # 0.08 is the formula-v4 default base_k.
+    assert out["params"]["baseK"] == pytest.approx(0.08)
 
 
-def test_insufficient_principle_has_no_stages(seeded: Path) -> None:
+def test_thin_principle_is_graded_with_low_confidence(seeded: Path) -> None:
     out = explain_dimension(seeded, _PROJECT, _RUN, _DIM)
     p2 = next(p for p in out["principles"] if p["principleId"] == "P2")
-    assert (p2["insufficient"], p2["stages"], p2["findings"]) == (True, None, 1)
+    assert (p2["insufficient"], p2["confidence"], p2["findings"]) == (False, "low", 1)
+    assert p2["stages"]["violationRules"] == 1
 
 
 def test_dimension_lookup_is_case_insensitive(seeded: Path) -> None:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,7 +22,8 @@ from quodeq.core.evidence.parser import (
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
-from quodeq.services.wiring import evidence_file_size, load_compiled_refs, read_req_to_principle_map
+from quodeq.services.wiring import (
+    evidence_file_size, load_compiled_refs, load_severity_classes_for_run, read_req_to_principle_map)
 from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
@@ -126,6 +127,9 @@ class EvidenceScoreRequest:
     ``EvidenceParseOptions`` exposes; None keeps the wiring default
     (``read_req_to_principle_map`` / ``load_compiled_refs``) so existing
     callers stay valid while tests can substitute fakes.
+
+    *classes* maps requirement id to severity class; None loads it for the
+    run's project (standards plus the project's overrides).
     """
 
     dismissed: set[tuple]
@@ -136,6 +140,7 @@ class EvidenceScoreRequest:
     standard_dirs_fn: Callable[[], tuple[Path | None, Path | None]] | None = None
     req_map_reader: Callable | None = None
     refs_reader: Callable | None = None
+    classes: Mapping[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -186,13 +191,14 @@ def rescore_dimension_from_evidence(
     if excluded == 0 and not score_when_nothing_excluded:
         return EvidenceRescore(None, 0)
     _recompute_metrics(evidence, request.source_file_count)
+    classes = request.classes if request.classes is not None else load_severity_classes_for_run(run_dir)
 
     # Broad catch on purpose (mirrors mutation_rescore and the CLI print
     # guard): the engine can throw on edge-case evidence, and every consumer
     # (dashboard build, /api/rescore, trend fetcher) treats None as "fall back
     # to the stored score" — one bad dimension must not fail the whole run.
     try:
-        result = score_evidence(evidence, mode="numerical", params=request.params)
+        result = score_evidence(evidence, mode="numerical", params=request.params, classes=classes)
     except (ValueError, KeyError, TypeError, ArithmeticError) as exc:
         _logger.warning("Evidence rescore failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return EvidenceRescore(None, excluded)
