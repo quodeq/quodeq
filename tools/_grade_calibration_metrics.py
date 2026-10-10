@@ -16,13 +16,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from _grade_calibration_load import Report  # noqa: E402
-from quodeq.config.paths import default_paths  # noqa: E402
 from quodeq.core.scoring.internals import principle_score_and_grade, score_to_grade_label  # noqa: E402
 from quodeq.core.scoring.mass import LADDER, principle_mass, requirement_rows  # noqa: E402
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams  # noqa: E402
 from quodeq.core.scoring.projector_scoring import compute_dimension_score, compute_run_score  # noqa: E402
 from quodeq.core.scoring.report_grades import NUMERIC_GRADE_ORDER  # noqa: E402
-from quodeq.data.fs.standards_loader import read_severity_classes  # noqa: E402
 
 MODEL_WINDOW_DAYS = 45
 NAME_WIDTH = 12
@@ -35,7 +33,6 @@ BENCHMARK_DIMENSION = "security"
 NO_MODEL = "None"
 COMPILED_SUBDIR = "compiled"
 GRADES = tuple(reversed(NUMERIC_GRADE_ORDER))
-CLASS_MODES = ("compiled", "proxy", "none")
 _RANK = {sev: i for i, sev in enumerate(LADDER)}
 
 
@@ -45,7 +42,7 @@ def short(name: str) -> str:
 
 
 def score_report(
-    report: Report, params: ScoringParams, classes: dict[str, str], *, drop: frozenset[str] = frozenset(),
+    report: Report, params: ScoringParams, *, drop: frozenset[str] = frozenset(),
 ) -> float | None:
     """Dimension score of a stored report under *params*, optionally with the *drop* rules removed."""
     graded = []
@@ -53,36 +50,10 @@ def score_report(
         kept = [v for v in violations if v["req"] not in drop]
         if not kept and not compliance:
             continue
-        mass = principle_mass(requirement_rows(kept, compliance), report.files, classes, params=params)
+        mass = principle_mass(requirement_rows(kept, compliance), report.files, params=params)
         score, _grade = principle_score_and_grade(mass, params=params)
         graded.append({"score": score, "observation": mass.observation, "confidence": None})
     return compute_dimension_score(dimension=report.dimension, principle_grades=graded, params=params)["score"]
-
-
-def _modal(counts: Counter) -> str:
-    top = max(counts.values())
-    return max((s for s in counts if counts[s] == top), key=lambda s: _RANK[s])
-
-
-def proxy_classes(reports: list[Report]) -> dict[str, str]:
-    """Each rule's corpus-wide modal severity: one vote per run and rule from its per-file worst."""
-    votes: dict[str, Counter] = {}
-    for report in reports:
-        violations = [v for pair in report.principles.values() for v in pair[0]]
-        for req, files in requirement_rows(violations, []).violations.items():
-            votes.setdefault(req, Counter())[_modal(Counter(files.values()))] += 1
-    return {req: _modal(counts) for req, counts in votes.items()}
-
-
-def resolve_classes(mode: str, reports: list[Report]) -> dict[str, str]:
-    """The severity classes a ``--classes`` mode stands for."""
-    if mode == "none":
-        return {}
-    paths = default_paths()
-    compiled = read_severity_classes(paths.standards_dir / COMPILED_SUBDIR, paths.evaluators_dir)
-    if mode == "compiled":
-        return compiled
-    return {**proxy_classes(reports), **compiled}
 
 
 def _round(value: float | None) -> float | None:
@@ -170,7 +141,7 @@ def _grade_shares(scores: list[float], params: ScoringParams) -> dict[str, float
 
 def motion_rows(
     reports: list[Report], scores: list[float | None], motion: tuple[str, list[str]],
-    *, params: ScoringParams, classes: dict[str, str],
+    *, params: ScoringParams,
 ) -> list[dict]:
     """Score change when every violation under the listed rules is removed, per report of the named run."""
     run_prefix, rules = motion
@@ -178,7 +149,7 @@ def motion_rows(
     for report, before in zip(reports, scores):
         if before is None or not report.run.startswith(run_prefix):
             continue
-        after = score_report(report, params, classes, drop=frozenset(rules))
+        after = score_report(report, params, drop=frozenset(rules))
         rows.append({
             "project": short(report.project), "dimension": report.dimension, "run": report.run[:RUN_WIDTH],
             "before": before, "after": after, "delta": None if after is None else round(after - before, 1),
@@ -188,7 +159,7 @@ def motion_rows(
 
 def yardsticks(
     reports: list[Report], scores: list[float | None], *, params: ScoringParams = DEFAULT_PARAMS,
-    motion: tuple[str, list[str]] | None = None, classes: dict[str, str] | None = None,
+    motion: tuple[str, list[str]] | None = None,
 ) -> dict:
     """The calibration measures of one set of scores, aligned with *reports* (``None`` scores are skipped)."""
     pairs = [(r, s) for r, s in zip(reports, scores) if s is not None]
@@ -209,7 +180,7 @@ def yardsticks(
         "temporal_pairs": len(deltas),
         "temporal_mean_delta": _round(_mean(deltas)),
         "temporal_p90": _round(deltas[int(P90 * len(deltas))]) if deltas else None,
-        "motion": motion_rows(reports, scores, motion, params=params, classes=classes or {}) if motion else [],
+        "motion": motion_rows(reports, scores, motion, params=params) if motion else [],
     }
 
 
