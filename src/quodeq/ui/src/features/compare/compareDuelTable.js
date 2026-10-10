@@ -9,7 +9,8 @@ import { EVEN_BAND } from './compareDuelAnalysis.js';
 
 export const TABLE_SORT = Object.freeze({ GAP: 'gap', A: 'a', B: 'b', NAME: 'name' });
 
-// The axis starts this far below the lowest score, on a whole point.
+// The axis starts this far below the lowest score and ends this far above
+// the highest, each on a whole point.
 const AXIS_MARGIN = 0.5;
 // Axes spanning more than this many points tick every other point.
 const DENSE_SPAN = 6;
@@ -31,15 +32,15 @@ export function sortScoreRows(rows, key) {
 }
 
 /**
- * A score axis fitted to `values`: from just under the lowest (whole point)
- * to 10, integer ticks, and the grade zones that fall inside it (ascending,
+ * A score axis fitted to `values`: from just under the lowest to just over
+ * the highest (whole points, within 0-10), integer ticks, and the grade zones that fall inside it (ascending,
  * each {from, to, label}). `at(v)` is the 0-100 position. Shared by the
  * duel's score table and the fleet's projects table.
  */
 export function scoreAxisFor(scores, tiers = getGradeThresholds()) {
   const values = scores.filter((v) => v != null);
   const lo = values.length ? Math.max(0, Math.floor(Math.min(...values) - AXIS_MARGIN)) : 0;
-  const hi = SCORE_SCALE_MAX;
+  const hi = values.length ? Math.min(SCORE_SCALE_MAX, Math.ceil(Math.max(...values) + AXIS_MARGIN)) : SCORE_SCALE_MAX;
   const step = hi - lo > DENSE_SPAN ? 2 : 1;
   const ticks = [];
   for (let v = lo; v <= hi; v += step) ticks.push(v);

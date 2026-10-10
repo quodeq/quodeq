@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE_SORT, dimensionTally, scoreAxis, sortScoreRows } from './compareDuelTable.js';
+import { TABLE_SORT, dimensionTally, scoreAxis, scoreAxisFor, sortScoreRows } from './compareDuelTable.js';
 
 const TIERS = [[9, 'Exemplary'], [7, 'Good'], [5, 'Adequate'], [3, 'Poor']];
 const dim = (label, a, b) => ({ key: label, label, a, b, gap: a != null && b != null ? Math.round((a - b) * 10) / 10 : null, shared: a != null && b != null });
@@ -25,6 +25,19 @@ test('scoreAxis: zooms to just under the lowest score and keeps the zones inside
   assert.deepEqual(axis.zones.map((z) => [z.label, z.from, z.to]), [['Poor', 4, 5], ['Adequate', 5, 7], ['Good', 7, 9], ['Exemplary', 9, 10]]);
   assert.equal(axis.at(4), 0);
   assert.equal(axis.at(10), 100);
+});
+
+test('scoreAxisFor: the top fits the highest score the way the bottom fits the lowest', () => {
+  const axis = scoreAxisFor([8.3, 6.9, 6.8], TIERS);
+  assert.deepEqual([axis.lo, axis.hi], [6, 9]);
+  assert.deepEqual(axis.ticks, [6, 7, 8, 9]);
+  assert.deepEqual(axis.zones.map((z) => [z.label, z.from, z.to]), [['Adequate', 6, 7], ['Good', 7, 9]]);
+  assert.equal(axis.at(9), 100);
+});
+
+test('scoreAxisFor: never runs past 10, and an empty list spans the whole scale', () => {
+  assert.equal(scoreAxisFor([9.8], TIERS).hi, 10);
+  assert.deepEqual([scoreAxisFor([], TIERS).lo, scoreAxisFor([], TIERS).hi], [0, 10]);
 });
 
 test('scoreAxis: a wide span ticks every other point', () => {
