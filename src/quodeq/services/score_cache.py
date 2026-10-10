@@ -46,7 +46,7 @@ from quodeq.services.wiring import (  # noqa: F401 — facade re-export
     read_cached_project_summary,
     read_cached_rows,
     read_last_project_summary_cached,
-    read_project_summary_cached,
+    read_project_summary_or_last,
     score_cache_path_override,
     store_run_keys,
     write_cached_project_summary,

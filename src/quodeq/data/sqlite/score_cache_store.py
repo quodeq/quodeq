@@ -241,13 +241,20 @@ def read_last_project_summary_cached(project: str) -> dict | None:
         return None
 
 
-def read_project_summary_cached(project: str, version: str) -> dict | None:
-    """Open the cache, read one project-summary row, close.
+def read_project_summary_or_last(project: str, version: str) -> tuple[dict | None, bool]:
+    """``(summary, settled)`` in one cache open: the row at *version*, else the last known row.
 
-    None on a clean miss and on any sqlite3 error (corrupt/locked db).
+    ``settled`` is True only for the exact-version hit. A last known row is
+    the previous version's summary, for showing while the rebuild runs; no
+    row at all answers ``(None, False)``. One connection for both reads, so
+    a cold project list pays one open per card, as it did before the last
+    known row was consulted.
     """
     try:
         with open_score_cache() as conn:
-            return read_cached_project_summary(conn, project, version)
+            hit = read_cached_project_summary(conn, project, version)
+            if hit is not None:
+                return hit, True
+            return read_last_project_summary(conn, project), False
     except sqlite3.Error:
-        return None
+        return None, False
