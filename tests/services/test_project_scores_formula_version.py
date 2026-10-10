@@ -11,7 +11,7 @@ def test_an_empty_project_payload_carries_the_formula_version(tmp_path: Path) ->
     (tmp_path / "proj").mkdir(parents=True)
     payload = scoring.get_project_scores(tmp_path, "proj")
     assert payload is not None
-    assert payload["scoring"]["formulaVersion"] == GRADE_ALGO_VERSION == 5
+    assert payload["scoring"]["formulaVersion"] == GRADE_ALGO_VERSION == 6
 
 
 def test_a_project_with_runs_carries_the_formula_version(tmp_path: Path) -> None:

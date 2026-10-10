@@ -39,6 +39,7 @@ def _explain_one(
 ) -> dict[str, Any]:
     findings: list[Finding] = inputs.violations_by.get(key, [])
     compliance: list[Finding] = inputs.compliance_by.get(key, [])
+    dismissed: list[Finding] = inputs.dismissed_by.get(key, [])
     entry: dict[str, Any] = {
         "principleId": key[1], "findings": len(findings), "compliance": len(compliance),
         "insufficient": True, "confidence": None, "files": inputs.source_file_count,
@@ -47,7 +48,8 @@ def _explain_one(
     if not findings and not compliance:
         return entry
     rows = requirement_rows([finding_to_scoring_dict(f) for f in findings],
-                            [finding_to_scoring_dict(c) for c in compliance])
+                            [finding_to_scoring_dict(c) for c in compliance],
+                            [finding_to_scoring_dict(d) for d in dismissed])
     mass = principle_mass(rows, inputs.source_file_count, params=params)
     entry["insufficient"] = False
     entry["confidence"] = str(classify_confidence_level(

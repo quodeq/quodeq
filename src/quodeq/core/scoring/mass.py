@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.severity import Severity, parse_severity
@@ -43,13 +43,27 @@ def finding_key(item: Mapping) -> str:
 
 @dataclass(frozen=True, slots=True)
 class RequirementRows:
-    """Violations as ``{req: {file: worst model severity}}``, compliance as ``{req: files}``."""
+    """Violations as ``{req: {file: worst model severity}}``, compliance and dismissed as ``{req: files}``.
+
+    Dismissed files carry no penalty but stay observed: a dismissal raises its
+    principle and never shrinks the principle's weight in the dimension.
+    """
 
     violations: Mapping[str, Mapping[str, str]]
     compliance: Mapping[str, frozenset[str]]
+    dismissed: Mapping[str, frozenset[str]] = field(default_factory=dict)
 
 
-def requirement_rows(violations: Iterable[Mapping], compliance: Iterable[Mapping]) -> RequirementRows:
+def _files_by_rule(items: Iterable[Mapping]) -> dict[str, frozenset[str]]:
+    by_rule: dict[str, set[str]] = {}
+    for item in items:
+        by_rule.setdefault(finding_key(item), set()).add(str(item.get("file") or _NO_FILE))
+    return {req: frozenset(files) for req, files in by_rule.items()}
+
+
+def requirement_rows(
+    violations: Iterable[Mapping], compliance: Iterable[Mapping], dismissed: Iterable[Mapping] = (),
+) -> RequirementRows:
     """Group findings per rule and file; repeats in one file collapse to the worst."""
     worst: dict[str, dict[str, str]] = {}
     for item in violations:
@@ -58,12 +72,10 @@ def requirement_rows(violations: Iterable[Mapping], compliance: Iterable[Mapping
         file = str(item.get("file") or _NO_FILE)
         if file not in files or _RANK[sev] > _RANK[files[file]]:
             files[file] = sev
-    ok: dict[str, set[str]] = {}
-    for item in compliance:
-        ok.setdefault(finding_key(item), set()).add(str(item.get("file") or _NO_FILE))
     return RequirementRows(
         violations={req: dict(files) for req, files in worst.items()},
-        compliance={req: frozenset(files) for req, files in ok.items()},
+        compliance=_files_by_rule(compliance),
+        dismissed=_files_by_rule(dismissed),
     )
 
 
@@ -131,7 +143,10 @@ def principle_mass(
     rows: RequirementRows, project_files: int,
     *, params: ScoringParams = DEFAULT_PARAMS,
 ) -> PrincipleMass:
-    """Sum the rule masses of a principle; observation is the spread of every observed rule."""
+    """Sum the rule masses of a principle; observation is the spread of every observed rule.
+
+    A rule's observed files are its violating files plus its dismissed ones.
+    """
     violations: list[ViolationRow] = []
     worst: str | None = None
     for req in sorted(rows.violations):
@@ -143,7 +158,10 @@ def principle_mass(
         ComplianceRow(req=req, files_ok=len(files), spread=spread(len(files), project_files))
         for req, files in sorted(rows.compliance.items())
     )
-    observation = sum(spread(len(rows.violations[r.req]), project_files) for r in violations)
+    observed: dict[str, set[str]] = {req: set(files) for req, files in rows.violations.items()}
+    for req, files in rows.dismissed.items():
+        observed.setdefault(req, set()).update(files)
+    observation = sum(spread(len(files), project_files) for files in observed.values())
     observation += sum(c.spread for c in compliance)
     return PrincipleMass(
         violation_mass=sum(r.weight for r in violations),

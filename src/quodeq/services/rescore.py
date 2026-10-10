@@ -38,6 +38,18 @@ def filter_excluded_violations(dim: DimensionResult, keys: SuppressionKeys) -> l
     ]
 
 
+def dismissed_violations(dim: DimensionResult, keys: SuppressionKeys) -> list[Finding]:
+    """Violations the project dismissed (and did not delete): no penalty, still observed."""
+    dim_id = dim.dimension or ""
+    return [
+        v for v in dim.violations
+        if is_dismissed(keys.dismissed, FindingRef(
+            req=v.req, principle=v.practice_id, file=v.file, line=v.line,
+            snippet=v.snippet), rules=keys.rules)
+        and not is_deleted(keys.deleted, dimension=dim_id, principle=v.practice_id, file=v.file)
+    ]
+
+
 def _compliance_count(dim: DimensionResult) -> int:
     return dim.totals.compliance_count if dim.totals else len(dim.compliance)
 
@@ -97,12 +109,14 @@ def _rescore_from_evidence(
 
 def _rescore_legacy_fallback(
     dim: DimensionResult, filtered_violations: list[Finding], params: ScoringParams,
+    dismissed: list[Finding] = (),
 ) -> DimensionResult:
     """In-place rescore for a run/dimension with no evidence basis."""
     principles_violations = group_by_principle(filtered_violations)
     principles_compliance = group_by_principle(dim.compliance)
     principle_scores, principle_grades = score_all_principles(
         principles_violations, principles_compliance,
+        principles_dismissed=group_by_principle(list(dismissed)),
         source_file_count=dim.source_file_count or 0,
         params=params,
     )
@@ -135,7 +149,7 @@ def rescore_dimension(
         if rescored is not None:
             return rescored
 
-    return _rescore_legacy_fallback(dim, filtered_violations, params)
+    return _rescore_legacy_fallback(dim, filtered_violations, params, dismissed_violations(dim, keys))
 
 
 def with_hidden_counts(
