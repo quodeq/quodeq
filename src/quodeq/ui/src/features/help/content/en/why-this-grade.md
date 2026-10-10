@@ -4,7 +4,7 @@ A principle's score comes from four stages. Each stage reads one part of the gra
 
 | Key | Value |
 | --- | --- |
-| 1. Rules, weighted by spread | One row per requirement of the standard that was broken. A rule weighs more the larger the share of files it is broken in, so a rule broken everywhere weighs far more than the same rule broken once. The standard's class for the requirement (critical, major or minor) sets its severity, not the model's rating. Repeats of a finding in the same file do not count. |
+| 1. Rules, weighted by spread | One row per requirement of the standard that was broken. A rule weighs more the larger the share of files it is broken in, so a rule broken everywhere weighs far more than the same rule broken once. The severity of each finding is the model's own rating. The standard suggests a severity per rule in the checklist the model reads, and the model may depart from it with a stated reason. Repeats of a finding in the same file do not count. |
 | 2. Base | The total weight of the broken rules sets the base score on a curve that falls fast at first and flattens later. Strictness K sets how fast. |
 | 3. Lift | Compliance lifts the base toward 10. It is counted in the same unit as the violations, by how many files follow each rule, and compressed so a few good examples do not erase real problems. |
 | 4. Ceiling and floor | The ceiling falls with the log of the total rule weight, so a principle with many broken rules cannot reach the top on compliance alone. The worst severity present sets a floor. The score is the lifted value held between floor and ceiling. |

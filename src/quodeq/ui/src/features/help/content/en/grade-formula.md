@@ -16,7 +16,7 @@ Pick a dimension and a principle in the header. The right column of each row rea
 
 | Key | Value |
 | --- | --- |
-| 1. Rules, weighted by spread | Severity weights for critical, major and minor rules. One row is one requirement of the standard, not one finding. A rule weighs more the more files it is broken in, and its severity comes from the standard's class for that requirement, not from the model. Repeats of a finding in the same file do not count. A readout shows how much a critical rule weighs relative to a minor one. Live: how many rules the principle broke and their total weight. |
+| 1. Rules, weighted by spread | Severity weights for critical, major and minor rules. One row is one requirement of the standard, not one finding. A rule weighs more the more files it is broken in, and its severity is the model's rating for each finding; the standard's suggested severity is shown to the model in its checklist, never applied afterwards. Repeats of a finding in the same file do not count. A readout shows how much a critical rule weighs relative to a minor one. Live: how many rules the principle broke and their total weight. |
 | 2. Base | Strictness K, with the curve it draws. Live: the base score. |
 | 3. Lift | Lift compress. Live: the principle's compliance rules, the share of the gap they lift, and the lifted score. |
 | 4. Ceiling and floors | Ceiling scale and the severity floors for a worst rule that is minor or major. Live: the ceiling, the floor, and the final score with its grade. |

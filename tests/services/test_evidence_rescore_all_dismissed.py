@@ -18,7 +18,7 @@ def test_dimension_with_every_violation_dismissed_reads_insufficient(tmp_path):
     out = score_dimension_from_evidence(
         tmp_path, DIM, EvidenceScoreRequest(
             dismissed={("R-1", "a.kt", 10), ("R-2", "b.kt", 20)}, deleted=set(),
-            source_file_count=10, files_read=5, params=DEFAULT_PARAMS, classes={}))
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     assert out is not None
     emptied = out.principles["Modularity"]
     assert emptied.final_score is None and emptied.grade == Grade.INSUFFICIENT

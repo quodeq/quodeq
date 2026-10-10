@@ -2,8 +2,8 @@
 """Re-score stored dimension reports with the production grade formula and print the calibration yardsticks.
 
 Usage:
-    uv run python tools/grade_calibration.py <root>... [--classes compiled|proxy|none]
-        [--params FILE] [--labels FILE] [--grid FILE] [--motion RUNID:REQ,REQ]
+    uv run python tools/grade_calibration.py <root>... [--params FILE] [--labels FILE]
+        [--grid FILE] [--motion RUNID:REQ,REQ]
 
 A root holds ``<project>/<run>/evaluation/<dimension>.json``. The table sets
 the stored scores beside the current formula's. Output is numbers and short
@@ -21,11 +21,9 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from _grade_calibration_load import load_reports  # noqa: E402
 from _grade_calibration_metrics import (  # noqa: E402
-    CLASS_MODES,
     GRADES,
     RUN_WIDTH,
     label_rows,
-    resolve_classes,
     score_report,
     yardsticks,
 )
@@ -94,14 +92,14 @@ def _parse_motion(raw: str | None) -> tuple[str, list[str]] | None:
     return run, [r for r in rules.split(",") if r]
 
 
-def _scores(reports: list, params: ScoringParams, classes: dict[str, str]) -> list[float | None]:
-    return [score_report(r, params, classes) for r in reports]
+def _scores(reports: list, params: ScoringParams) -> list[float | None]:
+    return [score_report(r, params) for r in reports]
 
 
-def _print_grid(reports: list, grid: list[dict], classes: dict[str, str]) -> None:
+def _print_grid(reports: list, grid: list[dict]) -> None:
     for number, entry in enumerate(grid, 1):
         params = params_from_dict(entry)
-        y = yardsticks(reports, _scores(reports, params, classes), params=params)
+        y = yardsticks(reports, _scores(reports, params), params=params)
         print(f"grid {number}: bench {_range(y['benchmark_range'])} model dev {_fmt(y['model_deviation'])} "
               f"s/n {_fmt(y['signal_to_noise'])} temporal {_fmt(y['temporal_mean_delta'])} p90 {_fmt(y['temporal_p90'])} "
               f"| {_shares(y['grade_shares'])} | {json.dumps(entry, sort_keys=True)}")
@@ -110,7 +108,6 @@ def _print_grid(reports: list, grid: list[dict], classes: dict[str, str]) -> Non
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("roots", nargs="+", type=Path)
-    parser.add_argument("--classes", choices=CLASS_MODES, default="compiled")
     parser.add_argument("--params", help="JSON file of formula params (camelCase), default the shipped formula")
     parser.add_argument("--labels", help='JSON {"<project>": "<grade>"} of expected bands')
     parser.add_argument("--grid", help="JSON list of param dicts, one yardstick row each")
@@ -123,18 +120,17 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     reports = load_reports([p.expanduser() for p in args.roots])
     params = params_from_dict(_read_json(args.params)) if args.params else DEFAULT_PARAMS
-    classes = resolve_classes(args.classes, reports)
-    scores = _scores(reports, params, classes)
+    scores = _scores(reports, params)
     motion = _parse_motion(args.motion)
     stored = yardsticks(reports, [r.cur for r in reports])
-    current = yardsticks(reports, scores, params=params, motion=motion, classes=classes)
-    print(f"classes {args.classes} ({len(classes)} rules), run ids shown to {RUN_WIDTH} characters")
+    current = yardsticks(reports, scores, params=params, motion=motion)
+    print(f"run ids shown to {RUN_WIDTH} characters")
     _print_table(stored, current)
     _print_motion(current["motion"])
     if args.labels:
         _print_labels(label_rows(reports, scores, _read_json(args.labels), params))
     if args.grid:
-        _print_grid(reports, _read_json(args.grid), classes)
+        _print_grid(reports, _read_json(args.grid))
     return 0
 
 

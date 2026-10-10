@@ -79,7 +79,7 @@ def _score_numerical(ctx: _PrincipleContext) -> PrincipleScore:
         return PrincipleScore(**kwargs, final_score=None, grade=Grade.INSUFFICIENT, observation=0.0)
     rows = requirement_rows(violations, compliance)
     params = ctx.scale.params
-    mass = principle_mass(rows, ctx.scale.source_file_count, ctx.scale.classes, params=params)
+    mass = principle_mass(rows, ctx.scale.source_file_count, params=params)
     base, lift, _raw, final = principle_stages(mass, params=params)
     return PrincipleScore(
         **kwargs, base_score=round(base, 1),
@@ -142,8 +142,8 @@ def score_all_principles(
     """Score every principle and return the per-principle dict.
 
     ``scale`` carries the project size, the confidence scale multiplier, the
-    scoring formula and the standard's severity classes, the same object the
-    projector's ``compute_principle_grade`` takes.
+    scoring formula, the same object the projector's ``compute_principle_grade``
+    takes.
     """
     scorer = _score_numerical if mode == MODE_NUMERICAL else _score_graded
     return {

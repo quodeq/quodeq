@@ -51,7 +51,7 @@ def standards_fingerprint(project_dir: Path, *, compiled_dir: Path | None | obje
     the project's local clone (``repository_info.json`` ``path``), and a
     project without one contributes no overrides. *compiled_dir* defaults to
     the directory a rescore resolves. Custom evaluators count too: their
-    severity classes reach the grade.
+    suggested severities reach the prompt.
     """
     default_compiled, evaluators_dir = standard_dirs()
     if compiled_dir is _UNSET:

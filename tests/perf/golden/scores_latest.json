@@ -11,14 +11,14 @@
         "fromDateLabel": "5 Feb 2026",
         "fromProject": "golden-child",
         "fromRunId": "20260205T000000",
-        "overallGrade": "Good",
-        "overallScore": "7.7/10",
+        "overallGrade": "Exemplary",
+        "overallScore": "9.6/10",
         "principles": [
           {
             "confidence": "low",
-            "grade": "Good",
+            "grade": "Exemplary",
             "principle": "Confidentiality",
-            "score": "8.5/10"
+            "score": "9.6/10"
           },
           {
             "grade": "Adequate",
@@ -27,9 +27,9 @@
           },
           {
             "confidence": "low",
-            "grade": "Adequate",
+            "grade": "Exemplary",
             "principle": "Integrity",
-            "score": "6.8/10"
+            "score": "9.6/10"
           }
         ],
         "quarantinedCount": 0,
@@ -90,14 +90,14 @@
         "fromDateLabel": "10 Feb 2026",
         "fromProject": "golden-child",
         "fromRunId": "20260210T000000",
-        "overallGrade": "Adequate",
-        "overallScore": "6.0/10",
+        "overallGrade": "Exemplary",
+        "overallScore": "9.1/10",
         "principles": [
           {
             "confidence": "medium",
-            "grade": "Adequate",
+            "grade": "Exemplary",
             "principle": "Confidentiality",
-            "score": "6.0/10"
+            "score": "9.1/10"
           }
         ],
         "quarantinedCount": 0,
@@ -174,8 +174,8 @@
     "project": "golden",
     "summary": {
       "dimensionCount": 2,
-      "numericAverage": 6.8,
-      "overallGrade": "Adequate",
+      "numericAverage": 9.3,
+      "overallGrade": "Exemplary",
       "previousNumericAverage": null,
       "severity": {
         "critical": 0,
@@ -220,7 +220,7 @@
   ],
   "scoring": {
     "customFormula": false,
-    "formulaVersion": 4
+    "formulaVersion": 5
   },
   "trend": [
     {
@@ -231,12 +231,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": -1.4,
+          "delta": -0.1,
           "dimension": "security",
-          "grade": "Good",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 3,
-          "score": 7.8,
+          "score": 9.7,
           "violations": 3
         }
       ],
@@ -245,12 +245,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 7.8,
+      "numericAverage": 9.7,
       "openTypes": 3,
-      "overallGrade": "Good",
+      "overallGrade": "Exemplary",
       "runId": "20260205T000000",
-      "runNumericAverage": 7.8,
-      "runOverallGrade": "Good",
+      "runNumericAverage": 9.7,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 3
     },
@@ -262,12 +262,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.9,
+          "delta": 0.4,
           "dimension": "security",
           "grade": "Exemplary",
           "majors": 0,
           "openTypes": 2,
-          "score": 9.2,
+          "score": 9.8,
           "violations": 2
         }
       ],
@@ -276,11 +276,11 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 9.2,
+      "numericAverage": 9.8,
       "openTypes": 2,
       "overallGrade": "Exemplary",
       "runId": "20260204T000000",
-      "runNumericAverage": 9.2,
+      "runNumericAverage": 9.8,
       "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 2
@@ -293,12 +293,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.9,
+          "delta": 0.1,
           "dimension": "security",
-          "grade": "Good",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 3,
-          "score": 8.3,
+          "score": 9.4,
           "violations": 3
         }
       ],
@@ -307,12 +307,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 8.3,
+      "numericAverage": 9.4,
       "openTypes": 3,
-      "overallGrade": "Good",
+      "overallGrade": "Exemplary",
       "runId": "20260202T000000",
-      "runNumericAverage": 8.3,
-      "runOverallGrade": "Good",
+      "runNumericAverage": 9.4,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 3
     },
@@ -324,12 +324,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 1.4,
+          "delta": 0.2,
           "dimension": "security",
-          "grade": "Good",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 4,
-          "score": 7.4,
+          "score": 9.3,
           "violations": 4
         }
       ],
@@ -338,12 +338,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 7.4,
+      "numericAverage": 9.3,
       "openTypes": 4,
-      "overallGrade": "Good",
+      "overallGrade": "Exemplary",
       "runId": "20260201T000000",
-      "runNumericAverage": 7.4,
-      "runOverallGrade": "Good",
+      "runNumericAverage": 9.3,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 4
     },
@@ -357,10 +357,10 @@
           "critical": 0,
           "delta": null,
           "dimension": "security",
-          "grade": "Adequate",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 5,
-          "score": 6.0,
+          "score": 9.1,
           "violations": 5
         }
       ],
@@ -369,12 +369,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 6.0,
+      "numericAverage": 9.1,
       "openTypes": 5,
-      "overallGrade": "Adequate",
+      "overallGrade": "Exemplary",
       "runId": "20260200T000000",
-      "runNumericAverage": 6.0,
-      "runOverallGrade": "Adequate",
+      "runNumericAverage": 9.1,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 5
     }

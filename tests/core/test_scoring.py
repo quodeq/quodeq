@@ -246,9 +246,10 @@ def test_thin_principle_is_scored_with_a_low_confidence_marker():
     assert p.observation > 0
 
 
-def test_classes_pin_the_severity_of_a_rule():
-    v = [{"file": f"f{i}.py", "line": 1, "snippet": "s", "reason": "sql", "severity": "minor", "req": "S-INT-2"} for i in range(50)]
-    ev = _make_evidence(violations=v, compliance=[{"file": "ok.py", "line": 1, "snippet": "p", "reason": "safe", "req": "S-INT-2"}])
-    loose = score_evidence(ev, mode="numerical").principles["ts-001"].final_score
-    pinned = score_evidence(ev, mode="numerical", classes={"S-INT-2": "critical"}).principles["ts-001"].final_score
-    assert pinned < loose
+def test_the_findings_own_severity_sets_the_weight():
+    minor = [{"file": f"f{i}.py", "line": 1, "snippet": "s", "reason": "sql", "severity": "minor", "req": "S-INT-2"} for i in range(50)]
+    critical = [dict(x, severity="critical") for x in minor]
+    ok = [{"file": "ok.py", "line": 1, "snippet": "p", "reason": "safe", "req": "S-INT-2"}]
+    loose = score_evidence(_make_evidence(violations=minor, compliance=ok), mode="numerical").principles["ts-001"].final_score
+    harsh = score_evidence(_make_evidence(violations=critical, compliance=ok), mode="numerical").principles["ts-001"].final_score
+    assert harsh < loose

@@ -1,8 +1,6 @@
 """Public scoring API, delegates principle-level work to principle."""
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 from quodeq.core.types import ScaleInfo, ScoringResult
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.scoring.overall import weighted_overall
@@ -19,7 +17,6 @@ def grade_for_score(score: float) -> str:
 
 def run_scoring(
     evidence: dict, mode: str, params: ScoringParams = DEFAULT_PARAMS,
-    *, classes: Mapping[str, str] | None = None,
 ) -> ScoringResult:
     """Compute per-principle scores and return the full result."""
     source_file_count = evidence.get("source_file_count", 0)
@@ -28,7 +25,7 @@ def run_scoring(
 
     scale = PrincipleGradeScale(
         source_file_count=source_file_count, scale_multiplier=scale_mult,
-        params=params, classes=classes or {},
+        params=params,
     )
     per_principle = score_all_principles(evidence.get("principles", {}), mode, scale, files_read)
     return ScoringResult(
@@ -49,7 +46,6 @@ def run_scoring(
 def score_evidence(
     evidence: Evidence, mode: str = "numerical",
     params: ScoringParams = DEFAULT_PARAMS,
-    *, classes: Mapping[str, str] | None = None,
 ) -> ScoringResult:
     """Score Evidence using the scoring engine."""
-    return run_scoring(evidence.to_evidence_dict(), mode=mode, params=params, classes=classes)
+    return run_scoring(evidence.to_evidence_dict(), mode=mode, params=params)

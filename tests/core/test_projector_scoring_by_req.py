@@ -55,7 +55,7 @@ def test_projector_and_evidence_agree_by_req():
         [judgment_to_dict(j) for j in violations],
         [judgment_to_dict(j) for j in compliance],
     )
-    expected_score, expected_grade = principle_score_and_grade(principle_mass(rows, 0, {}))
+    expected_score, expected_grade = principle_score_and_grade(principle_mass(rows, 0))
 
     # SQL path: the Finding shape the projector scores.
     projector = compute_principle_grade(

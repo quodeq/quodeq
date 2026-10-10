@@ -6,8 +6,7 @@ same object and cannot drift on which inputs reach the formula.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 
@@ -18,12 +17,10 @@ class PrincipleGradeScale:
 
     ``source_file_count``/``scale_multiplier`` feed
     ``classify_confidence_level`` (thin evidence relative to project size) and
-    the requirement spread; ``params`` is the scoring formula; ``classes``
-    maps a requirement id to the severity class its standard pins. Defaults
+    the requirement spread; ``params`` is the scoring formula. Defaults
     reproduce the pre-object call shape (no scaling, default formula).
     """
 
     source_file_count: int = 0
     scale_multiplier: int = 1
     params: ScoringParams = DEFAULT_PARAMS
-    classes: Mapping[str, str] = field(default_factory=dict)

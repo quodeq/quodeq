@@ -53,11 +53,6 @@ class _FakeStore:
     def save_grades_algo_version(self, version):
         pass
 
-    def get_grades_classes_fingerprint(self):
-        from quodeq.data.fs.severity_classes_store import (
-            load_severity_classes, severity_classes_fingerprint)
-        return severity_classes_fingerprint(load_severity_classes(None))
-
     def record_finding(self, payload):
         self.findings.append(payload)
 

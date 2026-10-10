@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
-from quodeq.data.fs.severity_classes_store import load_severity_classes_for_run, severity_classes_fingerprint
 from quodeq.data.projection.grade_projector import report_stamp
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 
@@ -37,7 +36,6 @@ def build_projected_run(
     # the baked grades as computed-by-older-math and recomputes them, from
     # this run's zero findings, wiping the very scores the tests bake in.
     store.save_grades_algo_version(GRADE_ALGO_VERSION)
-    store.save_grades_classes_fingerprint(severity_classes_fingerprint(load_severity_classes_for_run(run_dir)))
     for dim, (score, grade) in dims.items():
         store.record_dimension_score(dimension=dim, score=score, grade=grade)
 

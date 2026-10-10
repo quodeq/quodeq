@@ -22,12 +22,12 @@ def _report(path: Path, dimension: str, score: str, violations, files=1000):
 
 
 def test_harness_scores_and_reports_without_paths(tmp_path: Path, capsys) -> None:
-    bad = [{"principle": "P", "req": "S-INT-2", "severity": "minor", "file": f"f{i}.java"} for i in range(900)]
+    bad = [{"principle": "P", "req": "S-INT-2", "severity": "critical", "file": f"f{i}.java"} for i in range(900)]
     _report(tmp_path / "BenchmarkJava" / "r1" / "evaluation" / "security.json", "security", "4.5/10", bad)
     (tmp_path / "BenchmarkJava" / "r1" / "status.json").write_text('{"ai_provider": "x", "ai_model": "m"}')
     _report(tmp_path / "clean" / "r1" / "evaluation" / "security.json", "security", "9.0/10", [{"principle": "P", "req": "S-INT-2", "severity": "minor", "file": "a.java"}])
     reports = load_reports([tmp_path])
-    scores = [score_report(r, DEFAULT_PARAMS, {"S-INT-2": "critical"}) for r in reports]
+    scores = [score_report(r, DEFAULT_PARAMS) for r in reports]
     out = yardsticks(reports, scores)
     assert out["benchmark_range"][1] < 3.0
     assert set(out["grade_shares"]) == {"Exemplary", "Good", "Adequate", "Poor", "Critical"}
@@ -50,7 +50,7 @@ def _two_models(tmp_path: Path) -> None:
 def test_pairs_temporal_and_motion(tmp_path: Path) -> None:
     _two_models(tmp_path)
     reports = load_reports([tmp_path])
-    scores = [score_report(r, DEFAULT_PARAMS, {}) for r in reports]
+    scores = [score_report(r, DEFAULT_PARAMS) for r in reports]
     out = yardsticks(reports, scores, motion=("bbbb", ["S-INT-9", "S-INT-2"]))
     assert out["model_pairs"] == 1
     assert out["model_deviation"] == pytest.approx(abs(scores[0] - scores[1]), abs=1e-3)
@@ -66,7 +66,7 @@ def test_cli_prints_table_labels_and_grid_without_paths(tmp_path: Path, capsys) 
     labels.write_text(json.dumps({"proj-with-a-long-name": "Poor"}))
     grid = tmp_path / "grid.json"
     grid.write_text(json.dumps([{"baseK": 0.2}, {"baseK": 0.05}]))
-    code = main([str(tmp_path), "--classes", "none", "--labels", str(labels), "--grid", str(grid), "--motion", "bbbb:S-INT-9"])
+    code = main([str(tmp_path), "--labels", str(labels), "--grid", str(grid), "--motion", "bbbb:S-INT-9"])
     out = capsys.readouterr().out
     assert code == 0
     assert "proj-with-a-" in out and "proj-with-a-long" not in out
@@ -97,7 +97,7 @@ def test_pairing_temporal_shares_and_signal_to_noise(tmp_path: Path) -> None:
     _run(tmp_path, "proj", "r1", "reliability", "m1", 10, 10)
     _run(tmp_path, "proj", "r2", "reliability", "m2", 12, 30)
     reports = load_reports([tmp_path])
-    scores = [score_report(r, DEFAULT_PARAMS, {}) for r in reports]
+    scores = [score_report(r, DEFAULT_PARAMS) for r in reports]
     by_run = {r.run: s for r, s in zip(reports, scores)}
     out = yardsticks(reports, scores)
 
@@ -127,7 +127,7 @@ def test_names_are_cut_and_paths_never_printed(tmp_path: Path, capsys) -> None:
     (tmp_path / "project_index.json").write_text(json.dumps({f"{long_name}\x00{secret}": "uuid-1"}))
     labels = tmp_path / "labels.json"
     labels.write_text(json.dumps({long_name: "Good", "AnotherVeryLongProjectName": "Good"}))
-    assert main([str(tmp_path), "--classes", "none", "--labels", str(labels), "--motion", "run1:S-INT-2"]) == 0
+    assert main([str(tmp_path), "--labels", str(labels), "--motion", "run1:S-INT-2"]) == 0
     out = capsys.readouterr().out
     assert long_name[:12] in out and "AnotherVeryL" in out
     for forbidden in (long_name, "AnotherVeryLongProjectName", "/Users/secret", str(tmp_path)):
@@ -144,3 +144,8 @@ def test_a_principle_stored_as_insufficient_is_still_scored(tmp_path: Path) -> N
     path.write_text(json.dumps(data))
     (report,) = load_reports([tmp_path])
     assert set(report.principles) == {"P"}
+
+
+def test_cli_has_no_classes_option():
+    from grade_calibration import _parser
+    assert "--classes" not in _parser().format_help()

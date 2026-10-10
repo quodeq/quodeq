@@ -45,10 +45,10 @@
       "dismissedCount": 2,
       "evidenceDate": "<timestamp>",
       "filesRead": 10,
-      "overallGrade": "Good",
-      "overallScore": "7.8/10",
+      "overallGrade": "Exemplary",
+      "overallScore": "9.7/10",
       "previousRunId": "20260204T000000",
-      "previousScore": "9.2/10",
+      "previousScore": "9.8/10",
       "principles": [
         {
           "confidence": "low",
@@ -58,9 +58,9 @@
         },
         {
           "confidence": "low",
-          "grade": "Adequate",
+          "grade": "Exemplary",
           "principle": "Integrity",
-          "score": "6.8/10"
+          "score": "9.6/10"
         }
       ],
       "quarantinedCount": 0,
@@ -129,7 +129,7 @@
       "evidenceDate": "<timestamp>",
       "openTypes": 2,
       "overallGrade": "Exemplary",
-      "overallScore": "9.2/10",
+      "overallScore": "9.8/10",
       "principles": [],
       "quarantinedCount": 0,
       "runId": "20260204T000000",
@@ -156,7 +156,7 @@
     "dateLabel": "5 Feb 2026",
     "exitReason": null,
     "gradeAlgoVersion": null,
-    "gradesAlgoVersion": 4,
+    "gradesAlgoVersion": 5,
     "runId": "20260205T000000"
   },
   "sinceBaseline": {
@@ -210,11 +210,11 @@
     "gradeBreakdown": [
       {
         "count": 1,
-        "grade": "Good"
+        "grade": "Exemplary"
       }
     ],
-    "numericAverage": 7.8,
-    "overallGrade": "Good"
+    "numericAverage": 9.7,
+    "overallGrade": "Exemplary"
   },
   "trend": [
     {
@@ -225,12 +225,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": -1.4,
+          "delta": -0.1,
           "dimension": "security",
-          "grade": "Good",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 3,
-          "score": 7.8,
+          "score": 9.7,
           "violations": 3
         }
       ],
@@ -239,12 +239,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 7.8,
+      "numericAverage": 9.7,
       "openTypes": 3,
-      "overallGrade": "Good",
+      "overallGrade": "Exemplary",
       "runId": "20260205T000000",
-      "runNumericAverage": 7.8,
-      "runOverallGrade": "Good",
+      "runNumericAverage": 9.7,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 3
     },
@@ -256,12 +256,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.9,
+          "delta": 0.4,
           "dimension": "security",
           "grade": "Exemplary",
           "majors": 0,
           "openTypes": 2,
-          "score": 9.2,
+          "score": 9.8,
           "violations": 2
         }
       ],
@@ -270,11 +270,11 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 9.2,
+      "numericAverage": 9.8,
       "openTypes": 2,
       "overallGrade": "Exemplary",
       "runId": "20260204T000000",
-      "runNumericAverage": 9.2,
+      "runNumericAverage": 9.8,
       "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 2
@@ -287,12 +287,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.9,
+          "delta": 0.1,
           "dimension": "security",
-          "grade": "Good",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 3,
-          "score": 8.3,
+          "score": 9.4,
           "violations": 3
         }
       ],
@@ -301,12 +301,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 8.3,
+      "numericAverage": 9.4,
       "openTypes": 3,
-      "overallGrade": "Good",
+      "overallGrade": "Exemplary",
       "runId": "20260202T000000",
-      "runNumericAverage": 8.3,
-      "runOverallGrade": "Good",
+      "runNumericAverage": 9.4,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 3
     },
@@ -318,12 +318,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 1.4,
+          "delta": 0.2,
           "dimension": "security",
-          "grade": "Good",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 4,
-          "score": 7.4,
+          "score": 9.3,
           "violations": 4
         }
       ],
@@ -332,12 +332,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 7.4,
+      "numericAverage": 9.3,
       "openTypes": 4,
-      "overallGrade": "Good",
+      "overallGrade": "Exemplary",
       "runId": "20260201T000000",
-      "runNumericAverage": 7.4,
-      "runOverallGrade": "Good",
+      "runNumericAverage": 9.3,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 4
     },
@@ -351,10 +351,10 @@
           "critical": 0,
           "delta": null,
           "dimension": "security",
-          "grade": "Adequate",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 5,
-          "score": 6.0,
+          "score": 9.1,
           "violations": 5
         }
       ],
@@ -363,12 +363,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 6.0,
+      "numericAverage": 9.1,
       "openTypes": 5,
-      "overallGrade": "Adequate",
+      "overallGrade": "Exemplary",
       "runId": "20260200T000000",
-      "runNumericAverage": 6.0,
-      "runOverallGrade": "Adequate",
+      "runNumericAverage": 9.1,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 5
     }

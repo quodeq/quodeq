@@ -43,7 +43,7 @@ The major weight and K carry the formula; the ceiling scale and the minor weight
 Group the principle's non-dismissed violations by requirement code (fallback: the `vt` tag, then the free-text `reason`). For each requirement `r`:
 
 - For each file `f` with a violation under `r`, `sev(r, f)` is the severity of that file's worst finding under `r`. Repeats of the same finding in the same file change nothing. A finding with no severity counts as minor.
-- If the standard declares a class for `r`, every file takes the class: `sev(r, f) = class(r)`. The model's rating is not used for classed rules, in either direction.
+- The severity is the finding's own: the model's rating as gated at scan time. The standard's suggested severity per requirement is shown to the model in its checklist and never applied here.
 - `n_>=s(r)` is the number of files whose `sev(r, f)` is at least `s`.
 - Cumulative mass: `w(r) = w_minor * spread(n_>=minor) + (w_major - w_minor) * spread(n_>=major) + (w_critical - w_major) * spread(n_>=critical)`.
 
@@ -134,11 +134,11 @@ Every principle with at least one instance is scored and enters the dimension av
 | P3 | Raising one finding's severity never raises the score |
 | P4 | A model repeating a finding (same rule, file) or a compliance changes nothing |
 | P5 | Doubling the project (every file and finding twice, file count twice) changes nothing, for projects at or above the 100-file floor |
-| P6 | For a classed rule, the model's severity ratings change nothing |
+| P6 | Raising a rating never raises the score |
 | P7 | No cliff from evidence volume: thin evidence is marked, not gated |
 | P8 | A grade label is never worse than the worst effective severity allows |
 
-Known non-properties, accepted: the same location filed under two different rules counts twice (no dedup); floors are a discontinuity in severity, and only unclassed rules can flip them; the mass of an unclassed rule follows the model's per-file severities, which is why the standards carry a severity class on each requirement.
+Known non-properties, accepted: the same location filed under two different rules counts twice (no dedup); floors are a discontinuity in severity, and a single rating can flip them; the mass of a rule follows the model's per-file severities, so two models that rate differently grade differently, by design.
 
 ## Tunable parameters
 

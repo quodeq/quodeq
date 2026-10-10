@@ -200,6 +200,7 @@ def render_standards_grouped(data: object, overrides: dict | None = None) -> str
     present, each requirement's text template is resolved before being emitted
     so that models never receive raw ``{placeholder}`` strings.
     """
+    from quodeq.analysis.prompts.severity_advice import advised_class  # noqa: PLC0415
     from quodeq.core.standards.overrides import resolve_requirement_text  # noqa: PLC0415
 
     if not isinstance(data, dict):
@@ -218,10 +219,14 @@ def render_standards_grouped(data: object, overrides: dict | None = None) -> str
         for r in raw_requirements:
             if not isinstance(r, dict) or not isinstance(r.get("id"), str):
                 continue
-            requirements.append({
+            entry = {
                 "id": r["id"],
                 "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"])),
-            })
+            }
+            advised = advised_class(r, (overrides or {}).get(r["id"]))
+            if advised:
+                entry["severity"] = advised
+            requirements.append(entry)
         checklist.append({
             "principle": p.get("name", "Unknown"),
             "requirements": requirements,
