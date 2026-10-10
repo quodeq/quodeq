@@ -85,7 +85,7 @@ function AppTopBar({ shell }) {
   const {
     state, activeTab, navTab, resolvedDisplayName, sidebarProvider, sidebarModel, isEvaluating, showEvaluate,
     activePage, navStack, navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, setSidebarPinned,
-    contentProps,
+    contentProps, sharedSignal,
   } = shell;
   // A running team-results job (connect, refresh, pull) sweeps the same
   // loading hairline as pending page data, so the top bar moves while the
@@ -113,7 +113,7 @@ function AppTopBar({ shell }) {
             projectName={resolvedDisplayName}
             onSelectProject={() => navTab(NAV_TAB.PROJECTS)}
             siblingsFor={breadcrumbSiblingsFor}
-            projectSwitcher={buildProjectSwitcherProps({ state, navigation: contentProps.navigation, navTab, navStack })}
+            projectSwitcher={buildProjectSwitcherProps({ state, sharedProjects: sharedSignal.projects, navigation: contentProps.navigation, navTab, navStack })}
           />
         ),
         mobileTitle: navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || ''),

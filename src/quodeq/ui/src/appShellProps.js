@@ -64,16 +64,18 @@ export function buildTopBarProps({
 }
 
 // The breadcrumb's project switcher (NavBreadcrumb `projectSwitcher`). Picking
-// a project runs the same switchProject a Repositories card click does, told
-// where the user is so a project-scoped page stays put. "add project" is the
-// navigation bundle's guarded add action, so a running evaluation still
-// blocks it with its toast. Only a LOCAL selection marks a row current: the
-// list holds local projects alone.
-export function buildProjectSwitcherProps({ state, navigation, navTab, navStack }) {
+// a project runs the same switchProject a Repositories card click does, with
+// the row's source, told where the user is so a project-scoped page stays
+// put. The list holds the local projects plus the remote ones with no local
+// copy, so a selection of either source marks its row current. "add project"
+// is the navigation bundle's guarded add action, so a running evaluation
+// still blocks it with its toast.
+export function buildProjectSwitcherProps({ state, sharedProjects, navigation, navTab, navStack }) {
   return {
     projects: state.projects ?? [],
-    selectedProject: state.selectedSource === PROJECT_SOURCE.SHARED ? null : state.selectedProject,
-    onPick: (id) => switchProject(navigation, id, PROJECT_SOURCE.LOCAL, {
+    sharedProjects,
+    selectedProject: state.selectedProject,
+    onPick: (id, source = PROJECT_SOURCE.LOCAL) => switchProject(navigation, id, source, {
       rootTab: navStack[0]?.page, depth: navStack.length,
     }),
     onAllRepositories: () => navTab(NAV_TAB.PROJECTS),
