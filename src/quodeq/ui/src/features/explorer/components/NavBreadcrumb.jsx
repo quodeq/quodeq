@@ -146,13 +146,14 @@ function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey,
  * or no project to list (the crumb then keeps its plain navigation). */
 function useSwitcher(projectSwitcher, hasProjectCrumb) {
   const projects = projectSwitcher?.projects;
-  const rows = useMemo(() => buildSwitcherRows(projects), [projects]);
+  const sharedProjects = projectSwitcher?.sharedProjects;
+  const rows = useMemo(() => buildSwitcherRows(projects, sharedProjects), [projects, sharedProjects]);
   if (!projectSwitcher || !hasProjectCrumb || rows.length === 0) return null;
   const { selectedProject, onPick, onAllRepositories, onAddProject } = projectSwitcher;
   return {
     rows,
     currentId: selectedProject ?? null,
-    onPick: (row) => onPick(row.id),
+    onPick: (row) => onPick(row.id, row.source),
     onAllRepositories,
     onAddProject,
   };
@@ -177,8 +178,8 @@ function useSwitcher(projectSwitcher, hasProjectCrumb) {
  * Ancestor menus are a path, sibling menus are a choice — they're styled
  * differently on purpose.
  *
- * Project switcher: given `projectSwitcher` and at least one local project,
- * the project root opens a searchable project list (also on Cmd/Ctrl+P)
+ * Project switcher: given `projectSwitcher` and at least one project, local
+ * or remote, the project root opens a searchable project list (also on Cmd/Ctrl+P)
  * instead of navigating to Repositories; see ProjectSwitcher.jsx.
  *
  * Segments never wrap; only the current (last) segment may shrink.

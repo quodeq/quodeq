@@ -738,6 +738,7 @@
   "explorer.switcherAria": "Switch project",
   "explorer.switcherEmpty": "No matching projects",
   "explorer.switcherListAria": "Projects",
+  "explorer.switcherRemoteTag": "remote",
   "explorer.switcherSearchAria": "Search projects",
   "explorer.switcherSearchPlaceholder": "search projects",
   "explorer.switcherTitle": "Switch project ({shortcut})",
