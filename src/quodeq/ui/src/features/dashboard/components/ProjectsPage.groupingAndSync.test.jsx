@@ -220,6 +220,17 @@ describe('ProjectsPage — pending grade chip', () => {
     expect(chip).toHaveAttribute('aria-label');
   });
 
+  it('shows the last known grade dimmed while the summary is recomputed', async () => {
+    const projects = [{ id: 'a', name: 'proj-a', location: 'local', summaryPending: true, latestGrade: 'B', latestScore: 7.4 }];
+    const fakeApi = makeFakeApi();
+    const { container } = renderWithApi(<ProjectsPage projects={projects} actions={{}} />, fakeApi);
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(container.querySelector('.projects-grade--pending')).toBeNull();
+    const chip = container.querySelector('.projects-grade--updating');
+    expect(chip).toHaveTextContent('7.4 B');
+    expect(chip).toHaveAttribute('aria-busy', 'true');
+  });
+
   it('shows the real grade, not the placeholder, once the summary settles', async () => {
     const projects = [{ id: 'a', name: 'proj-a', location: 'local', summaryPending: false, latestGrade: 'B', latestScore: 7.5 }];
     const fakeApi = makeFakeApi();

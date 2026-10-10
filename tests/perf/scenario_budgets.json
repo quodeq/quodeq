@@ -25,6 +25,12 @@
     "response_bytes": 790,
     "standards_reads": 2
   },
+  "formula_pass": {
+    "eval_report_reads": 134,
+    "evaluation_db_opens": 201,
+    "peak_kib": 246,
+    "response_bytes": 0
+  },
   "project_list_cold": {
     "eval_report_reads": 67,
     "evaluation_db_opens": 66,

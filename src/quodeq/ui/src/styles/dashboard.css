@@ -1923,6 +1923,8 @@
 /* 31px matches the real .term-stat__value box (font-size 28px, line-height
    1.1, terminal.css:119-124) so the stat card's footprint doesn't shrink. */
 .overview-skeleton__bar--value { width: 55%; height: 31px; }
+/* The score slot's last known grade: real text at the bar's dimness. */
+.overview-skeleton__last-known { opacity: 0.55; }
 .overview-skeleton__bar--hint { width: 70%; height: 8px; }
 .overview-skeleton__bar--name { width: 60%; height: 14px; }
 /* 100px matches DimensionGaugeCard's RING_SIZE (DimensionGaugeCard.jsx) so the
@@ -2559,6 +2561,10 @@
 @media (prefers-reduced-motion: reduce) {
   .projects-grade--pending { animation: none; opacity: 0.6; }
 }
+
+/* The last known grade while the warm-up rebuilds it: readable, but
+   visibly not the current number. */
+.projects-grade--updating { opacity: 0.55; }
 
 /* ── Repositories table ──
    One row per project (ProjectsTable / ProjectRow). Columns: name, score,

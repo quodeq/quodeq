@@ -240,3 +240,4 @@ describe("applyMutationDelta", () => {
     expect(next.dimensions[1]).toBe(prevDims[1]);
   });
 });
+

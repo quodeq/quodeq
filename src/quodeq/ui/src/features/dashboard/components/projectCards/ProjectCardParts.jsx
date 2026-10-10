@@ -7,8 +7,11 @@ export function GradeChip({ grade, score, pending = false }) {
   }
   if (!grade && score == null) return null;
   const cls = grade ? `projects-grade--${grade.toLowerCase()}` : 'projects-grade--x';
+  // A pending card with a grade is the last known one, computed under the
+  // previous formula or version: shown dimmed while the warm-up rebuilds it.
+  const updating = pending ? ' projects-grade--updating' : '';
   return (
-    <span className={`projects-grade ${cls}`}>
+    <span className={`projects-grade ${cls}${updating}`} title={pending ? t('projects.gradeUpdating') : undefined} aria-busy={pending || undefined}>
       {score != null ? `${score} ` : ''}{gradeLetter(grade)}
     </span>
   );

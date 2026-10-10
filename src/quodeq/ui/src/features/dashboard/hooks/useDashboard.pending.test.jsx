@@ -61,3 +61,31 @@ describe('useDashboard with a pending Overview', () => {
     expect(result.current.error).toBeNull();
   });
 });
+
+describe('useDashboard with a last known grade in the pending body', () => {
+  it('exposes lastKnown while pending and drops it once the payload lands', async () => {
+    const lastKnown = { grade: 'B', score: 7.4, files: 12 };
+    const fakeApi = makeFakeApi({ dashboard: { ...PENDING, lastKnown } });
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: 'p1', selectedRun: null }),
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
+    );
+    await waitFor(() => expect(result.current.pending).toBe(true));
+    expect(result.current.lastKnown).toEqual(lastKnown);
+
+    fakeApi.getDashboard.mockResolvedValue({ project: 'p1', trend: [], summary: {}, dimensions: [], selectedRun: { runId: 'r1' } });
+    await waitFor(() => expect(result.current.dashboard?.selectedRun?.runId).toBe('r1'), { timeout: 5000 });
+    expect(result.current.lastKnown).toBeNull();
+  });
+
+  it('is null when the pending body carries no summary', async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: 'p1', selectedRun: null }),
+      { wrapper: ({ children }) => wrap(fakeApi, children) },
+    );
+    await waitFor(() => expect(result.current.pending).toBe(true));
+    expect(result.current.lastKnown).toBeNull();
+  });
+});
+
