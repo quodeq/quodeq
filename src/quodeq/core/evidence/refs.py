@@ -90,5 +90,5 @@ def enrich_judgment(
     resolved = resolve_llm_refs(llm_refs, all_req_refs, options.cwe_url_template)
     if not resolved:
         return j
-    refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in resolved]
+    refs = [ReqRef.from_dict(r) for r in resolved]
     return replace(j, req_refs=refs)
