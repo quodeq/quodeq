@@ -61,10 +61,9 @@ _SELECT_NON_DISMISSED = (
     "FROM findings WHERE verdict != 'dismissed'"
 )
 
-_SELECT_DISMISSED_COUNTS = (
-    "SELECT dimension, practice_id, COUNT(*) FROM findings "
-    "WHERE verdict = 'dismissed' GROUP BY dimension, practice_id"
-)
+# Dismissed violations score nothing but stay observed: the grade reads
+# their rule and file.
+_SELECT_DISMISSED = _SELECT_NON_DISMISSED.replace("verdict != 'dismissed'", "verdict = 'dismissed'")
 
 
 def _dict_row(cursor, row):
@@ -74,7 +73,7 @@ def _dict_row(cursor, row):
 def _grade_all_principles(
     violations_by: dict[tuple[str, str], list[Finding]],
     compliance_by: dict[tuple[str, str], list[Finding]],
-    dismissed_counts: dict[tuple[str, str], int],
+    dismissed_by: dict[tuple[str, str], list[Finding]],
     source_file_count: int,
     params: ScoringParams,
 ) -> tuple[list[tuple[str, dict]], dict[str, list[dict]]]:
@@ -88,7 +87,7 @@ def _grade_all_principles(
             principle_id=principle_id,
             findings=violations_by.get((dim, principle_id), []),
             compliance=compliance_by.get((dim, principle_id), []),
-            dismissed_count=dismissed_counts.get((dim, principle_id), 0),
+            dismissed=dismissed_by.get((dim, principle_id), []),
             scale=scale,
         )
         principle_grades_by_dim.setdefault(dim, []).append(grade)
@@ -98,12 +97,12 @@ def _grade_all_principles(
 
 @dataclass(frozen=True, slots=True)
 class GradeInputs:
-    """What the scorer reads from a run: active findings grouped by
-    (dimension, principle), dismissed counts, and the project size."""
+    """What the scorer reads from a run: active and dismissed findings
+    grouped by (dimension, principle), and the project size."""
 
     violations_by: dict[tuple[str, str], list[Finding]]
     compliance_by: dict[tuple[str, str], list[Finding]]
-    dismissed_counts: dict[tuple[str, str], int]
+    dismissed_by: dict[tuple[str, str], list[Finding]]
     source_file_count: int
 
 
@@ -116,18 +115,20 @@ def load_grade_inputs(run_dir: Path) -> GradeInputs:
     ``unmapped_findings``, which is never graded.
     """
     with open_evaluation_db(run_dir) as conn:
-        dismissed_raw = conn.execute(_SELECT_DISMISSED_COUNTS).fetchall()
         conn.row_factory = _dict_row
         rows = conn.execute(_SELECT_NON_DISMISSED).fetchall()
+        dismissed_rows = conn.execute(_SELECT_DISMISSED).fetchall()
     violations_by: dict[tuple[str, str], list[Finding]] = {}
     compliance_by: dict[tuple[str, str], list[Finding]] = {}
     for f in (row_to_finding(r) for r in rows):
         bucket = violations_by if f.verdict == FindingType.VIOLATION else compliance_by
         bucket.setdefault((f.dimension or "", f.practice_id), []).append(f)
-    dismissed = {(dimension, practice_id): count for dimension, practice_id, count in dismissed_raw}
+    dismissed_by: dict[tuple[str, str], list[Finding]] = {}
+    for f in (row_to_finding(r) for r in dismissed_rows):
+        dismissed_by.setdefault((f.dimension or "", f.practice_id), []).append(f)
     return GradeInputs(
         violations_by=violations_by, compliance_by=compliance_by,
-        dismissed_counts=dismissed,
+        dismissed_by=dismissed_by,
         source_file_count=_read_source_file_count(run_dir),
     )
 
@@ -145,7 +146,7 @@ def compute_run_grades(
     """
     inputs = load_grade_inputs(run_dir)
     principle_rows, principle_grades_by_dim = _grade_all_principles(
-        inputs.violations_by, inputs.compliance_by, inputs.dismissed_counts,
+        inputs.violations_by, inputs.compliance_by, inputs.dismissed_by,
         inputs.source_file_count, params,
     )
     dimension_rows = [

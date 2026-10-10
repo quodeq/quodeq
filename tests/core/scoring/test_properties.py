@@ -124,3 +124,14 @@ def test_counterexamples_from_the_rigour_pass():
     outlier = minor_rule[:-1] + [dict(minor_rule[-1], severity="critical")]
     with_outlier, _ = _score(outlier, [{"req": "U-3", "file": f"g{i}"} for i in range(100)], files)
     assert base - 2.5 < with_outlier < base  # one file's worth, not a re-label of the rule
+
+
+def test_p9_a_dismissal_keeps_the_observation_and_never_lowers_the_score(cases):
+    for v, c, files in cases:
+        if not v:
+            continue
+        s0, m0 = _score(v, c, files)
+        mass = principle_mass(requirement_rows(v[:-1], c, v[-1:]), files, params=DEFAULT_PARAMS)
+        assert mass.observation == pytest.approx(m0.observation)
+        if v[:-1] or c:
+            assert principle_score_and_grade(mass, params=DEFAULT_PARAMS)[0] >= s0 - EPS

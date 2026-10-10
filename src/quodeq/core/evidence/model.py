@@ -95,6 +95,8 @@ class PrincipleEvidence:
     violations: list[dict] = field(default_factory=list)
     compliance: list[dict] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
+    # Violations the project dismissed: no penalty, still observed by the grade.
+    dismissed: list[dict] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.practice_id:
@@ -206,6 +208,7 @@ def evidence_to_scoring_dict(evidence: Evidence) -> dict:
             "violations": pe.violations,
             "compliance": pe.compliance,
             "metrics": pe.metrics,
+            "dismissed": pe.dismissed,
         }
     result = {
         "repository": evidence.repository,

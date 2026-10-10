@@ -19,7 +19,7 @@ from quodeq.core.types.scoring import ConfidenceLevel, PrincipleScore
 
 def _score_principle(
     violations: list[Finding], compliance: list[Finding],
-    *, source_file_count: int = 0, scale_multiplier: int = 1,
+    *, dismissed: list[Finding] = (), source_file_count: int = 0, scale_multiplier: int = 1,
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[float | None, str, str | None, float]:
     """Score a single principle from its filtered violations and compliance lists.
@@ -39,7 +39,8 @@ def _score_principle(
         source_file_count=source_file_count,
     )
     rows = requirement_rows([finding_to_scoring_dict(v) for v in violations],
-                            [finding_to_scoring_dict(c) for c in compliance])
+                            [finding_to_scoring_dict(c) for c in compliance],
+                            [finding_to_scoring_dict(d) for d in dismissed])
     mass = principle_mass(rows, source_file_count, params=params)
     final, grade = principle_score_and_grade(mass, params=params)
     return final, grade, str(confidence), mass.observation
@@ -59,6 +60,7 @@ def score_all_principles(
     principles_violations: dict[str, list[Finding]],
     principles_compliance: dict[str, list[Finding]],
     *,
+    principles_dismissed: dict[str, list[Finding]] | None = None,
     source_file_count: int = 0,
     scale_multiplier: int = 1,
     params: ScoringParams = DEFAULT_PARAMS,
@@ -73,6 +75,7 @@ def score_all_principles(
         p_compliance = principles_compliance.get(name, [])
         final_score, grade, confidence, observation = _score_principle(
             p_violations, p_compliance,
+            dismissed=(principles_dismissed or {}).get(name, []),
             source_file_count=source_file_count,
             scale_multiplier=scale_multiplier,
             params=params,

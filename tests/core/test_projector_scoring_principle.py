@@ -14,7 +14,8 @@ def test_single_violation_is_scored_with_low_confidence() -> None:
 
 
 def test_nothing_at_all_is_insufficient() -> None:
-    result = compute_principle_grade(principle_id="P1", findings=[], compliance=[], dismissed_count=2)
+    dismissed = [_f("R1", "P1", "major", "dismissed", "a.py"), _f("R2", "P1", "minor", "dismissed", "b.py")]
+    result = compute_principle_grade(principle_id="P1", findings=[], compliance=[], dismissed=dismissed)
     assert (result["grade"], result["score"], result["dismissed_count"]) == ("Insufficient", None, 2)
 
 

@@ -55,7 +55,8 @@ from quodeq.core.types.scoring import ConfidenceLevel
 # 4: requirement spread, standard-owned severity classes, observation-weighted
 #    principles, thin evidence scored instead of gated (spec 2026-10-09).
 # 5: the finding's own severity again; the standard only suggests, in the prompt.
-GRADE_ALGO_VERSION = 5
+# 6: dismissed findings stay observed (no penalty, principle weight kept).
+GRADE_ALGO_VERSION = 6
 
 # A dimension is flagged low confidence when more than this share of its
 # observation comes from low-confidence principles.
@@ -79,17 +80,20 @@ def compute_principle_grade(
     principle_id: str,
     findings: list[Finding],
     compliance: list[Finding],
-    dismissed_count: int = 0,
+    dismissed: list[Finding] = (),
     scale: PrincipleGradeScale = PrincipleGradeScale(),
 ) -> dict[str, Any]:
     """Score a single principle. ``findings`` excludes dismissed.
+
+    *dismissed* adds no penalty; its files count as observed, so a dismissal
+    never shrinks the principle's weight in its dimension.
 
     Thin evidence is scored and carries ``confidence``; only a principle with
     no findings and no compliance is Insufficient. Returns a principle-grade
     result dict (keys listed in the module docstring).
     """
     if not findings and not compliance:
-        return _insufficient_grade(principle_id, 0, dismissed_count)
+        return _insufficient_grade(principle_id, 0, len(dismissed))
 
     confidence = classify_confidence_level(
         len(findings), len(compliance),
@@ -99,6 +103,7 @@ def compute_principle_grade(
     rows = requirement_rows(
         [finding_to_scoring_dict(v) for v in findings],
         [finding_to_scoring_dict(c) for c in compliance],
+        [finding_to_scoring_dict(d) for d in dismissed],
     )
     mass = principle_mass(rows, scale.source_file_count, params=scale.params)
     final, grade = principle_score_and_grade(mass, params=scale.params)
@@ -107,7 +112,7 @@ def compute_principle_grade(
         "score": final,
         "grade": grade,
         "finding_count": len(findings),
-        "dismissed_count": dismissed_count,
+        "dismissed_count": len(dismissed),
         "confidence": str(confidence),
         "observation": mass.observation,
     }

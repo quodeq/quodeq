@@ -77,7 +77,7 @@ def _score_numerical(ctx: _PrincipleContext) -> PrincipleScore:
     compliance = ctx.pdata.get("compliance", [])
     if not violations and not compliance:
         return PrincipleScore(**kwargs, final_score=None, grade=Grade.INSUFFICIENT, observation=0.0)
-    rows = requirement_rows(violations, compliance)
+    rows = requirement_rows(violations, compliance, ctx.pdata.get("dismissed", []))
     params = ctx.scale.params
     mass = principle_mass(rows, ctx.scale.source_file_count, params=params)
     base, lift, _raw, final = principle_stages(mass, params=params)

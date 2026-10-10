@@ -17,11 +17,13 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 
-from quodeq.core.standards.severity_classes import SEVERITY_KEY, is_severity_class
+from quodeq.core.types.severity import is_severity
 
 _logger = logging.getLogger(__name__)
 
 OVERRIDES_RELPATH = Path(".quodeq") / "standards-overrides.json"
+# The requirement field (standard and override alike) holding the suggested severity.
+SEVERITY_KEY = "severity"
 _PLACEHOLDER_RE = re.compile(r"\{([a-z_][a-z0-9_]*)\}")
 
 
@@ -159,7 +161,7 @@ def _validate_requirement(
     clean_values: dict[str, object] = {}
     for name, value in values.items():
         if name == SEVERITY_KEY:
-            if is_severity_class(value):
+            if is_severity(value):
                 clean_values[name] = value
             else:
                 errors.append(f"{req_id}.{name}: must be one of minor, major, critical")

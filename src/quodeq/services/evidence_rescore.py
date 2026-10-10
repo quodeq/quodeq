@@ -69,17 +69,23 @@ def _apply_suppressions(
     evidence, dim_id: str, dismissed: set[tuple], deleted: set[tuple],
 ) -> int:
     """Drop dismissed/deleted violations from each principle's evidence in
-    place, and return how many violations that removed."""
+    place, and return how many violations that removed.
+
+    Dismissed ones move to ``pe.dismissed`` (still observed by the grade);
+    deleted ones are gone.
+    """
     excluded = 0
     for pe in evidence.principles.values():
-        kept = [
-            v for v in pe.violations
-            if not is_dismissed(dismissed, FindingRef(
-                req=v.get("req"), principle=pe.practice_id, file=v.get("file"),
-                line=v.get("line"), snippet=v.get("snippet")))
-            and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
-                               file=v.get("file"))
-        ]
+        kept: list[dict] = []
+        for v in pe.violations:
+            if is_deleted(deleted, dimension=dim_id, principle=pe.practice_id, file=v.get("file")):
+                continue
+            if is_dismissed(dismissed, FindingRef(
+                    req=v.get("req"), principle=pe.practice_id, file=v.get("file"),
+                    line=v.get("line"), snippet=v.get("snippet"))):
+                pe.dismissed.append(v)
+            else:
+                kept.append(v)
         excluded += len(pe.violations) - len(kept)
         pe.violations = kept
     return excluded
