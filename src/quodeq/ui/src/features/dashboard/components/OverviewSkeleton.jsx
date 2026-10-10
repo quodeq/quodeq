@@ -1,5 +1,6 @@
 import { TermHeader, StatStrip, SectionLabel } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
+import { formatScoreDisplay, gradeLetter } from '../../../utils/formatters.js';
 import RunHistoryPanelPlaceholder from './RunHistoryPanelPlaceholder.jsx';
 
 // Skeleton frame for the Overview's full footprint: the stat-strip hero,
@@ -22,6 +23,23 @@ import RunHistoryPanelPlaceholder from './RunHistoryPanelPlaceholder.jsx';
 // text with nothing to show yet.
 
 const STAT_SLOTS = ['score', 'violations', 'compliance', 'ratio'];
+const LAST_KNOWN_SLOT = 'score';
+
+function hasLastKnown(lastKnown) {
+  return Boolean(lastKnown && (lastKnown.grade || lastKnown.score != null));
+}
+
+// The header's second line: the project being loaded, and the last known
+// grade with the updating mark when the server still has one to show.
+function skeletonSub(projectName, lastKnown) {
+  if (hasLastKnown(lastKnown)) {
+    const values = { score: formatScoreDisplay(lastKnown.score), grade: gradeLetter(lastKnown.grade) };
+    return projectName
+      ? t('overview.lastKnownUpdatingProject', { name: projectName, ...values })
+      : t('overview.lastKnownUpdating', values);
+  }
+  return projectName ? t('overview.loadingProject', { name: projectName }) : t('overview.loading');
+}
 
 // Representative placeholder counts -- the real grid's card count varies per
 // project (server-filtered by visible standards, see readVisibleStandardIds),
@@ -33,14 +51,27 @@ const DIMENSION_CARD_COUNT = 6;
 const DIM_SCORE_ROW_COUNT = 6;
 const OFFENDING_FILE_ROW_COUNT = 5;
 
-function SkeletonStat({ slot }) {
+// The score slot shows the last known grade as dimmed text while the
+// server rebuilds it: a number the user had yesterday beats an empty bar.
+function LastKnownValue({ lastKnown }) {
+  return (
+    <span className="term-stat__value overview-skeleton__last-known">
+      {formatScoreDisplay(lastKnown.score)} {gradeLetter(lastKnown.grade)}
+    </span>
+  );
+}
+
+function SkeletonStat({ slot, lastKnown = null }) {
+  const showLastKnown = slot === LAST_KNOWN_SLOT && hasLastKnown(lastKnown);
   return (
     <div className="term-stat term-stat--default" aria-hidden="true" data-slot={slot}>
       <div className="term-stat__label">
         <span className="overview-skeleton__bar overview-skeleton__bar--label" />
       </div>
       <div className="term-stat__value-row">
-        <span className="overview-skeleton__bar overview-skeleton__bar--value" />
+        {showLastKnown
+          ? <LastKnownValue lastKnown={lastKnown} />
+          : <span className="overview-skeleton__bar overview-skeleton__bar--value" />}
       </div>
       <div className="term-stat__hint">
         <span className="overview-skeleton__bar overview-skeleton__bar--hint" />
@@ -84,16 +115,19 @@ function SkeletonDimScoreRow({ index }) {
  * @param {object} props
  * @param {string} [props.projectName] The project being loaded, carried in
  *   the header sub line so the wait still names what it's waiting on.
+ * @param {{grade?: string, score?: number, files?: number}|null} [props.lastKnown]
+ *   The grade the server last computed for the project, under the previous
+ *   formula or version, shown dimmed in the score slot while it rebuilds.
  */
-export default function OverviewSkeleton({ projectName }) {
+export default function OverviewSkeleton({ projectName, lastKnown = null }) {
   return (
     <div className="overview-skeleton" aria-busy="true">
       <section className="acc-eval-panel acc-eval-panel--terminal">
         <div className="acc-eval-panel__top">
-          <TermHeader name={t('overview.termName')} sub={projectName ? t('overview.loadingProject', { name: projectName }) : t('overview.loading')} />
+          <TermHeader name={t('overview.termName')} sub={skeletonSub(projectName, lastKnown)} />
         </div>
         <StatStrip cards>
-          {STAT_SLOTS.map((slot) => <SkeletonStat key={slot} slot={slot} />)}
+          {STAT_SLOTS.map((slot) => <SkeletonStat key={slot} slot={slot} lastKnown={lastKnown} />)}
         </StatStrip>
       </section>
       <div className="history-panels-row" aria-hidden="true">

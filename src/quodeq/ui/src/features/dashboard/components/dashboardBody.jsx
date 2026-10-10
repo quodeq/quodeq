@@ -77,7 +77,7 @@ export function renderDashboardBody(ctx) {
       <div className={dashboardPageClassName({ appearClass: dashboardAppearClass, dimmed: isDimmed })}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={onSetupComplete} />
         {error && <p className="inline-error">{t('overview.loadFailed')}</p>}
-        {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} />}
+        {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} lastKnown={data.lastKnown} />}
         {/* No runMode equivalent of the Overview's grace-fallback loader: in
             runMode contentReady is `!!dashboard`, so the instant dashboard lands
             contentReady is already true -- there's no window where dashboard is

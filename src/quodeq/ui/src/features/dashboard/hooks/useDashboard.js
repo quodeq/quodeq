@@ -117,6 +117,11 @@ function buildDashboardResult({
     // the warm of a large project: the boot loader drops into the Overview's
     // own loading state instead of walling off the app for that long.
     pending: isPendingPayload(dashboardQuery.data) || scoresPendingBody,
+    // The last known card summary the pending body carries ({grade, score,
+    // files} computed under the previous version), so the Overview can show
+    // that grade dimmed while the rebuild runs. null once the real payload
+    // lands, and when the project was never summarised.
+    lastKnown: (isPendingPayload(dashboardQuery.data) && dashboardQuery.data.lastKnown) || null,
     // True during background refetch when we already have placeholder data
     // (e.g. user switched to a different run). Page shows a subtle
     // shimmer/dim instead of the full loading screen.

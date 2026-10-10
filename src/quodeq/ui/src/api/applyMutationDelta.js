@@ -142,6 +142,39 @@ function makePatchAccumulatedDims(queryClient, scoreByDim, runId) {
   };
 }
 
+// Patch the trend entry of the rescored run: its per-dimension detail scores
+// are what the client recomputes the Overview's headline number from (see
+// filterTrendByVisibleStandards in utils/scoreFiltering.js), so with them
+// patched the headline moves with the dismiss instead of waiting for the
+// reconcile refetch. Every other entry keeps its identity. No-op when the
+// payload carries no trend (the run-scoped findings payloads).
+function patchTrendDetail(detail, scoreByDim) {
+  const resc = scoreByDim.get(detail?.dimension);
+  if (!resc) return detail;
+  const score = parseFloat(resc.overallScore);
+  return {
+    ...detail,
+    score: Number.isFinite(score) ? score : detail.score,
+    grade: resc.overallGrade ?? detail.grade,
+  };
+}
+
+function patchTrendEntry(entry, scoreByDim) {
+  if (!Array.isArray(entry?.dimensionDetails)) return entry;
+  return { ...entry, dimensionDetails: entry.dimensionDetails.map((d) => patchTrendDetail(d, scoreByDim)) };
+}
+
+function makePatchTrend(queryClient, scoreByDim, runId) {
+  return (key) => {
+    const prev = queryClient.getQueryData(key);
+    if (!Array.isArray(prev?.trend)) return;
+    queryClient.setQueryData(key, (old) => ({
+      ...old,
+      trend: old.trend.map((entry) => (entry?.runId === runId ? patchTrendEntry(entry, scoreByDim) : entry)),
+    }));
+  };
+}
+
 // Invalidate the run-detail violation source so lists refetch on next view.
 // refetchType:"none" keeps it lazy — no eager network churn while scores
 // already updated instantly via the score-patch above.
@@ -172,9 +205,16 @@ function applyRunScopedPatches({ runId, projectId, patchScores, invalidateViolat
   }
 }
 
-function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims }) {
+function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims, patchTrend }) {
   if (!delta.isLatest) return;
   patchScores(overviewKey(projectId, LATEST_RUN_ID));
+  if (runId) {
+    // The headline reads the latest trend entry; both payload shapes carry it.
+    for (const key of [overviewKey(projectId, LATEST_RUN_ID), overviewKey(projectId, runId),
+      projectKeys.scores(projectId, null), projectKeys.scores(projectId, runId)]) {
+      patchTrend(key);
+    }
+  }
   if (delta.accumulated) {
     // A caller supplied the authoritative rollup — prefer it.
     patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);
@@ -222,8 +262,9 @@ export function applyMutationDelta(queryClient, projectId, delta) {
   const patchScores = makePatchScores(queryClient, scoreByDim, dismissed);
   const patchAccumulated = makePatchAccumulated(queryClient);
   const patchAccumulatedDims = makePatchAccumulatedDims(queryClient, scoreByDim, runId);
+  const patchTrend = makePatchTrend(queryClient, scoreByDim, delta.runId);
   const invalidateViolations = makeInvalidateViolations(queryClient);
 
   applyRunScopedPatches({ runId, projectId, patchScores, invalidateViolations, splices });
-  applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims });
+  applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims, patchTrend });
 }
