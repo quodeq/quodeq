@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import FadeIn from './components/FadeIn.jsx';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
+import RebuildStrip from './features/rebuild/RebuildStrip.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
 import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.jsx';
@@ -36,6 +37,9 @@ function AppShell({ sidebar, header, content, drawer, startupLoader, booting }) 
         {sidebar}
         <div className="app-shell__main-column" inert={booting || undefined}>
           <UpdateBanner />
+          {/* Under the top bar on every page while scores rebuild; it reads
+              the rescore tracker mounted around the shell. */}
+          <RebuildStrip />
           <main className="dashboard">
             {content}
           </main>

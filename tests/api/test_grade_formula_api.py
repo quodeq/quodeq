@@ -198,3 +198,20 @@ def test_put_names_the_malformed_key_without_echoing_exception_text(client, form
     assert body["code"] == "INVALID_INPUT"
     assert body["error"] == "Malformed params: baseK"
     assert not formula_path.exists()
+
+
+def test_post_rescore_runs_the_pass_again_with_the_saved_params(rescore_client, formula_path):
+    """The retry behind the rebuild strip: no body, a new generation, same payload shape."""
+    client, rescorer = rescore_client(_instant_apply(rescored=3))
+    payload = params_to_dict(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
+    client.put("/api/grade-formula", json=payload, headers=_ORIGIN)
+    assert rescorer.wait_idle(budget(5))
+
+    resp = client.post("/api/grade-formula/rescore", headers=_ORIGIN)
+    assert resp.status_code == 202
+    body = resp.get_json()
+    assert body["current"]["baseK"] == 0.3
+    assert (body["rescore"]["state"], body["rescore"]["generation"]) == ("running", 2)
+    assert rescorer.wait_idle(budget(5))
+    landed = client.get("/api/grade-formula").get_json()["rescore"]
+    assert (landed["state"], landed["appliedGeneration"], landed["done"]) == ("idle", 2, 3)

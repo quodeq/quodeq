@@ -49,11 +49,16 @@ function isTimeoutOrAbort(e) {
   return e?.name === FETCH_ERROR_NAME.TIMEOUT || e?.name === FETCH_ERROR_NAME.ABORT;
 }
 
-/** @returns {Promise<{ projects: import('../models/project.js').Project[] }>} */
+/**
+ * The local project list, with the server's warm-up progress when it reports
+ * one (`warmup`: the projects it still owes a summary, see
+ * services/warmup.py snapshot); null when the server sent none.
+ * @returns {Promise<{ projects: import('../models/project.js').Project[], warmup: Object|null }>}
+ */
 export async function listProjects() {
   const data = await request('/projects', { timeout: PROJECTS_LIST_TIMEOUT_MS });
   const list = data?.projects ?? data ?? [];
-  return { projects: Array.isArray(list) ? list.map(createProject) : [] };
+  return { projects: Array.isArray(list) ? list.map(createProject) : [], warmup: data?.warmup ?? null };
 }
 
 /** @returns {Promise<import('../models/project.js').Project>} */

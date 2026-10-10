@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext.jsx';
 import { projectsKeys } from '../api/queryKeys.js';
 import { invalidateProjects } from './invalidateProjects.js';
+import { recordWarmupSnapshot } from '../features/rebuild/warmupSnapshot.js';
 import {
   DEFAULT_SOURCE, persistProject, persistSource, readStoredProject, readStoredSource, resolveInitialProject,
 } from './projectStateStorage.js';
@@ -45,11 +46,14 @@ function projectsRetryOptions(maxRetries, retryDelayMs) {
  * so the list is never a private copy some component has to remember to
  * reload.
  */
-function useProjectsQuery({ listProjects, maxRetries, retryDelayMs, summaryPollMs, autoRetryMs }) {
+function useProjectsQuery({ listProjects, queryClient, maxRetries, retryDelayMs, summaryPollMs, autoRetryMs }) {
   return useQuery({
     queryKey: projectsKeys.list(),
     queryFn: async () => {
       const data = await listProjects();
+      // The warm-up progress rides on the same response; the rebuild strip
+      // reads it from the cache, so the list's pending poll is its poll too.
+      if (!Array.isArray(data)) recordWarmupSnapshot(queryClient, data?.warmup ?? null);
       return Array.isArray(data) ? data : (data?.projects ?? []);
     },
     staleTime: PROJECTS_STALE_MS,
@@ -157,7 +161,7 @@ export function useProjectState({
 } = {}) {
   const { listProjects } = useApi();
   const queryClient = useQueryClient();
-  const query = useProjectsQuery({ listProjects, maxRetries, retryDelayMs, summaryPollMs, autoRetryMs });
+  const query = useProjectsQuery({ listProjects, queryClient, maxRetries, retryDelayMs, summaryPollMs, autoRetryMs });
   const {
     selectedProject, setSelectedProject, selectedSource, setSelectedSource, selectedRun, setSelectedRun,
   } = useSelectionFields(storage);

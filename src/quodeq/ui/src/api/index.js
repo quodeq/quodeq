@@ -48,7 +48,8 @@ export {
 } from './scores.js';
 
 export {
-  getGradeFormula, saveGradeFormula, resetGradeFormula, previewGradeFormula,
+  getGradeFormula, saveGradeFormula, resetGradeFormula,
+  rescoreGradeFormula, previewGradeFormula,
 } from './gradeFormula.js';
 
 export { getGradeExplain, previewGradeExplain } from './gradeExplain.js';

@@ -164,6 +164,9 @@ export const projectsKeys = {
   all: () => [PROJECTS_SCOPE],
   list: () => [PROJECTS_SCOPE, LIST_KEY],
   clone: () => [PROJECTS_SCOPE, CLONE_KEY],
+  // The server's warm-up snapshot that rode on the last list response
+  // (features/rebuild/warmupSnapshot.js); never fetched on its own.
+  warmup: () => [PROJECTS_SCOPE, "warmup"],
 };
 
 const STANDARDS_SCOPE = "standards"; // query-key prefix for the standardsKeys.* subtree below

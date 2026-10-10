@@ -20,6 +20,11 @@ export function resetGradeFormula() {
   return request('/grade-formula?confirm=true', { method: 'DELETE' });
 }
 
+/** Run the rescore pass again with the saved params (the retry after a failed pass). */
+export function rescoreGradeFormula() {
+  return request('/grade-formula/rescore', { method: 'POST' });
+}
+
 /** @returns {Promise<{project: string, runId: string, before: Object, after: Object}>} */
 export function previewGradeFormula(projectId, params) {
   return request('/grade-formula/preview', {
