@@ -20,6 +20,7 @@ import { NAV_TAB } from '../../../vocab/navTab.js';
 import { HELP_SECTION } from '../../../vocab/helpSection.js';
 import { buildHeadline, dimensionHeadlineInput } from '../../dashboard/headlineStats.js';
 import TrendBadge from '../../../components/TrendBadge.jsx';
+import { useExplorerTrend } from './useExplorerTrend.js';
 import { dimensionPeriodDeltas } from '../dimensionPeriodDeltas.js';
 
 /** Empty/loading/error states, checked in order — extracted so the main
@@ -238,10 +239,11 @@ export default function ExplorerPage({
   selectedSource = PROJECT_SOURCE.LOCAL,
   onNavigate,
   refreshSignal,
-  trend = [],
+  trend: borrowedTrend = [],
   granularity = 'day',
   onGranularityChange,
 }) {
+  const trend = useExplorerTrend(project, selectedSource, borrowedTrend);
   const {
     d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel,
     buildEvalPrincipal, dimFile, principleViews,
