@@ -2412,6 +2412,35 @@ button.term-sev-badge--clickable:focus-visible {
   .topbar-run-chip__bar > span,
   .topbar-progress > span { transition: none; }
 }
+/* The rebuild strip (features/rebuild/RebuildStrip.jsx): a one-line band
+   under the top bar while scores rebuild. Same vocabulary as the team
+   repository strip (.sync-strip in dashboard.css: dot, meta, bar), but a
+   band in the main column, not a card top, so no radius and the top bar's
+   horizontal padding. Hidden entirely while nothing runs. */
+.rebuild-strip {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-8);
+  background: var(--color-surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  font-family: var(--term-font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+}
+.rebuild-strip__label {
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+.rebuild-strip .sync-strip__meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Report and Fix-plan toolbar buttons: ghost like the rest of the cluster
    (hover = neutral surface + expanded label); the accent treatment is
    reserved for the open-pane state so "on" stays unambiguous. */
