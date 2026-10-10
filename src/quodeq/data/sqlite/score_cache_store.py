@@ -77,13 +77,10 @@ class _PayloadSlot:
 _PROJECT_SUMMARY = _PayloadSlot("project_summary_cache", "project summary cache write failed for %s")
 
 
-def _read_payload(conn: sqlite3.Connection, slot: _PayloadSlot, project: str, version: str) -> dict | None:
-    """The payload stored in *slot* for (project, version); None on miss, error or bad JSON."""
+def _load_payload(conn: sqlite3.Connection, sql: str, params: tuple) -> dict | None:
+    """The JSON payload of the first row *sql* selects; None on miss, error or bad JSON."""
     try:
-        row = conn.execute(
-            f"SELECT payload FROM {slot.table} WHERE project=? AND version=?",
-            (project, version),
-        ).fetchone()
+        row = conn.execute(sql, params).fetchone()
     except sqlite3.Error:
         return None
     if row is None:
@@ -92,6 +89,13 @@ def _read_payload(conn: sqlite3.Connection, slot: _PayloadSlot, project: str, ve
         return json.loads(row[0])
     except (ValueError, TypeError):
         return None
+
+
+def _read_payload(conn: sqlite3.Connection, slot: _PayloadSlot, project: str, version: str) -> dict | None:
+    """The payload stored in *slot* for (project, version); None on miss, error or bad JSON."""
+    return _load_payload(
+        conn, f"SELECT payload FROM {slot.table} WHERE project=? AND version=?", (project, version),
+    )
 
 
 def _write_payload(
@@ -215,18 +219,9 @@ def read_last_project_summary(conn: sqlite3.Connection, project: str) -> dict | 
     rewrites it. That is the last known grade a pending card or Overview can
     show while the rebuild runs. None on miss, error or bad JSON.
     """
-    try:
-        row = conn.execute(
-            "SELECT payload FROM project_summary_cache WHERE project=?", (project,),
-        ).fetchone()
-    except sqlite3.Error:
-        return None
-    if row is None:
-        return None
-    try:
-        return json.loads(row[0])
-    except (ValueError, TypeError):
-        return None
+    return _load_payload(
+        conn, f"SELECT payload FROM {_PROJECT_SUMMARY.table} WHERE project=?", (project,),
+    )
 
 
 def read_last_project_summary_cached(project: str) -> dict | None:
