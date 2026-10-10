@@ -27,7 +27,7 @@ from quodeq.api._constants import (
 )
 from quodeq.api.helpers import json_error, optional_json_object_or_response, page_params, validate_segment
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
-from quodeq.services.dismissed_listing import load_dismissed
+from quodeq.services.dismissed_listing import dismissed_item, load_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
 from quodeq.services.mutation_rescore import (
     delete_all_delta,
@@ -166,19 +166,26 @@ def _mutate_finding(
     app: Flask,
     mutate: Callable[[Path, dict[str, Any], str | None], object],
     delta_for: Callable[..., Any],
+    extra: Callable[[Path, dict[str, Any]], dict[str, Any]] | None = None,
 ) -> tuple[Response, int]:
-    """Apply *mutate* to the finding named in the request body, then rescore."""
+    """Apply *mutate* to the finding named in the request body, then rescore.
+
+    *extra*, when given, adds fields to the response after the mutation,
+    from the project dir and the finding key the client named.
+    """
     body, target, err = _finding_request()
     if err is not None:
         return err
     run_id = _run_id(body)
-    mutate(_project_dir(_eval_dir(app), target["project"]), body, run_id)
+    project_dir = _project_dir(_eval_dir(app), target["project"])
+    mutate(project_dir, body, run_id)
     scores = _scores_with_fallback(app, target["project"], run_id)
-    delta = delta_for(
-        _eval_dir(app), target["project"], run_id,
-        {"req": target["req"], "file": target["file"], "line": target["line"]},
-    )
-    return jsonify({"scores": scores, "delta": delta}), HTTPStatus.OK
+    key = {"req": target["req"], "file": target["file"], "line": target["line"]}
+    delta = delta_for(_eval_dir(app), target["project"], run_id, key)
+    response = {"scores": scores, "delta": delta}
+    if extra is not None:
+        response.update(extra(project_dir, key))
+    return jsonify(response), HTTPStatus.OK
 
 
 def _mutate_project(
@@ -204,9 +211,15 @@ def _mutate_project(
     return jsonify({"ok": True, count_key: count, "scores": scores, "delta": delta}), HTTPStatus.OK
 
 
+def _dismissed_entry_field(project_dir: Path, key: dict[str, Any]) -> dict[str, Any]:
+    """``dismissedEntry``: the Dismissed tab's item for the finding just dismissed."""
+    return {"dismissedEntry": dismissed_item(project_dir, key["req"], key["file"], key["line"])}
+
+
 def _dismiss(app: Flask) -> tuple[Response, int]:
     return _mutate_finding(
         app, lambda project_dir, body, run_id: dismiss_finding(project_dir, body, run_id=run_id), dismiss_delta,
+        extra=_dismissed_entry_field,
     )
 
 

@@ -63,6 +63,17 @@ def undismiss_event(entry: DismissedEntry) -> FindingUndismissedEvent:
         req=entry.req, file=entry.file, line=entry.line, fingerprint=entry.fingerprint))
 
 
+def _recordable_run_id(project_dir: Path, run_id: str | None) -> str | None:
+    """*run_id* when it names a run directory of the project, else None.
+
+    The client may send a sentinel (``latest``) or a run that is gone; the
+    event records only a real directory name, and never a path.
+    """
+    if not run_id or Path(run_id).name != run_id or run_id in (".", ".."):
+        return None
+    return run_id if (project_dir / run_id).is_dir() else None
+
+
 def dismiss_finding(
     project_dir: Path, finding: dict, *, writer: ActionLog | None = None,
     run_id: str | None = None,
@@ -72,7 +83,9 @@ def dismiss_finding(
     The fingerprint is resolved server-side from the finding's stored snippet
     (*run_id*'s findings first, then every run newest first, then the
     client's ``snippet`` field) so the recorded identity always matches what
-    the projection hashes from the same rows.
+    the projection hashes from the same rows. *run_id* is recorded on the
+    event too, so the dismissed listing can look the finding up in that run
+    before walking the others.
     """
     # Fold any legacy dismissed.json in FIRST, so the new event lands after the
     # migrated history rather than the migration appending stale dismissals on
@@ -86,6 +99,7 @@ def dismiss_finding(
         reason=finding.get("dismissReason"),
         fingerprint=resolve_fingerprint(
             project_dir, target, run_id=run_id, snippet=finding.get("snippet")),
+        run_id=_recordable_run_id(project_dir, run_id),
     )
     log = writer or ActionLogWriter(project_dir)
     log.emit(FindingDismissedEvent(payload=payload))

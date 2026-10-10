@@ -12,6 +12,7 @@ from quodeq.core.types.finding import Finding, Totals
 from quodeq.data.projection.projector import Projector
 from quodeq.services.dismissed import (
     dismiss_finding,
+    dismissed_keys,
     filter_dismissed_from_dimensions,
     load_dismissed,
     recount_totals,
@@ -276,3 +277,34 @@ class TestRecencyCache:
         cache = _RecencyCache()
         assert run_started_at(run_dir, cache=cache) == "2026-02-02T00:00:00Z"
         assert cache.get(run_dir) == "2026-02-02T00:00:00Z"
+
+
+class TestRecordedRun:
+    """A dismissal remembers the run it was made from, when that run exists."""
+
+    def test_run_id_is_recorded_on_the_entry(self, tmp_path):
+        project_dir = tmp_path / "project"
+        _seed_projected_run(project_dir, "r1", req="A", file="a.py", line=1)
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1}, run_id="r1")
+
+        (entry,) = dismissed_keys(project_dir).entries
+
+        assert entry.run_id == "r1"
+
+    def test_sentinel_and_unknown_runs_are_not_recorded(self, tmp_path):
+        project_dir = tmp_path / "project"
+        _seed_projected_run(project_dir, "r1", req="A", file="a.py", line=1)
+        _seed_projected_run(project_dir, "r1", req="B", file="b.py", line=2)
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1}, run_id="latest")
+        dismiss_finding(project_dir, {"req": "B", "file": "b.py", "line": 2}, run_id="../r1")
+
+        assert {e.run_id for e in dismissed_keys(project_dir).entries} == {None}
+
+    def test_run_id_is_not_identity(self, tmp_path):
+        project_dir = tmp_path / "project"
+        _seed_projected_run(project_dir, "r1", req="A", file="a.py", line=1)
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1}, run_id="r1")
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1})
+
+        assert len(dismissed_keys(project_dir).entries) == 1
+

@@ -46,6 +46,11 @@ def _load_overview(client) -> None:
         assert client.get(url).status_code == 200, url
 
 
+def _load_dismissed(client) -> None:
+    resp = client.get(f"/api/findings/dismissed?project={PROJECT}")
+    assert resp.status_code == 200 and len(resp.get_json()) == 1
+
+
 def _scenarios(client, monkeypatch) -> dict[str, dict[str, int]]:
     out: dict[str, dict[str, int]] = {}
     with count_io(monkeypatch) as cold:
@@ -58,6 +63,14 @@ def _scenarios(client, monkeypatch) -> dict[str, dict[str, int]]:
     with count_io(monkeypatch) as after:
         _load_overview(client)
     out["overview_after_dismiss"] = dict(after)
+    # The Dismissed tab's listing: the finding sits in the newest run, so the
+    # cold lookup opens that run only; the warm one reuses the resolved detail.
+    with count_io(monkeypatch) as list_cold:
+        _load_dismissed(client)
+    out["dismissed_list_cold"] = dict(list_cold)
+    with count_io(monkeypatch) as list_warm:
+        _load_dismissed(client)
+    out["dismissed_list_warm"] = dict(list_warm)
     return out
 
 
