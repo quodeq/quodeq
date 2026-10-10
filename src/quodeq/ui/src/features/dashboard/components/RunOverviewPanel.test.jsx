@@ -79,3 +79,17 @@ describe('RunHeroSection primary tiles', () => {
     expect(screen.queryByText('MAJORS')).toBeNull();
   });
 });
+
+describe('RunHeroSection formula note', () => {
+  const note = /recomputed with the current grade formula/;
+
+  it('says the scores were recomputed when the run was scanned with an older formula', () => {
+    render(<RunHeroSection dashboard={dashboard} selectedRunId="r1" runSummary={baseSummary} formulaUpdated />);
+    expect(screen.getByText(note)).toBeTruthy();
+  });
+
+  it('stays silent when the run was scanned with the current formula', () => {
+    render(<RunHeroSection dashboard={dashboard} selectedRunId="r1" runSummary={baseSummary} formulaUpdated={false} />);
+    expect(screen.queryByText(note)).toBeNull();
+  });
+});

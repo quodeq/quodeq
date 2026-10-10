@@ -3,6 +3,7 @@
     "dimensions": [
       {
         "compliance": [],
+        "confidence": "low",
         "dimension": "security",
         "evidenceDate": "<timestamp>",
         "filesRead": 10,
@@ -10,13 +11,14 @@
         "fromDateLabel": "5 Feb 2026",
         "fromProject": "golden-child",
         "fromRunId": "20260205T000000",
-        "overallGrade": "Insufficient",
-        "overallScore": "6.0/10",
+        "overallGrade": "Exemplary",
+        "overallScore": "9.6/10",
         "principles": [
           {
-            "grade": "Insufficient",
+            "confidence": "low",
+            "grade": "Exemplary",
             "principle": "Confidentiality",
-            "score": "6.0/10"
+            "score": "9.6/10"
           },
           {
             "grade": "Adequate",
@@ -24,9 +26,10 @@
             "score": "6.0/10"
           },
           {
-            "grade": "Insufficient",
+            "confidence": "low",
+            "grade": "Exemplary",
             "principle": "Integrity",
-            "score": "6.0/10"
+            "score": "9.6/10"
           }
         ],
         "quarantinedCount": 0,
@@ -88,12 +91,13 @@
         "fromProject": "golden-child",
         "fromRunId": "20260210T000000",
         "overallGrade": "Exemplary",
-        "overallScore": "9.4/10",
+        "overallScore": "9.1/10",
         "principles": [
           {
+            "confidence": "medium",
             "grade": "Exemplary",
             "principle": "Confidentiality",
-            "score": "9.4/10"
+            "score": "9.1/10"
           }
         ],
         "quarantinedCount": 0,
@@ -170,8 +174,8 @@
     "project": "golden",
     "summary": {
       "dimensionCount": 2,
-      "numericAverage": 7.7,
-      "overallGrade": "Good",
+      "numericAverage": 9.3,
+      "overallGrade": "Exemplary",
       "previousNumericAverage": null,
       "severity": {
         "critical": 0,
@@ -215,7 +219,8 @@
     }
   ],
   "scoring": {
-    "customFormula": false
+    "customFormula": false,
+    "formulaVersion": 6
   },
   "trend": [
     {
@@ -226,12 +231,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.0,
+          "delta": -0.1,
           "dimension": "security",
-          "grade": "Insufficient",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 3,
-          "score": 0.0,
+          "score": 9.7,
           "violations": 3
         }
       ],
@@ -240,12 +245,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 0.0,
+      "numericAverage": 9.7,
       "openTypes": 3,
-      "overallGrade": "Critical",
+      "overallGrade": "Exemplary",
       "runId": "20260205T000000",
-      "runNumericAverage": 0.0,
-      "runOverallGrade": "Critical",
+      "runNumericAverage": 9.7,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 3
     },
@@ -257,12 +262,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.0,
+          "delta": 0.4,
           "dimension": "security",
-          "grade": "Insufficient",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 2,
-          "score": 0.0,
+          "score": 9.8,
           "violations": 2
         }
       ],
@@ -271,12 +276,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 0.0,
+      "numericAverage": 9.8,
       "openTypes": 2,
-      "overallGrade": "Critical",
+      "overallGrade": "Exemplary",
       "runId": "20260204T000000",
-      "runNumericAverage": 0.0,
-      "runOverallGrade": "Critical",
+      "runNumericAverage": 9.8,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 2
     },
@@ -288,12 +293,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": 0.0,
+          "delta": 0.1,
           "dimension": "security",
-          "grade": "Insufficient",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 3,
-          "score": 0.0,
+          "score": 9.4,
           "violations": 3
         }
       ],
@@ -302,12 +307,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 0.0,
+      "numericAverage": 9.4,
       "openTypes": 3,
-      "overallGrade": "Critical",
+      "overallGrade": "Exemplary",
       "runId": "20260202T000000",
-      "runNumericAverage": 0.0,
-      "runOverallGrade": "Critical",
+      "runNumericAverage": 9.4,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 3
     },
@@ -319,12 +324,12 @@
       "dimensionDetails": [
         {
           "critical": 0,
-          "delta": -9.4,
+          "delta": 0.2,
           "dimension": "security",
-          "grade": "Insufficient",
+          "grade": "Exemplary",
           "majors": 0,
           "openTypes": 4,
-          "score": 0.0,
+          "score": 9.3,
           "violations": 4
         }
       ],
@@ -333,12 +338,12 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 0.0,
+      "numericAverage": 9.3,
       "openTypes": 4,
-      "overallGrade": "Critical",
+      "overallGrade": "Exemplary",
       "runId": "20260201T000000",
-      "runNumericAverage": 0.0,
-      "runOverallGrade": "Critical",
+      "runNumericAverage": 9.3,
+      "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 4
     },
@@ -355,7 +360,7 @@
           "grade": "Exemplary",
           "majors": 0,
           "openTypes": 5,
-          "score": 9.4,
+          "score": 9.1,
           "violations": 5
         }
       ],
@@ -364,11 +369,11 @@
       ],
       "dimensionsCount": 1,
       "majors": 0,
-      "numericAverage": 9.4,
+      "numericAverage": 9.1,
       "openTypes": 5,
       "overallGrade": "Exemplary",
       "runId": "20260200T000000",
-      "runNumericAverage": 9.4,
+      "runNumericAverage": 9.1,
       "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 5

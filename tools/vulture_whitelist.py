@@ -74,6 +74,7 @@ _.menubar_status  # api/routes_menubar.py: Flask view function; the route decora
 _.plain_logs  # api/_log_stream_routes.py: Flask view function; the route decorator is its only caller.
 _.post_assistant_message  # api/assistant_turn_routes.py: Flask view function; the route decorator is its only caller.
 _.preview_grade_formula  # api/_grade_formula_routes.py: Flask view function; the route decorator is its only caller.
+_.rescore_grade_formula  # api/_grade_formula_routes.py: Flask view function; the route decorator is its only caller.
 _.fleet_compare  # api/routes_compare.py: Flask view function; the route decorator is its only caller.
 _.project_compare_summary  # api/routes_compare.py: Flask view function; the route decorator is its only caller.
 _.project_compliance_detail  # api/_scores_routes.py: Flask view function; the route decorator is its only caller.
@@ -120,7 +121,6 @@ _.accumulatedDimensionsCount  # services/dashboard_trend.py: TrendEntry field; r
 _.majors  # services/dashboard_trend.py: TrendEntry and DimensionDetail field; read by name through serialization or a dict key.
 _.openTypes  # services/dashboard_trend.py: TrendEntry and DimensionDetail field; read by name through serialization or a dict key.
 _.active_agents  # services/_scan_progress_types.py: _DimProgress field; read by name through serialization or a dict key (2 refs).
-_.analyzed  # analysis/subagents/_consolidated.py: _ConsolidatedRunContext field; read by name through serialization or a dict key (82 refs).
 _.analyzed_files  # core/types/project.py: ProjectEntry field; read by name through serialization or a dict key (3 refs).
 _.base_args  # assistant/adapters/cli_config.py: CliChatConfig field; read by name through serialization or a dict key (14 refs).
 _.base_grade  # core/types/scoring.py: PrincipleScore field; read by name through serialization or a dict key (5 refs).
@@ -265,7 +265,6 @@ _.sync_source_to_workdir  # dashboard/_build_npm.py: Referenced as a name or key
 # Public re-export aliases. Importers name them; nothing in-package reads them.
 _.ENV_MAX_DURATION  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
 _.ENV_MAX_TURNS  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
-_.ENV_NO_CONSOLIDATE  # _cli_env.py: Public re-export alias kept for symmetry with the three siblings cli.py imports.
 _.ENV_POOL_BUDGET  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
 _.cli_env_int  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
 _.cli_environ  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
@@ -315,4 +314,7 @@ _.load_standard_catalog  # data/fs/standard_index_loader.py: admission catalog l
 
 # pywebview window event. The toolkit fires it; we only subscribe.
 _.minimized  # dashboard/_webview_window_visibility.py: pywebview window event, fired by the toolkit.
-
+# core/run/origin.py: RunOrigin fields serialized into status.json and the job
+# JSON (to_dict / to_camel_dict); the dashboard reads them by key.
+_.workflow
+_.run_url

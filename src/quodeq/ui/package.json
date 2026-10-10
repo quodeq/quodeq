@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.9",
-    "@tanstack/react-query": "^5.104.0",
+    "@tanstack/react-query": "^5.104.1",
     "@tanstack/react-virtual": "^3.14.13",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
@@ -48,17 +48,17 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@tanstack/react-query-devtools": "^5.104.0",
+    "@tanstack/react-query-devtools": "^5.104.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.6",
     "@vitejs/plugin-react": "6.1.1",
-    "eslint": "10.11.0",
-    "eslint-plugin-jsdoc": "64.5.4",
+    "eslint": "10.12.0",
+    "eslint-plugin-jsdoc": "65.0.1",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
-    "jscpd": "5.2.1",
-    "jsdom": "^30.1.1",
+    "jscpd": "5.4.0",
+    "jsdom": "^30.1.2",
     "vite": "8.3.1",
     "vitest": "^5.0.3"
   },

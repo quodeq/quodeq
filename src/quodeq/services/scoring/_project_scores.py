@@ -8,12 +8,14 @@ still ``monkeypatch.setattr(_fetchers, "make_scoring_trend_fetcher", ...)``.
 """
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.core.scoring.params import ScoringParams
+from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
 from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.grade_formula import is_custom, load_params
@@ -125,6 +127,35 @@ def _empty_project_scores(scoring_meta: dict) -> dict[str, Any]:
 PAYLOAD_MEMO_MAX = 8
 _PAYLOADS = StampCache(max_entries=PAYLOAD_MEMO_MAX, name="project_scores.payloads")
 
+#: One build at a time per memo key. A detail page asks /compliance-detail
+#: once per dimension and kind, all at once; on a memo miss (a run in flight
+#: moves the stamp with every heartbeat) each request built the payload for
+#: itself, beside the others. The first builds, the rest wait and read.
+_BUILD_LOCKS: dict[str, threading.Lock] = {}
+_BUILD_LOCKS_GUARD = threading.Lock()
+
+
+def _build_lock(key: str) -> threading.Lock:
+    with _BUILD_LOCKS_GUARD:
+        return _BUILD_LOCKS.setdefault(key, threading.Lock())
+
+
+def _memoized_payload(
+    req: _ScoresRequest, key: str, stamp: tuple, all_runs: list, scoring_meta: dict, keys: SuppressionKeys,
+) -> dict[str, Any]:
+    """The payload under *stamp*, built once however many callers ask at the same time."""
+    hit = _PAYLOADS.get(key, stamp)
+    if hit is not None:
+        return hit  # type: ignore[return-value]
+    with _build_lock(key):
+        hit = _PAYLOADS.get(key, stamp)
+        if hit is not None:
+            return hit  # type: ignore[return-value]
+        payload, complete = _build_project_scores(req, all_runs, scoring_meta, keys)
+        if complete:
+            _PAYLOADS.put(key, stamp, payload)
+        return payload
+
 
 def _payload_stamp(
     req: _ScoresRequest, all_runs: list, run_versions: list[tuple], keys: SuppressionKeys, custom: bool,
@@ -196,7 +227,10 @@ def get_project_scores_stamped(
     # How the numbers were produced, not what they are. A tuned formula moves
     # every score at once and leaves no other trace -- findings and runs are
     # unchanged -- so the Overview has to be able to say so next to the grade.
-    scoring_meta = {"customFormula": (d.is_custom_formula or is_custom)()}
+    scoring_meta = {
+        "customFormula": (d.is_custom_formula or is_custom)(),
+        "formulaVersion": GRADE_ALGO_VERSION,
+    }
     all_runs = list_runs(reports_root, project)
     if not all_runs:
         return _empty_project_scores(scoring_meta), None
@@ -212,13 +246,7 @@ def get_project_scores_stamped(
                                     [(r.run_id, r.status) for r in all_runs], keys=keys)
     stamp = _payload_stamp(req, all_runs, run_versions, keys, scoring_meta["customFormula"])
     key = f"{reports_root}|{project}"
-    hit = _PAYLOADS.get(key, stamp)
-    if hit is not None:
-        return hit, stamp  # type: ignore[return-value]
-    payload, complete = _build_project_scores(req, all_runs, scoring_meta, keys)
-    if complete:
-        _PAYLOADS.put(key, stamp, payload)
-    return payload, stamp
+    return _memoized_payload(req, key, stamp, all_runs, scoring_meta, keys), stamp
 
 
 def get_project_scores(

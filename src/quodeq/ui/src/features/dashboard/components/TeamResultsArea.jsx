@@ -31,47 +31,51 @@ function useConnectCard(shared) {
 }
 
 /**
- * The team results block under the Repositories header: the sync strip while
- * a repository is configured (or a first connect runs), and the failure card
- * when a connect failed (see pickStripState: a failed connect is reported by
- * the card only, so the strip keeps the working repository). The card's
- * field is prefilled with the URL that failed, so "connect" is the retry;
- * "close" dismisses that failure (by its finishedAt), and a later failure
- * shows again. Connecting and changing the repository open the welcome's
- * connect step (`onConnectEvaluations`). Everything reads `shared`
- * (useSharedProjects), the screen's one status poll.
+ * The server band on top of the Repositories table: the sync strip while a
+ * repository is configured (or a first connect runs). Everything reads
+ * `shared` (useSharedProjects), the screen's one status poll. Changing the
+ * repository opens the welcome's connect step (`onConnectEvaluations`).
  */
-export function TeamResultsArea({ shared, onConnectEvaluations, onSharedDisconnected }) {
+export function TeamSyncBand({ shared, onConnectEvaluations, onSharedDisconnected }) {
   const { invite, copyInvite } = useCopyInvite();
   const { disconnect, disconnecting } = useSharedDisconnect({ onDisconnected: onSharedDisconnected });
-  const card = useConnectCard(shared);
   return (
-    <>
-      <SyncStrip
-        status={shared.status}
-        offline={shared.offline}
-        updateFailed={shared.updateFailed}
-        loadFailed={Boolean(shared.error)}
-        lastSynced={shared.lastSynced}
-        projectsCount={shared.projects.length}
-        warming={shared.warming}
-        invite={invite}
-        onUpdate={shared.refresh}
-        onCopyInvite={copyInvite}
-        onChange={onConnectEvaluations}
-        onDisconnect={disconnect}
-        disconnecting={disconnecting}
-      />
-      {card.showCard && (
-        <ConnectTeamCard
-          initialUrl={card.retryUrl}
-          onConnect={shared.connect}
-          connecting={shared.connecting}
-          error={shared.connectError}
-          onClose={card.onClose}
-          accessFailure={shared.accessFailure}
-        />
-      )}
-    </>
+    <SyncStrip
+      status={shared.status}
+      offline={shared.offline}
+      updateFailed={shared.updateFailed}
+      loadFailed={Boolean(shared.error)}
+      lastSynced={shared.lastSynced}
+      projectsCount={shared.projects.length}
+      warming={shared.warming}
+      invite={invite}
+      onUpdate={shared.refresh}
+      onCopyInvite={copyInvite}
+      onChange={onConnectEvaluations}
+      onDisconnect={disconnect}
+      disconnecting={disconnecting}
+    />
+  );
+}
+
+/**
+ * The failure card when a connect failed (see pickStripState: a failed
+ * connect is reported by the card only, so the band keeps the working
+ * repository). Its field is prefilled with the URL that failed, so
+ * "connect" is the retry; "close" dismisses that failure (by its
+ * finishedAt), and a later failure shows again.
+ */
+export function ConnectFailureArea({ shared }) {
+  const card = useConnectCard(shared);
+  if (!card.showCard) return null;
+  return (
+    <ConnectTeamCard
+      initialUrl={card.retryUrl}
+      onConnect={shared.connect}
+      connecting={shared.connecting}
+      error={shared.connectError}
+      onClose={card.onClose}
+      accessFailure={shared.accessFailure}
+    />
   );
 }

@@ -26,142 +26,88 @@ from quodeq.core.scoring.numerical import (  # noqa: F401 — re-export
     build_deductions,
     count_grade_drops,
 )
+from quodeq.core.scoring.mass import PrincipleMass
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.finding import Finding
+from quodeq.core.types.severity import Severity
 
 
 # ---------------------------------------------------------------------------
-# 4-stage scoring formula
+# 4-stage scoring formula, on requirement masses (core/scoring/mass.py)
 # ---------------------------------------------------------------------------
 
-def violation_base(
-    violation_type_counts: dict[str, int],
-    *, params: ScoringParams = DEFAULT_PARAMS,
-) -> float:
-    """Compute the base score from violations alone (ignoring compliance).
-
-    Uses a hyperbolic curve: ``base = 10 / (1 + K * weighted_violations)``
-    Returns a value in [0, 10].
-    """
-    wv = weighted_sum(violation_type_counts, params.severity_weight)
-    if wv == 0:
+def violation_base(violation_mass: float, *, params: ScoringParams = DEFAULT_PARAMS) -> float:
+    """``base = 10 / (1 + K · violation_mass)``; 10 with no violations."""
+    if violation_mass <= 0:
         return float(MAX_SCORE)
-    return MAX_SCORE / (1.0 + params.base_k * wv)
+    return MAX_SCORE / (1.0 + params.base_k * violation_mass)
 
 
 def compliance_lift(
-    compliance_type_counts: dict[str, int],
-    violation_type_counts: dict[str, int],
-    *, params: ScoringParams = DEFAULT_PARAMS,
+    compliance_mass: float, violation_mass: float, *, params: ScoringParams = DEFAULT_PARAMS,
 ) -> float:
-    """Compute the lift factor from compliance evidence.
-
-    Returns a value in [0, 1] representing the fraction of the gap filled.
-    """
-    wv = weighted_sum(violation_type_counts, params.severity_weight)
-    cc = sum(compliance_type_counts.values())
-    if cc == 0 or wv == 0:
+    """Fraction of the gap to 10 that compliance fills: ``(cc / (cc + wv)) ^ compress``."""
+    if compliance_mass <= 0 or violation_mass <= 0:
         return 0.0
-    raw_lift = cc / (cc + wv)
-    return raw_lift ** params.lift_compress
+    return (compliance_mass / (compliance_mass + violation_mass)) ** params.lift_compress
 
 
-def violation_ceiling(
-    violation_type_counts: dict[str, int],
-    *, params: ScoringParams = DEFAULT_PARAMS,
-) -> float:
-    """Compute the maximum achievable score given the violation weight.
-
-    ``ceiling = 10 - log2(1 + wv) * CEIL_SCALE``
-    """
-    wv = weighted_sum(violation_type_counts, params.severity_weight)
-    if wv == 0:
+def violation_ceiling(violation_mass: float, *, params: ScoringParams = DEFAULT_PARAMS) -> float:
+    """``ceiling = 10 − scale · log2(1 + violation_mass)``."""
+    if violation_mass <= 0:
         return float(MAX_SCORE)
-    return MAX_SCORE - math.log2(1.0 + wv) * params.ceil_scale
+    return MAX_SCORE - math.log2(1.0 + violation_mass) * params.ceil_scale
 
 
-def severity_grade_floor(
-    violation_type_counts: dict[str, int],
-    *, params: ScoringParams = DEFAULT_PARAMS,
-) -> float:
-    """Return the minimum score based on the worst violation severity present."""
-    if violation_type_counts.get("critical", 0) > 0:
+def severity_grade_floor(worst: str | None, *, params: ScoringParams = DEFAULT_PARAMS) -> float:
+    """The lowest score the worst effective severity allows; 10 with no violations."""
+    if worst == Severity.CRITICAL:
         return 0.0
-    if violation_type_counts.get("major", 0) > 0:
+    if worst == Severity.MAJOR:
         return params.floor_major
-    if violation_type_counts.get("minor", 0) > 0:
+    if worst == Severity.MINOR:
         return params.floor_minor
     return float(MAX_SCORE)
 
 
 def finding_to_scoring_dict(f: Finding) -> dict[str, Any]:
-    """Convert a Finding dataclass to the dict format scoring internals expect.
-
-    Carries ``req`` so the tally groups untagged findings by requirement code
-    on the SQL path exactly as the evidence path does. Includes ``vt`` only
-    when the finding has an explicit violation_type, so
-    ``evidence_has_taxonomy()`` reports the same mode the evaluation used.
-    """
-    d: dict[str, Any] = {
-        "severity": f.severity or "minor",
-        "reason": f.reason or "",
-    }
+    """The dict shape the mass builder reads: severity, reason, req, vt and file."""
+    d: dict[str, Any] = {"severity": f.severity or Severity.MINOR, "reason": f.reason or ""}
     if f.req:
         d["req"] = f.req
     if f.violation_type:
         d["vt"] = f.violation_type
+    if f.file:
+        d["file"] = f.file
     return d
 
 
 def clamp_principle_score(
-    raw: float, vt_counts: dict[str, int], *, params: ScoringParams = DEFAULT_PARAMS,
+    raw: float, violation_mass: float, worst: str | None, *, params: ScoringParams = DEFAULT_PARAMS,
 ) -> float:
-    """Clamp a raw principle score between the severity floor and the volume ceiling.
-
-    Floor first, ceiling last. The two guards cross when a principle carries a
-    LOT of issues that all happen to be minor: the minor-only floor (8.0) rises
-    above the volume ceiling. Clamping the other way round handed back the
-    floor and discarded the ceiling -- the one guard that encodes volume -- so
-    a principle with 269 findings read "Good". Algebraically identical whenever
-    floor <= ceil, so only the contradictory case moves. Every scoring path
-    (evidence, projector, legacy no-evidence fallback) goes through here so a
-    principle scores the same whichever read surface asked.
-    """
-    ceil = violation_ceiling(vt_counts, params=params)
-    floor = severity_grade_floor(vt_counts, params=params)
+    """Floor first, ceiling last: the ceiling (volume) wins when the two cross."""
+    ceil = violation_ceiling(violation_mass, params=params)
+    floor = severity_grade_floor(worst, params=params)
     return round(min(ceil, max(floor, raw)), 1)
 
 
-def principle_score_and_grade(
-    vt_counts: dict[str, int],
-    ct_counts: dict[str, int],
-    *, params: ScoringParams = DEFAULT_PARAMS,
-) -> tuple[float, str]:
-    """Score one principle from its violation and compliance type counts.
-
-    Compliance lifts the violation-derived base towards 10 rather than adding
-    to it, so a principle with violations can never reach a clean score on
-    volume of compliance alone. Returns (score, grade_label).
-    """
-    _base, _lift, _raw, final = principle_stages(vt_counts, ct_counts, params=params)
-    grade = score_to_grade_label(final, params=params)
-    return final, grade
-
-
 def principle_stages(
-    vt_counts: dict[str, int],
-    ct_counts: dict[str, int],
-    *, params: ScoringParams = DEFAULT_PARAMS,
+    mass: PrincipleMass, *, params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[float, float, float, float]:
-    """``(base, lift, raw, final)`` for one principle: the base from the
-    violation types, the compliance lift, the lifted score and the clamped
-    result. ``principle_score_and_grade`` and the help page's explain view
-    both read these."""
-    base = violation_base(vt_counts, params=params)
-    lift = compliance_lift(ct_counts, vt_counts, params=params)
+    """``(base, lift, raw, final)`` for one principle's masses."""
+    base = violation_base(mass.violation_mass, params=params)
+    lift = compliance_lift(mass.compliance_mass, mass.violation_mass, params=params)
     raw = base + (MAX_SCORE - base) * lift
-    final = clamp_principle_score(raw, vt_counts, params=params)
+    final = clamp_principle_score(raw, mass.violation_mass, mass.worst, params=params)
     return base, lift, raw, final
+
+
+def principle_score_and_grade(
+    mass: PrincipleMass, *, params: ScoringParams = DEFAULT_PARAMS,
+) -> tuple[float, str]:
+    """Score one principle from its masses. Returns (score, grade_label)."""
+    _base, _lift, _raw, final = principle_stages(mass, params=params)
+    return final, score_to_grade_label(final, params=params)
 
 
 # ---------------------------------------------------------------------------

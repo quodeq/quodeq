@@ -33,7 +33,7 @@ def build_projected_run(
     store = SQLiteStateStore(run_dir)
     store.save_projected_size((run_dir / "events.jsonl").stat().st_size)
     # Same freeze for the grade-algo stamp: without it ensure_projected treats
-    # the baked grades as computed-by-older-math and recomputes them — from
+    # the baked grades as computed-by-older-math and recomputes them, from
     # this run's zero findings, wiping the very scores the tests bake in.
     store.save_grades_algo_version(GRADE_ALGO_VERSION)
     for dim, (score, grade) in dims.items():

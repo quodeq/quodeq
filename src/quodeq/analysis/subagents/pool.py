@@ -8,6 +8,7 @@ from pathlib import Path
 
 from quodeq.analysis.subagents._heartbeat import HeartbeatContext, heartbeat_loop
 from quodeq.analysis.subagents._pool_loops import LoopContext, immediate_loop, scout_loop
+from quodeq.analysis.subagents._pool_scaling import get_queue
 from quodeq.analysis.subagents._pool_models import (
     PoolOptions,
     PoolPaths,
@@ -22,7 +23,8 @@ from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
-from quodeq.shared.constants import CONSOLIDATED_DIMENSION_KEY, DEFAULT_TIME_LIMIT
+from quodeq.shared import cancellation
+from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 
 # Re-export public API so existing imports keep working.
@@ -45,12 +47,8 @@ class SubagentPool:
         self._evidence_dir, self._queue_path = paths.evidence_dir, paths.queue_path
         self._queue = queue
         dimension = options.dimension
-        if isinstance(dimension, list):
-            self._dimensions, self._dimension = dimension, ",".join(dimension)
-            self._dimension_key = CONSOLIDATED_DIMENSION_KEY
-        else:
-            self._dimensions = [dimension] if dimension else []
-            self._dimension, self._dimension_key = dimension, dimension
+        self._dimensions = [dimension] if dimension else []
+        self._dimension, self._dimension_key = dimension, dimension
         self._base_config = config or AnalysisConfig()
         self._worker_ctx = WorkerContext(
             dimension=self._dimension, dimension_key=self._dimension_key,
@@ -98,13 +96,10 @@ class SubagentPool:
         no extra file reads. Suppression state is project-scoped and the
         evidence dir is ``<project>/<run>/evidence``.
 
-        Returns None when the project has no suppressions, when the layout
-        isn't the expected one, or for consolidated runs — whose synthetic
-        dimension key would never match a real delete key anyway. The counts
-        then stay raw, which is the pre-existing behaviour.
+        Returns None when the project has no suppressions or when the layout
+        isn't the expected one. The counts then stay raw, which is the
+        pre-existing behaviour.
         """
-        if self._dimension_key == CONSOLIDATED_DIMENSION_KEY:
-            return None
         try:
             from quodeq.services.suppression import matcher_for  # noqa: PLC0415
             project_dir = self._evidence_dir.parent.parent
@@ -182,9 +177,18 @@ class SubagentPool:
             hb.join(timeout=HEARTBEAT_JOIN_TIMEOUT_S)
 
     def _record_exit_reason(self, max_dur: int, pool_start: float) -> None:
-        """Without an exception, decide between "done" and "time_limit"."""
-        elapsed = time.monotonic() - pool_start
-        if max_dur > 0 and elapsed >= max_dur:
+        """Without an exception, decide between "done" and "time_limit".
+
+        Hitting the pool's own budget or the deadline (often this dimension's
+        slice of the run) with files still queued is a time limit too.
+        """
+        now = time.monotonic()
+        if max_dur > 0 and now - pool_start >= max_dur:
+            self.exit_reason = ExitReason.TIME_LIMIT
+            return
+        deadline_at = self._base_config.deadline_at
+        if deadline_at is not None and now >= deadline_at and not cancellation.is_cancelled() \
+                and get_queue(self._queue, self._queue_path).remaining() > 0:
             self.exit_reason = ExitReason.TIME_LIMIT
 
     def run(self) -> list[SubagentResult]:

@@ -1977,15 +1977,37 @@ textarea:focus {
   text-align: center;
 }
 
+/* Tip-first boot layout: logo on the left, the tip as the headline beside
+   it. Both sit in one centered row with a fixed panel width and a reserved
+   panel height, so nothing shifts when a tip arrives, swaps or wraps. */
+.loading-tips-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 30rem);
+  align-items: center;
+  gap: var(--space-8);
+  padding: 0 var(--space-6);
+}
+
+.loading-tips-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 7.5rem;
+  justify-content: center;
+}
+
+.loading-screen--tips .loading-logo {
+  width: 140px;
+}
+
+.loading-screen--tips .loading-message {
+  text-align: left;
+}
+
 .loading-tip {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: var(--space-2);
-  max-width: 34rem;
-  padding: 0 var(--space-4);
-  margin-top: var(--space-5);
-  text-align: center;
   animation: loading-fadein 700ms ease;
   /* Duration mirrors TIP_FADE_MS in LoadingScreen.jsx. */
   transition: opacity 700ms ease, transform 700ms ease;
@@ -2006,10 +2028,12 @@ textarea:focus {
 
 .loading-tip__text {
   margin: 0;
-  font-size: var(--text-base);
-  line-height: 1.55;
-  color: var(--color-text-muted);
-  text-wrap: balance;
+  min-height: 4.4em;
+  font-size: var(--text-lg);
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--color-text);
+  text-wrap: pretty;
 }
 
 /* The question is a block so the answer starts on the next line; the space
@@ -2017,14 +2041,13 @@ textarea:focus {
 .loading-tip__question {
   display: block;
   margin-bottom: 6px;
-  font-weight: 500;
-  color: var(--color-text);
+  font-weight: 600;
 }
 
-/* Medium, not bold: the highlight should guide a skim, not shout. */
+/* The one thing worth catching at a glance takes the logo's color. */
 .loading-tip__text strong {
-  font-weight: 500;
-  color: var(--color-text);
+  font-weight: 600;
+  color: var(--logo-q);
 }
 
 .loading-tip__text code {
@@ -2033,29 +2056,18 @@ textarea:focus {
   padding: 1px 6px;
   border: 1px solid var(--color-border);
   border-radius: 4px;
-  color: var(--color-text);
   white-space: nowrap;
 }
 
-/* With tips on, the logo sits above center so logo and tip read as one group
-   centered on screen, instead of the tip hanging below a centered logo. The
-   margin (not a transform) keeps loading-pulse's scale free. */
-.loading-screen--tips {
-  --loading-tip-lift: 48px;
-}
-
-.loading-screen--tips .loading-logo {
-  margin-bottom: calc(var(--loading-tip-lift) * 2);
-}
-
-/* The tip floats below the logo instead of joining the flex column, so the
-   logo never shifts when a tip appears or wraps to a second line. */
-.loading-screen:not(.loading-screen--inline) .loading-tip {
-  position: absolute;
-  top: calc(50% + 76px - var(--loading-tip-lift, 0px));
-  left: 0;
-  right: 0;
-  margin: 0 auto;
+@media (max-width: 640px) {
+  .loading-tips-layout {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+  }
+  .loading-screen--tips .loading-logo { width: 110px; }
+  .loading-screen--tips .loading-message { text-align: center; }
+  .loading-tips-panel { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2071,17 +2083,46 @@ textarea:focus {
   to   { opacity: 0; }
 }
 
+/* The full logo (LoaderLogo.jsx). The needle sways around north like a real
+   compass settling: uneven swings, so it never reads as a metronome. */
 .loading-logo {
-  width: 80px;
+  width: 104px;
   height: auto;
-  color: var(--logo-q);   /* QMarkIcon fills with currentColor */
-  opacity: 0.15;
-  animation: loading-pulse 1.8s ease-in-out infinite;
+  overflow: visible;
 }
 
-@keyframes loading-pulse {
-  0%, 100% { opacity: 0.1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(1.05); }
+/* Every loader except the boot screen sits on a page, so it stays quiet: a
+   smaller logo at low opacity, slowly breathing, with the needle still
+   swaying. The boot screen keeps the full-strength logo beside its tips. */
+.loading-screen:not(.loading-screen--tips) .loading-logo {
+  width: 88px;
+  animation: loading-logo-breathe 2s ease-in-out infinite;
+}
+
+@keyframes loading-logo-breathe {
+  0%, 100% { opacity: 0.14; }
+  50%      { opacity: 0.34; }
+}
+
+.loader-logo__chevron { fill: var(--logo-chevron); }
+.loader-logo__q { fill: var(--logo-q); }
+.loader-logo__needle-light { fill: var(--logo-needle); }
+.loader-logo__needle-dark { fill: var(--logo-needle-dark); }
+
+.loader-logo__needle {
+  animation: loader-needle-sway 2.8s ease-in-out infinite alternate;
+}
+
+@keyframes loader-needle-sway {
+  0%   { transform: rotate(-9deg); }
+  35%  { transform: rotate(4deg); }
+  65%  { transform: rotate(-2deg); }
+  100% { transform: rotate(8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-logo__needle { animation: none; }
+  .loading-screen:not(.loading-screen--tips) .loading-logo { animation: none; opacity: 0.24; }
 }
 
 @keyframes loading-fadein {

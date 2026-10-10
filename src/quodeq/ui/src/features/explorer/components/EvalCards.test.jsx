@@ -11,14 +11,15 @@ describe('ComplianceCard', () => {
     expect(screen.getByText(t('explorer.detailUnavailable'))).toBeInTheDocument();
   });
 
-  it('says the finding changed when its detail row no longer exists on the server', () => {
-    render(<ComplianceCard c={{ ...item, detailOutdated: true }} principle="P1" index={0} />);
-    expect(screen.getByText(t('explorer.detailOutdated'))).toBeInTheDocument();
+  it('shows a loading skeleton, and no note, while the detail is still deferred', () => {
+    render(<ComplianceCard c={{ ...item, detailDeferred: true }} principle="P1" index={0} />);
+    expect(screen.getByRole('status', { name: t('explorer.detailLoading') })).toBeInTheDocument();
     expect(screen.queryByText(t('explorer.detailUnavailable'))).not.toBeInTheDocument();
   });
 
-  it('shows no note for an item whose detail is present or still loading', () => {
-    render(<ComplianceCard c={{ ...item, detailDeferred: true }} principle="P1" index={0} />);
-    expect(screen.queryByText(t('explorer.detailUnavailable'))).not.toBeInTheDocument();
+  it('shows neither once the detail is present', () => {
+    render(<ComplianceCard c={{ ...item, reason: 'why', detailDeferred: false }} principle="P1" index={0} />);
+    expect(screen.getByText('why')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

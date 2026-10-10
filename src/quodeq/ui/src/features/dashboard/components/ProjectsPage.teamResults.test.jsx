@@ -60,14 +60,14 @@ describe('ProjectsPage — header actions', () => {
     expect(onImportProject).toHaveBeenCalledTimes(1);
   });
 
-  it('while a connect reads, one placeholder card per project found heads the list', async () => {
+  it('while a connect reads, one placeholder row per project found heads the list', async () => {
     const reading = { state: 'running', phase: SYNC_PHASE.READING, percent: null, projectsFound: 3, url: URL };
     const { api } = makeApi({ slots: { connect: reading } });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     await waitFor(() => expect(screen.getByText('reading projects · 3 found…')).toBeInTheDocument());
-    expect(document.querySelectorAll('.project-card--placeholder')).toHaveLength(3);
+    expect(document.querySelectorAll('.projects-row--placeholder')).toHaveLength(3);
     // One announcement comes from the strip; the placeholders themselves are silent.
-    expect(document.querySelector('.projects-cards--placeholders')).toHaveAttribute('aria-hidden', 'true');
+    expect(document.querySelector('.projects-placeholders')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('app')).toBeInTheDocument();
   });
 
@@ -219,7 +219,7 @@ describe('ProjectsPage — pull state on team cards', () => {
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
     const btn = await screen.findByRole('button', { name: 'downloading…' });
     expect(btn).toBeDisabled();
-    const card = btn.closest('.project-card');
+    const card = btn.closest('.projects-row-group');
     expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-busy', 'true');
   });
 

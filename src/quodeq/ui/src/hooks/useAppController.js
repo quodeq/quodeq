@@ -1,5 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { applyMutationDelta } from '../api/applyMutationDelta.js';
+import { recordDismissedEntry } from '../api/dismissedListCache.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 import {
   computeIsEvaluating, useAppBootExtras, useAppWizardBounce, useAppDerived,
   useSidebarProviderSelection, useAppStartupGate, useAppNavigationEffects, useSelectedProjectSyncEffects,
@@ -25,13 +27,16 @@ export function useAppDismissBridge(state) {
   const boot = useAppBootExtras({ onCloneLanded: (slot) => selectLandedProject(state, slot.projectId) });
   const applyDelta = (project, scores, delta) =>
     applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions });
+  // A dismiss is local-only, so the entry always lands in the local list.
+  const recordDismissed = (project, entry) =>
+    recordDismissedEntry(queryClient, project, PROJECT_SOURCE.LOCAL, entry);
   useAssistantActionAppliedEffect({
     applyDelta,
-    bumpDismissRefresh: boot.bumpDismissRefresh,
+    recordDismissed,
     scheduleReconcileForApply: state.scheduleDashboardReconcile,
     selectedProject: state.selectedProject,
   });
-  return { ...boot, applyDelta };
+  return { ...boot, applyDelta, recordDismissed };
 }
 
 /**

@@ -208,6 +208,7 @@ export function updateSceneLiveData(scene, dimensions) {
       prin.score = pScore;
       prin.rawScore = gl?.score ?? null;
       prin.grade = gl?.grade || null;
+      prin.confidence = gl?.confidence ?? null;
       prin.col = scoreRGB(pScore);
       prin._rawViolations = g.violations;
       prin._rawCompliance = g.compliance;

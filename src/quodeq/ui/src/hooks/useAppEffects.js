@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getGradeFormula } from '../api/index.js';
 import { setGradeThresholds } from '../utils/gradeThresholds.js';
+import { setDimensionWeights } from '../utils/dimensionWeights.js';
 import { hydrateVisibleStandardIds } from '../utils/visibleStandards.js';
 import { shouldRedirectToRepositories } from '../appGating.js';
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
@@ -35,24 +36,24 @@ export function useDeadSharedSelectionEffect({ state, sharedSignal }) {
 
 /**
  * Bridges ASSISTANT_ACTION_APPLIED_EVENT window events into the
- * dashboard/scores cache patch + dismissed-list refresh, mirroring the
+ * dashboard/scores cache patch + dismissed-list entry, mirroring the
  * manual dismiss handlers (dismissWithReconcile callers in
  * routes/renderers.jsx).
  */
 export function useAssistantActionAppliedEffect({
-  applyDelta, bumpDismissRefresh, scheduleReconcileForApply, selectedProject,
+  applyDelta, recordDismissed, scheduleReconcileForApply, selectedProject,
 }) {
   // The two cache-patch callbacks get a new identity on most renders. Reading
   // them through a ref keeps the listener attached across those renders (a
   // detach/attach cycle could drop an event that lands in between) while the
   // handler still calls the current ones.
-  const patchRef = useRef({ applyDelta, bumpDismissRefresh });
-  patchRef.current = { applyDelta, bumpDismissRefresh };
+  const patchRef = useRef({ applyDelta, recordDismissed });
+  patchRef.current = { applyDelta, recordDismissed };
 
   useEffect(() => {
     const handler = buildAssistantActionAppliedHandler({
       applyDelta: (...args) => patchRef.current.applyDelta(...args),
-      bumpDismissRefresh: (...args) => patchRef.current.bumpDismissRefresh(...args),
+      recordDismissed: (...args) => patchRef.current.recordDismissed?.(...args),
       scheduleDashboardReconcile: scheduleReconcileForApply,
       selectedProject,
     });
@@ -62,15 +63,18 @@ export function useAssistantActionAppliedEffect({
 }
 
 /**
- * Sync the client-side grade-label thresholds with the server formula at
- * boot so every gauge/badge agrees with the applied Q² parameters. The
- * gradeThresholds store seeds with the Q² defaults, so a failed/absent
- * fetch leaves a sane fallback in place.
+ * Sync the client-side grade-label thresholds and dimension weights with
+ * the server formula at boot so every gauge/badge and recomputed average
+ * agrees with the applied Q² parameters. Both stores seed with the Q²
+ * defaults, so a failed/absent fetch leaves a sane fallback in place.
  */
 export function useGradeFormulaBootSyncEffect() {
   useEffect(() => {
     getGradeFormula()
-      .then((d) => setGradeThresholds(d?.current?.gradeThresholds))
+      .then((d) => {
+        setGradeThresholds(d?.current?.gradeThresholds);
+        setDimensionWeights(d?.current);
+      })
       .catch((err) => {
         console.warn('[useAppEffects] grade formula boot fetch failed:', err);
       });

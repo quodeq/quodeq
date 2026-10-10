@@ -37,10 +37,7 @@ def _seed(store: SQLiteStateStore, *, req: str, principle: str, dimension: str, 
 
 
 def test_recompute_grades_writes_dimension_and_principle_rows(tmp_path: Path) -> None:
-    """Seed 5+ findings per principle so they clear the confidence floor —
-    otherwise the projector now correctly returns Insufficient (no
-    numeric score) for thin evidence, matching the CLI engine.
-    """
+    """Seed 5+ findings per principle so they clear the thin-evidence marker."""
     store = SQLiteStateStore(tmp_path)
     for i in range(5):
         _seed(store, req=f"P1-{i}", principle="P1", dimension="Security", severity="high")
@@ -53,29 +50,21 @@ def test_recompute_grades_writes_dimension_and_principle_rows(tmp_path: Path) ->
     assert len(dim_rows) == 1
     assert dim_rows[0]["dimension"] == "Security"
     assert dim_rows[0]["score"] is not None
+    assert "confidence" in dim_rows[0]
 
     p_rows = store.read_principle_grades()
     assert len(p_rows) == 2
+    assert all("confidence" in r for r in p_rows)
     assert {r["principle_id"] for r in p_rows} == {"P1", "P2"}
 
 
-def test_recompute_grades_below_confidence_floor_writes_insufficient(
-    tmp_path: Path,
-) -> None:
-    """A principle with one finding clears the empty-tally guard but trips
-    the confidence-level check, so the projector now returns
-    ``Insufficient`` instead of a real score — matching the CLI engine.
-    """
+def test_recompute_grades_thin_principle_is_scored_and_marked(tmp_path: Path) -> None:
     store = SQLiteStateStore(tmp_path)
     _seed(store, req="R1", principle="P1", dimension="Security", severity="high")
-
     recompute_grades(tmp_path)
-
-    p_rows = store.read_principle_grades()
-    assert len(p_rows) == 1
-    assert p_rows[0]["principle_id"] == "P1"
-    assert p_rows[0]["grade"] == "Insufficient"
-    assert p_rows[0]["score"] is None
+    row = store.read_principle_grades()[0]
+    assert row["score"] is not None and row["grade"] != "Insufficient" and row["confidence"] == "low"
+    assert store.read_dimension_scores()[0]["confidence"] == "low"
 
 
 def test_recompute_grades_excludes_dismissed(tmp_path: Path) -> None:
@@ -172,3 +161,35 @@ def test_recompute_grades_exit_reason_none_when_done_clean(tmp_path: Path) -> No
     rows = store.read_dimension_scores()
     sec = next(r for r in rows if r["dimension"] == "security")
     assert sec["exit_reason"] is None
+
+
+def _write_manifest(run_dir: Path, count: int) -> None:
+    (run_dir / "evidence").mkdir(parents=True, exist_ok=True)
+    (run_dir / "evidence" / "manifest.json").write_text(f'{{"source_files_count": {count}}}')
+
+
+def test_read_source_file_count_falls_back_to_the_manifest_on_a_live_run(tmp_path: Path) -> None:
+    """A live run has no dim JSON yet; the scan manifest's count stands in."""
+    _write_manifest(tmp_path, 2803)
+    assert _read_source_file_count(tmp_path) == 2803
+
+
+def test_read_source_file_count_prefers_the_dim_json_over_the_manifest(tmp_path: Path) -> None:
+    """Either order of arrival: the dim JSON wins once it exists, the manifest before it."""
+    _write_manifest(tmp_path, 40)
+    assert _read_source_file_count(tmp_path) == 40
+    (tmp_path / "evaluation").mkdir()
+    (tmp_path / "evaluation" / "security.json").write_text('{"sourceFileCount": 41}')
+    assert _read_source_file_count(tmp_path) == 41
+
+    other = tmp_path / "other"
+    (other / "evaluation").mkdir(parents=True)
+    (other / "evaluation" / "security.json").write_text('{"sourceFileCount": 41}')
+    _write_manifest(other, 40)
+    assert _read_source_file_count(other) == 41
+
+
+def test_read_source_file_count_is_zero_without_either(tmp_path: Path) -> None:
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "evidence" / "manifest.json").write_text('{"language_stats": {}}')
+    assert _read_source_file_count(tmp_path) == 0

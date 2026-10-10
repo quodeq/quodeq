@@ -88,7 +88,7 @@ describe('GradeFormulaPage', () => {
     mockHook();
     mount(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
     expect(screen.getByLabelText('critical')).toBeInTheDocument();
-    for (const title of ['Types, weighted', 'Base', 'Lift', 'Ceiling and floors']) {
+    for (const title of ['Rules, weighted', 'Base', 'Lift', 'Ceiling and floors']) {
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
     }
     // Switch to Dimensions: its toggle button appears, severity slider goes away.

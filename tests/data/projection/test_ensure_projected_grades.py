@@ -147,16 +147,17 @@ def test_pre_stamp_db_heals_on_first_contact(tmp_path: Path) -> None:
     assert len(store.read_dimension_scores()) == 1
 
 
-def test_grade_algo_version_is_three() -> None:
-    """v3: the tally groups findings by ``req`` before ``vt`` (issue #1274).
+def test_grade_algo_version_is_six() -> None:
+    """v6: requirement spread, the finding's own severity, observation weighting
+    that keeps dismissed findings observed.
 
-    Grade tables stamped v2 were computed with vt-grouped tallies, so a
+    Grade tables stamped v3 were computed with the tally formula, so a
     run untouched since then must re-derive; the staleness test above proves
     the mechanism, this pins the version that triggers it.
     """
     from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
 
-    assert GRADE_ALGO_VERSION == 3
+    assert GRADE_ALGO_VERSION == 6
 
 
 def test_a_dismiss_that_touches_no_finding_keeps_the_grades(
@@ -185,3 +186,22 @@ def test_a_dismiss_that_touches_no_finding_keeps_the_grades(
     Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
 
     assert calls == [run_dir]
+
+
+def test_the_grader_reads_dismissed_findings_with_their_rule_and_file(tmp_path: Path) -> None:
+    """Dismissed findings reach the grader (observed, no penalty), not just a count."""
+    from quodeq.data.projection.grade_projector import load_grade_inputs
+
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "r1"
+    run_dir.mkdir(parents=True)
+    events_log = _seed_run_with_finding(run_dir, req="R1", file="a.py", line=10)
+    ActionLogWriter(project_dir).emit(
+        FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10))
+    )
+    Projector().ensure_projected(events_log, run_dir, project_dir=project_dir)
+
+    inputs = load_grade_inputs(run_dir)
+    assert inputs.violations_by == {}
+    [dismissed] = [f for group in inputs.dismissed_by.values() for f in group]
+    assert (dismissed.req, dismissed.file) == ("R1", "a.py")

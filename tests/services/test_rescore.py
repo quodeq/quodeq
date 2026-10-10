@@ -1,5 +1,6 @@
 """Tests for the live rescore service."""
 import json
+from dataclasses import replace
 
 from quodeq.core.types.finding import Finding, Totals, SeverityTally
 from quodeq.core.types.report import PrincipleGrade
@@ -230,3 +231,29 @@ def test_rescore_dismiss_by_principle_key_matches_no_req_finding():
     ])
     rescored = rescore_dimension(dim, SuppressionKeys({("P1", "a.py", 3)}))
     assert [v.req for v in rescored.violations] == ["R2"]
+
+
+def _many(n, make, **kw):
+    return [make(req=f"R{i}", file=f"f{i}.py", line=i + 1, **kw) for i in range(n)]
+
+
+def test_rescore_dimension_marker_follows_the_surviving_evidence():
+    """Dismissing the bulk of the evidence thins it: the dimension marker flips to low."""
+    comp = _many(2, _make_compliance)
+    viols = _many(28, _make_violation, severity="major")
+    dim = _make_dimension(violations=viols, compliance=comp)
+    one = SuppressionKeys({(viols[0].req, viols[0].file, viols[0].line)})
+    assert rescore_dimension(dim, one).confidence is None
+
+    all_viols = SuppressionKeys({(v.req, v.file, v.line) for v in viols})
+    thinned = rescore_dimension(dim, all_viols)
+    assert thinned.confidence == "low"
+    assert [p.confidence for p in thinned.principles] == ["low"]
+
+
+def test_rescore_dimension_marker_clears_when_a_stale_low_no_longer_holds():
+    comp = _many(2, _make_compliance)
+    viols = _many(28, _make_violation, severity="major")
+    dim = replace(_make_dimension(violations=viols, compliance=comp), confidence="low")
+    one = SuppressionKeys({(viols[0].req, viols[0].file, viols[0].line)})
+    assert rescore_dimension(dim, one).confidence is None

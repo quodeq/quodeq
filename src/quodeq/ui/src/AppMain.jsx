@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import FadeIn from './components/FadeIn.jsx';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
+import RebuildStrip from './features/rebuild/RebuildStrip.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
 import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.jsx';
@@ -17,7 +18,7 @@ import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvi
 import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
 import { RescoreTrackerProvider } from './features/grade-formula/rescore/RescoreTrackerProvider.jsx';
 import { MainContent } from './routes/renderers.jsx';
-import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
+import { buildSidebarProps, buildTopBarProps, buildProjectSwitcherProps } from './appShellProps.js';
 import { useSyncActivity } from './hooks/useSyncActivity.js';
 import { NAV_TAB } from './vocab/navTab.js';
 
@@ -36,6 +37,9 @@ function AppShell({ sidebar, header, content, drawer, startupLoader, booting }) 
         {sidebar}
         <div className="app-shell__main-column" inert={booting || undefined}>
           <UpdateBanner />
+          {/* Under the top bar on every page while scores rebuild; it reads
+              the rescore tracker mounted around the shell. */}
+          <RebuildStrip />
           <main className="dashboard">
             {content}
           </main>
@@ -85,6 +89,7 @@ function AppTopBar({ shell }) {
   const {
     state, activeTab, navTab, resolvedDisplayName, sidebarProvider, sidebarModel, isEvaluating, showEvaluate,
     activePage, navStack, navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, setSidebarPinned,
+    contentProps, sharedSignal,
   } = shell;
   // A running team-results job (connect, refresh, pull) sweeps the same
   // loading hairline as pending page data, so the top bar moves while the
@@ -112,6 +117,7 @@ function AppTopBar({ shell }) {
             projectName={resolvedDisplayName}
             onSelectProject={() => navTab(NAV_TAB.PROJECTS)}
             siblingsFor={breadcrumbSiblingsFor}
+            projectSwitcher={buildProjectSwitcherProps({ state, sharedProjects: sharedSignal.projects, navigation: contentProps.navigation, navTab, navStack })}
           />
         ),
         mobileTitle: navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || ''),

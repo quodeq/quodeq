@@ -1,7 +1,6 @@
 """Live-progress polling reuses one IncrementalTally per evidence file.
 
-`_dim_evidence_tally` and `consolidated_dim_progress`
-called `tally_unique_findings` from byte 0 on every poll, so a growing
+`_dim_evidence_tally` called `tally_unique_findings` from byte 0 on every poll, so a growing
 evidence.jsonl got fully re-parsed on every ~2s tick while a pool ran.
 `live_tally` memoizes an `IncrementalTally` per (file, suppression state) so
 a poll only reads what was appended since the previous one.

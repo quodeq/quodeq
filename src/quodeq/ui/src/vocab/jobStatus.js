@@ -12,3 +12,6 @@ export const JOB_FINISHED = Object.freeze(new Set([JOB_STATUS.DONE, JOB_STATUS.F
 // Mirrors core/run/job_status.py:EXTERNAL_JOB_PREFIX / is_external_job_id.
 export const EXTERNAL_JOB_PREFIX = 'ext-';
 export const isExternalJobId = (jobId) => jobId.startsWith(EXTERNAL_JOB_PREFIX);
+// Who started a run: this app, or something else (CI, a terminal, MCP).
+// Mirrors core/types/job.py:JobSnapshot.source.
+export const JOB_SOURCE = Object.freeze({ INTERNAL: 'internal', EXTERNAL: 'external' });

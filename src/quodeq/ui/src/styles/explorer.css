@@ -351,6 +351,139 @@
   background: var(--color-accent);
 }
 
+/* Project switcher — the project root's popover (ProjectSwitcher.jsx).
+   The caret stays visible on the root: it is always a menu. */
+.nav-breadcrumb__crumb--switcher .nav-breadcrumb__caret {
+  opacity: 0.7;
+}
+.project-switcher {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  font-family: var(--term-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12.5px;
+  color: var(--color-text);
+}
+.project-switcher__search {
+  margin: 8px 8px 4px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font: inherit;
+}
+.project-switcher__search::placeholder {
+  color: var(--color-text-subtle);
+}
+.project-switcher__search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+/* ~8 rows visible (30px each), the rest scroll. */
+.project-switcher__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: calc(8 * 30px + 8px);
+  overflow-y: auto;
+}
+.project-switcher__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.project-switcher__option.is-active,
+.project-switcher__option.is-current {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+.project-switcher__option.is-current .project-switcher__name {
+  color: var(--color-accent);
+}
+/* The keyboard highlight is the soft fill plus a hairline, so it still
+   reads on the (also filled) current row. */
+.project-switcher__option.is-active {
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+.project-switcher__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-switcher__remote {
+  flex-shrink: 0;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.project-switcher__empty {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-text-muted);
+}
+.project-switcher__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--color-border);
+}
+.project-switcher__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.project-switcher__btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.project-switcher__btn--primary,
+.project-switcher__btn--primary:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.project-switcher__btn--primary:hover {
+  background: var(--color-accent-hover);
+}
+.project-switcher__btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 /* Legacy chip-trail classes — kept inert in case a stray consumer
    imports them; the new breadcrumb does not use them. */
 .nav-back-btn,

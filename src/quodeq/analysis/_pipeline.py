@@ -15,18 +15,15 @@ from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.dimension_runner import DimensionRunner, log_dimension_result
+from quodeq.analysis.dimension_runner import DimensionRunner
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
-from quodeq.analysis.subagents.runner import process_consolidated_dimensions
-from quodeq.analysis.subprocess import get_provider_type
-from quodeq.config.provider import ProviderType
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.run.dimensions import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
 from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
-from quodeq.shared.logging import log_info, log_warning
+from quodeq.shared.logging import log_info
 from quodeq.shared.log_sink import SHARED_LOG
 
 
@@ -61,6 +58,7 @@ def _dry_run_dimension(
         language=config.language,
         date=scope.date_str,
         source_file_count=config.source_file_count,
+        source_line_count=config.source_line_count,
         files_read=0,
         coverage_pct=0.0,
     )
@@ -157,49 +155,6 @@ def _prepare_run_context(
     return dimensions, ctx, runner, dim_counts
 
 
-def _consolidated_is_available(config: RunConfig, dimensions: list[str]) -> bool:
-    """True when one all-dimensions pass is worth attempting.
-
-    It needs more than one dimension to consolidate, more than one subagent
-    to spread them over, and a non-api provider: local models lose coverage
-    when asked for eight dimensions in a single prompt.
-    """
-    return (
-        config.options.consolidated
-        and len(dimensions) > 1
-        and config.options.max_subagents > 1
-        and get_provider_type(config.ai_cmd) != ProviderType.API
-    )
-
-
-def _try_consolidated_mode(
-    config: RunConfig,
-    dimensions: list[str],
-    ctx: AnalysisContext,
-) -> dict[str, Evidence] | None:
-    """Attempt consolidated (all-dimensions-in-one-pass) mode; None to fall back.
-
-    Disabled for API providers — per-dimension gives better coverage since
-    local models struggle with 8 dimensions in one prompt.
-    """
-    if not _consolidated_is_available(config, dimensions):
-        return None
-    try:
-        result = process_consolidated_dimensions(
-            config, dimensions, ctx, log=SHARED_LOG,
-        )
-        if result:
-            dim_index = {d: i + 1 for i, d in enumerate(dimensions)}
-            for dim, ev in result.items():
-                idx = dim_index.get(dim, 0)
-                log_dimension_result(ev, dim, idx, len(dimensions), log=SHARED_LOG)
-            return result
-        log_warning("Consolidated mode produced no results, falling back to per-dimension")
-    except (OSError, KeyError, ValueError, RuntimeError) as exc:
-        log_warning(f"Consolidated mode failed: {exc}, falling back to per-dimension")
-    return None
-
-
 def _dispatch_fixed_mode(
     config: RunConfig,
     dimensions: list[str],
@@ -211,8 +166,8 @@ def _dispatch_fixed_mode(
 ) -> dict[str, Evidence] | None:
     """Diff-mode or incremental-mode dispatch; None falls through to clean-scan.
 
-    Diff mode always per-dimension — consolidated/incremental loops are
-    incompatible with evidence-only runs (no prior fingerprint, no
+    Diff mode always runs the plain per-dimension loop: the incremental loop
+    is incompatible with evidence-only runs (no prior fingerprint, no
     cross-dimension scoring).
     """
     if config.options.diff_from:
@@ -242,15 +197,13 @@ def _run_clean_scan(
     runner: DimensionRunner,
     on_dimension_done: "Callable[[str, Evidence], None] | None",
 ) -> dict[str, Evidence]:
-    """Full re-analysis with no carry-forward, consolidated where possible.
+    """Full re-analysis with no carry-forward: one pass per dimension.
 
-    Reached only for --clean-scan or --diff-from. Consolidated mode is
-    allowed here because there is no prior fingerprint to honour.
+    Reached only for --clean-scan, which runs every dimension over every
+    file with the same prompt an incremental run uses, so a clean baseline
+    and the runs that follow it are rated by the same judge.
     """
     emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
-    consolidated_result = _try_consolidated_mode(config, dimensions, ctx)
-    if consolidated_result is not None:
-        return consolidated_result
     return run_per_dimension_loop(
         config, dimensions, ctx,
         default_loop_deps(runner, on_dimension_done, SHARED_LOG),
@@ -287,6 +240,7 @@ def run(config: RunConfig) -> Evidence:
         source_file_count=config.source_file_count,
         src=str(config.src),
         language=config.language,
+        source_line_count=config.source_line_count,
     )
 
 

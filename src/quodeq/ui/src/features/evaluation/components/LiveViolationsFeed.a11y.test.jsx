@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
@@ -25,6 +25,7 @@ describe('LiveViolationsFeed decorative chevron accessibility', () => {
 
   it('hides the expand/collapse chevron svg from assistive tech', () => {
     const { container } = renderFeed({ liveViolations: violations });
+    fireEvent.click(container.querySelector('.vlive-dimension-group:not(.vlatest-group) .vlive-dimension-label'));
     const chevron = container.querySelector('.vlive-chevron');
     expect(chevron).toHaveAttribute('aria-hidden', 'true');
     expect(chevron).toHaveAttribute('focusable', 'false');

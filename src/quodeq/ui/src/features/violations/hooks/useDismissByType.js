@@ -36,11 +36,11 @@ async function confirmed(row, scopeKind) {
 }
 
 /**
- * @param {{project: string, selectedSource: string, onReconcile?: Function, bumpDismissRefresh?: Function}} args
+ * @param {{project: string, selectedSource: string, onReconcile?: Function}} args
  * @returns {{dismissType: (row: Object, scopeKind: string) => Promise<void>, error: string|null, notice: string|null}}
  *   `notice` says when the server dismissed a different number than the row showed.
  */
-export function useDismissByType({ project, selectedSource, onReconcile, bumpDismissRefresh }) {
+export function useDismissByType({ project, selectedSource, onReconcile }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const [error, setError] = useState(null);
@@ -54,7 +54,6 @@ export function useDismissByType({ project, selectedSource, onReconcile, bumpDis
       const result = await api.dismissByType(project, scopePayload(row, scopeKind));
       if (result?.delta) applyMutationDelta(queryClient, project, { ...result.delta, dimensions: result.scores?.dimensions });
       onReconcile?.();
-      bumpDismissRefresh?.();
       setError(null);
       const expected = scopeKind === DISMISS_SCOPE.PRINCIPLE ? principleCount(row) : row.now;
       setNotice(result?.dismissed === expected ? null : t('violations.dismissTypeCountDiffers', { actual: result?.dismissed ?? 0, expected }));
@@ -62,7 +61,7 @@ export function useDismissByType({ project, selectedSource, onReconcile, bumpDis
       console.error('Failed to dismiss by type:', err);
       setError(t('violations.dismissTypeFailed'));
     }
-  }, [api, queryClient, project, isShared, onReconcile, bumpDismissRefresh]);
+  }, [api, queryClient, project, isShared, onReconcile]);
 
   return { dismissType, error, notice };
 }

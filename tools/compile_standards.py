@@ -27,7 +27,7 @@ sys.path.insert(0, str(repo_root / "src"))
 
 from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
 
-STANDARDS_DIR = repo_root / "standards"
+STANDARDS_DIR = repo_root / "src" / "quodeq" / "data" / "standards"
 OUTPUT_DIR = STANDARDS_DIR / "compiled"
 
 ALL_DIMENSIONS = ["maintainability", "security", "reliability", "performance",

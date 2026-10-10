@@ -1,4 +1,4 @@
-"""Public scoring API — delegates principle-level work to principle."""
+"""Public scoring API, delegates principle-level work to principle."""
 from __future__ import annotations
 
 from quodeq.core.types import ScaleInfo, ScoringResult
@@ -7,10 +7,11 @@ from quodeq.core.scoring.overall import weighted_overall
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import SCALE_TIER_NAMES, scale_multiplier, score_to_grade_label
 from quodeq.core.scoring.principle import score_all_principles
+from quodeq.core.scoring.scale import PrincipleGradeScale
 
 
 def grade_for_score(score: float) -> str:
-    """Alias for score_to_grade_label — kept for public API compatibility."""
+    """Alias for score_to_grade_label, kept for public API compatibility."""
     return score_to_grade_label(score)
 
 
@@ -22,9 +23,11 @@ def run_scoring(
     files_read = evidence.get("files_read", 0)
     scale_mult = scale_multiplier(source_file_count)
 
-    per_principle = score_all_principles(
-        evidence.get("principles", {}), mode, scale_mult, files_read, params,
+    scale = PrincipleGradeScale(
+        source_file_count=source_file_count, scale_multiplier=scale_mult,
+        params=params,
     )
+    per_principle = score_all_principles(evidence.get("principles", {}), mode, scale, files_read)
     return ScoringResult(
         repository=evidence.get("repository", ""),
         discipline=evidence.get("discipline", ""),

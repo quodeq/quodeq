@@ -81,10 +81,26 @@ def make_admitter(catalog_fn: Callable[[], StandardCatalog] | None = None) -> Ad
     evidence, so rerouting here would count a finding on the dashboard that
     the CLI report quarantines.
     """
+    scoped: dict[str, StandardCatalog] = {}  # per dimension, for the catalog last seen
+    last: list[StandardCatalog] = []
+
     def admit_judgment(j: Judgment) -> Admitted | Unmapped:
         catalog = catalog_fn() if catalog_fn is not None else installed_catalog()
-        return admit(_facts(j), catalog.only([j.dimension or ""]), j.dimension or None)
+        if not last or last[0] is not catalog:
+            last[:] = [catalog]
+            scoped.clear()
+        dimension = j.dimension or ""
+        if dimension not in scoped:
+            scoped[dimension] = catalog.only([dimension])
+        return admit(_facts(j), scoped[dimension], j.dimension or None)
     return admit_judgment
+
+
+def batch_admitter() -> Admitter:
+    """An admitter for one projection pass: the installed standards are read
+    once up front instead of re-stat'ed for every finding."""
+    catalog = installed_catalog()
+    return make_admitter(lambda: catalog)
 
 
 def placed(j: Judgment, result: Admitted) -> Judgment:

@@ -5,9 +5,7 @@ from unittest.mock import patch
 from quodeq.analysis.prompts._context import PromptContext
 from quodeq.analysis.prompts.builder import (
     build_analysis_prompt,
-    build_consolidated_prompt,
     load_template,
-    render_all_standards,
     render_compiled_standards,
     render_previous_findings_section,
 )
@@ -139,44 +137,6 @@ def test_build_analysis_prompt_uses_injected_overrides_loader(tmp_path):
                 dimension="security", source_file_count=42,
                 dimensions_data=_sample_dimensions(),
                 standards_dir=tmp_path / "standards",
-                project_root=tmp_path,
-                overrides_loader=_fake_loader,
-            ),
-        )
-    assert loader_calls == [tmp_path]
-    assert spy_render.call_args.kwargs["overrides"] is sentinel_overrides
-
-
-def test_build_consolidated_prompt_uses_injected_overrides_loader(tmp_path):
-    """Same seam, consolidated-prompt path."""
-    compiled = tmp_path / "compiled"
-    compiled.mkdir()
-    data = {"id": "security", "principles": [{"name": "Test", "source": "iso25010",
-            "requirements": [{"id": "S-CON-1", "source": "iso25010",
-            "text": "Test req", "refs": []}]}]}
-    (compiled / "security.json").write_text(json.dumps(data))
-
-    loader_calls: list = []
-    sentinel_overrides = {"S-CON-1": {"floorMajor": 9.0}}
-
-    def _fake_loader(project_root):
-        loader_calls.append(project_root)
-        return sentinel_overrides
-
-    with patch(
-        "quodeq.analysis.prompts.builder.load_project_overrides",
-        side_effect=AssertionError("the concrete loader must not be called"),
-    ), patch(
-        "quodeq.analysis.prompts.builder.render_all_standards",
-        wraps=render_all_standards,
-    ) as spy_render:
-        build_consolidated_prompt(
-            dimensions=["security"],
-            context=PromptContext(
-                language="python", repo_name="test", date_str="2026-03-22",
-                dimension="consolidated", source_file_count=20,
-                dimensions_data=_sample_dimensions(),
-                standards_dir=tmp_path,
                 project_root=tmp_path,
                 overrides_loader=_fake_loader,
             ),

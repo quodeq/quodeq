@@ -1,168 +1,150 @@
 /**
- * CompareDuelTrend — both projects' overall-score history on one time axis,
- * for the head-to-head view. Runs land at their real dates (not evenly
- * spaced), so unevenly paced projects still line up in time.
+ * CompareDuelTrend: both projects' overall score over one time axis, for
+ * the head-to-head view. Each project is a smoothed trend line with its real
+ * runs drawn faint behind it; the space between the two lines is tinted by
+ * whoever leads; a dotted tail runs from each project's last run to today.
+ * Hovering reads the REAL scores in force on that date, never smoothed ones.
  *
- * Axis labels are HTML overlays rather than SVG text (the CompareRadar
- * pattern): the SVG scales with its container, and scaled text would drop
- * below the 11px floor. Colours come from CSS classes so theming stays in
- * compare.css.
+ * Drawn at the container's real pixel width (ResizeObserver), so the plot
+ * fills its panel and the text never scales. Geometry lives in
+ * duelTrendGeometry.js; this file only renders it.
  */
+import { useMemo, useState } from 'react';
+import { useMeasuredWidth } from '../hooks/useMeasuredWidth.js';
 import { t, LOCALE } from '../../../strings/index.js';
-import { MS_PER_DAY } from '../../../utils/time.js';
-import { DELTA_WINDOW_DAYS } from '../compareModel.js';
-import { trendDomain, monotonePath } from '../compareTrendModel.js';
-import { PERCENT } from '../../../constants.js';
+import { scoreColorClass } from '../../../utils/formatters.js';
+import { buildTrendGeometry, DUEL_SIDE, toPoints } from '../duelTrendGeometry.js';
+import { gapClass, score1, signed1 } from './compareDuelShared.jsx';
+import { roundOneDecimal } from '../../../utils/rounding.js';
 
-const W = 640;
-const H = 240;
-const PAD = { top: 12, right: 14, bottom: 8, left: 14 };
-// Only a lone-point series draws a visible dot; every point gets a larger
-// transparent circle so the tooltip has a comfortable hit target.
-const LONE_POINT_R = 4;
-const TOOLTIP_HIT_R = 7;
+const HEIGHT = 220;
+const PAD = Object.freeze({ top: 16, right: 56, bottom: 8, left: 30 });
+// Width before the first measurement (and in test environments without ResizeObserver).
+const FALLBACK_WIDTH = 640;
+// End labels closer than this get pushed apart.
+const LABEL_MIN_GAP = 14;
+const LABEL_NUDGE = LABEL_MIN_GAP / 2;
+const LABEL_BASELINE = 4;
+const TICK_X_OFFSET = 8;
+const TICK_BASELINE = 3.5;
+const WINDOW_LABEL_INSET = 4;
+const WINDOW_LABEL_Y = 11;
+const DOT_R = 3.5;
+const HOVER_DOT_R = 4;
+const TIP_OFFSET = 12;
+const TIP_WIDTH = 190;
 
-const shortDate = (ms) => new Date(ms).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
+const shortDate = (ms) => new Date(ms).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' });
 
-/* Lines stay clean: no per-point dots. A lone-point series still gets a
-   visible dot (a dotless single point would vanish), and every point keeps
-   an invisible, slightly larger circle as the tooltip hit target. */
-function DuelTrendLine({ series, variant, x, y }) {
-  if (series.length === 0) return null;
+/* End-of-line score labels, nudged apart when the lines finish close together. */
+function endLabels(sides) {
+  let ya = sides.a?.end.y;
+  let yb = sides.b?.end.y;
+  if (sides.a && sides.b && Math.abs(ya - yb) < LABEL_MIN_GAP) {
+    const mid = (ya + yb) / 2;
+    const aUp = sides.a.end.value >= sides.b.end.value;
+    ya = mid + (aUp ? -LABEL_NUDGE : LABEL_NUDGE);
+    yb = mid + (aUp ? LABEL_NUDGE : -LABEL_NUDGE);
+  }
+  return { a: ya, b: yb };
+}
+
+function Side({ side, geo, right }) {
+  if (!geo) return null;
   return (
     <g>
-      {series.length > 1 ? (
-        <path
-          className={`compare-duel-trend__line compare-duel-trend__line--${variant}`}
-          d={monotonePath(series.map((e) => [x(e.dateISO), y(e.value)]))}
-        />
-      ) : (
-        <circle
-          className={`compare-duel-trend__dot compare-duel-trend__dot--${variant}`}
-          cx={x(series[0].dateISO).toFixed(1)}
-          cy={y(series[0].value).toFixed(1)}
-          r={LONE_POINT_R}
-        />
-      )}
-      {series.map((e) => (
-        <circle
-          key={e.dateISO}
-          className="compare-duel-trend__hit"
-          cx={x(e.dateISO).toFixed(1)}
-          cy={y(e.value).toFixed(1)}
-          r={TOOLTIP_HIT_R}
-        >
-          <title>
-            {t('compare.duelPointTip', { date: shortDate(Date.parse(e.dateISO)), score: e.value.toFixed(1) })}
-          </title>
-        </circle>
-      ))}
+      {geo.raw && <path className={`compare-duel-trend__raw compare-duel-trend__stroke--${side}`} d={geo.raw} />}
+      {geo.trend && <path className={`compare-duel-trend__line compare-duel-trend__stroke--${side}`} d={geo.trend} />}
+      <line className={`compare-duel-trend__tail compare-duel-trend__stroke--${side}`} x1={geo.tail.x1} x2={right} y1={geo.tail.y} y2={geo.tail.y} />
+      {geo.single && <circle className={`compare-duel-trend__dot compare-duel-trend__dot--${side}`} cx={geo.single.x} cy={geo.single.y} r={DOT_R} />}
     </g>
   );
 }
 
-/* The 30-day delta window, shaded so the numbers in the versus header
-   visibly correspond to this slice of the chart. */
-function DuelTrendWindow({ t0, t1, span, xAt }) {
-  if (span <= 0) return null;
-  const windowStart = Math.max(t0, t1 - DELTA_WINDOW_DAYS * MS_PER_DAY);
-  const xw = xAt(windowStart);
+function Plot({ g, width, right, hoverX, onMove, onLeave, aName, bName }) {
+  const labels = endLabels(g.sides);
+  const hover = hoverX != null ? g.valueAt(hoverX) : null;
   return (
-    <rect
-      className="compare-duel-trend__window"
-      x={xw.toFixed(1)}
-      y={PAD.top}
-      width={(W - PAD.right - xw).toFixed(1)}
-      height={H - PAD.top - PAD.bottom}
-    />
+    <svg
+      width={width}
+      height={HEIGHT}
+      className="compare-duel-trend__svg"
+      role="img"
+      aria-label={t('compare.trendChartAria', { a: aName, b: bName })}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+    >
+      <rect className="compare-duel-trend__window" x={g.window.x} y={PAD.top} width={g.window.width} height={HEIGHT - PAD.top - PAD.bottom} />
+      <text className="compare-duel-trend__windowLabel" x={right - WINDOW_LABEL_INSET} y={PAD.top + WINDOW_LABEL_Y} textAnchor="end">{t('compare.duelTrendWindow')}</text>
+      {g.yTicks.map((tk) => (
+        <g key={tk.v}>
+          <line className="compare-duel-trend__grid" x1={PAD.left} x2={right} y1={tk.y} y2={tk.y} />
+          <text className="compare-duel-trend__tick" x={PAD.left - TICK_X_OFFSET} y={tk.y + TICK_BASELINE} textAnchor="end">{tk.v}</text>
+        </g>
+      ))}
+      {g.gaps.map((p) => (
+        <path key={p.d} className={`compare-duel-trend__gap compare-duel-trend__gap--${p.lead}${p.held ? ' compare-duel-trend__gap--held' : ''}`} d={p.d} />
+      ))}
+      <Side side={DUEL_SIDE.B} geo={g.sides.b} right={right} />
+      <Side side={DUEL_SIDE.A} geo={g.sides.a} right={right} />
+      {g.sides.a && <text className="compare-duel-trend__end compare-duel-trend__end--a" x={right + TICK_X_OFFSET} y={labels.a + LABEL_BASELINE}>{score1(g.sides.a.end.value)}</text>}
+      {g.sides.b && <text className="compare-duel-trend__end compare-duel-trend__end--b" x={right + TICK_X_OFFSET} y={labels.b + LABEL_BASELINE}>{score1(g.sides.b.end.value)}</text>}
+      {hover && (
+        <g>
+          <line className="compare-duel-trend__cross" x1={hoverX} x2={hoverX} y1={PAD.top} y2={HEIGHT - PAD.bottom} />
+          {hover.a != null && <circle className="compare-duel-trend__dot compare-duel-trend__dot--a" cx={hoverX} cy={g.sides.a.yAt(hoverX) ?? g.yOf(hover.a)} r={HOVER_DOT_R} />}
+          {hover.b != null && <circle className="compare-duel-trend__dot compare-duel-trend__dot--b" cx={hoverX} cy={g.sides.b.yAt(hoverX) ?? g.yOf(hover.b)} r={HOVER_DOT_R} />}
+        </g>
+      )}
+    </svg>
   );
 }
 
-function DuelTrendGrid({ ticks, y }) {
-  return ticks.map((v) => (
-    <line
-      key={v}
-      className="compare-duel-trend__grid"
-      x1={PAD.left}
-      y1={y(v)}
-      x2={W - PAD.right}
-      y2={y(v)}
-    />
-  ));
-}
-
-/** The y-axis tick labels, an HTML overlay positioned to match the SVG grid. */
-function DuelTrendAxis({ ticks, y }) {
+function HoverTip({ g, hoverX, width, aName, bName }) {
+  const v = g.valueAt(hoverX);
+  const gap = v.a != null && v.b != null ? roundOneDecimal(v.a - v.b) : null;
   return (
-    <div className="compare-duel-trend__ticks" aria-hidden="true">
-      {ticks.map((v) => (
-        <span
-          key={v}
-          className="compare-duel-trend__tick"
-          style={{ top: `${(y(v) / H) * PERCENT}%` }}
-        >
-          {v}
-        </span>
-      ))}
+    <div className="compare-duel-trend__tip" style={{ left: Math.min(hoverX + TIP_OFFSET, width - TIP_WIDTH) }} aria-hidden="true">
+      <span className="compare-duel-trend__tipDate">{shortDate(g.tAt(hoverX))}</span>
+      <span><span className="compare-duel__swatch compare-duel__swatch--a" /> {aName} <b className={scoreColorClass(v.a)}>{score1(v.a)}</b></span>
+      <span><span className="compare-duel__swatch compare-duel__swatch--b" /> {bName} <b className={scoreColorClass(v.b)}>{score1(v.b)}</b></span>
+      {gap != null && (
+        <span>{t('compare.duelTrendGap')} <span className={`compare-duel__gap ${gapClass(gap)}`}>{signed1(gap)}</span></span>
+      )}
     </div>
   );
 }
 
-/**
- * @param {object} props
- * @param {{dateISO: string, value: number}[]} props.a - Oldest-first series.
- * @param {{dateISO: string, value: number}[]} props.b - Oldest-first series.
- * @param {string} props.aName - Left/first project, for the chart's name.
- * @param {string} props.bName - Right/second project, for the chart's name.
- */
-export default function CompareDuelTrend({ a, b, aName, bName }) {
-  const { t0, t1, v0, v1 } = trendDomain([a, b]);
-  // Both series empty: trendDomain returns an explicit null domain rather
-  // than an Infinity/-Infinity span. The panel that mounts this component
-  // already gates on there being at least 2 combined points, so render
-  // nothing rather than dividing by an undefined span. Number.isFinite (not
-  // `== null`) also catches an unparseable dateISO: Date.parse on a bad
-  // string is NaN, and NaN propagates through Math.min/max without being
-  // loosely equal to null.
-  if (!Number.isFinite(t0) || !Number.isFinite(t1)) return null;
-  const span = t1 - t0;
-  // Time (ms) to x; a single-instant domain centres its points.
-  const xAt = (ms) => (span
-    ? PAD.left + ((ms - t0) / span) * (W - PAD.left - PAD.right)
-    : W / 2);
-  const x = (iso) => xAt(new Date(iso).getTime());
-  const y = (v) => PAD.top + (1 - (v - v0) / (v1 - v0)) * (H - PAD.top - PAD.bottom);
+export default function CompareDuelTrend({ a, b, aName, bName, now: nowProp }) {
+  // "Today" is pinned once per mount: a fresh Date.now() on every render
+  // would change the geometry's input each time and defeat the memo below.
+  const [mountedAt] = useState(() => Date.now());
+  const now = nowProp ?? mountedAt;
+  // Measured only while there is a chart to measure: an empty duel renders
+  // nothing, and the observer attaches once runs arrive.
+  const hasRuns = useMemo(() => toPoints(a).length + toPoints(b).length > 0, [a, b]);
+  const [ref, width] = useMeasuredWidth(FALLBACK_WIDTH, hasRuns);
+  const [hoverX, setHoverX] = useState(null);
+  const right = width - PAD.right;
+  const box = useMemo(() => ({ left: PAD.left, top: PAD.top, width: right - PAD.left, height: HEIGHT - PAD.top - PAD.bottom }), [right]);
+  // The geometry samples both curves every few pixels: rebuild it only when
+  // the data, the size or "today" change, never on a hover re-render.
+  const g = useMemo(() => buildTrendGeometry({ a, b, box, now }), [a, b, box, now]);
+  if (!g) return null;
 
-  const ticks = [];
-  for (let v = v0; v <= v1; v += 1) ticks.push(v);
-
+  const onMove = (e) => {
+    const px = e.clientX - e.currentTarget.getBoundingClientRect().left;
+    setHoverX(px >= box.left && px <= right ? px : null);
+  };
   return (
-    <div className="compare-duel-trend">
-      <div className="compare-duel-trend__plot">
-        {/* role="img" prunes everything inside the svg from the a11y tree,
-            so the name is the whole account of the chart a screen reader
-            gets; without it the plot is an unnamed image (U-ACC-1). */}
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          role="img"
-          aria-label={t('compare.trendChartAria', { a: aName, b: bName })}
-          className="compare-duel-trend__svg"
-        >
-          <DuelTrendWindow t0={t0} t1={t1} span={span} xAt={xAt} />
-          <DuelTrendGrid ticks={ticks} y={y} />
-          <DuelTrendLine key="b" series={b} variant="b" x={x} y={y} />
-          <DuelTrendLine key="a" series={a} variant="a" x={x} y={y} />
-        </svg>
-        <DuelTrendAxis ticks={ticks} y={y} />
-      </div>
-      {/* Not aria-hidden: this sits outside the role="img" svg, so hiding it
-          really did withhold the chart's time span from a screen reader
-          (U-ACC-1). The 0..10 tick column above stays hidden; it duplicates
-          the grid lines and reads as loose numbers. */}
+    <div ref={ref} className="compare-duel-trend">
+      <Plot g={g} width={width} right={right} hoverX={hoverX} onMove={onMove} onLeave={() => setHoverX(null)} aName={aName} bName={bName} />
+      {/* The time axis in words, outside the role="img" svg so a screen
+          reader still gets the span the chart covers (U-ACC-1). */}
       <div className="compare-duel-trend__dates">
-        <span>{shortDate(t0)}</span>
-        {span > 0 && <span>{shortDate(t1)}</span>}
+        {g.xTicks.map((tk) => <span key={tk.t} style={{ left: tk.x }}>{shortDate(tk.t)}</span>)}
       </div>
+      {hoverX != null && <HoverTip g={g} hoverX={hoverX} width={width} aName={aName} bName={bName} />}
     </div>
   );
 }

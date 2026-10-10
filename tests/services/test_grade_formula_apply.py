@@ -17,7 +17,7 @@ from quodeq.services import grade_formula
 from tests.services._grade_formula_fixtures import formula_path  # noqa: F401 -- pytest fixture
 
 _STRICT = dataclasses.replace(
-    DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 6.0, "minor": 0.25},
+    DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 3.5, "minor": 0.25},
 )
 
 
@@ -145,7 +145,7 @@ def test_apply_to_all_runs_isolates_an_out_of_scope_recompute_error_and_continue
     result = grade_formula.apply_to_all_runs(tmp_path)
     assert result.rescored == 1
     assert result.failed == ["run-bad"]
-    assert seen == ["run-bad", "run-good"]
+    assert sorted(seen) == ["run-bad", "run-good"]
 
 
 def test_apply_to_all_runs_clears_cache_when_root_missing(formula_path, monkeypatch, tmp_path):

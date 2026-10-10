@@ -7,6 +7,7 @@
  * than in any one feature.
  */
 import ContextBlock from './ContextBlock.jsx';
+import DetailSkeleton from './DetailSkeleton.jsx';
 import { filterValidRefs } from '../utils/reqRefs.js';
 import { t } from '../strings/index.js';
 
@@ -29,7 +30,9 @@ export function RefLinks({ reqRefs }) {
 /**
  * A finding's expanded body: its title under a REASON label, its reason text
  * under a DETAIL label, and the source context underneath. The whole reason
- * section is dropped for a finding that carries neither.
+ * section is dropped for a finding that carries neither. A finding whose
+ * detail is still deferred (api/complianceDetail.js) shows a skeleton in
+ * place of the text and code; one whose detail could not load says so.
  */
 export function FindingDetailBody({ v }) {
   return (
@@ -47,7 +50,11 @@ export function FindingDetailBody({ v }) {
           </>}
         </div>
       )}
-      <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} />
+      {v.detailDeferred && <DetailSkeleton />}
+      {v.detailUnavailable && (
+        <p className="vlive-detail-reason vlive-detail-reason--unavailable">{t('explorer.detailUnavailable')}</p>
+      )}
+      {!v.detailDeferred && <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} file={v.file} />}
     </div>
   );
 }

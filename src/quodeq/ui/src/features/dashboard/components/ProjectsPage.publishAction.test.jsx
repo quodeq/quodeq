@@ -178,7 +178,7 @@ describe('ProjectsPage — publish action (local cards)', () => {
   // and the button both flip in that same render -- proven here by holding
   // the authoritative re-list open and asserting the card has already
   // flipped before it resolves.
-  it('post-publish: the card flips to PUBLISHED with no publish button immediately, before the authoritative refresh resolves (C4 regression lock)', async () => {
+  it('post-publish: the row flips to published with no publish button immediately, before the authoritative refresh resolves (C4 regression lock)', async () => {
     vi.useFakeTimers();
     try {
       let publishDone = false;
@@ -216,7 +216,7 @@ describe('ProjectsPage — publish action (local cards)', () => {
       // The authoritative refresh is still pending (captured but not yet
       // resolved) -- the card must already reflect completion regardless.
       expect(resolveList).toBeDefined();
-      expect(screen.getByText('PUBLISHED')).toBeInTheDocument();
+      expect(screen.getAllByText(/^published/, { selector: '.projects-row__sync' })).toHaveLength(1);
       // p1's own publish button is gone; p2 (never published) still has one.
       expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(1);
 
@@ -230,7 +230,7 @@ describe('ProjectsPage — publish action (local cards)', () => {
         });
         await vi.advanceTimersByTimeAsync(0);
       });
-      expect(screen.getByText('PUBLISHED')).toBeInTheDocument();
+      expect(screen.getAllByText(/^published/, { selector: '.projects-row__sync' })).toHaveLength(1);
       expect(screen.getAllByRole('button', { name: 'publish' })).toHaveLength(1);
     } finally {
       vi.useRealTimers();

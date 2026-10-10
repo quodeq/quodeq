@@ -54,7 +54,6 @@ class AnalysisOptions:
     subagent_model: str | None = None
     ai_model: str | None = None
     verify_findings: bool = True
-    consolidated: bool = True
     time_limit: int | None = None
     deadline_at: float | None = None
     # The whole-run deadline while ``deadline_at`` holds one dimension's slice
@@ -193,6 +192,15 @@ class RunConfig:
             return total
         dispatchable, _excluded = policy.split_api_dispatchable(self.src, files)
         return len(dispatchable)
+
+    @property
+    def source_line_count(self) -> int | None:
+        """The project's source line count from the manifest, None when unmeasured.
+
+        History for a later denominator study, recorded beside
+        ``source_file_count``. Nothing in scoring reads it.
+        """
+        return self.manifest.total_lines if self.manifest else None
 
 
 @dataclass(frozen=True)

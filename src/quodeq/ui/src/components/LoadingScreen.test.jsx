@@ -106,6 +106,12 @@ describe('LoadingScreen tips', () => {
     }
   });
 
+  it('shows the logo alone, with no tip layout, outside the boot screen', () => {
+    const { container } = render(<LoadingScreen variant="inline" />);
+    expect(container.querySelector('.loader-logo')).toBeTruthy();
+    expect(container.querySelector('.loading-tips-layout')).toBeNull();
+  });
+
   it('marks the boot variant so it covers the shell body and swallows clicks', () => {
     const { container } = render(<LoadingScreen variant="shell" />);
     const el = container.querySelector('.loading-screen');

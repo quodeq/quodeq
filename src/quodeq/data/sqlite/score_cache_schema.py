@@ -30,7 +30,7 @@ SCHEMA = (
     "CREATE INDEX IF NOT EXISTS idx_run_scalars_lookup ON run_scalars(project, version);"
     "CREATE TABLE IF NOT EXISTS run_principle_scalars ("
     " project TEXT NOT NULL, run_id TEXT NOT NULL, version TEXT NOT NULL,"
-    " dimension TEXT NOT NULL, principle TEXT NOT NULL, score TEXT, grade TEXT,"
+    " dimension TEXT NOT NULL, principle TEXT NOT NULL, score TEXT, grade TEXT, confidence TEXT,"
     " PRIMARY KEY (project, run_id, dimension, principle, version));"
     "CREATE INDEX IF NOT EXISTS idx_run_principle_scalars_lookup ON run_principle_scalars(project, version);"
     "DROP TABLE IF EXISTS accumulated_cache;"
@@ -120,3 +120,15 @@ def ensure_run_scalars_columns(conn: sqlite3.Connection) -> None:
     except sqlite3.Error:
         _rollback_quietly(conn)
         _logger.warning("run_scalars column migration failed", exc_info=True)
+
+
+def ensure_principle_confidence_column(conn: sqlite3.Connection) -> None:
+    """Add ``confidence`` to a ``run_principle_scalars`` table created before it (NULL on old rows)."""
+    try:
+        present = {row[1] for row in conn.execute("PRAGMA table_info(run_principle_scalars)")}
+        if "confidence" not in present:
+            conn.execute("ALTER TABLE run_principle_scalars ADD COLUMN confidence TEXT")
+            conn.commit()
+    except sqlite3.Error:
+        _rollback_quietly(conn)
+        _logger.warning("run_principle_scalars column migration failed", exc_info=True)

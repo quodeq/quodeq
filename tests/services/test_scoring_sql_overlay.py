@@ -20,6 +20,7 @@ import pytest
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.fs.report_parser.runs import read_run_data
+from quodeq.data.projection.grade_projector import recompute_grades
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 from quodeq.services import grade_formula
 from quodeq.services.dashboard import clear_shared_dimension_cache
@@ -30,7 +31,7 @@ from tests.services.conftest import seed_security_findings
 # A formula whose severity weights differ sharply from the default so the
 # baked-with-custom-params grade is provably different from the default one.
 _STRICT = dataclasses.replace(
-    DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 6.0, "minor": 0.25},
+    DEFAULT_PARAMS, severity_weight={"critical": 8.0, "major": 4.0, "minor": 0.5},
 )
 
 
@@ -89,6 +90,10 @@ def _build_event_log_run(
             "compliance": [],
             "totals": {"violationCount": 0, "complianceCount": 0, "severity": {}},
         }), encoding="utf-8")
+
+    # The grade depends on the eval JSON's sourceFileCount, so bake it again now
+    # that the file exists: the baked default rows are what a read must serve.
+    recompute_grades(run_dir, params=DEFAULT_PARAMS)
 
     # Minimal manifest so list_runs surfaces the run as "complete".
     evidence_dir = run_dir / "evidence"

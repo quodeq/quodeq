@@ -1,0 +1,204 @@
+{
+ "description": "OWASP BenchmarkJava v1.2, security dimension, Claude Sonnet 5.5 run of 2026-10-04 (quodeq 1.12.0), reduced to per-rule file counts; no snippets, no file names.",
+ "principles": {
+  "Authenticity": {
+   "complianceFiles": {
+    "S-AUT-2": 36,
+    "S-AUT-3": 41
+   },
+   "violations": {
+    "S-AUT-1": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 1
+     }
+    },
+    "S-AUT-2": {
+     "filesBySeverity": {
+      "critical": 121,
+      "major": 12,
+      "minor": 3
+     }
+    },
+    "S-AUT-3": {
+     "filesBySeverity": {
+      "critical": 113,
+      "major": 24,
+      "minor": 4
+     }
+    },
+    "S-AUT-5": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 2
+     }
+    },
+    "S-AUT-7": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 1,
+      "minor": 0
+     }
+    }
+   }
+  },
+  "Confidentiality": {
+   "complianceFiles": {
+    "S-CON-11": 150,
+    "S-CON-12": 53
+   },
+   "violations": {
+    "S-CON-1": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 1
+     }
+    },
+    "S-CON-10": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 1
+     }
+    },
+    "S-CON-11": {
+     "filesBySeverity": {
+      "critical": 5,
+      "major": 343,
+      "minor": 11
+     }
+    },
+    "S-CON-12": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 36,
+      "minor": 1
+     }
+    },
+    "S-CON-15": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 5,
+      "minor": 0
+     }
+    },
+    "S-CON-16": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 1,
+      "minor": 5
+     }
+    },
+    "S-CON-18": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 1
+     }
+    },
+    "S-CON-2": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 1
+     }
+    },
+    "S-CON-6": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 3,
+      "minor": 2
+     }
+    },
+    "S-CON-8": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 200,
+      "minor": 27
+     }
+    }
+   }
+  },
+  "Integrity": {
+   "complianceFiles": {
+    "S-INT-1": 17,
+    "S-INT-10": 3,
+    "S-INT-2": 74,
+    "S-INT-20": 1,
+    "S-INT-3": 100,
+    "S-INT-5": 66,
+    "S-INT-6": 20,
+    "S-INT-7": 18
+   },
+   "violations": {
+    "S-INT-1": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 59,
+      "minor": 7
+     }
+    },
+    "S-INT-10": {
+     "filesBySeverity": {
+      "critical": 5,
+      "major": 1,
+      "minor": 1
+     }
+    },
+    "S-INT-12": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 0,
+      "minor": 1
+     }
+    },
+    "S-INT-16": {
+     "filesBySeverity": {
+      "critical": 2,
+      "major": 6,
+      "minor": 2
+     }
+    },
+    "S-INT-2": {
+     "filesBySeverity": {
+      "critical": 276,
+      "major": 0,
+      "minor": 18
+     }
+    },
+    "S-INT-3": {
+     "filesBySeverity": {
+      "critical": 218,
+      "major": 25,
+      "minor": 15
+     }
+    },
+    "S-INT-5": {
+     "filesBySeverity": {
+      "critical": 0,
+      "major": 125,
+      "minor": 8
+     }
+    },
+    "S-INT-7": {
+     "filesBySeverity": {
+      "critical": 46,
+      "major": 0,
+      "minor": 6
+     }
+    }
+   }
+  },
+  "Non-repudiation": {
+   "complianceFiles": {
+    "S-NRP-6": 1
+   },
+   "violations": {}
+  }
+ },
+ "sourceFileCount": 2803,
+ "storedOverallScore": 3.5
+}

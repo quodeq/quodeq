@@ -70,6 +70,15 @@ test('extractDimensionPeriodSeries: runs with missing/invalid dateISO collapse i
   assert.equal(s[0].score, 8.0);
 });
 
+test('extractDimensionPeriodSeries: carries the representative run\'s critical and major counts', () => {
+  const trend = [
+    { runId: 'b', dateISO: '2026-03-26T10:00:00', dimensionDetails: [{ dimension: 'security', score: 8, critical: 1, majors: 4 }] },
+    { runId: 'a', dateISO: '2026-03-25T10:00:00', dimensionDetails: [{ dimension: 'security', score: 7 }] },
+  ];
+  const s = extractDimensionPeriodSeries(trend, 'security', 'day');
+  assert.deepEqual(s.map((x) => [x.runId, x.critical, x.majors]), [['a', undefined, undefined], ['b', 1, 4]]);
+});
+
 test('extractDimensionPeriodSeries: empty/invalid inputs return []', () => {
   assert.deepEqual(extractDimensionPeriodSeries([], 'maintainability', 'day'), []);
   assert.deepEqual(extractDimensionPeriodSeries(null, 'maintainability', 'day'), []);

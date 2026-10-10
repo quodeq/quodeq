@@ -63,8 +63,6 @@ def build_eval_env(
     # skipping 0 turned "unlimited" into a 10-minute run.
     if options.time_limit is not None and options.time_limit >= 0:
         built_env["QUODEQ_TIME_LIMIT"] = str(options.time_limit)
-    if options.per_dimension:
-        built_env["QUODEQ_NO_CONSOLIDATE"] = ENV_TRUTHY
     if options.context_size > 0:
         built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
     _apply_provider_credentials(built_env, options)

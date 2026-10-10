@@ -222,9 +222,14 @@ def _terminal_long_ago(run_dir: Path) -> bool:
     return time.time() - written > cancel_escalation_window_s()
 
 
+def _job_field(job: Any, name: str) -> Any:
+    """*name* off a job snapshot, which is a job object or a plain dict."""
+    return job.get(name) if isinstance(job, dict) else getattr(job, name, None)
+
+
 def _run_process_alive(reports_dir: str, job: Any) -> bool:
     """True while the run's ``.pid`` names a live process (still writing its own reports)."""
-    project, run_id = getattr(job, "output_project", None), getattr(job, "output_run_id", None)
+    project, run_id = _job_field(job, "output_project"), _job_field(job, "output_run_id")
     project_dir = resolve_child_dir(reports_dir, project) if project and run_id else None
     run_dir = resolve_child_dir(project_dir, run_id) if project_dir is not None else None
     if run_dir is None or _terminal_long_ago(Path(run_dir)):
@@ -248,7 +253,7 @@ def score_terminal_run_once(
     submission (queue full) releases the claim so the next call retries.
     Skipped, unclaimed, while the run's process is still alive.
     """
-    job_status = getattr(job, "status", None)
+    job_status = _job_field(job, "status")
     if job_status not in (JobStatus.FAILED, JobStatus.CANCELLED):
         return
     if not claims.claim(job_id):
@@ -260,8 +265,8 @@ def score_terminal_run_once(
         claims.release(job_id)
         return
     _score_args = {
-        "outputProject": job.output_project,
-        "outputRunId": job.output_run_id,
+        "outputProject": _job_field(job, "output_project"),
+        "outputRunId": _job_field(job, "output_run_id"),
     }
 
     def _score_in_bg() -> None:

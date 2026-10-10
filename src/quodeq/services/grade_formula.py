@@ -102,14 +102,21 @@ _APPLY_RETRY_SLEEP_S = 0.15
 def _iter_event_log_runs(reports_root: Path) -> Iterator[Path]:
     """Yield every run dir under *reports_root* that has an events.jsonl.
 
-    Legacy runs without an event log cannot be rescored and are skipped.
+    Newest first: the projects with the most recent run come first, and
+    within a project its runs come newest first, so the grades people look
+    at (every project's latest run) are rewritten early in the pass and the
+    history fills in behind them. Legacy runs without an event log cannot be
+    rescored and are skipped.
     """
     if not reports_root.is_dir():
         return
-    for project_dir in sorted(p for p in reports_root.iterdir() if p.is_dir()):
-        for run_dir in sorted(r for r in project_dir.iterdir() if r.is_dir()):
-            if (run_dir / "events.jsonl").is_file():
-                yield run_dir
+    per_project = [
+        runs for runs in (_event_log_runs(p) for p in sorted(reports_root.iterdir()) if p.is_dir())
+        if runs
+    ]
+    per_project.sort(key=lambda runs: _run_recency_key(runs[0]), reverse=True)
+    for runs in per_project:
+        yield from runs
 
 
 def _recompute_with_retries(run_dir: Path, params: ScoringParams) -> bool:

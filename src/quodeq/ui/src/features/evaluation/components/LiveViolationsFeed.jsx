@@ -1,55 +1,40 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
+import { memo, useState, useMemo, useCallback, useRef } from 'react';
 import { FindingDetailBody } from '../../../components/findingDetail.jsx';
-import { parseFileRef } from '../../../utils/formatters.js';
-import { staggerDelayStyle } from '../../../utils/animation.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
-import { orderDimensions, autoOpenTarget } from './liveViolationsOrdering.js';
+import { orderDimensions, sortBySeverity, sameDim } from './liveViolationsOrdering.js';
+import LatestGroup, { FindingCells } from './LatestGroup.jsx';
+import VirtualList, { useDashboardScrollElement, useScrollMargin } from '../../explorer/components/VirtualList.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { DIM_STATE } from '../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 import { KEY } from '../../../vocab/keyboard.js';
-import { pluralKey } from '../../../utils/plural.js';
+import { isDiffReview, checksPassed } from '../externalRun.js';
 
-const ANIM_DELAY_PER_ITEM_MS = 40;
-const ANIM_MAX_DELAY_MS = 400;
-// The 3 real severities (as opposed to a missing/unrecognised one), for
-// deciding whether SevBadge (which only knows those 3) can render this row.
-const REAL_SEVERITY_SET = new Set(SEVERITY_ORDER);
+// A collapsed row: 38px min-height plus its 1px border. The virtualizer
+// measures the real height, this only sizes rows it has not mounted yet.
+const ROW_HEIGHT_ESTIMATE = 39;
 
-function ViolationLiveRow({ violation, index }) {
-  const [open, setOpen] = useState(false);
+// Open state lives in the group, not here: the virtual list unmounts rows
+// scrolled out of view, and a row would come back closed.
+const ViolationLiveRow = memo(function ViolationLiveRow({ dim, violation, rowKey, open, onToggle }) {
   const v = violation;
-  const { filePath, line } = parseFileRef(v.file, v.line);
-  const filename = filePath ? filePath.split('/').pop() : null;
-  const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
-  const ref = line != null ? `${filePath}:${range}` : filePath;
-  const display = line != null ? `${filename}:${range}` : filename;
-
   return (
-    <div
-      className={`vdetail-row vdetail-row--${v.severity}`}
-      style={staggerDelayStyle(index, ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}
-    >
+    <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div
-        className="vdetail-row-main vlive-collapsible"
+        className="vdetail-row-main vlive-collapsible vticker-row-main vlive-row--expandable"
         role="button"
         tabIndex={0}
         aria-expanded={open}
         aria-label={t('evaluate.findingAria', { severity: severityLabel(v.severity), title: v.title || v.file || t('evaluate.detailsFallback') })}
-        onClick={() => setOpen(o => !o)}
-        onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
+        onClick={() => onToggle(rowKey)}
+        onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggle(rowKey); } }}
       >
-        <span className="vlive-rail" aria-hidden="true" />
-        {REAL_SEVERITY_SET.has(v.severity)
-          ? <SevBadge level={v.severity} format="long" />
-          : <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>}
-        <span className="vrow-rule">{v.principle || ''}</span>
-        {filename ? <FileCopyBtn display={display} copyText={ref} /> : <span />}
+        {/* Same shape as the latest rows: principle, then the title. */}
+        <FindingCells dim={dim} v={v} />
         <svg
           className={`vlive-chevron${open ? ' open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24"
@@ -63,42 +48,88 @@ function ViolationLiveRow({ violation, index }) {
       {open && <FindingDetailBody v={v} />}
     </div>
   );
+});
+
+function rowKeyOf(dim, v) {
+  return `${dim}-${v.arrivalSeq ?? ''}-${v.file}-${v.principle}-${String(v.line ?? '')}`;
 }
 
-function DimensionGroup({ dim, violations, open, onToggle }) {
+function severityMix(violations) {
+  const mix = { critical: 0, major: 0, minor: 0 };
+  for (const v of violations) if (v.severity in mix) mix[v.severity] += 1;
+  return mix;
+}
+
+function DimensionHeader({ dim, violations, open, scanning, onToggle }) {
   const count = violations.length;
+  const mix = severityMix(violations);
   return (
-    <div className={`vlive-dimension-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
-      <button
-        type="button"
-        className="vlive-dimension-label"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
-        <span className={`vlive-dimension-caret${open ? ' vlive-dimension-caret--open' : ''}`} aria-hidden="true">▸</span>
-        <span className="vlive-dimension-name">{dim}</span>
-        <span className="vlive-dimension-count">{count}</span>
-      </button>
-      {open && violations.map((v, i) => (
-        <ViolationLiveRow key={`${dim}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
-      ))}
+    <button type="button" className="vlive-dimension-label" onClick={onToggle} aria-expanded={open}>
+      <span className={`vlive-dimension-caret${open ? ' vlive-dimension-caret--open' : ''}`} aria-hidden="true">▸</span>
+      <span className="vlive-dimension-name">{dim}</span>
+      {scanning && <span className="vlive-dimension-scanning">{t('evaluate.dimScanning')}</span>}
+      <span className="vlive-dimension-mix">
+        {SEVERITY_ORDER.map((level) => (mix[level] > 0
+          ? <SevBadge key={level} level={level} format="count-abbr" count={mix[level]} />
+          : null))}
+      </span>
+      {/* Keyed on the count so the bump animation replays on every arrival. */}
+      <span key={count} className="vlive-dimension-count">{count}</span>
+    </button>
+  );
+}
+
+// Only the rows near the viewport are mounted, however many the dimension
+// holds, the same virtual list the Explorer's detail pages use.
+function DimensionRows({ dim, violations }) {
+  // Sorted only while open: a closed group costs one header however big it is.
+  const rows = useMemo(() => sortBySeverity(violations), [violations]);
+  const scrollElement = useDashboardScrollElement();
+  const listRef = useRef(null);
+  const scrollMargin = useScrollMargin(listRef, scrollElement);
+  // One finding open at a time; closing the group drops it with the rows.
+  const [expanded, setExpanded] = useState(null);
+  const toggleRow = useCallback((key) => setExpanded((cur) => (cur === key ? null : key)), []);
+  const getItemKey = useCallback((i) => (rows[i] ? rowKeyOf(dim, rows[i]) : i), [dim, rows]);
+  const estimateSize = useCallback(() => ROW_HEIGHT_ESTIMATE, []);
+  const renderRow = (v) => {
+    const key = rowKeyOf(dim, v);
+    return <ViolationLiveRow dim={dim} violation={v} rowKey={key} open={expanded === key} onToggle={toggleRow} />;
+  };
+  return (
+    <div ref={listRef}>
+      <VirtualList
+        items={rows}
+        scrollElement={scrollElement}
+        scrollMargin={scrollMargin}
+        estimateSize={estimateSize}
+        getItemKey={getItemKey}
+        renderItem={renderRow}
+        label={t('evaluate.dimFindingsList', { dim })}
+      />
     </div>
   );
 }
 
-// Single-open-at-a-time accordion, following `autoOpenTarget`: whenever the
-// target changes (a new dimension starts producing findings, the run moves
-// on to one that has none yet, the run ends) the accordion follows it. The
-// user can still click any header to switch which one is open.
-function useAutoOpenDim(target) {
-  const [openDim, setOpenDim] = useState(null);
-  const prevTargetRef = useRef(undefined);
-  useEffect(() => {
-    if (target === undefined || prevTargetRef.current === target) return;
-    prevTargetRef.current = target;
-    setOpenDim(target);
-  }, [target]);
-  return [openDim, setOpenDim];
+// Memoised so a finding landing in one dimension does not re-render the others.
+const DimensionGroup = memo(function DimensionGroup({ dim, violations, open, scanning, onToggle }) {
+  return (
+    <div className={`vlive-dimension-group${open ? '' : ' vlive-dimension-group--collapsed'}`}>
+      <DimensionHeader dim={dim} violations={violations} open={open} scanning={scanning} onToggle={() => onToggle(dim)} />
+      {open && <DimensionRows dim={dim} violations={violations} />}
+    </div>
+  );
+});
+
+const LATEST = Symbol('latest');
+
+// An accordion: one group open at a time, "latest" first. Opening a group
+// closes the one that was open.
+function useOpenDims() {
+  const [openGroup, setOpenGroup] = useState(LATEST);
+  const toggle = useCallback((id) => setOpenGroup((cur) => (cur === id ? null : id)), []);
+  const toggleLatest = useCallback(() => toggle(LATEST), [toggle]);
+  return { openGroup, toggleDim: toggle, latestOpen: openGroup === LATEST, toggleLatest };
 }
 
 function computeQueuedFiles(runningDim) {
@@ -107,49 +138,59 @@ function computeQueuedFiles(runningDim) {
     : null;
 }
 
-function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, passedCount, isRunning, currentDimension }) {
+// The head says how many new findings this run has, and that it is still
+// streaming. Passed checks are in the progress details; carried-forward
+// findings follow the "new findings only" setting.
+// `passed` is the checks-passed total of a diff review, null otherwise.
+function LiveViolationsHead({ totalCount, isRunning, passed }) {
+  const parts = [totalCount > 0 ? t('evaluate.newCount', { count: totalCount }) : t('evaluate.noNewFindings')];
+  if (passed != null) parts.push(t('evaluate.checksPassed', { count: passed }));
+  if (isRunning) parts.push(t('evaluate.streaming'));
   return (
     <div className="vlive-head">
       <span className="vlive-head-left">
         <SectionLabel>{t('evaluate.liveViolationsLabel')}</SectionLabel>
-        <span className="vlive-counter">
-          {totalCount > 0
-            ? t(
-              pluralKey(orderedDimsCount, 'evaluate.acrossDimsOne', 'evaluate.acrossDimsMany'),
-              { count: totalCount, dims: orderedDimsCount },
-            )
-            : t('evaluate.noNewFindings')}
-          {/* The console line prints "40 v · 1056 c". Saying the passing
-              checks here keeps the feed from reading as the run's whole
-              output: the rows are the violations, this is the rest. */}
-          {passedCount > 0 && (
-            <span className="vlive-counter-passed"> · {t(pluralKey(passedCount, 'evaluate.checksPassedOne', 'evaluate.checksPassedMany'), { count: passedCount })}</span>
-          )}
-          {hiddenCarriedCount > 0 && (
-            <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>
-          )}
-          {isRunning && <> · {t('evaluate.streaming')}</>}
-        </span>
+        <span className="vlive-counter">{parts.join(' · ')}</span>
       </span>
-      {isRunning && currentDimension && (
-        <span className="vlive-head-dim">{currentDimension}</span>
-      )}
     </div>
   );
 }
 
-function LiveViolationsCard({ orderedDims, openDim, setOpenDim, isRunning, queued }) {
+function cleanDimStatus(d) {
+  if (d.state === DIM_STATE.DONE) return t('evaluate.dimPassed', { count: d.compliance ?? 0 });
+  if (d.state === DIM_STATE.RUNNING) return t('evaluate.dimScanning');
+  return t('evaluate.dimQueued');
+}
+
+// A diff-review dimension with no findings: nothing to open, so a plain
+// header row saying how it went.
+function CleanDimensionRow({ dim }) {
+  return (
+    <div className="vlive-dimension-group vlive-dimension-group--collapsed">
+      <div className="vlive-dimension-label vlive-dimension-label--static">
+        <span className="vlive-dimension-name">{dim.id}</span>
+        <span className={dim.state === DIM_STATE.RUNNING ? 'vlive-dimension-scanning' : 'vlive-dimension-status'}>{cleanDimStatus(dim)}</span>
+      </div>
+    </div>
+  );
+}
+
+function LiveViolationsCard({ liveViolations, orderedDims, open, currentDimension, isRunning, queued, review }) {
+  const { openGroup, toggleDim, latestOpen, toggleLatest } = open;
   return (
     <div className="vlive-card">
+      <LatestGroup liveViolations={liveViolations} isRunning={isRunning} open={latestOpen} onToggle={toggleLatest} passed={review.passed} />
       {orderedDims.map(({ dim, violations }) => (
         <DimensionGroup
           key={dim}
           dim={dim}
           violations={violations}
-          open={openDim === dim}
-          onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
+          open={openGroup === dim}
+          scanning={isRunning && sameDim(dim, currentDimension)}
+          onToggle={toggleDim}
         />
       ))}
+      {review.cleanDims.map((d) => <CleanDimensionRow key={d.id} dim={d} />)}
       {isRunning && (
         <div className="vlive-footer">
           <span className="vlive-footer__dot" aria-hidden="true" />
@@ -160,7 +201,17 @@ function LiveViolationsCard({ orderedDims, openDim, setOpenDim, isRunning, queue
   );
 }
 
-export default function LiveViolationsFeed({ liveViolations, job = null, hiddenCarriedCount = 0 }) {
+const NOT_A_REVIEW = Object.freeze({ passed: null, cleanDims: [] });
+
+// What a diff review adds to the feed: the checks passed in total, and its
+// dimensions that have no findings to group.
+function diffReviewOf(progress, orderedDims) {
+  if (!isDiffReview(progress)) return NOT_A_REVIEW;
+  const cleanDims = (progress.dimensions || []).filter((d) => !orderedDims.some((o) => sameDim(o.dim, d.id)));
+  return { passed: checksPassed(progress), cleanDims };
+}
+
+export default function LiveViolationsFeed({ liveViolations, job = null, hiddenCarriedCount = 0, newCount = null }) {
   // Per-dim activity timestamps power "latest active dimension on top".
   const lastActivity = useDimensionActivity(liveViolations);
 
@@ -172,34 +223,38 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   const queued = computeQueuedFiles(runningDim);
 
   const currentDimension = progress?.currentDimension;
-  // Compliance counts come from the same tally the console heartbeat prints
-  // (scan progress), not from the finding stream, which carries violations only.
-  const passedCount = (progress?.dimensions || []).reduce((sum, d) => sum + (d?.compliance ?? 0), 0);
   const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity, currentDimension),
     // lastActivity is a ref's current value — it's intentionally not in deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [liveViolations, currentDimension]);
 
-  const [openDim, setOpenDim] = useAutoOpenDim(autoOpenTarget({ isRunning, progress, orderedDims }));
+  const open = useOpenDims();
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
+  const review = diffReviewOf(progress, orderedDims);
+  // The list shows while there is something in it, while the run is live (the
+  // latest header says so before the first finding), and for a clean diff
+  // review (the checks that passed are its result).
+  const showCard = totalCount > 0 || isRunning || review.passed != null;
   // A fully-cached dimension yields zero NEW findings. Bailing out here
   // would make the feed disappear and read as "nothing found", so keep the
   // header whenever the filter is what emptied the list.
-  if (!totalCount && !hiddenCarriedCount) return null;
+  if (!showCard && !hiddenCarriedCount) return null;
 
   return (
     <div className="vlive-feed">
-      <LiveViolationsHead
-        totalCount={totalCount}
-        orderedDimsCount={orderedDims.length}
-        hiddenCarriedCount={hiddenCarriedCount}
-        passedCount={passedCount}
-        isRunning={isRunning}
-        currentDimension={currentDimension}
-      />
-      {(totalCount > 0 || isRunning) && (
-        <LiveViolationsCard orderedDims={orderedDims} openDim={openDim} setOpenDim={setOpenDim} isRunning={isRunning} queued={queued} />
+      {/* The head counts new findings even when the rows include carried ones. */}
+      <LiveViolationsHead totalCount={newCount ?? totalCount} isRunning={isRunning} passed={review.passed} />
+      {showCard && (
+        <LiveViolationsCard
+          liveViolations={liveViolations}
+          orderedDims={orderedDims}
+          open={open}
+          currentDimension={currentDimension}
+          isRunning={isRunning}
+          queued={queued}
+          review={review}
+        />
       )}
     </div>
   );

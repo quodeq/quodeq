@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { QMarkIcon } from './QMarkIcon.jsx';
+import { LoaderLogo } from './LoaderLogo.jsx';
 import { t } from '../strings/index.js';
 import { renderRich } from '../strings/rich.jsx';
 
@@ -17,6 +17,16 @@ const TIP_KEYS = [
   'loading.tips.duel', 'loading.tips.standards', 'loading.tips.customStandard',
   'loading.tips.prReview', 'loading.tips.ollama', 'loading.tips.monorepo',
   'loading.tips.shared',
+  'loading.tips.shareInvite', 'loading.tips.shareSecondMachine',
+  'loading.tips.shareBareRepo', 'loading.tips.shareUpdate',
+  'loading.tips.sharePublishedBy', 'loading.tips.shareLocation',
+  'loading.tips.sharePullCopy', 'loading.tips.shareAssistant',
+  'loading.tips.shareCompare', 'loading.tips.shareDisconnect',
+  'loading.tips.githubSignIn', 'loading.tips.testAccess',
+  'loading.tips.exportZip', 'loading.tips.fetchLatest',
+  'loading.tips.cancelKeep', 'loading.tips.timeLimit',
+  'loading.tips.dismissByType', 'loading.tips.trustModel', 'loading.tips.sarif',
+  'loading.tips.reviewDryRun',
 ];
 const LEADING_QUESTION = /^([^?]+\?)\s+(.+)$/s;
 
@@ -97,28 +107,42 @@ const VARIANT_SHELL = 'shell';
  * already-rendered page -- it must not compete with, or hide behind, other
  * loaders or dimmed containers on the same route.
  *
- * `tips` rotates a help tip under the logo once a wait drags past a few
- * seconds.
+ * `tips` (boot only) switches to the tip-first layout: the logo on the left
+ * and the rotating tip as the headline beside it. Every other loader shows
+ * the logo alone.
  */
 export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, leaving = false }) {
   const { tipKey, fading } = useRotatingTip(tips);
   const classes = ['loading-screen'];
   if (variant === VARIANT_INLINE) classes.push('loading-screen--inline');
   if (variant === VARIANT_SHELL) classes.push('loading-screen--shell');
-  // Known at mount, so the logo is lifted from the first frame and never
-  // jumps when the first tip arrives.
   if (tips) classes.push('loading-screen--tips');
   if (leaving) classes.push('loading-screen--leaving');
+  if (!tips) {
+    return (
+      <div className={classes.join(' ')} role="status" aria-live="polite">
+        <LoaderLogo className="loading-logo" />
+        {message && <p className="loading-message">{message}</p>}
+      </div>
+    );
+  }
+  // The tip column is laid out from the first frame (tips is known at mount)
+  // with a reserved height, so neither the logo nor the column moves when
+  // the first tip arrives or a long one wraps.
   return (
     <div className={classes.join(' ')} role="status" aria-live="polite">
-      <QMarkIcon className="loading-logo" />
-      {message && <p className="loading-message">{message}</p>}
-      {tipKey && (
-        <div className={fading ? 'loading-tip loading-tip--fading' : 'loading-tip'}>
-          <span className="loading-tip__label">{t('loading.tipLabel')}</span>
-          <TipText text={t(tipKey)} />
+      <div className="loading-tips-layout">
+        <LoaderLogo className="loading-logo" />
+        <div className="loading-tips-panel">
+          {tipKey && (
+            <div className={fading ? 'loading-tip loading-tip--fading' : 'loading-tip'}>
+              <span className="loading-tip__label">{t('loading.tipLabel')}</span>
+              <TipText text={t(tipKey)} />
+            </div>
+          )}
+          {message && <p className="loading-message">{message}</p>}
         </div>
-      )}
+      </div>
     </div>
   );
 }

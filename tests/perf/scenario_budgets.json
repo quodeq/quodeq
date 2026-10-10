@@ -6,17 +6,17 @@
     "standards_reads": 5
   },
   "compare_fleet_10": {
-    "eval_report_reads": 100,
-    "evaluation_db_opens": 400,
+    "eval_report_reads": 60,
+    "evaluation_db_opens": 300,
     "get_project_scores": 0,
-    "peak_kib": 239,
-    "response_bytes": 30778,
+    "peak_kib": 244,
+    "response_bytes": 32378,
     "score_cache_opens": 1
   },
   "dimension_eval_warm": {
     "eval_report_reads": 1,
     "peak_kib": 408,
-    "response_bytes": 1969,
+    "response_bytes": 1987,
     "score_cache_opens": 0,
     "standards_reads": 1
   },
@@ -25,6 +25,12 @@
     "response_bytes": 790,
     "standards_reads": 2
   },
+  "formula_pass": {
+    "eval_report_reads": 134,
+    "evaluation_db_opens": 201,
+    "peak_kib": 246,
+    "response_bytes": 0
+  },
   "project_list_cold": {
     "eval_report_reads": 67,
     "evaluation_db_opens": 66,
@@ -32,41 +38,42 @@
     "score_cache_opens": 22
   },
   "project_list_settled": {
-    "response_bytes": 2232,
+    "response_bytes": 2242,
     "score_cache_opens": 12
   },
   "project_warm_10": {
-    "eval_report_reads": 60,
-    "evaluation_db_opens": 390,
+    "eval_report_reads": 20,
+    "evaluation_db_opens": 290,
     "response_bytes": 0,
     "score_cache_opens": 110
   },
   "run_page_findings_warm": {
     "evaluation_db_opens": 5,
     "peak_kib": 18,
-    "response_bytes": 2249,
+    "response_bytes": 2304,
     "score_cache_opens": 0
   },
   "run_page_overview_cold": {
     "eval_report_reads": 1,
-    "response_bytes": 5018,
+    "evaluation_db_opens": 1,
+    "response_bytes": 5066,
     "score_cache_opens": 1
   },
   "run_page_overview_warm": {
-    "peak_kib": 161,
-    "response_bytes": 5018,
+    "peak_kib": 162,
+    "response_bytes": 5066,
     "score_cache_opens": 1
   },
   "scores_as_of_cold": {
-    "eval_report_reads": 14,
-    "evaluation_db_opens": 52,
+    "eval_report_reads": 10,
+    "evaluation_db_opens": 41,
     "event_log_reads": 1,
-    "response_bytes": 3894
+    "response_bytes": 3865
   },
   "scores_as_of_warm": {
     "eval_report_reads": 2,
     "evaluation_db_opens": 10,
     "peak_kib": 179,
-    "response_bytes": 3894
+    "response_bytes": 3865
   }
 }

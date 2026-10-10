@@ -13,7 +13,7 @@ const SEVERITY_WEIGHT_STEP = 0.05;
 // The stageRows key of the final line: it alone carries a "was".
 const FINAL_KEY = 'final';
 // Which stage rows (by stageRows key) each stage shows on its right.
-const STAGE_KEYS = [['types'], ['base'], ['lift', 'raw'], ['ceiling', 'floor', FINAL_KEY]];
+const STAGE_KEYS = [['rules'], ['base'], ['lift', 'raw'], ['ceiling', 'floor', FINAL_KEY]];
 const STAGE_TYPES = 0;
 const STAGE_BASE = 1;
 const STAGE_LIFT = 2;

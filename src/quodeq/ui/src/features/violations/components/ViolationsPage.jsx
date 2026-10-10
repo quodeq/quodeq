@@ -116,13 +116,13 @@ function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePri
     </span>
   );
   return (
-    <div className="violations-page__top">
+    <div className="term-page-top violations-page__top">
       <TermHeader
         name={t('violations.termName')}
         sub={subLine}
         badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
-      <div className="violations-flag-row">
+      <div className="term-seg violations-flag-row" role="group" aria-label={t('violations.viewAria')}>
         <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === VIOLATIONS_SUB_TAB.DIMENSION} onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.DIMENSION)} />
         <FlagPill flag={t('violations.flagByType')}      active={activeSubTab === VIOLATIONS_SUB_TAB.TYPE}      onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.TYPE)} />
         <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === VIOLATIONS_SUB_TAB.FILE}      onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.FILE)} />
@@ -134,7 +134,7 @@ function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePri
 
 export function ViolationsSubTabContent(props) {
   const {
-    activeSubTab, visibleDimensions, dismissed, callbacks,
+    activeSubTab, visibleDimensions, dismissed, dismissedLoading = false, callbacks,
     fileCurrentPath, setFileCurrentPath,
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
     selectedSource, selectedProject,
@@ -157,15 +157,17 @@ export function ViolationsSubTabContent(props) {
     const actions = selectedSource === PROJECT_SOURCE.SHARED
       ? {}
       : { onRestore: handleRestore, onRestoreAll: handleRestoreAll, onDelete: handleDelete, onDeleteAll: handleDeleteAll };
-    return dismissed.length > 0
-      ? <DismissedSubTab dismissed={dismissed} {...actions} />
-      : <p className="empty-state">{t('violations.noDismissedViolations')}</p>;
+    if (dismissed.length > 0) return <DismissedSubTab dismissed={dismissed} {...actions} />;
+    // The first fetch is in flight: bars in the list's slot, not an empty
+    // message that reads as "nothing dismissed" for as long as the fetch takes.
+    if (dismissedLoading) return <CardListSkeleton rows={3} />;
+    return <p className="empty-state">{t('violations.noDismissedViolations')}</p>;
   }
   return null;
 }
 
 export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = VIOLATIONS_SUB_TAB.DIMENSION, onSubTabChange }) {
-  const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = PROJECT_SOURCE.LOCAL } = data;
+  const { accumulatedDimensions = [], selectedProject, selectedSource = PROJECT_SOURCE.LOCAL } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching, error } = data;
   const { onNavigate, onReconcile, onRetry } = callbacks;
 
@@ -178,12 +180,12 @@ export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = V
   const setActiveSubTab = (v) => onSubTabChange?.(v);
 
   const {
-    dismissed,
+    dismissed, dismissedLoading,
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
     restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
-  } = useViolationsPageState({ tabKey, selectedProject, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource });
+  } = useViolationsPageState({ tabKey, selectedProject, onReconcile, accumulatedDimensions, selectedSource });
 
   const emptyState = renderViolationsEmptyState({
     projectsLoaded, projects, selectedSource, selectedProject, onNavigate,
@@ -203,7 +205,7 @@ export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = V
           tree, type rows over every finding) follows in the next commit. */}
       <DeferredMount fallback={<CardListSkeleton />}>
         <ViolationsSubTabContent
-          activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed}
+          activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed} dismissedLoading={dismissedLoading}
           callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}
           handleRestore={handleRestore} handleRestoreAll={handleRestoreAll}
           handleDelete={handleDelete} handleDeleteAll={handleDeleteAll}

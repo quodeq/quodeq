@@ -5,10 +5,12 @@ import { formatScoreDisplay } from '../../../utils/gradeFormatting.js';
 import SeverityBadgeRow from './SeverityBadgeRow.jsx';
 import { t } from '../../../strings/index.js';
 
-function RunStatStrip({ scoreDisplay, grade, violations, compliance, suppressed, totalChecks, ratio, handleViolations, handleCompliance, handleSeverity, severity, deltas, density }) {
+function RunStatStrip({ scoreDisplay, grade, formulaUpdated, violations, compliance, suppressed, totalChecks, ratio, handleViolations, handleCompliance, handleSeverity, severity, deltas, density }) {
   return (
     <>
-      <ScoreStat scoreDisplay={scoreDisplay} grade={grade} />
+      {/* A grade formula change recomputes every score, so a run scanned under
+          the old one says its numbers moved without a new scan. */}
+      <ScoreStat scoreDisplay={scoreDisplay} grade={grade} hint={formulaUpdated ? t('overview.formulaUpdatedNote') : null} />
       <Stat
         label={t('overview.statViolations')}
         value={violations}
@@ -28,7 +30,7 @@ function RunStatStrip({ scoreDisplay, grade, violations, compliance, suppressed,
   );
 }
 
-export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate, deltas = null, density = null }) {
+export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate, deltas = null, density = null, formulaUpdated = false }) {
   const dateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId);
   const scoreDisplay = formatScoreDisplay(runSummary.numericAverage);
   const grade = runSummary.overallGrade;
@@ -45,6 +47,7 @@ export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNav
       <RunStatStrip
         scoreDisplay={scoreDisplay}
         grade={grade}
+        formulaUpdated={formulaUpdated}
         violations={violations}
         compliance={compliance}
         suppressed={suppressed}

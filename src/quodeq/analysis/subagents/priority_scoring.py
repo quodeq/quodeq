@@ -57,50 +57,39 @@ def compute_base_score(
 
 def compute_dimension_boost(
     filepath: str,
-    dimension: str | list[str],
+    dimension: str,
     file_size: int = 0,
     config: dict | None = None,
 ) -> int:
     """Layer 2: dimension-specific keyword boost or file-size boost."""
     config = config or load_priority_config()
-    dims = dimension if isinstance(dimension, list) else [dimension]
     filepath_lower = filepath.lower().replace("\\", "/")
 
-    best = 0
-    for dim in dims:
-        keywords = config.get("dimension_keywords", {}).get(dim, [])
-        if not keywords and dim == _DIM_MAINTAINABILITY:
-            divisor = config.get("maintainability_size_divisor", _DEFAULT_MAINTAINABILITY_SIZE_DIVISOR)
-            score = min(_SIZE_SCORE_CAP, int(file_size / divisor))
-        else:
-            score = 0
-            for kw in keywords:
-                if kw in filepath_lower:
-                    score = config.get("dimension_keyword_boost", _DEFAULT_DIMENSION_KEYWORD_BOOST)
-                    break
-        best = max(best, score)
-    return best
+    keywords = config.get("dimension_keywords", {}).get(dimension, [])
+    if not keywords and dimension == _DIM_MAINTAINABILITY:
+        divisor = config.get("maintainability_size_divisor", _DEFAULT_MAINTAINABILITY_SIZE_DIVISOR)
+        return min(_SIZE_SCORE_CAP, int(file_size / divisor))
+    for kw in keywords:
+        if kw in filepath_lower:
+            return config.get("dimension_keyword_boost", _DEFAULT_DIMENSION_KEYWORD_BOOST)
+    return 0
 
 
 def compute_previous_violations(
-    config: Any, evidence_dir: Path, dimension: str | list[str],
+    config: Any, evidence_dir: Path, dimension: str,
 ) -> dict[str, int]:
     """Layer 5: count violations per file from previous evaluation.
 
     Reuses load_previous_findings_for_dimension from verify.py which
     resolves the correct previous run's evidence directory.
     """
-    dims = dimension if isinstance(dimension, list) else [dimension]
     counts: dict[str, int] = {}
-
-    for dim in dims:
-        try:
-            findings = load_previous_findings_for_dimension(config, dim, evidence_dir, quiet=True)
-        except (OSError, KeyError, ValueError):
-            continue
-        for finding in findings:
-            if finding.get("t") == FindingType.VIOLATION and finding.get("file"):
-                f = finding["file"]
-                counts[f] = counts.get(f, 0) + 1
-
+    try:
+        findings = load_previous_findings_for_dimension(config, dimension, evidence_dir, quiet=True)
+    except (OSError, KeyError, ValueError):
+        return counts
+    for finding in findings:
+        if finding.get("t") == FindingType.VIOLATION and finding.get("file"):
+            f = finding["file"]
+            counts[f] = counts.get(f, 0) + 1
     return counts

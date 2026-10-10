@@ -151,6 +151,33 @@ def test_ensure_clone_evicts_oldest_entries_beyond_the_cap(tmp_path, monkeypatch
     assert c_dir in entries
 
 
+def test_ensure_clone_never_evicts_the_entry_it_just_used_on_an_mtime_tie(monkeypatch):
+    """Windows' coarse mtime can tie the just-used entry with older ones; the
+    sort must not be free to evict it then (the entry the caller is about to
+    read would be rmtree'd)."""
+    monkeypatch.setattr(online_cache, "_MAX_CACHED_REPOS", 2)
+    for url in ("https://example.com/a.git", "https://example.com/b.git"):
+        (online_cache.repo_path_for_url(url) / ".git").mkdir(parents=True)
+
+    def fake_git(args, *, cwd=None, timeout=300):
+        if args[0] == "clone":
+            (Path(args[-1]) / ".git").mkdir(parents=True)
+            # A coarse clock ties every entry, and the tie then breaks in
+            # listing order: pin the unlucky break, the new entry looking
+            # oldest.
+            for entry in online_cache.cache_root().iterdir():
+                os.utime(entry, (2_000_000, 2_000_000))
+            os.utime(Path(args[-1]).parent, (1_000_000, 1_000_000))
+        return True
+
+    monkeypatch.setattr(online_cache, "_touch", lambda path: None)
+    with patch.object(online_cache, "_git", side_effect=fake_git):
+        repo = online_cache.ensure_clone("https://example.com/c.git")
+
+    assert repo is not None and repo.exists()
+    assert len([e for e in online_cache.cache_root().iterdir() if e.is_dir()]) == 2
+
+
 def test_ensure_clone_evicts_least_recently_used_not_least_recently_cloned(tmp_path, monkeypatch):
     """Eviction order must track actual use, not just clone order.
 

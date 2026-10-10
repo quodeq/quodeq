@@ -20,7 +20,6 @@ function baseData(overrides = {}) {
     projectName: 'Shared Repo',
     loading: false,
     isFetching: false,
-    dismissRefreshKey: 0,
     selectedSource: 'shared',
     ...overrides,
   };
@@ -183,7 +182,6 @@ describe('ViolationsPage — sub-tab lives in the nav entry (replace, not push)'
     projectName: 'p1',
     loading: false,
     isFetching: false,
-    dismissRefreshKey: 0,
     selectedSource: 'local',
   });
 

@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { FindingDetailBody } from '../../../components/findingDetail.jsx';
 import { ViolationActions } from './violationActions.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
@@ -29,9 +28,7 @@ function ViolationCardMarkup({ v, filename, display, refText, onDismiss }) {
         )}
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
         {v.principle && <span className="vrow-label">[{v.principle}]</span>}
-        {filename && (
-          <FileCopyBtn display={display} copyText={refText} />
-        )}
+        {filename && <span className="vlive-detail-file" title={refText}>{display}</span>}
         <ViolationActions v={v} onDismiss={onDismiss} />
       </div>
       <FindingDetailBody v={v} />

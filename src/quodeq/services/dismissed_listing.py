@@ -17,10 +17,18 @@ from quodeq.core.dismissals import DismissedEntry
 from quodeq.core.finding_identity import DismissKey
 from quodeq.services._run_recency import run_dirs_newest_first
 from quodeq.services.wiring import (
+    ACTIONS_LOG_FILENAME,
     read_finding_details,
     read_finding_details_from_json_eval,
 )
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.shared.stamp_memo import StampCache, file_stamp, memoized_by_stamp
+
+# The resolved detail of every dismissed entry, per project, reused while the
+# actions log and the run list are unchanged. An entry whose finding no run
+# holds any more costs a walk over every run (measured at 5.9 s for 382
+# runs); without this memo the Dismissed tab paid it on every open.
+_DETAILS = StampCache(max_entries=64, name="dismissed.details")
 
 
 def _enrich_from_sql(run_dir: Path, keys: set[DismissKey], out: dict[DismissKey, dict]) -> None:
@@ -52,27 +60,88 @@ def _enrich_from_json_eval(
         out.setdefault(key, detail)
 
 
-def _collect_dismissed_details(
-    project_dir: Path, keys: set[DismissKey],
-) -> dict[DismissKey, dict]:
-    """Look up finding detail for every dismissed key, newest run first.
+def _recorded_run_dirs(
+    entries: tuple[DismissedEntry, ...], runs: list[Path],
+) -> list[Path]:
+    """The run dirs the entries were dismissed from, newest first, each once.
 
-    Each run is asked only for the keys still missing, so older runs do less
-    work and the walk stops once every key has detail. Newest-first plus
-    ``setdefault`` in the enrichers makes the merge deterministic: the detail
-    shown is always the most recent run's -- for a fingerprinted entry that
-    is the finding's current location, whatever line it has moved to.
+    Only runs the recency walk knows are returned: the recorded id is a plain
+    directory name at best and a stale one at worst, so it is matched against
+    the listing rather than joined onto the project path.
     """
+    by_name = {run_dir.name: run_dir for run_dir in runs}
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for entry in entries:
+        run_dir = by_name.get(entry.run_id or "")
+        if run_dir is None or run_dir in seen:
+            continue
+        seen.add(run_dir)
+        out.append(run_dir)
+    return out
+
+
+def _collect_dismissed_details(
+    project_dir: Path, entries: tuple[DismissedEntry, ...],
+) -> dict[DismissKey, dict]:
+    """Look up finding detail for every dismissed entry.
+
+    The newest run is asked first: a finding still present there is shown at
+    its current location, whatever line it has moved to. Then the runs the
+    entries were dismissed from, for the keys still missing, so a finding
+    that a later run no longer holds costs one lookup, not a walk. Then the
+    remaining runs newest first, each asked only for what is still missing,
+    until every key has detail. ``setdefault`` in the enrichers keeps the
+    first hit, which makes the merge deterministic.
+    """
+    runs = run_dirs_newest_first(project_dir)
+    keys = {entry.key for entry in entries}
     details: dict[DismissKey, dict] = {}
-    for run_dir in run_dirs_newest_first(project_dir):
+    if not runs or not keys:
+        return details
+    asked: set[Path] = set()
+
+    def ask(run_dir: Path) -> None:
         missing = keys.difference(details)
-        if not missing:
-            break
+        if not missing or run_dir in asked:
+            return
+        asked.add(run_dir)
         _enrich_from_sql(run_dir, missing, details)
         missing = keys.difference(details)
         if missing:
             _enrich_from_json_eval(run_dir, missing, details)
+
+    ask(runs[0])
+    for run_dir in _recorded_run_dirs(entries, runs):
+        ask(run_dir)
+    for run_dir in runs[1:]:
+        if not keys.difference(details):
+            break
+        ask(run_dir)
     return details
+
+
+def _listing_stamp(project_dir: Path) -> tuple:
+    """What the resolved details depend on: the actions log and the run list."""
+    runs = run_dirs_newest_first(project_dir)
+    newest = runs[0].name if runs else ""
+    return (file_stamp(project_dir / ACTIONS_LOG_FILENAME), newest, len(runs))
+
+
+def _page_details(
+    project_dir: Path, page: tuple[DismissedEntry, ...], offset: int, limit: int | None,
+) -> dict[DismissKey, dict]:
+    """The memoized detail map for the entries of one page of the listing.
+
+    Keyed per page so a page asks the runs only about its own entries; the
+    stamp drops the map when the actions log or the run list changes.
+    """
+    details = memoized_by_stamp(
+        f"{project_dir}|{offset}|{limit}", _listing_stamp(project_dir),
+        lambda: _collect_dismissed_details(project_dir, page),
+        cache=_DETAILS,
+    )
+    return details if details is not None else {}
 
 
 def _dismissed_items(
@@ -112,9 +181,10 @@ def load_dismissed(
 ) -> list[dict]:
     """List dismissed findings as dicts (shape matches /api/findings/dismissed response).
 
-    Only the entries on the requested page are looked up in the runs; the
-    items are one-to-one with the entries, so paging the entries first gives
-    the same page as paging the full listing would.
+    Only the entries on the requested page are looked up in the runs, and
+    the result is kept per page while nothing changes; the items are
+    one-to-one with the entries, so paging the entries first gives the same
+    page as paging the full listing would.
     """
     if not project_dir.is_dir():
         return []
@@ -124,8 +194,26 @@ def load_dismissed(
     page = _page(state.entries, offset, limit)
     if not page:
         return []
-    details = _collect_dismissed_details(project_dir, {e.key for e in page})
-    return _dismissed_items(page, details)
+    return _dismissed_items(page, _page_details(project_dir, page, offset, limit))
+
+
+def dismissed_item(project_dir: Path, req: str, file: str, line: int) -> dict | None:
+    """The listing item for the entry recorded at ``(req, file, line)``, or None.
+
+    What the Dismissed tab would show for a finding just dismissed, in the
+    same shape as :func:`load_dismissed`, so a client can add it to the list
+    it holds without fetching the list again. A fingerprinted entry is
+    preferred over a line-keyed twin at the same place.
+    """
+    if not project_dir.is_dir():
+        return None
+    state = dismissed_keys(project_dir)
+    entries = state.entries_at(req, file, line)
+    if not entries:
+        return None
+    entry = next((e for e in entries if e.fingerprint), entries[0])
+    (item,) = _dismissed_items((entry,), _collect_dismissed_details(project_dir, (entry,)))
+    return item
 
 
 def _page(

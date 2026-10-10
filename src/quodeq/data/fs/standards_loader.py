@@ -11,11 +11,7 @@ import json
 import logging
 from pathlib import Path
 
-from quodeq.core.standards.refs import (
-    extract_refs,
-    extract_requirement_checks,
-    extract_requirements,
-)
+from quodeq.core.standards.refs import extract_refs, extract_requirement_checks, extract_requirements
 from quodeq.core.taxonomy import EMPTY_TAXONOMY, Taxonomy, TaxonomyError, extract_taxonomy
 from quodeq.core.utils.io import read_json
 from quodeq.shared.validation import validate_path_segment

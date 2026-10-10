@@ -153,6 +153,52 @@ describe('useRegisterWindowSpec', () => {
     expect(screen.getByTestId('dock-body')).toHaveTextContent('r1:v2');
   });
 
+  // The data under a spec moves without its id or title changing: the File
+  // and Principle pages receive the finding detail after their first render.
+  // A docked window and the toolbar's registered spec both follow it.
+  it('a docked window re-renders with the latest spec data without a re-register', () => {
+    function DataPage({ detail }) {
+      const spec = useMemo(
+        () => ({ id: 'r1', type: 'report', title: 'Report', render: () => <p data-testid="body">{detail}</p>, copy: () => detail }),
+        [detail],
+      );
+      const { toggle } = useRegisterWindowSpec('report', spec);
+      return <button data-testid="toggle" onClick={toggle}>toggle</button>;
+    }
+    function Harness() {
+      const [detail, setDetail] = useState('loading');
+      return (
+        <>
+          <DataPage detail={detail} />
+          <button data-testid="arrive" onClick={() => setDetail('the reason')}>arrive</button>
+        </>
+      );
+    }
+    function DockRender() {
+      const { windows, getRegisteredSpec } = useSidePane();
+      const [copied, setCopied] = useState('');
+      return (
+        <div>
+          {windows.map((w) => <div key={w.id}>{w.render()}</div>)}
+          <button data-testid="copy" onClick={() => setCopied(getRegisteredSpec('report').copy())}>copy</button>
+          <span data-testid="copied">{copied}</span>
+        </div>
+      );
+    }
+    render(
+      <SidePaneProvider>
+        <Harness />
+        <DockRender />
+      </SidePaneProvider>,
+    );
+    fireEvent.click(screen.getByTestId('toggle'));
+    expect(screen.getByTestId('body')).toHaveTextContent('loading');
+    act(() => { fireEvent.click(screen.getByTestId('arrive')); });
+    expect(screen.getByTestId('body')).toHaveTextContent('the reason');
+    fireEvent.click(screen.getByTestId('copy'));
+    expect(screen.getByTestId('copied')).toHaveTextContent('the reason');
+  });
+
   it('re-registering a spec when no matching window is docked does not add a window', () => {
     render(
       <SidePaneProvider>
@@ -193,11 +239,12 @@ describe('useRegisterWindowSpec', () => {
     const before = renderCount;
     fireEvent.click(screen.getByTestId('open'));
     const after = renderCount;
-    // Opening the window should cause at most one extra render of the page
-    // (the windows state changes once). If replaceWindow does not short-
-    // circuit on identity, this triggers an unbounded cascade and the diff
-    // will be much larger.
-    expect(after - before).toBeLessThanOrEqual(2);
+    // Opening the window should cause at most two extra renders of the page:
+    // the windows state changes once when the window is added, and once more
+    // when the raw spec it was added with is swapped for the page's live
+    // spec. If replaceWindow does not short-circuit on identity, this
+    // triggers an unbounded cascade and the diff will be much larger.
+    expect(after - before).toBeLessThanOrEqual(3);
   });
 
   it('a fresh spec object on every parent render does not loop the provider', () => {

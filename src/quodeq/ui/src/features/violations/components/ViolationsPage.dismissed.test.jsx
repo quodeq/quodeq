@@ -73,3 +73,23 @@ describe('ViolationsSubTabContent — dismissed sub-tab, source gating', () => {
     expect(screen.getByText('No dismissed violations.')).toBeInTheDocument();
   });
 });
+
+describe('ViolationsSubTabContent — dismissed sub-tab, first fetch', () => {
+  it('shows the list skeleton while the dismissed list is still loading', () => {
+    const { container } = render(
+      <ViolationsSubTabContent
+        activeSubTab="dismissed"
+        dismissed={[]}
+        dismissedLoading
+        visibleDimensions={[]}
+        callbacks={{}}
+        fileCurrentPath=""
+        setFileCurrentPath={() => {}}
+        selectedSource="local"
+      />
+    );
+    expect(container.querySelector('.card-list-skeleton')).not.toBeNull();
+    expect(screen.queryByText('No dismissed violations.')).toBeNull();
+  });
+});
+

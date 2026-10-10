@@ -39,6 +39,7 @@ def manifest_to_dict(manifest: SourceManifest) -> dict:
         "project_description": describe_target(primary) if primary else "Unknown",
         "total_files": manifest.total_files,
         "source_files_count": len(manifest.source_files),
+        "source_line_count": manifest.total_lines,
         "language_stats": manifest.language_stats,
         "targets": [target_to_dict(t) for t in manifest.targets],
     }

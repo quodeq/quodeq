@@ -69,12 +69,14 @@ describe('ProjectsPage — shared entries (configured)', () => {
     });
   }
 
-  it('renders shared-only cards with "published by"', async () => {
+  it('renders a shared-only row as remote only, with its publish age', async () => {
     const fakeApi = configuredApi();
     renderWithApi(<ProjectsPage projects={[]} actions={{}} />, fakeApi);
 
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
-    expect(screen.getByText(/published by ana/)).toBeInTheDocument();
+    expect(screen.getByText(/^remote only · published/)).toBeInTheDocument();
+    // No publisher name: the page does not assume a team.
+    expect(screen.queryByText(/ana/)).toBeNull();
   });
 
   // Regression: the header actions used to be gated on `projects.length > 0`,

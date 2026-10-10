@@ -3,7 +3,7 @@
  *
  * The payload construction, target-project resolution and the four-step
  * follow-up tail (dismiss POST → applyDelta → scheduleDashboardReconcile →
- * bumpDismissRefresh) used to be copy-pasted across three route renderers.
+ * recordDismissed) used to be copy-pasted across three route renderers.
  * The targetProject resolution in particular is the recurring
  * identity-divergence class from the assistant dismiss bug: one resolver,
  * one place, so the three call sites cannot drift apart again.
@@ -43,11 +43,13 @@ export function resolveDismissTargetProject({ explicitProject, selectedProject }
  *
  * POST returns { scores: { dimensions, summary } } — the rescored payload for
  * this run — plus a delta the caller-supplied applyDelta patches into the
- * dashboard/scores caches so the visible screen updates instantly. One
- * reconcile call per suppression mutation: scheduleDashboardReconcile marks
- * the project queries stale synchronously AND schedules the debounced active
- * refetch (see useDashboard.js), so a separate refreshDashboard call here
- * would be redundant.
+ * dashboard/scores caches so the visible screen updates instantly, and
+ * `dismissedEntry`, the Dismissed tab's item for the finding, which
+ * recordDismissed prepends to the cached list so the tab shows it at once.
+ * One reconcile call per suppression mutation: scheduleDashboardReconcile
+ * marks the project queries stale synchronously AND schedules the debounced
+ * active refetch (see useDashboard.js), so a separate refreshDashboard call
+ * here would be redundant.
  *
  * @param {{
  *   violation: Object,
@@ -59,7 +61,7 @@ export function resolveDismissTargetProject({ explicitProject, selectedProject }
  *     dismissFinding: (project: string, payload: Object) => Promise<Object>,
  *     applyDelta?: (project: string, scores: Object, delta: Object) => void,
  *     scheduleDashboardReconcile?: () => void,
- *     bumpDismissRefresh?: () => void,
+ *     recordDismissed?: (project: string, entry: Object) => void,
  *   },
  * }} args
  * @returns {Promise<Object>} the dismiss response (scores + delta)
@@ -72,6 +74,6 @@ export async function dismissWithReconcile({
   const result = await deps.dismissFinding(targetProject, payload);
   deps.applyDelta?.(targetProject, result?.scores, result?.delta);
   deps.scheduleDashboardReconcile?.();
-  deps.bumpDismissRefresh?.();
+  deps.recordDismissed?.(targetProject, result?.dismissedEntry);
   return result;
 }

@@ -121,3 +121,13 @@ def test_well_formed_findings_are_unaffected(tmp_path: Path):
     assert result is not None
     assert len(result["violations"]) == 1
     assert len(result["compliance"]) == 1
+
+
+def test_malformed_principles_are_dropped_not_indexed(tmp_path: Path):
+    json_path = tmp_path / "security.json"
+    good = {"name": "Confidentiality", "score": 9.0, "grade": "A"}
+    json_path.write_text(json.dumps(_base_report(principles=[None, "x", good])))
+    assert parse_report_json(json_path)["principles"] == [good]
+
+    json_path.write_text(json.dumps(_base_report(principles=None)))
+    assert parse_report_json(json_path)["principles"] == []

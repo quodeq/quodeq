@@ -1,6 +1,6 @@
 import { pct } from './scanProgressTotals.js';
 import { formatDuration } from '../../../utils/formatters.js';
-import { exitReasonHint, exitReasonLabel } from '../../../models/exitReason.js';
+import { exitReasonHint, exitReasonLabel, isTimeLimitExit } from '../../../models/exitReason.js';
 import { t } from '../../../strings/index.js';
 import { EXIT_REASON } from '../../../vocab/exitReason.js';
 import { DIM_STATE } from '../../../vocab/dimState.js';
@@ -76,6 +76,21 @@ function DimMetaRunning({ dim, reasonBadge }) {
   );
 }
 
+// When the dimension reports `done`, force the bar to 100% even if
+// `files.taken < files.total` (incremental skips, dismissed files, etc.).
+// Backend `done` is the source of truth — count drift shouldn't make a
+// green dimension look red. A dimension that ran out of time is the
+// exception: its bar shows how far it got, in the partial colour.
+function barLook(dim, taken, total) {
+  const isDone = dim.state === DIM_STATE.DONE;
+  if (isDone && isTimeLimitExit(dim.exitReason)) {
+    return { p: pct(taken, total), dotClass: ' scan-progress__dim-dot--partial', fillClass: 'scan-progress__bar-fill--partial' };
+  }
+  if (isDone) return { p: PERCENT, dotClass: ' scan-progress__dim-dot--done', fillClass: 'scan-progress__bar-fill--done' };
+  const running = dim.state === DIM_STATE.RUNNING;
+  return { p: pct(taken, total), dotClass: running ? ' scan-progress__dim-dot--running' : '', fillClass: '' };
+}
+
 export default function DimRow({ dim }) {
   const taken = dim.files?.taken ?? 0;
   const isPending = dim.state === DIM_STATE.PENDING;
@@ -84,15 +99,8 @@ export default function DimRow({ dim }) {
   const reasonBadge = reasonLabel
     ? <> · <span className="scan-progress__dim-reason">{reasonLabel}</span></>
     : null;
-  // When the dimension reports `done`, force the bar to 100% even if
-  // `files.taken < files.total` (incremental skips, dismissed files, etc.).
-  // Backend `done` is the source of truth — count drift shouldn't make a
-  // green dimension look red.
   const isDone = dim.state === DIM_STATE.DONE;
-  const isRunning = dim.state === DIM_STATE.RUNNING;
-  const p = isDone ? PERCENT : pct(taken, total);
-  const dotClass = isDone ? ' scan-progress__dim-dot--done' : isRunning ? ' scan-progress__dim-dot--running' : '';
-  const fillClass = isDone ? 'scan-progress__bar-fill--done' : '';
+  const { p, dotClass, fillClass } = barLook(dim, taken, total);
 
   const meta = isPending
     ? <DimMetaPending reasonBadge={reasonBadge} />

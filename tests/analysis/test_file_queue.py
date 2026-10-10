@@ -10,10 +10,18 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
+from quodeq.data.fs.run_files import read_queue_state
 from quodeq.data.file_lock import lock_file, unlock_file
 
 
 SAMPLE_FILES = [f"src/file_{i}.py" for i in range(30)]
+
+
+def _taken_log(queue_path: Path) -> list[dict]:
+    """The take log as the progress reader sees it: the queue file's ``taken`` entries."""
+    state = read_queue_state(queue_path)
+    assert state is not None
+    return list(state["taken"])
 
 
 class TestInit:
@@ -84,7 +92,7 @@ class TestTake:
         q = FileQueue(tmp_path / "q.json", SAMPLE_FILES)
         q.take(3, agent_id="agent-0")
         q.take(3, agent_id="agent-1")
-        log = q.taken_log()
+        log = _taken_log(tmp_path / "q.json")
         assert len(log) == 2
         assert log[0]["agent"] == "agent-0"
         assert log[1]["agent"] == "agent-1"
@@ -93,18 +101,17 @@ class TestTake:
 
 
 class TestTakenLog:
-    def test_all_taken_files(self, tmp_path: Path) -> None:
+    def test_taken_log_lists_every_file_in_take_order(self, tmp_path: Path) -> None:
         q = FileQueue(tmp_path / "q.json", SAMPLE_FILES)
         q.take(10, agent_id="a")
         q.take(10, agent_id="b")
         q.take(10, agent_id="c")
-        assert q.all_taken_files() == SAMPLE_FILES
+        assert [f for entry in _taken_log(tmp_path / "q.json") for f in entry["files"]] == SAMPLE_FILES
         assert q.remaining() == 0
 
     def test_empty_log_initially(self, tmp_path: Path) -> None:
-        q = FileQueue(tmp_path / "q.json", SAMPLE_FILES)
-        assert q.taken_log() == []
-        assert q.all_taken_files() == []
+        FileQueue(tmp_path / "q.json", SAMPLE_FILES)
+        assert _taken_log(tmp_path / "q.json") == []
 
 
 class TestPersistence:
@@ -115,7 +122,7 @@ class TestPersistence:
 
         q2 = FileQueue(qp)  # reopen
         assert q2.remaining() == 20
-        assert len(q2.taken_log()) == 1
+        assert len(_taken_log(qp)) == 1
         batch = q2.take(5, agent_id="b")
         assert batch == SAMPLE_FILES[10:15]
 
@@ -126,7 +133,7 @@ class TestPersistence:
         # Re-init with new file list overwrites
         q2 = FileQueue(qp, ["new.py"])
         assert q2.remaining() == 1
-        assert q2.taken_log() == []
+        assert _taken_log(qp) == []
 
     def test_on_disk_format_after_takes(self, tmp_path: Path) -> None:
         # Other processes read this JSON directly: pending must stay a plain
@@ -261,4 +268,4 @@ class TestConcurrency:
         # Verify taken log accounts for everything
         q = FileQueue(qp)
         assert q.remaining() == 0
-        assert sorted(q.all_taken_files()) == sorted(files)
+        assert sorted(f for entry in _taken_log(qp) for f in entry["files"]) == sorted(files)

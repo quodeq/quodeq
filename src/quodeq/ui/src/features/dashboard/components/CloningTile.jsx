@@ -22,9 +22,9 @@ function cloneLabel(slot) {
 function FailedRow({ slot, onRetry, onClose }) {
   const message = apiErrorMessage({ code: slot.code, message: slot.error }, 'onboarding.cloneFailed');
   return (
-    <p className="inline-error project-card--ghost__error" role="alert">
+    <p className="inline-error projects-row__ghost-error" role="alert">
       <span>{t('projects.cloneFailedTile', { message })}</span>
-      <button type="button" className="term-btn term-btn--secondary" onClick={onRetry}>{t('sync.retry')}</button>
+      <button type="button" className="projects-row__btn" onClick={onRetry}>{t('sync.retry')}</button>
       <button type="button" className="connect-team-card__close" aria-label={t('projects.connectTeamClose')} onClick={onClose}>
         <span aria-hidden="true">×</span>
       </button>
@@ -33,9 +33,10 @@ function FailedRow({ slot, onRetry, onClose }) {
 }
 
 /**
- * The placeholder tile for a project that is still cloning, or whose clone
- * failed and was not closed. DONE never reaches it: the real tile arrives
- * through the projects invalidation.
+ * The first row of the table for a project that is still cloning, or whose
+ * clone failed and was not closed. DONE never reaches it: the real row
+ * arrives through the projects invalidation. The progress spans the row's
+ * data columns, so it reads the same with or without a server.
  *
  * @param {{ slot: Object, onRetry: () => void, onClose: () => void }} props
  */
@@ -44,19 +45,21 @@ export default function CloningTile({ slot, onRetry, onClose }) {
   const failed = slot.phase === SYNC_PHASE.ERROR;
   const percent = barPercent(slot);
   return (
-    <article className="project-card project-card--ghost">
-      <header className="project-card--ghost__head">
-        <h3 className="project-card--ghost__name">{name}</h3>
-        <span className="badge badge--local">{t('projects.badgeLocal')}</span>
-      </header>
-      {failed
-        ? <FailedRow slot={slot} onRetry={onRetry} onClose={onClose} />
-        : (
-          <>
-            <p className="project-card--ghost__meta">{cloneLabel(slot)}</p>
-            <SyncBar percent={percent} label={t('onboarding.cloneProgressAria')} />
-          </>
-        )}
-    </article>
+    <div className="projects-row projects-row--ghost" role="row">
+      <div className="projects-row__name" role="cell">
+        <span className="projects-row__title"><span className="projects-row__ghost-name">{name}</span></span>
+        {slot.repo && <small className="projects-row__sub">{slot.repo}</small>}
+      </div>
+      <div className="projects-row__ghost-progress" role="cell">
+        {failed
+          ? <FailedRow slot={slot} onRetry={onRetry} onClose={onClose} />
+          : (
+            <>
+              <SyncBar percent={percent} label={t('onboarding.cloneProgressAria')} />
+              <span className="projects-row__ghost-meta">{cloneLabel(slot)}</span>
+            </>
+          )}
+      </div>
+    </div>
   );
 }

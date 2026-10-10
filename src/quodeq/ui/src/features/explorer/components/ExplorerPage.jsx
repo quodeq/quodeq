@@ -18,7 +18,10 @@ import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { HERO_CARD_KIND } from '../../dashboard/dashboardVocab.js';
 import { NAV_TAB } from '../../../vocab/navTab.js';
 import { HELP_SECTION } from '../../../vocab/helpSection.js';
-import { buildHeadline, chipDeltas, dimensionHeadlineInput, sinceBaselineFor, sumSinceBaseline } from '../../dashboard/headlineStats.js';
+import { buildHeadline, dimensionHeadlineInput } from '../../dashboard/headlineStats.js';
+import TrendBadge from '../../../components/TrendBadge.jsx';
+import { useExplorerTrend } from './useExplorerTrend.js';
+import { dimensionPeriodDeltas } from '../dimensionPeriodDeltas.js';
 
 /** Empty/loading/error states, checked in order — extracted so the main
  * render stays a single happy-path return. The loading state keeps the
@@ -120,7 +123,7 @@ function buildExplorerCardNavigation({ dimFile, onNavigate, project, activeRunId
 /** Top grid: the stats panel (score/violations/compliance/history) plus
  * the principles radial. */
 function ExplorerTopGrid({
-  overallScoreNum, d, sinceBaseline, onSeverityBadge, onNavigate, handleCardNavigate, trend, granularity,
+  overallScoreNum, d, periodDeltas, onSeverityBadge, onNavigate, handleCardNavigate, trend, granularity,
   onGranularityChange, setActiveRunId, setActiveDateLabel, activeRunId, radialPrinciples, onPrincipleClick,
 }) {
   return (
@@ -131,7 +134,8 @@ function ExplorerTopGrid({
         allViolations={d.allViolations}
         totalCompliant={d.totalCompliant}
         sev={d.severityCounts}
-        deltas={chipDeltas(sinceBaseline ? sumSinceBaseline({ entry: sinceBaseline }) : null)}
+        scoreDelta={periodDeltas.score}
+        deltas={periodDeltas.chips}
         density={buildHeadline([dimensionHeadlineInput(d.allViolations, d.severityCounts, d.evalData)]).density}
         onSeverityBadge={onSeverityBadge}
         onNavigate={onNavigate}
@@ -157,17 +161,25 @@ function ExplorerPageBody({
   isRefreshing, dim, standardDescription, activeDateLabel, activeRunId, overallScoreNum, d,
   onSeverityBadge, onNavigate, handleCardNavigate, trend, granularity, onGranularityChange,
   setActiveRunId, setActiveDateLabel, radialPrinciples, onPrincipleClick, enrichedPrinciples,
-  sourceTab, project, sinceBaseline,
+  sourceTab, project,
 }) {
+  // The arrows on the title, the score and the chips: this dimension's
+  // change since the previous period of the chart's grouping, as of the
+  // run on show, the way the Overview's cards and hero read.
+  const periodDeltas = useMemo(
+    () => dimensionPeriodDeltas(trend, dim, granularity, activeRunId),
+    [trend, dim, granularity, activeRunId],
+  );
   return (
     <div className={`explorer-page dashboard-fade${isRefreshing ? ' section-pending' : ''}`}>
       <TermHeader
         name={dim} description={standardDescription} sub={activeDateLabel || activeRunId || null}
+        badge={periodDeltas.score !== null ? <TrendBadge delta={periodDeltas.score} /> : null}
         learnMore={onNavigate ? { label: t('helpHint.learnMore'), onClick: () => onNavigate(NAV_TAB.HELP, { section: HELP_SECTION.WHY_THIS_GRADE, dimension: dim }) } : undefined}
       />
 
       <ExplorerTopGrid
-        overallScoreNum={overallScoreNum} d={d} sinceBaseline={sinceBaseline} onSeverityBadge={onSeverityBadge} onNavigate={onNavigate}
+        overallScoreNum={overallScoreNum} d={d} periodDeltas={periodDeltas} onSeverityBadge={onSeverityBadge} onNavigate={onNavigate}
         handleCardNavigate={handleCardNavigate} trend={trend} granularity={granularity}
         onGranularityChange={onGranularityChange} setActiveRunId={setActiveRunId} setActiveDateLabel={setActiveDateLabel}
         activeRunId={activeRunId} radialPrinciples={radialPrinciples} onPrincipleClick={onPrincipleClick}
@@ -227,12 +239,11 @@ export default function ExplorerPage({
   selectedSource = PROJECT_SOURCE.LOCAL,
   onNavigate,
   refreshSignal,
-  trend = [],
+  trend: borrowedTrend = [],
   granularity = 'day',
   onGranularityChange,
-  sinceBaseline,
-  sinceBaselineRunId,
 }) {
+  const trend = useExplorerTrend(project, selectedSource, borrowedTrend);
   const {
     d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel,
     buildEvalPrincipal, dimFile, principleViews,
@@ -263,7 +274,6 @@ export default function ExplorerPage({
       setActiveRunId={setActiveRunId} setActiveDateLabel={setActiveDateLabel}
       radialPrinciples={radialPrinciples} onPrincipleClick={onPrincipleClick} enrichedPrinciples={enrichedPrinciples}
       sourceTab={sourceTab} project={project}
-      sinceBaseline={sinceBaselineFor(sinceBaseline, dim, { runId: activeRunId, baselineRunId: sinceBaselineRunId })}
     />
   );
 }

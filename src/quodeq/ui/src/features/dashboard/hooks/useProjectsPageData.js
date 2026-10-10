@@ -151,6 +151,7 @@ function useEntryLists(projectsWithPublished, shared, filters) {
     filters: {
       location: shared.configured ? filters?.location : 'all',
       sort: filters?.sort,
+      dir: filters?.dir,
     },
   });
   return { allEntries, locationFilteredEntries };

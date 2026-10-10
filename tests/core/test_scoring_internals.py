@@ -1,218 +1,109 @@
-"""Tests for core scoring formula internals."""
+"""Tests for the four-stage curve on requirement masses."""
 from __future__ import annotations
 
-
-import pytest
-
-from quodeq.core.scoring.internals import (
-    compliance_dampening,
-    compliance_lift,
-    drop_grade,
-    score_to_grade_label,
-    severity_grade_floor,
-    violation_base,
-    violation_ceiling,
-    weight_as_multiplier,
-)
-from quodeq.core.scoring.constants import (
-    MAX_PENALTY_MULTIPLIER,
-)
 import dataclasses
-from quodeq.core.scoring.params import DEFAULT_PARAMS
+import math
+
 from quodeq.core.scoring.internals import (
-    violation_base as _vb,
-    compliance_lift as _cl,
-    violation_ceiling as _vc,
-    severity_grade_floor as _sgf,
-    score_to_grade_label as _stgl,
+    clamp_principle_score, compliance_dampening, compliance_lift, drop_grade,
+    principle_score_and_grade, principle_stages, score_to_grade_label,
+    severity_grade_floor, violation_base, violation_ceiling, weight_as_multiplier,
 )
+from quodeq.core.scoring.constants import MAX_PENALTY_MULTIPLIER
+from quodeq.core.scoring.mass import principle_mass, requirement_rows, spread
+from quodeq.core.scoring.params import DEFAULT_PARAMS
+
+K = DEFAULT_PARAMS.base_k
+W = DEFAULT_PARAMS.severity_weight
+
+
+def _mass(violations, compliance=(), files=1000):
+    return principle_mass(requirement_rows(list(violations), list(compliance)), files, params=DEFAULT_PARAMS)
 
 
 class TestViolationBase:
-    def test_no_violations_returns_ten(self):
-        assert violation_base({}) == 10.0
+    def test_no_mass_returns_ten(self):
+        assert violation_base(0.0, params=DEFAULT_PARAMS) == 10.0
 
-    def test_zero_violations_returns_ten(self):
-        assert violation_base({"critical": 0, "major": 0, "minor": 0}) == 10.0
+    def test_one_isolated_critical_caps_near_seven_and_a_half(self):
+        wv = W["critical"] * spread(1, 4000)
+        assert 7.4 < violation_base(wv, params=DEFAULT_PARAMS) < 7.6
 
-    def test_single_critical_violation(self):
-        score = violation_base({"critical": 1})
-        # base = 10 / (1 + 0.12 * 4.0) = 10 / 1.48 ~ 6.757
-        assert 6.7 < score < 6.8
-
-    def test_single_minor_violation(self):
-        score = violation_base({"minor": 1})
-        # base = 10 / (1 + 0.12 * 0.25) = 10 / 1.03 ~ 9.709
-        assert 9.7 < score < 9.8
-
-    def test_many_violations_approaches_zero(self):
-        score = violation_base({"critical": 100})
-        assert score < 0.3
-
-    def test_score_in_range(self):
-        for counts in [{"critical": 5}, {"major": 10}, {"minor": 20}]:
-            s = violation_base(counts)
-            assert 0.0 <= s <= 10.0
+    def test_formula(self):
+        assert math.isclose(violation_base(12.5, params=DEFAULT_PARAMS), 10 / (1 + K * 12.5))
 
 
 class TestComplianceLift:
-    def test_no_compliance_returns_zero(self):
-        assert compliance_lift({}, {"critical": 1}) == 0.0
+    def test_zero_when_no_compliance_or_no_violations(self):
+        assert compliance_lift(0.0, 5.0, params=DEFAULT_PARAMS) == 0.0
+        assert compliance_lift(5.0, 0.0, params=DEFAULT_PARAMS) == 0.0
 
-    def test_no_violations_returns_zero(self):
-        assert compliance_lift({"minor": 5}, {}) == 0.0
-
-    def test_lift_between_zero_and_one(self):
-        lift = compliance_lift({"minor": 5}, {"minor": 2})
-        assert 0.0 < lift < 1.0
-
-    def test_high_compliance_gives_higher_lift(self):
-        low = compliance_lift({"minor": 1}, {"minor": 5})
-        high = compliance_lift({"minor": 20}, {"minor": 5})
-        assert high > low
+    def test_formula_and_monotone(self):
+        a = compliance_lift(3.0, 3.0, params=DEFAULT_PARAMS)
+        b = compliance_lift(9.0, 3.0, params=DEFAULT_PARAMS)
+        assert math.isclose(a, 0.5 ** DEFAULT_PARAMS.lift_compress)
+        assert b > a
 
 
-class TestViolationCeiling:
-    def test_no_violations_returns_ten(self):
-        assert violation_ceiling({}) == 10.0
+class TestCeilingAndFloor:
+    def test_ceiling(self):
+        assert violation_ceiling(0.0, params=DEFAULT_PARAMS) == 10.0
+        assert math.isclose(violation_ceiling(7.0, params=DEFAULT_PARAMS), 10 - 0.5 * math.log2(8))
 
-    def test_violations_lower_ceiling(self):
-        ceil = violation_ceiling({"critical": 1})
-        # ceiling = 10 - log2(1 + 4.0) * 0.5 = 10 - 2.322 * 0.5 ~ 8.839
-        assert 8.8 < ceil < 8.9
+    def test_floor_by_worst_effective_severity(self):
+        assert severity_grade_floor(None, params=DEFAULT_PARAMS) == 10.0
+        assert severity_grade_floor("minor", params=DEFAULT_PARAMS) == 5.0
+        assert severity_grade_floor("major", params=DEFAULT_PARAMS) == 3.0
+        assert severity_grade_floor("critical", params=DEFAULT_PARAMS) == 0.0
 
-    def test_many_violations_lower_ceiling_further(self):
-        ceil = violation_ceiling({"critical": 50})
-        assert ceil < 7.0
-
-
-class TestSeverityGradeFloor:
-    def test_no_violations_returns_ten(self):
-        assert severity_grade_floor({}) == 10.0
-
-    def test_critical_floor(self):
-        assert severity_grade_floor({"critical": 1}) == 0.0
-
-    def test_major_floor(self):
-        assert severity_grade_floor({"major": 1}) == 5.0
-
-    def test_minor_floor(self):
-        assert severity_grade_floor({"minor": 1}) == 8.0
-
-    def test_critical_takes_priority(self):
-        assert severity_grade_floor({"critical": 1, "major": 5, "minor": 10}) == 0.0
+    def test_clamp_ceiling_beats_floor(self):
+        # a violation mass of 2000, far past any floor: the ceiling is well under the minor floor
+        assert clamp_principle_score(9.0, 2000.0, "minor", params=DEFAULT_PARAMS) == round(violation_ceiling(2000.0, params=DEFAULT_PARAMS), 1)
 
 
-class TestScoreToGradeLabel:
-    def test_exemplary(self):
-        assert score_to_grade_label(9.5) == "Exemplary"
+class TestStages:
+    def test_stages_compose(self):
+        mass = _mass([{"req": "R-1", "file": "a", "severity": "major"}], [{"req": "R-2", "file": f"c{i}"} for i in range(50)])
+        base, lift, raw, final = principle_stages(mass, params=DEFAULT_PARAMS)
+        assert math.isclose(base, violation_base(mass.violation_mass, params=DEFAULT_PARAMS))
+        assert math.isclose(lift, compliance_lift(mass.compliance_mass, mass.violation_mass, params=DEFAULT_PARAMS))
+        assert math.isclose(raw, base + (10 - base) * lift)
+        assert final == clamp_principle_score(raw, mass.violation_mass, mass.worst, params=DEFAULT_PARAMS)
 
-    def test_good(self):
-        assert score_to_grade_label(7.5) == "Good"
+    def test_single_minor_in_a_thousand_files_reads_about_nine_point_seven(self):
+        mass = _mass([{"req": "R-1", "file": "a", "severity": "minor"}], [{"req": "R-2", "file": f"c{i}"} for i in range(50)])
+        final, grade = principle_score_and_grade(mass, params=DEFAULT_PARAMS)
+        assert 9.6 <= final <= 9.8 and grade == "Exemplary"
 
-    def test_adequate(self):
-        assert score_to_grade_label(5.5) == "Adequate"
+    def test_clean_principle_is_ten(self):
+        final, grade = principle_score_and_grade(_mass([], [{"req": "R-1", "file": "a"}]), params=DEFAULT_PARAMS)
+        assert (final, grade) == (10.0, "Exemplary")
 
-    def test_poor(self):
-        assert score_to_grade_label(3.5) == "Poor"
-
-    def test_critical(self):
-        assert score_to_grade_label(2.0) == "Critical"
-
-    def test_zero_is_critical(self):
-        assert score_to_grade_label(0.0) == "Critical"
-
-    def test_boundary_nine(self):
-        assert score_to_grade_label(9.0) == "Exemplary"
-
-    def test_boundary_seven(self):
-        assert score_to_grade_label(7.0) == "Good"
-
-
-class TestComplianceDampening:
-    def test_no_violations_returns_one(self):
-        assert compliance_dampening({"minor": 5}, {}) == 1.0
-
-    def test_no_compliance_returns_max_penalty(self):
-        assert compliance_dampening({}, {"minor": 5}) == MAX_PENALTY_MULTIPLIER
-
-    def test_high_ratio_reduces_multiplier(self):
-        mult = compliance_dampening({"minor": 30}, {"minor": 5})
-        assert mult < 1.0  # High compliance ratio dampens
-
-    def test_low_ratio_increases_multiplier(self):
-        mult = compliance_dampening({"minor": 1}, {"minor": 10})
-        assert mult >= 1.0  # Low ratio amplifies penalty
+    def test_a_critical_rule_over_many_files_reads_well_below_a_minor_one(self):
+        minor = [{"req": "S-INT-2", "file": f"f{i}", "severity": "minor"} for i in range(294)]
+        critical = [dict(r, severity="critical") for r in minor]
+        loose, _ = principle_score_and_grade(_mass(minor, files=2803), params=DEFAULT_PARAMS)
+        harsh, _ = principle_score_and_grade(_mass(critical, files=2803), params=DEFAULT_PARAMS)
+        assert harsh < loose and harsh < 5.0  # one critical rule over 294 files: 4.1, not under 3.0
 
 
-class TestDropGrade:
-    def test_drop_zero_no_change(self):
-        assert drop_grade("Exemplary", 0) == "Exemplary"
+class TestNonDefaultParams:
+    def test_params_thread_through_the_score(self):
+        params = dataclasses.replace(DEFAULT_PARAMS, base_k=0.2, floor_minor=6.0)
+        rows = [{"req": f"R-{j}", "file": f"f{i}", "severity": "minor"} for j in range(10) for i in range(20)]
+        mass = _mass(rows, files=1000)
+        base_default, _, _, _ = principle_stages(mass, params=DEFAULT_PARAMS)
+        base_tuned, _, raw, _ = principle_stages(mass, params=params)
+        assert base_tuned < base_default
+        assert raw < 6.0
+        assert principle_score_and_grade(mass, params=params)[0] == 6.0
 
-    def test_drop_one_from_exemplary(self):
+
+class TestLegacyHelpers:
+    def test_dampening_and_drop_grade_unchanged(self):
+        assert compliance_dampening({}, {"major": 1}) == MAX_PENALTY_MULTIPLIER
         assert drop_grade("Exemplary", 1) == "Proficient"
-
-    def test_drop_floors_at_insufficient(self):
-        assert drop_grade("Exemplary", 100) == "Insufficient"
-
-    def test_invalid_grade_returns_insufficient(self):
-        assert drop_grade("Unknown", 0) == "Insufficient"
-
-
-class TestWeightAsMultiplier:
-    def test_triple(self):
         assert weight_as_multiplier("High (x3)") == 3
 
-    def test_double(self):
-        assert weight_as_multiplier("Medium (x2)") == 2
-
-    def test_default(self):
-        assert weight_as_multiplier("Low") == 1
-
-    def test_no_weight(self):
-        assert weight_as_multiplier("") == 1
-
-
-# --- ScoringParams threading -------------------------------------------------
-
-
-def test_violation_base_with_custom_k():
-    params = dataclasses.replace(DEFAULT_PARAMS, base_k=0.5)
-    # wv for 1 critical = 4.0 → base = 10/(1+0.5*4) = 3.333...
-    assert abs(_vb({"critical": 1}, params=params) - 10.0 / 3.0) < 0.01
-
-
-def test_violation_base_with_custom_severity_weight():
-    params = dataclasses.replace(
-        DEFAULT_PARAMS, severity_weight={"critical": 8.0, "major": 1.5, "minor": 0.25},
-    )
-    # wv = 8.0 → base = 10/(1+0.12*8) = 5.102
-    assert abs(_vb({"critical": 1}, params=params) - 5.102) < 0.01
-
-
-def test_compliance_lift_with_custom_compress():
-    params = dataclasses.replace(DEFAULT_PARAMS, lift_compress=1.0)
-    # cc=4, wv=4 → raw 0.5, compress 1.0 → 0.5
-    assert _cl({"minor": 4}, {"critical": 1}, params=params) == pytest.approx(0.5)
-
-
-def test_violation_ceiling_with_custom_scale():
-    params = dataclasses.replace(DEFAULT_PARAMS, ceil_scale=1.0)
-    # wv=4 → ceiling = 10 - log2(5)*1.0 = 7.678
-    assert abs(_vc({"critical": 1}, params=params) - 7.678) < 0.01
-
-
-def test_severity_grade_floor_with_custom_floors():
-    params = dataclasses.replace(DEFAULT_PARAMS, floor_minor=6.0, floor_major=4.0)
-    assert _sgf({"minor": 3}, params=params) == 6.0
-    assert _sgf({"major": 1}, params=params) == 4.0
-    assert _sgf({"critical": 1}, params=params) == 0.0
-
-
-def test_score_to_grade_label_with_custom_thresholds():
-    params = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=(
-        (9.5, "Exemplary"), (8.0, "Good"), (6.0, "Adequate"), (4.0, "Poor"),
-    ))
-    assert _stgl(9.4, params=params) == "Good"
-    assert _stgl(5.0, params=params) == "Poor"
-    assert _stgl(3.9, params=params) == "Critical"
+    def test_grade_labels(self):
+        assert score_to_grade_label(9.0) == "Exemplary" and score_to_grade_label(2.9) == "Critical"

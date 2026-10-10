@@ -125,3 +125,9 @@ def register_grade_formula_routes(
     @app.post("/api/grade-formula/preview")
     def preview_grade_formula() -> Response | tuple[Response, int]:
         return _preview_response()
+
+    @app.post("/api/grade-formula/rescore")
+    def rescore_grade_formula() -> tuple[Response, int]:
+        """Run the pass again with the params saved now: the retry after a failed pass."""
+        snap = job.request(Path(reports_dir()))
+        return jsonify(_state_payload(snap)), HTTPStatus.ACCEPTED

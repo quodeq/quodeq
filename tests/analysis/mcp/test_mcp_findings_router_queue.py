@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.analysis.mcp.args import parse_args
+from quodeq.data.fs.run_files import read_queue_state
 
 from tests._analysis_helpers import _make_request, _run_server
 
@@ -98,8 +99,7 @@ class TestGetNextFiles:
             str(qp),
             agent_id="agent-42",
         )
-        q = FileQueue(qp)
-        log = q.taken_log()
+        log = read_queue_state(qp)["taken"]
         assert len(log) == 1
         assert log[0]["agent"] == "agent-42"
 

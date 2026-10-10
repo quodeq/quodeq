@@ -61,19 +61,22 @@ export const projectKeys = {
   all: () => [PROJECT_SCOPE],
   project: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source),
   scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || LATEST_RUN_ID),
-  // Detail /scores deferred, per finding kind (violation | compliance).
-  findingDetail: (projectId, asOf, kind, dimension, generation, scope = {}) => projectScope(
-    projectId, DEFAULT_PROJECT_SOURCE, "findingDetail", kind, asOf || LATEST_RUN_ID, dimension, generation,
+  // Detail /scores deferred, per finding kind (violation | compliance). Keyed
+  // on content (as-of run, dimension, scope), not on the /scores response it
+  // was fetched for: the next response's items read the same rows, and an
+  // invalidation of the project subtree refetches them in place.
+  findingDetail: (projectId, asOf, kind, dimension, scope = {}) => projectScope(
+    projectId, DEFAULT_PROJECT_SOURCE, "findingDetail", kind, asOf || LATEST_RUN_ID, dimension,
     scope.principle ?? null, scope.pathPrefix ?? null,
   ),
-  complianceDetail: (projectId, asOf, dimension, generation, scope = {}) =>
-    projectKeys.findingDetail(projectId, asOf, FINDING_TYPE.COMPLIANCE, dimension, generation, scope),
+  complianceDetail: (projectId, asOf, dimension, scope = {}) =>
+    projectKeys.findingDetail(projectId, asOf, FINDING_TYPE.COMPLIANCE, dimension, scope),
   // Detail /scores/<run> deferred: one run's lists, on either source. Takes
   // the ref a run finding carries (api/complianceDetail.js) plus the kind
   // and the request scope.
-  runFindingDetail: ({ project, run, dimension, generation, source = DEFAULT_PROJECT_SOURCE }, kind, scope = {}) =>
+  runFindingDetail: ({ project, run, dimension, source = DEFAULT_PROJECT_SOURCE }, kind, scope = {}) =>
     projectScope(
-      project, source, "runFindingDetail", kind, run, dimension, generation,
+      project, source, "runFindingDetail", kind, run, dimension,
       scope.principle ?? null, scope.pathPrefix ?? null,
     ),
   dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) =>
@@ -92,6 +95,10 @@ export const projectKeys = {
   // merge. Both sit inside the project subtree on purpose, so every existing
   // mutation invalidation (dismiss/delete/formula reconcile) reaches them.
   runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runScores", run || LATEST_RUN_ID),
+  // The Dismissed tab's list. In the project subtree so the reconcile after
+  // a suppression mutation refreshes it; the dismiss flow prepends the entry
+  // the server answers with (see api/dismissedListCache.js).
+  dismissed: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dismissed"),
   // Compare tab's slim per-project payload. Lives inside the project subtree
   // on purpose: dismiss/delete/formula invalidations must reach it, or the
   // fleet table would keep showing pre-dismissal scores.
@@ -157,6 +164,9 @@ export const projectsKeys = {
   all: () => [PROJECTS_SCOPE],
   list: () => [PROJECTS_SCOPE, LIST_KEY],
   clone: () => [PROJECTS_SCOPE, CLONE_KEY],
+  // The server's warm-up snapshot that rode on the last list response
+  // (features/rebuild/warmupSnapshot.js); never fetched on its own.
+  warmup: () => [PROJECTS_SCOPE, "warmup"],
 };
 
 const STANDARDS_SCOPE = "standards"; // query-key prefix for the standardsKeys.* subtree below

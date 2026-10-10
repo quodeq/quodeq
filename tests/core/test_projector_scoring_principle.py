@@ -1,54 +1,26 @@
-"""Unit tests for canonical projector_scoring — compute_principle_grade.
-
-Split from test_projector_scoring.py. Shared `_f` finding builder lives in
-tests/core/_projector_scoring_fixtures.py.
-"""
+"""compute_principle_grade: thin evidence is scored and marked, classes pin severity."""
 from __future__ import annotations
 
-from quodeq.core.scoring.projector_scoring import compute_principle_grade
+from quodeq.core.scoring.projector_scoring import PrincipleGradeScale, compute_principle_grade
 
 from tests.core._projector_scoring_fixtures import _f
 
 
-def test_compute_principle_grade_single_violation_is_insufficient() -> None:
-    """One finding total is below the medium-confidence threshold; the
-    projector must short-circuit to Insufficient to match the CLI engine's
-    ``core.scoring._principle._score_numerical`` behaviour. Previously this
-    came out as a real score, which is what made the SQL grade tables
-    disagree with the CLI's evaluation JSON."""
-    finding = _f("R1", "P1", severity="high", verdict="violation")
-
-    result = compute_principle_grade(
-        principle_id="P1", findings=[finding], compliance=[],
-    )
-
-    assert result["principle_id"] == "P1"
-    assert result["grade"] == "Insufficient"
-    assert result["score"] is None
+def test_single_violation_is_scored_with_low_confidence() -> None:
+    result = compute_principle_grade(principle_id="P1", findings=[_f("R1", "P1", severity="critical")], compliance=[])
+    assert result["grade"] != "Insufficient" and result["score"] is not None
+    assert result["confidence"] == "low" and result["observation"] > 0
     assert result["finding_count"] == 1
-    assert result["dismissed_count"] == 0
 
 
-def test_compute_principle_grade_sufficient_evidence_scores_normally() -> None:
-    """With enough findings to clear the confidence floor, scoring runs."""
-    findings = [_f(f"R{i}", "P1", severity="medium") for i in range(5)]
-
-    result = compute_principle_grade(
-        principle_id="P1", findings=findings, compliance=[],
-    )
-
-    assert result["grade"] != "Insufficient"
-    assert result["score"] is not None
-    assert result["finding_count"] == 5
+def test_nothing_at_all_is_insufficient() -> None:
+    dismissed = [_f("R1", "P1", "major", "dismissed", "a.py"), _f("R2", "P1", "minor", "dismissed", "b.py")]
+    result = compute_principle_grade(principle_id="P1", findings=[], compliance=[], dismissed=dismissed)
+    assert (result["grade"], result["score"], result["dismissed_count"]) == ("Insufficient", None, 2)
 
 
-def test_compute_principle_grade_only_dismissed_returns_insufficient() -> None:
-    """Caller filters by verdict != 'dismissed' before passing; this models the case
-    where the only findings for a principle were dismissed."""
-    result = compute_principle_grade(
-        principle_id="P1", findings=[], compliance=[], dismissed_count=2,
-    )
-
-    assert result["grade"] == "Insufficient"
-    assert result["score"] is None
-    assert result["dismissed_count"] == 2
+def test_unknown_project_size_scores_like_the_unspread_formula() -> None:
+    findings = [_f("R1", "P1", severity="major", file=f"f{i}.py") for i in range(30)]
+    spread_on = compute_principle_grade(principle_id="P1", findings=findings, compliance=[], scale=PrincipleGradeScale(source_file_count=100))["score"]
+    spread_off = compute_principle_grade(principle_id="P1", findings=findings, compliance=[], scale=PrincipleGradeScale(source_file_count=0))["score"]
+    assert spread_off > spread_on

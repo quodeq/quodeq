@@ -41,6 +41,25 @@ def test_miss_returns_pending_without_computing(tmp_path, monkeypatch):
     assert (grade, score, files, pending) == (None, None, None, True)
 
 
+def test_miss_answers_the_last_known_summary_still_pending(tmp_path, monkeypatch):
+    """After a formula change or an upgrade the version moves and every row
+    misses; the previous row is still the best number to show, dimmed, so
+    the card is not blank while the warm-up rebuilds it. It stays pending:
+    the list keeps polling until the rebuilt row lands."""
+    from quodeq.data.sqlite.score_cache_db import open_score_cache
+    from quodeq.data.sqlite.score_cache_store import write_cached_project_summary
+
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    _project(tmp_path)
+    with open_score_cache() as conn:
+        write_cached_project_summary(conn, "proj", "stale-version", {"grade": "B", "score": 7.4, "files": 12})
+    with patch("quodeq.services._fs_metadata._compute_summary") as compute:
+        grade, score, files, pending = read_accumulated_summary(
+            tmp_path, "proj", _runs(), DEFAULT_PARAMS)
+    compute.assert_not_called()
+    assert (grade, score, files, pending) == ("B", 7.4, 12, True)
+
+
 def test_no_complete_runs_is_not_pending(tmp_path, monkeypatch):
     """A project with NO runs at all can never be warmed (warm_project_summary
     also requires at least one run), so it must never report pending -- there

@@ -1,11 +1,15 @@
 {
+  "dismissed_list_cold": {
+    "evaluation_db_opens": 1
+  },
+  "dismissed_list_warm": {},
   "overview_after_dismiss": {
     "actions_log_reads": 2,
     "eval_report_reads": 1
   },
   "overview_cold": {
-    "eval_report_reads": 13,
-    "evaluation_db_opens": 45
+    "eval_report_reads": 9,
+    "evaluation_db_opens": 36
   },
   "overview_warm": {}
 }

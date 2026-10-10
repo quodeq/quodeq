@@ -51,15 +51,20 @@ export function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, 
   );
 }
 
-export function DetectedLine({ scanData }) {
+// One count: the files the evaluation dispatches (what the cards count too),
+// or the scan's own count until the estimates land. The languages go by
+// name: the scan's per-language counts use another definition of source
+// file and would not add up to it.
+export function DetectedLine({ scanData, estimates = null }) {
   const s = createScanSummary(scanData);
   if (!s || !(s.codeFiles > 0)) return null;
   const langs = detectedLanguages(s.languages);
+  const count = estimates?.projectFiles > 0 ? estimates.projectFiles : s.codeFiles;
   return (
     <div className="eval-detected-line">
-      {t('evaluate.detectedSourceFiles', { count: formatCount(s.codeFiles) })}
-      {langs.map(({ name, count }) => (
-        <span key={name}> · {name} {formatCount(count)}</span>
+      {t('evaluate.sourceFiles', { count: formatCount(count) })}
+      {langs.map(({ name }) => (
+        <span key={name}> · {name}</span>
       ))}
     </div>
   );
@@ -102,52 +107,52 @@ export function BudgetChips({ valueS, onChange, disabled }) {
   );
 }
 
-function runBarLine1({ picked, scanFiles, isClean, budgetPart }) {
+function runBarLine1({ picked, budgetPart }) {
   if (picked === 0) return t('evaluate.noDimsSelected');
-  return [
-    t(pluralKey(picked, 'evaluate.dimSingular', 'evaluate.dimPlural'), { count: picked }),
-    scanFiles != null
-      ? (isClean
-          ? t('evaluate.filesFullRescan', { count: formatCount(scanFiles) })
-          : t('evaluate.changedFilesThisRun', { count: formatCount(scanFiles) }))
-      : null,
-    budgetPart,
-  ].filter(Boolean).join(' · ');
+  return `${t(pluralKey(picked, 'evaluate.dimSingular', 'evaluate.dimPlural'), { count: picked })} · ${budgetPart}`;
 }
 
-// The second line of the run bar: what still stands between the user and a
-// scan. A missing model comes first (the strip's model cell is marked for
-// it), then the dimensions, then the queued file count.
-function runBarLine2({ hasModel, picked, pickedSum }) {
+// The second line, only when something stands between the user and a scan:
+// a missing model (the strip's model cell is marked for it), no dimension,
+// or nothing to analyze in an incremental scan.
+function runBarLine2({ hasModel, picked, nothingToDo }) {
   if (!hasModel) return t('evaluate.noModelHint');
   if (picked === 0) return t('evaluate.pickOneDim');
-  return pickedSum != null ? t('evaluate.fileAnalysesQueued', { count: formatCount(pickedSum) }) : t('evaluate.durationDepends');
+  return nothingToDo ? t('evaluate.pickCleanScan') : null;
+}
+
+// What the button says after "scan": the files it will analyze, "up to
+// date" when there are none, nothing before the estimates land.
+function scanCountLabel(pickedSum, nothingToDo) {
+  if (pickedSum == null) return null;
+  return nothingToDo ? t('evaluate.scanUpToDate') : t('evaluate.scanFiles', { count: formatCount(pickedSum) });
 }
 
 export function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, cleanScan, timeLimitS, hasModel = true }) {
   const picked = selectedDims.size;
   const isClean = cleanScan !== CLEAN_PERSIST.OFF;
-  const scanFiles = estimates ? (isClean ? estimates.projectFiles : estimates.changedFiles) : null;
   const pickedSum = queuedFileAnalyses(selectedDims, estimates, isClean);
+  // A clean scan re-reads every file, so it always has work.
+  const nothingToDo = !isClean && picked > 0 && pickedSum === 0;
 
   const budgetPart = timeLimitS > 0 ? t('evaluate.totalBudget', { label: formatBudgetLabel(timeLimitS) }) : t('evaluate.noTimeLimit');
-  const line1 = runBarLine1({ picked, scanFiles, isClean, budgetPart });
-  const line2 = runBarLine2({ hasModel, picked, pickedSum });
+  const line2 = runBarLine2({ hasModel, picked, nothingToDo });
+  const countLabel = scanCountLabel(pickedSum, nothingToDo);
 
   return (
     <div className="eval-run-bar">
       <span className="eval-run-bar__summary">
-        {line1}
-        <br />
-        <span className="eval-run-bar__summary-sub">{line2}</span>
+        {runBarLine1({ picked, budgetPart })}
+        {line2 && <><br /><span className="eval-run-bar__summary-sub">{line2}</span></>}
       </span>
-      <button
-        type="button"
-        className="term-btn term-btn--primary term-btn--filled eval-run-bar__scan"
-        disabled={!canStart}
-        onClick={handleScan}
-      >
-        {disabled ? t('evaluate.running') : (<><span aria-hidden="true">▸</span> {t('evaluate.scanBtn')}</>)}
+      <button type="button" className="eval-scan-pill" disabled={!canStart || nothingToDo} onClick={handleScan}>
+        {disabled ? t('evaluate.running') : (
+          <>
+            <span className="eval-scan-pill__glyph" aria-hidden="true">▶</span>
+            {t('evaluate.scanBtn')}
+            {countLabel && <span className="eval-scan-pill__count">{countLabel}</span>}
+          </>
+        )}
       </button>
     </div>
   );

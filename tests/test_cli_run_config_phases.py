@@ -81,7 +81,6 @@ class TestBuildAnalysisOptions:
             env={},
         )
         resolved = RunConfigLocals(
-            consolidated=False,
             effective_ai_model="claude-3",
             subagent_model="ollama/llama3",
             diff_from="HEAD~1",
@@ -94,7 +93,6 @@ class TestBuildAnalysisOptions:
         assert options.ai_model == "claude-3"
         assert options.dimensions == ["security"]
         assert options.subagent_model == "ollama/llama3"
-        assert options.consolidated is False
         assert options.diff_from == "HEAD~1"
         assert options.incremental_file_filter == {"a.py"}
         assert options.skip_scoring is True

@@ -1,54 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { trendDomain, monotonePath } from './compareTrendModel.js';
-import { scoreDomain } from '../../components/scoreChartHelpers.js';
-
-// ---------------------------------------------------------------------------
-// trendDomain
-// ---------------------------------------------------------------------------
-
-test('trendDomain: value bounds delegate to scoreDomain (dedup with the score charts)', () => {
-  const a = [{ dateISO: '2024-01-01', value: 6.9 }, { dateISO: '2024-02-01', value: 7.7 }];
-  const b = [{ dateISO: '2024-01-15', value: 8.2 }];
-  const { v0, v1 } = trendDomain([a, b]);
-  assert.deepEqual([v0, v1], scoreDomain([6.9, 7.7, 8.2]));
-});
-
-test('trendDomain: time bounds span the min/max timestamp across both series', () => {
-  const a = [{ dateISO: '2024-03-01', value: 7 }];
-  const b = [{ dateISO: '2024-01-01', value: 7 }, { dateISO: '2024-06-01', value: 7 }];
-  const { t0, t1 } = trendDomain([a, b]);
-  assert.equal(t0, Date.parse('2024-01-01'));
-  assert.equal(t1, Date.parse('2024-06-01'));
-});
-
-test('trendDomain: flattens the series once, deriving times and values from one pass', () => {
-  // Both axes come from the same flattened list; a second flat() would redo
-  // the allocation on every render of the duel trend.
-  let flatCalls = 0;
-  const a = [{ dateISO: '2024-01-01', value: 6 }];
-  const b = [{ dateISO: '2024-02-01', value: 8 }];
-  const series = { flat: () => { flatCalls += 1; return [...a, ...b]; } };
-  const { t0, t1, v0, v1 } = trendDomain(series);
-  assert.equal(flatCalls, 1);
-  assert.deepEqual([t0, t1], [Date.parse('2024-01-01'), Date.parse('2024-02-01')]);
-  assert.deepEqual([v0, v1], scoreDomain([6, 8]));
-});
-
-test('trendDomain: returns an explicit empty domain (not Infinity/-Infinity) for an empty combined series', () => {
-  const domain = trendDomain([[], []]);
-  assert.deepEqual(domain, { t0: null, t1: null, v0: null, v1: null });
-});
-
-test('trendDomain: an unparseable dateISO produces a NaN time bound (documents why callers must check Number.isFinite, not == null)', () => {
-  const a = [{ dateISO: 'not-a-date', value: 7 }, { dateISO: '2024-02-01', value: 7.5 }];
-  const { t0, t1 } = trendDomain([a, []]);
-  assert.ok(Number.isNaN(t0));
-  assert.ok(Number.isNaN(t1));
-  // NaN is not loosely equal to null (Node's assert.notEqual uses `!=`) --
-  // a caller guarding with `== null` would miss this case.
-  assert.notEqual(t0, null);
-});
+import { monotonePath, monotoneAt, smoothSeries, stepValueAt } from './compareTrendModel.js';
 
 // ---------------------------------------------------------------------------
 // monotonePath — exact `d`-string (rounding + spline math frozen)
@@ -103,4 +55,35 @@ test('monotonePath: a 50-point series starts at the first point and emits one cu
   assert.ok(result.startsWith('M0.0,10.0'));
   assert.ok(result.includes(' C'));
   assert.equal(result.split(' C').length - 1, 49); // one C-segment per point pair
+});
+
+// ---------------------------------------------------------------------------
+// monotoneAt / smoothSeries / stepValueAt
+// ---------------------------------------------------------------------------
+
+test('monotoneAt: passes through every point and is null outside the span', () => {
+  const pts = [[0, 10], [10, 20], [20, 15], [30, 30]];
+  for (const [x, y] of pts) assert.ok(Math.abs(monotoneAt(pts, x) - y) < 1e-9);
+  assert.equal(monotoneAt(pts, -1), null);
+  assert.equal(monotoneAt(pts, 31), null);
+});
+
+test('monotoneAt: never overshoots a peak', () => {
+  const pts = [[0, 0], [10, 10], [20, 0]];
+  for (let x = 0; x <= 20; x += 0.5) assert.ok(monotoneAt(pts, x) <= 10 + 1e-9);
+});
+
+test('smoothSeries: lags the raw values but pins the last point to the real score', () => {
+  const day = 86400000;
+  const out = smoothSeries([{ t: 0, v: 5 }, { t: day, v: 9 }, { t: 2 * day, v: 9 }, { t: 3 * day, v: 4 }], 7 * day);
+  assert.equal(out[0].v, 5);
+  assert.ok(out[1].v > 5 && out[1].v < 9);
+  assert.deepEqual(out.at(-1), { t: 3 * day, v: 4 });
+});
+
+test('stepValueAt: the value in force, null before the first point', () => {
+  const pts = [{ t: 10, v: 6 }, { t: 20, v: 8 }];
+  assert.equal(stepValueAt(pts, 5), null);
+  assert.equal(stepValueAt(pts, 15), 6);
+  assert.equal(stepValueAt(pts, 25), 8);
 });

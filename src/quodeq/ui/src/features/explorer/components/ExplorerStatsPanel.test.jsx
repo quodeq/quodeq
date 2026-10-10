@@ -86,3 +86,16 @@ describe('ExplorerStatsPanel severity badges', () => {
     expect(screen.getByText('EXEMPLARY').className).toContain('chip');
   });
 });
+
+describe('ExplorerStatsPanel score trend', () => {
+  it('shows the period delta as a trend badge beside the grade', () => {
+    render(<ExplorerStatsPanel {...baseProps} scoreDelta={-0.5} />);
+    const badge = document.querySelector('.acc-eval-sev-row .trend-badge');
+    expect(badge).toHaveTextContent('-0.5');
+  });
+
+  it('shows no badge without a previous period', () => {
+    render(<ExplorerStatsPanel {...baseProps} scoreDelta={null} />);
+    expect(document.querySelector('.trend-badge')).toBeNull();
+  });
+});

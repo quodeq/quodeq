@@ -15,7 +15,13 @@ from quodeq.services.shared_settings import SharedSettings, write_settings
 from tests.api.conftest import _make_origin
 
 
-def wait_shared_warmup_idle(timeout_s: float = 10.0) -> None:
+# A ceiling, not a delay: the wait returns as soon as the worker is idle. It
+# must cover a loaded Windows CI runner, where warming even the one-run
+# fixture (summary, scores and Overview) under xdist outlasted 10 s.
+_WARMUP_SETTLE_CEILING_S = 60.0
+
+
+def wait_shared_warmup_idle(timeout_s: float = _WARMUP_SETTLE_CEILING_S) -> None:
     """Block until the shared warm-up has no project queued or in flight.
 
     A cold shared card stays off the listing, and a cold shared Overview

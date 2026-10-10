@@ -13,6 +13,9 @@
  * @property {string[]}      logs
  * @property {string|null}   startedAt
  * @property {string|null}   endedAt
+ * @property {string|null}   commitSha      - The commit the run evaluates; null when unknown
+ * @property {string|null}   originUrl      - git origin of the run's project folder; null when unknown
+ * @property {object|null}   origin         - where the run came from ({kind: 'ci'|'cli', event, workflow, pr, prUrl, runUrl}); null when not recorded
  * @property {string|null}   deadlineAt     - ISO-8601 wall-clock deadline for the run; null when unlimited or not yet set
  * @property {number|null}   exitCode
  * @property {string|null}   error
@@ -54,6 +57,9 @@ const JOB_FIELDS = {
   source:           ['source', 'internal'],
   aiProvider:       [['ai_provider', 'aiProvider'], null],
   aiModel:          [['ai_model', 'aiModel'], null],
+  commitSha:        [['commit_sha', 'commitSha'], null],
+  originUrl:        ['originUrl', null],
+  origin:           ['origin', null],
 };
 
 // RunState values that have no JobStatus counterpart: the job is still going.
@@ -66,7 +72,7 @@ const RUN_STATE_IN_PROGRESS = new Set([RUN_STATE.PENDING, RUN_STATE.FINALIZING])
  */
 const STATUS_FRAME_FIELDS = Object.freeze([
   'jobId', 'status', 'phase', 'currentDimension', 'dimensions', 'startedAt',
-  'endedAt', 'deadlineAt', 'exitReason', 'aiProvider', 'aiModel', 'timeLimitS',
+  'endedAt', 'deadlineAt', 'exitReason', 'aiProvider', 'aiModel', 'timeLimitS', 'commitSha',
 ]);
 
 function timeLimitOf(raw) {

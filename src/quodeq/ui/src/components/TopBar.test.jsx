@@ -85,17 +85,14 @@ describe('TopBar evaluate and run state', () => {
     expect(onEvaluate).toHaveBeenCalledTimes(1);
   });
 
-  it('dims Evaluate and moves the click to the run chip while a run is live', () => {
+  it('replaces Evaluate with the run chip while a run is live', () => {
     const onEvaluate = vi.fn();
     renderTopBar({
       onEvaluate,
       evaluating: true,
       runProgress: { dimension: 'reliability', percent: 41 },
     });
-    const evalBtn = screen.getByRole('button', { name: 'Evaluate' });
-    expect(evalBtn).toHaveAttribute('aria-disabled', 'true');
-    fireEvent.click(evalBtn);
-    expect(onEvaluate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Evaluate' })).not.toBeInTheDocument();
 
     const chip = screen.getByRole('button', { name: /reliability/ });
     expect(chip).toHaveTextContent('41%');

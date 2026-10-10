@@ -22,7 +22,8 @@ from quodeq.core.evidence.parser import (
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
-from quodeq.services.wiring import evidence_file_size, load_compiled_refs, read_req_to_principle_map
+from quodeq.services.wiring import (
+    evidence_file_size, load_compiled_refs, read_req_to_principle_map)
 from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
@@ -68,17 +69,23 @@ def _apply_suppressions(
     evidence, dim_id: str, dismissed: set[tuple], deleted: set[tuple],
 ) -> int:
     """Drop dismissed/deleted violations from each principle's evidence in
-    place, and return how many violations that removed."""
+    place, and return how many violations that removed.
+
+    Dismissed ones move to ``pe.dismissed`` (still observed by the grade);
+    deleted ones are gone.
+    """
     excluded = 0
     for pe in evidence.principles.values():
-        kept = [
-            v for v in pe.violations
-            if not is_dismissed(dismissed, FindingRef(
-                req=v.get("req"), principle=pe.practice_id, file=v.get("file"),
-                line=v.get("line"), snippet=v.get("snippet")))
-            and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
-                               file=v.get("file"))
-        ]
+        kept: list[dict] = []
+        for v in pe.violations:
+            if is_deleted(deleted, dimension=dim_id, principle=pe.practice_id, file=v.get("file")):
+                continue
+            if is_dismissed(dismissed, FindingRef(
+                    req=v.get("req"), principle=pe.practice_id, file=v.get("file"),
+                    line=v.get("line"), snippet=v.get("snippet"))):
+                pe.dismissed.append(v)
+            else:
+                kept.append(v)
         excluded += len(pe.violations) - len(kept)
         pe.violations = kept
     return excluded
@@ -94,10 +101,13 @@ def _recompute_metrics(evidence, source_file_count: int) -> None:
         pe.compute_metrics(source_file_count=source_file_count)
 
 
-def _parse_evidence_jsonl(jsonl: Path, run_dir: Path, dim_id: str, request: EvidenceScoreRequest):
+def _parse_evidence_jsonl(
+    jsonl: Path, run_dir: Path, dim_id: str, request: EvidenceScoreRequest,
+    dirs: tuple[Path | None, Path | None],
+):
     """Parse the evidence jsonl into an Evidence object, or None on any
     parse failure (logged at warning)."""
-    compiled_dir, evaluators_dir = (request.standard_dirs_fn or standard_dirs)()
+    compiled_dir, evaluators_dir = dirs
     try:
         return parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
@@ -178,7 +188,8 @@ def rescore_dimension_from_evidence(
     jsonl = _resolve_evidence_jsonl(run_dir, dim_id)
     if jsonl is None or evidence_file_size(jsonl) == 0:
         return EvidenceRescore(None, 0)
-    evidence = _parse_evidence_jsonl(jsonl, run_dir, dim_id, request)
+    dirs = (request.standard_dirs_fn or standard_dirs)()
+    evidence = _parse_evidence_jsonl(jsonl, run_dir, dim_id, request, dirs)
     if evidence is None:
         return EvidenceRescore(None, 0)
 
@@ -186,7 +197,6 @@ def rescore_dimension_from_evidence(
     if excluded == 0 and not score_when_nothing_excluded:
         return EvidenceRescore(None, 0)
     _recompute_metrics(evidence, request.source_file_count)
-
     # Broad catch on purpose (mirrors mutation_rescore and the CLI print
     # guard): the engine can throw on edge-case evidence, and every consumer
     # (dashboard build, /api/rescore, trend fetcher) treats None as "fall back

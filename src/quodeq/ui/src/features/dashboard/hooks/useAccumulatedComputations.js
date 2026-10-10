@@ -150,6 +150,6 @@ export function useAccumulatedComputations(data) {
 
   return {
     currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend,
-    filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends,
+    filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends, visibleSet,
   };
 }

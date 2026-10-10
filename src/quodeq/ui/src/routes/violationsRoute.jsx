@@ -76,7 +76,6 @@ function buildViolationsData({ props, acc, dims }) {
     loading: props.dashboardData.loading,
     isFetching: props.dashboardData.isFetching,
     error: props.dashboardData.error,
-    dismissRefreshKey: props.dismissRefreshKey,
   };
 }
 
@@ -105,7 +104,6 @@ function makeNavigateToType({ dimMap, nav }) {
 function buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension, navigateToType }) {
   return {
     onTypeClick: navigateToType,
-    onBumpDismissRefresh: props.bumpDismissRefresh,
     onDimensionClick: (dim) => nav(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: NAV_TAB.VIOLATIONS }),
     onFileClick: (fileObj, opts) => nav(NAV_TAB.FILE, { file: fileObj, sourceTab: NAV_TAB.VIOLATIONS, severityFilter: opts?.severity || null }),
     onCellClick: ({ row, severity }) => {
@@ -138,7 +136,7 @@ function buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPri
 
 // dimension -> entry and "dimension\0principle" -> principle lookups for the
 // accumulated payload. ViolationsRoute re-renders on every parent state
-// change (dismissRefreshKey bumps, sub-tab flips) while `dims` is the same
+// change (sub-tab flips, reconcile refetches) while `dims` is the same
 // react-query array, so rebuilding these each render walked every principle
 // for nothing. Memoized by array identity in a WeakMap rather than useMemo:
 // ViolationsRoute is deliberately hook-free (the App tests invoke it as a

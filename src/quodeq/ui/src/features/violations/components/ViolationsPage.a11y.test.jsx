@@ -36,7 +36,6 @@ const DATA = {
   projectName: 'p1',
   loading: false,
   isFetching: false,
-  dismissRefreshKey: 0,
   selectedSource: 'local',
 };
 

@@ -37,7 +37,8 @@
             "mobile_ios": "accessibilityLabel on Image and icon buttons; Image(decorative:) or .accessibilityHidden(true) for decorative; UIKit isAccessibilityElement=false for decorative.",
             "web": "alt text on img; alt=\"\" for decorative; aria-label on icon-only buttons; aria-hidden=\"true\" on decorative svg."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-02",
@@ -106,7 +107,8 @@
             "mobile_ios": "AVPlayer legible media selection exposed; player controls accessible; no autoplay with sound without a pause control.",
             "web": "<track kind=\"captions\">, native or custom controls with labels, no autoplay with sound."
           },
-          "description": "WCAG level A. Verifiable from mixed code."
+          "description": "WCAG level A. Verifiable from mixed code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-03",
@@ -145,7 +147,8 @@
             "mobile_ios": ".accessibilityAddTraits(.isHeader) on section titles; .accessibilityLabeledPair for label and value; .accessibilityElement(children: .contain) for groups.",
             "web": "h1 to h6, ul/ol, table with th and scope, label for=id; no divs styled as headings."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-04",
@@ -178,7 +181,8 @@
             "mobile_ios": ".accessibilitySortPriority when visual order differs from element order; set accessibilityElements order on custom UIKit containers.",
             "web": "DOM order matches visual order; avoid CSS order or row-reverse reordering; no positive tabindex."
           },
-          "description": "WCAG level A. Verifiable from mixed code."
+          "description": "WCAG level A. Verifiable from mixed code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-05",
@@ -205,7 +209,8 @@
             "mobile_ios": "Errors carry text; selection exposed via .isSelected trait or accessibilityValue, not colour only.",
             "web": "aria-selected, aria-invalid plus visible text or icon; links distinguishable by more than colour."
           },
-          "description": "WCAG level A. Verifiable from mixed code."
+          "description": "WCAG level A. Verifiable from mixed code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-06",
@@ -226,7 +231,8 @@
             "mobile_ios": "Flag UISupportedInterfaceOrientations limited to portrait or supportedInterfaceOrientations overrides without essential reason.",
             "web": "No orientation media queries that hide functionality."
           },
-          "description": "WCAG level AA. Verifiable from source code."
+          "description": "WCAG level AA. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-07",
@@ -247,7 +253,8 @@
             "mobile_ios": ".textContentType(.emailAddress), .username, .password, .newPassword on the relevant fields.",
             "web": "autocomplete=\"email\", \"name\", \"current-password\" and friends on inputs."
           },
-          "description": "WCAG level AA. Verifiable from source code."
+          "description": "WCAG level AA. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-08",
@@ -274,7 +281,8 @@
             "mobile_ios": "Check asset-catalog colours for light and dark, text over imagery, secondary label colours.",
             "web": "Check CSS custom property pairs, placeholder colours, focus outlines against backgrounds."
           },
-          "description": "WCAG level AA. Verifiable from mixed code."
+          "description": "WCAG level AA. Verifiable from mixed code.",
+          "severity": "major"
         },
         {
           "id": "ACC-PER-09",
@@ -313,7 +321,8 @@
             "mobile_ios": "Dynamic Type via text styles or @ScaledMetric; no fixed frames around text; no .dynamicTypeSize cap below accessibility sizes on essential text; minimumScaleFactor only for non-essential text.",
             "web": "rem or em units, no fixed heights on text containers, reflow at 320 CSS px width and 400 percent zoom."
           },
-          "description": "WCAG level AA. Verifiable from source code."
+          "description": "WCAG level AA. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-10",
@@ -334,7 +343,8 @@
             "mobile_ios": "Same: text as Text, not in the asset.",
             "web": "Same: text as HTML, not in a bitmap; CSS for styling."
           },
-          "description": "WCAG level AA. Verifiable from mixed code."
+          "description": "WCAG level AA. Verifiable from mixed code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PER-11",
@@ -355,7 +365,8 @@
             "mobile_ios": "Custom popovers dismissible with escape action and not timed.",
             "web": "Custom tooltips: dismiss on Escape, stay while hovered, no title-attribute-only tooltips on essential info."
           },
-          "description": "WCAG level AA. Verifiable from source code."
+          "description": "WCAG level AA. Verifiable from source code.",
+          "severity": "minor"
         }
       ]
     },
@@ -395,7 +406,8 @@
             "mobile_ios": "Buttons and gestures have equivalents reachable with Full Keyboard Access; escape action closes modals; custom controls are .focusable().",
             "web": "No div onclick without tabindex and key handlers; modals trap focus inside but Escape closes them."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-OPR-02",
@@ -434,7 +446,8 @@
             "mobile_ios": ".swipeActions and drag gestures need matching .accessibilityAction(named:); no action on touchDown.",
             "web": "Drag and drop needs button alternatives; actions on click or keyup, not mousedown or pointerdown."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "major"
         },
         {
           "id": "ACC-OPR-03",
@@ -455,7 +468,8 @@
             "mobile_ios": "motionEnded shake handling needs a button equivalent and a setting.",
             "web": "DeviceMotionEvent triggers need a button equivalent."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-OPR-04",
@@ -476,7 +490,8 @@
             "mobile_ios": "Flag Button or onTapGesture on views framed under 44 pt without a larger .contentShape.",
             "web": "Flag icon buttons and inline controls under 24 CSS px; aim for 44."
           },
-          "description": "WCAG level AA. Verifiable from source code."
+          "description": "WCAG level AA. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-OPR-05",
@@ -503,7 +518,8 @@
             "mobile_ios": "Toasts with actions do not auto-dismiss; auto-advancing carousels pausable; no asyncAfter dismissing dialogs.",
             "web": "Toasts with actions persist; carousels have pause; setTimeout dismissals only for pure notices."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "major"
         },
         {
           "id": "ACC-OPR-06",
@@ -536,7 +552,8 @@
             "mobile_ios": "Check UIAccessibility.isReduceMotionEnabled or the accessibilityReduceMotion environment before parallax, autoplay and large transitions.",
             "web": "prefers-reduced-motion media query disables decorative animation and autoplay."
           },
-          "description": "WCAG level A. Verifiable from mixed code."
+          "description": "WCAG level A. Verifiable from mixed code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-OPR-07",
@@ -575,7 +592,8 @@
             "mobile_ios": "Post .screenChanged or .layoutChanged with the target element, or drive .accessibilityFocused; avoid resetting focus on data reload.",
             "web": "Move focus into modals, return on close, mark background inert; do not re-render lists in a way that drops focus."
           },
-          "description": "WCAG level A. Verifiable from mixed code."
+          "description": "WCAG level A. Verifiable from mixed code.",
+          "severity": "major"
         },
         {
           "id": "ACC-OPR-08",
@@ -602,7 +620,8 @@
             "mobile_ios": "Default focus ring not suppressed; scroll views respect safeAreaInset and keyboard avoidance.",
             "web": ":focus-visible styles never removed by outline: none without replacement; scroll-padding for sticky headers."
           },
-          "description": "WCAG level AA. Verifiable from mixed code."
+          "description": "WCAG level AA. Verifiable from mixed code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-OPR-09",
@@ -629,7 +648,8 @@
             "mobile_ios": "accessibilityLabel that includes the subject for repeated generic buttons; combined card elements.",
             "web": "aria-label or aria-describedby giving context to repeated 'Read more' links."
           },
-          "description": "WCAG level A. Verifiable from mixed code."
+          "description": "WCAG level A. Verifiable from mixed code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-OPR-10",
@@ -650,7 +670,8 @@
             "mobile_ios": "accessibilityLabel must contain the visible title of the control.",
             "web": "aria-label must contain the visible text."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         }
       ]
     },
@@ -678,7 +699,8 @@
             "mobile_ios": "Localized strings via String catalogs; Locale not overridden to a mismatch.",
             "web": "html lang set to the content language."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-UND-02",
@@ -705,7 +727,8 @@
             "mobile_ios": "No navigation from onChange of a TextField or Toggle; pickers do not submit on selection.",
             "web": "No submit on change of a select; no navigation on focus."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-UND-03",
@@ -732,7 +755,8 @@
             "mobile_ios": "Error text next to the field with accessibilityValue or an announcement; concrete correction hints.",
             "web": "aria-invalid, aria-describedby to the error text, aria-live on the error container."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-UND-04",
@@ -753,7 +777,8 @@
             "mobile_ios": "TextField prompt-only inputs get an accessibilityLabel and a visible label.",
             "web": "label for each input, required marked in text not colour, format hints visible."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-UND-05",
@@ -774,7 +799,8 @@
             "mobile_ios": "Same: confirmation or undo before irreversible commits.",
             "web": "Same: review step or undo before irreversible submissions."
           },
-          "description": "WCAG level AA. Verifiable from source code."
+          "description": "WCAG level AA. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-UND-06",
@@ -801,7 +827,8 @@
             "mobile_ios": ".textContentType(.oneTimeCode) and password autofill; biometrics offered; paste not blocked.",
             "web": "autocomplete=\"one-time-code\", paste not blocked, passkey or password manager supported."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-UND-07",
@@ -822,7 +849,8 @@
             "mobile_ios": "Help or support entry comes from one shared toolbar item, tab or settings row reused across screens.",
             "web": "Help link, chat widget or contact entry comes from a shared header, footer or layout component, in the same position on every page."
           },
-          "description": "WCAG level A. Verifiable from mixed code."
+          "description": "WCAG level A. Verifiable from mixed code.",
+          "severity": "minor"
         }
       ]
     },
@@ -880,7 +908,8 @@
             "mobile_ios": ".accessibilityAddTraits(.isButton, .isSelected, .isToggle), .accessibilityValue for sliders and toggles; UIKit accessibilityTraits and accessibilityValue on custom controls.",
             "web": "Native elements first; otherwise role plus aria-checked, aria-selected, aria-expanded, aria-disabled kept in sync."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-ROB-02",
@@ -925,7 +954,8 @@
             "mobile_ios": ".accessibilityElement(children: .combine) on cards with .accessibilityAction(named:) for secondary actions.",
             "web": "Card pattern with one primary link and labelled buttons; no click handlers on wrapper divs."
           },
-          "description": "WCAG level A. Verifiable from source code."
+          "description": "WCAG level A. Verifiable from source code.",
+          "severity": "major"
         },
         {
           "id": "ACC-ROB-03",
@@ -952,7 +982,8 @@
             "mobile_ios": "AccessibilityNotification.Announcement or UIAccessibility.post(.announcement) for transient status; accessibilityValue for persistent state.",
             "web": "aria-live=\"polite\" or role=\"status\" containers; role=\"alert\" only for errors."
           },
-          "description": "WCAG level AA. Verifiable from source code."
+          "description": "WCAG level AA. Verifiable from source code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-ROB-04",
@@ -985,7 +1016,8 @@
             "mobile_ios": ".accessibilityHidden(true) for hidden layers; accessibilityViewIsModal on custom modals.",
             "web": "aria-modal or inert for backgrounds; display:none or visibility:hidden for hidden content, not opacity 0."
           },
-          "description": "WCAG level A. Verifiable from mixed code."
+          "description": "WCAG level A. Verifiable from mixed code.",
+          "severity": "minor"
         }
       ]
     },
@@ -1019,7 +1051,8 @@
             "mobile_ios": "Flag hard caps on dynamicTypeSize for essential text, ignoring isBoldTextEnabled, isDarkerSystemColorsEnabled or reduce transparency.",
             "web": "Respect browser zoom and prefers-contrast, prefers-reduced-motion, prefers-color-scheme."
           },
-          "description": "EN 301 549 only. Verifiable from source code."
+          "description": "EN 301 549 only. Verifiable from source code.",
+          "severity": "major"
         },
         {
           "id": "ACC-PLT-02",
@@ -1040,7 +1073,8 @@
             "mobile_ios": "Same: settings screens fully accessible; caption toggles not hidden behind gestures.",
             "web": "Same: settings reachable by keyboard and screen reader."
           },
-          "description": "EN 301 549 only. Verifiable from mixed code."
+          "description": "EN 301 549 only. Verifiable from mixed code.",
+          "severity": "minor"
         },
         {
           "id": "ACC-PLT-03",
@@ -1054,7 +1088,8 @@
             "mobile_ios": "XCUIApplication().performAccessibilityAudit() in UI tests; snapshot tests at accessibility Dynamic Type sizes.",
             "web": "axe-core or jest-axe in component tests; Lighthouse or Playwright accessibility scans in CI."
           },
-          "description": "EN 301 549 only. Verifiable from source code."
+          "description": "EN 301 549 only. Verifiable from source code.",
+          "severity": "minor"
         }
       ]
     }

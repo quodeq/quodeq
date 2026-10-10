@@ -190,7 +190,8 @@ export function buildPeriodRuns(availableRuns, trend, granularity = GRANULARITY.
  * @param {string} dimensionName   Case-insensitive match.
  * @param {'day'|'week'|'month'} [granularity='day']
  * @param {number} [limit=Infinity] Max buckets to keep (newest buckets win).
- * @returns {Array<{runId:string, dateISO:string, dateLabel:string, score:number, grade:*, overallGrade:*}>}
+ * @returns {Array<{runId:string, dateISO:string, dateLabel:string, score:number, grade:*, overallGrade:*, critical:(number|undefined), majors:(number|undefined)}>}
+ *   `critical` and `majors` are the representative run's counts, when the row carries them.
  */
 export function extractDimensionPeriodSeries(trend, dimensionName, granularity = GRANULARITY.DAY, limit = Infinity) {
   if (!Array.isArray(trend) || !dimensionName) return [];
@@ -214,6 +215,8 @@ export function extractDimensionPeriodSeries(trend, dimensionName, granularity =
       score,
       grade: match.grade,
       overallGrade: entry.overallGrade,
+      critical: match.critical,
+      majors: match.majors,
     });
     if (out.length >= limit) break;
   }

@@ -216,11 +216,6 @@ class TestParserAdditionalFlags:
         args = parser.parse_args(["evaluate", "/tmp/repo", "--pool-budget", "120"])
         assert args.pool_budget == 120
 
-    def test_no_consolidated_flag(self):
-        parser = build_parser()
-        args = parser.parse_args(["evaluate", "/tmp/repo", "--no-consolidated"])
-        assert args.no_consolidated is True
-
     def test_incremental_flag(self):
         # --incremental is a deprecated alias; it maps to legacy_incremental, not clean_scan.
         parser = build_parser()
@@ -236,7 +231,6 @@ class TestParserAdditionalFlags:
         assert args.n_subagents == 5
         assert args.no_verify is False
         assert args.pool_budget is None
-        assert args.no_consolidated is False
         assert args.clean_scan is False
         assert args.legacy_incremental is False
         assert args.no_prescan is False
@@ -253,7 +247,7 @@ class TestParserAdditionalFlags:
             "--no-prescan", "--evidence-only", "--no-verify",
             "--max-turns", "100", "--max-duration", "600",
             "--n-subagents", "10", "--pool-budget", "200",
-            "--no-consolidated", "--incremental",
+            "--incremental",
             "--branch", "develop", "--scope", "src/main",
             "-o", "/tmp/output",
         ])
@@ -269,7 +263,6 @@ class TestParserAdditionalFlags:
         ("max_duration", 600),
         ("n_subagents", 10),
         ("pool_budget", 200),
-        ("no_consolidated", True),
         ("legacy_incremental", True),
         ("clean_scan", False),
         ("branch", "develop"),

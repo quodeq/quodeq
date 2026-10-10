@@ -17,6 +17,7 @@ from quodeq.core.types.finding import Finding
 from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.grade_formula_store import load_params
 from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_reports
+from quodeq.data.fs.run_files import read_run_manifest
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
@@ -28,17 +29,19 @@ from quodeq.core.scoring.projector_scoring import (
     compute_principle_grade,
 )
 
+_MANIFEST_SOURCE_FILES_KEY = "source_files_count"
+
 
 def _read_source_file_count(run_dir: Path) -> int:
-    """Best-effort: pick up the run's ``sourceFileCount`` from any dim JSON.
+    """Best-effort: the run's project size, from a dim JSON or the scan manifest.
 
-    The projector needs this to apply the CLI's confidence-level thresholds
-    (which scale with project size). Every ``evaluation/<dim>.json`` in the
-    run carries the same value; we read the first one we find. Returns 0
-    when no JSON exists yet (early projection of a run-in-progress) — that
-    falls back to the unsclaed base thresholds in
-    ``classify_confidence_level``, matching the CLI's behaviour for runs
-    without a known file count.
+    The projector needs it for the confidence thresholds and the requirement
+    spread, both of which scale with project size. Every
+    ``evaluation/<dim>.json`` in the run carries the same ``sourceFileCount``;
+    the first one found wins. A live run has no dim JSON yet, so the count
+    the scan recorded in ``evidence/manifest.json`` (``source_files_count``)
+    stands in; without it the spread would score the run as if the size were
+    unknown. Returns 0 only when neither carries a count.
     """
     for _dimension, data in iter_readable_eval_reports(run_dir):
         if not isinstance(data, dict):
@@ -46,7 +49,9 @@ def _read_source_file_count(run_dir: Path) -> int:
         count = data.get("sourceFileCount")
         if isinstance(count, int) and count > 0:
             return count
-    return 0
+    manifest = read_run_manifest(run_dir) or {}
+    count = manifest.get(_MANIFEST_SOURCE_FILES_KEY)
+    return count if isinstance(count, int) and count > 0 else 0
 
 
 _SELECT_NON_DISMISSED = (
@@ -56,10 +61,9 @@ _SELECT_NON_DISMISSED = (
     "FROM findings WHERE verdict != 'dismissed'"
 )
 
-_SELECT_DISMISSED_COUNTS = (
-    "SELECT dimension, practice_id, COUNT(*) FROM findings "
-    "WHERE verdict = 'dismissed' GROUP BY dimension, practice_id"
-)
+# Dismissed violations score nothing but stay observed: the grade reads
+# their rule and file.
+_SELECT_DISMISSED = _SELECT_NON_DISMISSED.replace("verdict != 'dismissed'", "verdict = 'dismissed'")
 
 
 def _dict_row(cursor, row):
@@ -69,7 +73,7 @@ def _dict_row(cursor, row):
 def _grade_all_principles(
     violations_by: dict[tuple[str, str], list[Finding]],
     compliance_by: dict[tuple[str, str], list[Finding]],
-    dismissed_counts: dict[tuple[str, str], int],
+    dismissed_by: dict[tuple[str, str], list[Finding]],
     source_file_count: int,
     params: ScoringParams,
 ) -> tuple[list[tuple[str, dict]], dict[str, list[dict]]]:
@@ -83,7 +87,7 @@ def _grade_all_principles(
             principle_id=principle_id,
             findings=violations_by.get((dim, principle_id), []),
             compliance=compliance_by.get((dim, principle_id), []),
-            dismissed_count=dismissed_counts.get((dim, principle_id), 0),
+            dismissed=dismissed_by.get((dim, principle_id), []),
             scale=scale,
         )
         principle_grades_by_dim.setdefault(dim, []).append(grade)
@@ -93,12 +97,12 @@ def _grade_all_principles(
 
 @dataclass(frozen=True, slots=True)
 class GradeInputs:
-    """What the scorer reads from a run: active findings grouped by
-    (dimension, principle), dismissed counts, and the project size."""
+    """What the scorer reads from a run: active and dismissed findings
+    grouped by (dimension, principle), and the project size."""
 
     violations_by: dict[tuple[str, str], list[Finding]]
     compliance_by: dict[tuple[str, str], list[Finding]]
-    dismissed_counts: dict[tuple[str, str], int]
+    dismissed_by: dict[tuple[str, str], list[Finding]]
     source_file_count: int
 
 
@@ -111,18 +115,20 @@ def load_grade_inputs(run_dir: Path) -> GradeInputs:
     ``unmapped_findings``, which is never graded.
     """
     with open_evaluation_db(run_dir) as conn:
-        dismissed_raw = conn.execute(_SELECT_DISMISSED_COUNTS).fetchall()
         conn.row_factory = _dict_row
         rows = conn.execute(_SELECT_NON_DISMISSED).fetchall()
+        dismissed_rows = conn.execute(_SELECT_DISMISSED).fetchall()
     violations_by: dict[tuple[str, str], list[Finding]] = {}
     compliance_by: dict[tuple[str, str], list[Finding]] = {}
     for f in (row_to_finding(r) for r in rows):
         bucket = violations_by if f.verdict == FindingType.VIOLATION else compliance_by
         bucket.setdefault((f.dimension or "", f.practice_id), []).append(f)
-    dismissed = {(dimension, practice_id): count for dimension, practice_id, count in dismissed_raw}
+    dismissed_by: dict[tuple[str, str], list[Finding]] = {}
+    for f in (row_to_finding(r) for r in dismissed_rows):
+        dismissed_by.setdefault((f.dimension or "", f.practice_id), []).append(f)
     return GradeInputs(
         violations_by=violations_by, compliance_by=compliance_by,
-        dismissed_counts=dismissed,
+        dismissed_by=dismissed_by,
         source_file_count=_read_source_file_count(run_dir),
     )
 
@@ -140,7 +146,7 @@ def compute_run_grades(
     """
     inputs = load_grade_inputs(run_dir)
     principle_rows, principle_grades_by_dim = _grade_all_principles(
-        inputs.violations_by, inputs.compliance_by, inputs.dismissed_counts,
+        inputs.violations_by, inputs.compliance_by, inputs.dismissed_by,
         inputs.source_file_count, params,
     )
     dimension_rows = [
@@ -150,7 +156,9 @@ def compute_run_grades(
     return principle_rows, dimension_rows
 
 
-def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None:
+def recompute_grades(
+    run_dir: Path, params: ScoringParams | None = None,
+) -> None:
     """Full recompute of dimension_scores + principle_grades from findings.
 
     When *params* is None, the saved grade-formula params are loaded.
@@ -194,8 +202,10 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     # run graded with older scoring apart from one that is merely unchanged,
     # and the reports the coverage came from, so a report written after the
     # last event re-derives the tables instead of leaving coverage at zero.
-    store.save_grades_algo_version(GRADE_ALGO_VERSION)
-    store.save_coverage_stamp(report_stamp(run_dir))
+    # One held connection for the two stamps.
+    with store.connection():
+        store.save_grades_algo_version(GRADE_ALGO_VERSION)
+        store.save_coverage_stamp(report_stamp(run_dir))
 
 
 def report_stamp(run_dir: Path) -> str:

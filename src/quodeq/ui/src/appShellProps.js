@@ -4,6 +4,8 @@ import {
 } from './appGating.js';
 import { buildDashboardDataBundle, buildNavigationBundle } from './routes/renderers.jsx';
 import { NAV_TAB } from './vocab/navTab.js';
+import { PROJECT_SOURCE } from './vocab/projectSource.js';
+import { switchProject } from './routes/switchProject.js';
 
 // Pure prop-builders for App.jsx's Sidebar/TopBar wiring, extracted
 // verbatim from the inline JSX props so App.jsx itself stays a thin
@@ -61,13 +63,32 @@ export function buildTopBarProps({
   };
 }
 
-// The MainContent/route props bundle — extracted verbatim from App.jsx's
-// inline object literal. Pure: every field is either passed straight
-// through or built from an existing builder (buildDashboardDataBundle /
-// buildNavigationBundle), no new derivation.
+// The breadcrumb's project switcher (NavBreadcrumb `projectSwitcher`). Picking
+// a project runs the same switchProject a Repositories card click does, with
+// the row's source, told where the user is so a project-scoped page stays
+// put. The list holds the local projects plus the remote ones with no local
+// copy, so a selection of either source marks its row current. "add project"
+// is the navigation bundle's guarded add action, so a running evaluation
+// still blocks it with its toast.
+export function buildProjectSwitcherProps({ state, sharedProjects, navigation, navTab, navStack }) {
+  return {
+    projects: state.projects ?? [],
+    sharedProjects,
+    selectedProject: state.selectedProject,
+    onPick: (id, source = PROJECT_SOURCE.LOCAL) => switchProject(navigation, id, source, {
+      rootTab: navStack[0]?.page, depth: navStack.length,
+    }),
+    onAllRepositories: () => navTab(NAV_TAB.PROJECTS),
+    onAddProject: navigation.onAddProject,
+  };
+}
+
+// The MainContent/route props bundle. Pure: every field is either passed
+// straight through or built from an existing builder
+// (buildDashboardDataBundle / buildNavigationBundle), no new derivation.
 export function buildContentProps({
   state, sharedSignal, navTab, navStackLength, isEvaluating, showToast, setWizardEntry,
-  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey,
+  dismissFinding, applyDelta, recordDismissed,
 }) {
   return {
     dashboardData: buildDashboardDataBundle({ state, sharedHasContent: sharedSignal.hasContent }),
@@ -91,12 +112,12 @@ export function buildContentProps({
     handleRunDeleted: state.handleRunDeleted,
     dismissFinding,
     // Patch the dashboard/scores caches from the dismiss response delta so the
-    // Overview updates instantly. Additive — the refreshDashboard /
-    // bumpDismissRefresh mechanisms below still run. The delta carries only the
-    // mutation shape; the caller folds in the rescored dims from result.scores.
+    // Overview updates instantly. Additive — the reconcile above still runs.
+    // The delta carries only the mutation shape; the caller folds in the
+    // rescored dims from result.scores.
     applyDelta,
-    bumpDismissRefresh,
-    dismissRefreshKey,
+    // Prepend the dismiss response's entry to the cached Dismissed list.
+    recordDismissed,
   };
 }
 
@@ -107,14 +128,14 @@ export function buildContentProps({
 // without touching hook order.
 export function buildAppShell({
   state, sharedSignal, navTab, navStack, activeTab, activePage, isEvaluating, showToast, setWizardEntry,
-  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo, showEvaluate,
+  dismissFinding, applyDelta, recordDismissed, selectedProjectInfo, showEvaluate,
   assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel,
   navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, wizardEntry, wizardHandlers,
   filteredAccumulated, filteredTrend,
 }) {
   const contentProps = buildContentProps({
     state, sharedSignal, navTab, navStackLength: navStack.length, isEvaluating, showToast, setWizardEntry,
-    dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey,
+    dismissFinding, applyDelta, recordDismissed,
   });
 
   // Resolve the project's friendly name (see resolveProjectDisplayName): local

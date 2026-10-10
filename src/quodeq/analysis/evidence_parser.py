@@ -5,8 +5,8 @@ the final ``Evidence`` object once cache hits and dispatch results
 have all been merged into the dimension's ``<dim>_evidence.jsonl``.
 
 ``evidence_parse_options`` and ``parse_evidence_file`` are the shared
-pieces: the per-dimension runner, the single-dimension step and the
-consolidated pass all parse with the same readers and log sinks.
+pieces: the per-dimension runner and the single-dimension step parse
+with the same readers and log sinks.
 """
 from __future__ import annotations
 
@@ -56,6 +56,7 @@ def parse_evidence_file(
             language=config.language, repository=str(config.src),
             date_str=ctx.date_str, source_file_count=config.source_file_count,
             files_read=files_read, module=config.target.name if config.target else "",
+            source_line_count=config.source_line_count,
         ),
         resolved_options,
     )

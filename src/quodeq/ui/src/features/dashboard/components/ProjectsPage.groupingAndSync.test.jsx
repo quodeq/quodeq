@@ -145,7 +145,8 @@ describe('ProjectsPage — published-age on originUrl-matched cards', () => {
           id: 'local-1',
           name: 'app',
           originUrl: 'https://github.com/org/app',
-          latestDate: '2026-07-19T00:00:00Z',
+          // Evaluated before the publish, so the server copy is current, not behind.
+          latestDate: '2026-07-01T00:00:00Z',
         }]}
         actions={{}}
       />,
@@ -217,6 +218,17 @@ describe('ProjectsPage — pending grade chip', () => {
     const chip = container.querySelector('.projects-grade--pending');
     expect(chip).toBeTruthy();
     expect(chip).toHaveAttribute('aria-label');
+  });
+
+  it('shows the last known grade dimmed while the summary is recomputed', async () => {
+    const projects = [{ id: 'a', name: 'proj-a', location: 'local', summaryPending: true, latestGrade: 'B', latestScore: 7.4 }];
+    const fakeApi = makeFakeApi();
+    const { container } = renderWithApi(<ProjectsPage projects={projects} actions={{}} />, fakeApi);
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(container.querySelector('.projects-grade--pending')).toBeNull();
+    const chip = container.querySelector('.projects-grade--updating');
+    expect(chip).toHaveTextContent('7.4 B');
+    expect(chip).toHaveAttribute('aria-busy', 'true');
   });
 
   it('shows the real grade, not the placeholder, once the summary settles', async () => {

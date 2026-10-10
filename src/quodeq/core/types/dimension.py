@@ -62,6 +62,8 @@ class DimensionResult:
     from_date_iso: str | None = None
     from_date_label: str | None = None
     run_id: str | None = None
+    # Thin-evidence marker for the dimension: "low" or None.
+    confidence: str | None = None
 
 
 def open_types_of(dim: DimensionResult) -> int:

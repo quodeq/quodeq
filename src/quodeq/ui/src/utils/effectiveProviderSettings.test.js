@@ -11,13 +11,13 @@ test('defaults: local-API providers get 1 subagent / unlimited, others 5 / 600',
   for (const p of ['ollama', 'llamacpp', 'omlx']) {
     assert.deepEqual(
       effectiveProviderDefaults(p),
-      { subagents: 1, timeLimitS: 0, perDimension: false, verify: true },
+      { subagents: 1, timeLimitS: 0, verify: true },
     );
   }
   for (const p of ['claude', 'codex', 'gemini', 'openrouter', 'some-new-cloud']) {
     assert.deepEqual(
       effectiveProviderDefaults(p),
-      { subagents: 5, timeLimitS: 600, perDimension: false, verify: true },
+      { subagents: 5, timeLimitS: 600, verify: true },
     );
   }
 });
@@ -26,23 +26,22 @@ test('stored values win, including explicit unlimited (0)', () => {
   const s = storage({
     'cc-claude-subagents': '3',
     'cc-claude-time-limit': '0',
-    'cc-claude-per-dimension': 'true',
     'cc-claude-verify': 'false',
   });
   assert.deepEqual(
     resolveProviderSettings('claude', s),
-    { subagents: 3, timeLimitS: 0, perDimension: true, verify: false },
+    { subagents: 3, timeLimitS: 0, verify: false },
   );
 });
 
 test('unset keys resolve to the effective defaults', () => {
   assert.deepEqual(
     resolveProviderSettings('claude', storage({})),
-    { subagents: 5, timeLimitS: 600, perDimension: false, verify: true },
+    { subagents: 5, timeLimitS: 600, verify: true },
   );
   assert.deepEqual(
     resolveProviderSettings('ollama', storage({})),
-    { subagents: 1, timeLimitS: 0, perDimension: false, verify: true },
+    { subagents: 1, timeLimitS: 0, verify: true },
   );
 });
 
@@ -50,7 +49,7 @@ test('corrupt numeric values fall back to defaults instead of NaN', () => {
   const s = storage({ 'cc-claude-subagents': 'abc', 'cc-claude-time-limit': '' });
   assert.deepEqual(
     resolveProviderSettings('claude', s),
-    { subagents: 5, timeLimitS: 600, perDimension: false, verify: true },
+    { subagents: 5, timeLimitS: 600, verify: true },
   );
 });
 

@@ -10,7 +10,7 @@ from typing import Optional
 
 from quodeq.core.dismissals import fold_dismissals
 from quodeq.data.events.reader import EventLogReader
-from quodeq.data.projection.admission import Admitter, make_admitter, mapping_stamps
+from quodeq.data.projection.admission import Admitter, batch_admitter, mapping_stamps
 from quodeq.data.projection.handlers import handle
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 from quodeq.shared.stamp_memo import StampCache, file_stamp, memoized_by_stamp
@@ -41,7 +41,8 @@ class ProjectionEngine:
         admitter: Admitter | None = None,
     ) -> None:
         self._store_factory = store_factory or SQLiteStateStore
-        self._admitter = admitter if admitter is not None else make_admitter()
+        # None: each projection pass pins the installed standards once (batch_admitter).
+        self._admitter = admitter
 
     def rebuild(self, event_log: Path, run_dir: Path) -> int:
         """Full rebuild: clear all state and replay every event."""
@@ -113,11 +114,12 @@ class ProjectionEngine:
         reader = EventLogReader(event_log)
         count = 0
         last_ts = None
+        admitter = self._admitter if self._admitter is not None else batch_admitter()
         conn_ctx = store.connection() if hasattr(store, "connection") else nullcontext()
         with conn_ctx:
             for event in reader.stream(since_timestamp=since, from_offset=from_offset):
                 try:
-                    handle(event, store, self._admitter)
+                    handle(event, store, admitter)
                     last_ts = event.timestamp
                     count += 1
                 except (ValueError, KeyError, TypeError):

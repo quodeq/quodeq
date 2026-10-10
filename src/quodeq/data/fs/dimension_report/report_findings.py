@@ -1,7 +1,6 @@
 """Findings flattening and principle-row building for reports."""
 from __future__ import annotations
 
-from quodeq.core.scoring.constants import Grade
 from quodeq.core.types.severity import Severity
 from quodeq.data.fs.dimension_report.report_constants import (
     COMPLIANCE_FIELDS,
@@ -32,10 +31,7 @@ def build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
     raw_final = matched.get(FIELD_FINAL_SCORE)
     if raw_final is None:
         raw_final = matched.get(FIELD_FINAL_SCORE_SNAKE)
-    if grade == Grade.INSUFFICIENT:
-        formatted_score = None
-    else:
-        formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
+    formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
     row: dict = {
         "name": label,
         "score": formatted_score,
@@ -50,6 +46,7 @@ def build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
     raw_metrics = pdata.get("metrics")
     if raw_metrics:
         row["metrics"] = raw_metrics
+        row["confidence"] = raw_metrics.get("confidence_level")
     return row
 
 

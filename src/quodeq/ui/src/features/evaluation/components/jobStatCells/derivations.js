@@ -6,6 +6,7 @@
 import { computeOverallProgress } from '../scanProgressTotals.js';
 import { t } from '../../../../strings/index.js';
 import { SCAN_MODE } from '../scanModes.js';
+import { isDiffReview } from '../../externalRun.js';
 import { MS_PER_SECOND, SECONDS_PER_MINUTE, MINUTES_PER_HOUR, SECONDS_PER_HOUR } from '../../../../utils/time.js';
 import { DIM_STATE } from '../../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../../vocab/severity.js';
@@ -181,12 +182,12 @@ export function sumSeverities(liveViolations) {
   return counts;
 }
 
-/** "1 critical · 4 major" — zero buckets omitted; "none yet" when all zero. */
-export function formatSevHint(counts) {
+/** "1 critical · 4 major" — zero buckets omitted; `empty` ("none yet" while running) when all zero. */
+export function formatSevHint(counts, empty = 'none yet') {
   const parts = SEVERITY_ORDER
     .filter((k) => counts?.[k] > 0)
     .map((k) => `${counts[k]} ${k}`);
-  return parts.length > 0 ? parts.join(' · ') : 'none yet';
+  return parts.length > 0 ? parts.join(' · ') : empty;
 }
 
 /**
@@ -195,11 +196,14 @@ export function formatSevHint(counts) {
  * results exist only on incremental runs. Null while coverage is unknown
  * (legacy dims, preparing) — callers show a placeholder.
  *
- * Returns an identity value ('incremental' | 'clean'), never display text:
- * callers compare it, and the words a user sees come from the catalog.
+ * A run whose dimensions were estimated from a diff (a PR review) is 'diff'.
+ *
+ * Returns an identity value ('incremental' | 'clean' | 'diff'), never display
+ * text: callers compare it, and the words a user sees come from the catalog.
  */
 export function deriveScanMode(progress) {
   if (!progress) return null;
+  if (isDiffReview(progress)) return SCAN_MODE.DIFF;
   const { cachedFiles, projectTotal } = computeOverallProgress(progress);
   if (cachedFiles == null || !(projectTotal > 0)) return null;
   return cachedFiles > 0 ? SCAN_MODE.INCREMENTAL : SCAN_MODE.CLEAN;

@@ -18,7 +18,7 @@ class TestBuildRunConfig:
         mock_paths_obj.evaluators_dir = tmp_path / "evaluators"
         mock_paths.return_value = mock_paths_obj
         args = argparse.Namespace(
-            dimensions=None, no_consolidated=False, no_verify=False,
+            dimensions=None, no_verify=False,
             max_turns=None, max_duration=None, n_subagents=5,
             pool_budget=None, clean_scan=True, legacy_incremental=False,
         )
@@ -42,8 +42,7 @@ class TestBuildRunConfig:
             mock_paths_obj.evaluators_dir = tmp_path / "evaluators"
             mock_paths.return_value = mock_paths_obj
             args = argparse.Namespace(
-                dimensions="security,reliability", no_consolidated=False,
-                no_verify=True, max_turns=10, max_duration=300,
+                dimensions="security,reliability", no_verify=True, max_turns=10, max_duration=300,
                 n_subagents=3, pool_budget=120, clean_scan=False, legacy_incremental=False,
             )
             inputs = ResolvedInputs(
@@ -78,42 +77,6 @@ class TestBuildRunConfig:
 
     @patch("quodeq.cli_evaluation.default_paths")
     @patch("quodeq.cli_evaluation.get_ai_model", return_value="model-x")
-    def test_single_file_disables_consolidated(self, mock_model, mock_paths, tmp_path):
-        from quodeq.cli import ResolvedInputs, build_run_config
-        mock_paths_obj = MagicMock()
-        mock_paths_obj.standards_dir.exists.return_value = False
-        mock_paths_obj.evaluators_dir = tmp_path
-        mock_paths.return_value = mock_paths_obj
-        args = argparse.Namespace(
-            dimensions=None, no_consolidated=False, no_verify=False,
-            max_turns=None, max_duration=None, n_subagents=5,
-            pool_budget=None, clean_scan=True, legacy_incremental=False,
-        )
-        inputs = ResolvedInputs(
-            src=tmp_path, language="python", manifest=None, dims_data={}, single_file=True,
-        )
-        config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env={})
-        assert config.options.consolidated is False
-
-    @patch("quodeq.cli_evaluation.default_paths")
-    @patch("quodeq.cli_evaluation.get_ai_model", return_value="model-x")
-    def test_env_no_consolidate(self, mock_model, mock_paths, tmp_path):
-        from quodeq.cli import ResolvedInputs, build_run_config
-        mock_paths_obj = MagicMock()
-        mock_paths_obj.standards_dir.exists.return_value = False
-        mock_paths_obj.evaluators_dir = tmp_path
-        mock_paths.return_value = mock_paths_obj
-        args = argparse.Namespace(
-            dimensions=None, no_consolidated=False, no_verify=False,
-            max_turns=None, max_duration=None, n_subagents=5,
-            pool_budget=None, clean_scan=True, legacy_incremental=False,
-        )
-        inputs = ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data={})
-        config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env={"QUODEQ_NO_CONSOLIDATE": "1"})
-        assert config.options.consolidated is False
-
-    @patch("quodeq.cli_evaluation.default_paths")
-    @patch("quodeq.cli_evaluation.get_ai_model", return_value="model-x")
     def test_env_overrides_for_turns_and_duration(self, mock_model, mock_paths, tmp_path):
         from quodeq.cli import ResolvedInputs, build_run_config
         mock_paths_obj = MagicMock()
@@ -121,7 +84,7 @@ class TestBuildRunConfig:
         mock_paths_obj.evaluators_dir = tmp_path
         mock_paths.return_value = mock_paths_obj
         args = argparse.Namespace(
-            dimensions=None, no_consolidated=False, no_verify=False,
+            dimensions=None, no_verify=False,
             max_turns=None, max_duration=None, n_subagents=5,
             pool_budget=None, clean_scan=True, legacy_incremental=False,
         )
@@ -146,7 +109,7 @@ class TestBuildRunConfig:
         mock_paths_obj.evaluators_dir = tmp_path
         mock_paths.return_value = mock_paths_obj
         args = argparse.Namespace(
-            dimensions=None, no_consolidated=False, no_verify=False,
+            dimensions=None, no_verify=False,
             max_turns=None, max_duration=None, n_subagents=5,
             pool_budget=None, clean_scan=True, legacy_incremental=False,
         )

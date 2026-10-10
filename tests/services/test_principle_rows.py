@@ -53,8 +53,8 @@ _EXPECTED = {
 
 def test_principle_rows_skip_unnamed_principles():
     assert principle_rows(_dims()) == [
-        ("security", "P1", "6.0/10", "Fair"), ("security", "P2", "8.0/10", "Good"),
-        ("reliability", "R1", None, None),
+        ("security", "P1", "6.0/10", "Fair", None), ("security", "P2", "8.0/10", "Good", None),
+        ("reliability", "R1", None, None, None),
     ]
 
 
@@ -114,7 +114,7 @@ class TestStore:
     def test_schema_declares_the_table(self):
         with open_score_cache() as conn:
             cols = [row[1] for row in conn.execute("PRAGMA table_info(run_principle_scalars)")]
-        assert cols == ["project", "run_id", "version", "dimension", "principle", "score", "grade"]
+        assert cols == ["project", "run_id", "version", "dimension", "principle", "score", "grade", "confidence"]
 
 
 def test_scalar_dimension_drops_principles_and_files_read():
@@ -155,3 +155,15 @@ def test_cache_backed_fetcher_serves_rows_and_the_trend_shape_from_one_read():
     assert [len(d.principles) for d in rows] == [2, 2]
     assert [d.files_read for d in served] == [None, None]
     assert all(d.principles == [] for d in served)
+
+
+def test_thin_evidence_marker_round_trips_through_the_cache():
+    dims = [DimensionResult(
+        dimension="security", overall_score="7.0/10", overall_grade="Fair", confidence="low",
+        principles=[PrincipleGrade("P1", "6.0/10", "Fair", "low"), PrincipleGrade("P2", "8.0/10", "Good")],
+    )]
+    with open_score_cache() as conn:
+        write_cached_rows(conn, "proj", "r1", "v1", dims)
+        back = read_cached_rows(conn, "proj", "r1", "v1")
+    assert back[0].confidence == "low"
+    assert [p.confidence for p in back[0].principles] == ["low", None]

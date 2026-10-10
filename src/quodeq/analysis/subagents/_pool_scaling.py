@@ -105,8 +105,8 @@ def should_respawn(
     do useful work.
 
     The "time budget reached" log names the gate "run deadline" rather than
-    "dimension slice" whenever *run_deadline_at* is None (consolidated mode
-    never sets it) or the auto-scale ratchet has moved *deadline_at* to or
+    "dimension slice" whenever *run_deadline_at* is None or the auto-scale
+    ratchet has moved *deadline_at* to or
     past it, since only a *deadline_at* strictly earlier than the whole-run
     deadline is actually a per-dimension slice.
     """

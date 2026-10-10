@@ -2,8 +2,10 @@
  * Renders surrounding code context with VS Code-style line numbers and
  * highlighted violation lines. Falls back to snippet display if no
  * context is available. Shows a scope badge when scope is provided.
- * A single "See code" / "See <scope>" bar collapses the whole block;
- * nothing renders until it's expanded.
+ * An editor-tab strip on top of the code collapses the whole block: it names
+ * the file (or reads "See code" / "See <scope>" when the finding has none),
+ * the line range and the line count, so the location shows while collapsed.
+ * Nothing below the strip renders until it's expanded.
  *
  * Pretext integration:
  *   The `<pre>` block's height and widest-line width are pre-computed with
@@ -12,11 +14,13 @@
  *   scrollbar size is known and the collapsed→expanded transition doesn't
  *   snap.
  */
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { CheckIcon, CopyIcon, XIcon, COPY_FEEDBACK_MS } from './CopyButton.jsx';
 import { measureWidth, cssFontFromElement } from '../utils/pretext.js';
 import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js';
+import { copyToClipboard } from '../utils/clipboard.js';
+import { parseFileRef } from '../utils/textFormatting.js';
 import { t } from '../strings/index.js';
-import { KEY } from '../vocab/keyboard.js';
 
 const CONTEXT_PADDING = 5;
 const CODE_LINE_HEIGHT = 18; // must match terminal.css .ctx-line line-height
@@ -88,22 +92,85 @@ function CodeBlockPre({ renderedLines, codeLines }) {
   );
 }
 
-function ScopeBar({ label, lineCount, expanded, onToggle, children }) {
-  const hasCode = lineCount > 0;
+/** The file a finding points at, split for display: muted directory, file name, line. */
+function TabPath({ filePath, line }) {
+  const cut = filePath.lastIndexOf('/') + 1;
   return (
-    <>
-      <div
-        className={`scope-bar${expanded && hasCode ? ' scope-bar--expanded' : ''}`}
-        role={hasCode ? 'button' : undefined}
-        tabIndex={hasCode ? 0 : undefined}
-        onClick={hasCode ? onToggle : undefined}
-        onKeyDown={hasCode ? (e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggle(); } } : undefined}
-      >
-        <span className={`scope-bar-chevron${expanded ? ' scope-bar-chevron--open' : ''}`}>{'\u25b8'}</span>
-        <span className="scope-bar-label">{label}{hasCode ? ` \u00b7 ${lineCount} lines` : ''}</span>
+    <span className="code-tab-path" title={filePath}>
+      {cut > 0 && <span className="code-tab-dir">{filePath.slice(0, cut)}</span>}
+      <span className="code-tab-file">{filePath.slice(cut)}</span>
+      {line != null && <span className="code-tab-line">:{line}</span>}
+    </span>
+  );
+}
+
+/**
+ * Copies `path:line`. Lives beside the toggle rather than inside it so the
+ * strip never nests one button in another. The icon turns into a check (or an
+ * X when the clipboard refuses) for one beat, so the click visibly landed.
+ */
+// Clipboard-write feedback, local like FileCopyBtn's: 'failed' means the copy
+// failed, not a job or run status, so it stays out of vocab/*.js.
+const COPY_STATUS = Object.freeze({ COPIED: 'copied', FAILED: 'failed' });
+
+function CopyPathBtn({ text }) {
+  const [status, setStatus] = useState(null);
+  useEffect(() => {
+    if (!status) return undefined;
+    const timer = setTimeout(() => setStatus(null), COPY_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
+  const onCopy = (e) => {
+    // Same reason as FileCopyBtn: a finding row may toggle on click.
+    e.stopPropagation();
+    // copyToClipboard never rejects: it resolves whether the write landed.
+    copyToClipboard(text)
+      .then((ok) => setStatus(ok ? COPY_STATUS.COPIED : COPY_STATUS.FAILED))
+      .catch((err) => console.warn('[ContextBlock] copy feedback failed:', err?.message || err));
+  };
+  const label = status === COPY_STATUS.COPIED ? t('common.copiedShort')
+    : status === COPY_STATUS.FAILED ? t('common.copyFailed') : t('context.copyPath');
+  const icon = status === COPY_STATUS.COPIED ? <CheckIcon /> : status === COPY_STATUS.FAILED ? <XIcon /> : <CopyIcon />;
+  return (
+    <button
+      type="button"
+      className={`code-tab-copy${status ? ` code-tab-copy--${status}` : ''}`}
+      onClick={onCopy}
+      title={label}
+      aria-label={label}
+    >
+      {icon}
+    </button>
+  );
+}
+
+function CodeTab({ label, file, line, firstLine, lineCount, expanded, onToggle, children }) {
+  const hasCode = lineCount > 0;
+  const open = expanded && hasCode;
+  // `file` may carry its own ":line" suffix (parseFileRef); the line prop wins.
+  const { filePath, line: fileLine } = parseFileRef(file, line);
+  const lastLine = firstLine + lineCount - 1;
+  const range = lineCount > 1 ? t('context.lineRange', { from: firstLine, to: lastLine }) : t('context.lineSingle', { line: firstLine });
+  return (
+    <div className={`code-tab${open ? ' code-tab--open' : ''}`}>
+      <div className="code-tab-head">
+        <button
+          type="button"
+          className="code-tab-toggle"
+          aria-expanded={hasCode ? open : undefined}
+          disabled={!hasCode}
+          onClick={onToggle}
+        >
+          <span aria-hidden="true" className="code-tab-chevron">{'\u25b8'}</span>
+          {filePath ? <TabPath filePath={filePath} line={fileLine} /> : <span className="code-tab-label">{label}</span>}
+          {hasCode && (
+            <span className="code-tab-meta">{range} · {lineCount === 1 ? t('context.lineCountOne') : t('context.lineCount', { count: lineCount })}</span>
+          )}
+        </button>
+        {filePath && <CopyPathBtn text={fileLine != null ? `${filePath}:${fileLine}` : filePath} />}
       </div>
-      {expanded && hasCode && children}
-    </>
+      {open && children}
+    </div>
   );
 }
 
@@ -132,8 +199,12 @@ function splitContextLines(ctxLines, startLineNum) {
   return { before, highlighted, after };
 }
 
+function contextStartLine(line) {
+  return Math.max(1, (line || 1) - CONTEXT_PADDING);
+}
+
 function renderContextLines(ctxLines, line) {
-  const startLineNum = Math.max(1, (line || 1) - CONTEXT_PADDING);
+  const startLineNum = contextStartLine(line);
   const { before, highlighted, after } = splitContextLines(ctxLines, startLineNum);
   return [
     ...before.map((l) => renderLine(l.raw, l.lineNum, false)),
@@ -142,7 +213,7 @@ function renderContextLines(ctxLines, line) {
   ];
 }
 
-export default function ContextBlock({ context, snippet, scope, line }) {
+export default function ContextBlock({ context, snippet, scope, line, file }) {
   const [expanded, setExpanded] = useState(false);
   const toggle = () => setExpanded((e) => !e);
 
@@ -154,18 +225,18 @@ export default function ContextBlock({ context, snippet, scope, line }) {
     const startNum = line || 1;
     const rendered = scopeLines.map((text, i) => renderSnippetLine(text, startNum + i));
     return (
-      <ScopeBar label={`See ${scope}`} lineCount={scopeLines.length} expanded={expanded} onToggle={toggle}>
+      <CodeTab label={t('context.seeScope', { scope })} file={file} line={line} firstLine={startNum} lineCount={scopeLines.length} expanded={expanded} onToggle={toggle}>
         <CodeBlockPre renderedLines={rendered} codeLines={scopeLines} />
-      </ScopeBar>
+      </CodeTab>
     );
   }
 
   if (context) {
     const rendered = renderContextLines(ctxLines, line);
     return (
-      <ScopeBar label="See code" lineCount={ctxLines.length} expanded={expanded} onToggle={toggle}>
+      <CodeTab label={t('context.seeCode')} file={file} line={line} firstLine={contextStartLine(line)} lineCount={ctxLines.length} expanded={expanded} onToggle={toggle}>
         <CodeBlockPre renderedLines={rendered} codeLines={ctxLines} />
-      </ScopeBar>
+      </CodeTab>
     );
   }
 
@@ -173,9 +244,9 @@ export default function ContextBlock({ context, snippet, scope, line }) {
     const startNum = line || 1;
     const rendered = snippetLines.map((text, i) => renderSnippetLine(text, startNum + i));
     return (
-      <ScopeBar label="See code" lineCount={snippetLines.length} expanded={expanded} onToggle={toggle}>
+      <CodeTab label={t('context.seeCode')} file={file} line={line} firstLine={startNum} lineCount={snippetLines.length} expanded={expanded} onToggle={toggle}>
         <CodeBlockPre renderedLines={rendered} codeLines={snippetLines} />
-      </ScopeBar>
+      </CodeTab>
     );
   }
 

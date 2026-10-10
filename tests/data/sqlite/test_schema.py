@@ -35,7 +35,7 @@ def test_evaluation_ddl_includes_scope_downgrade_json_column():
 
 
 def test_schema_version_is_10() -> None:
-    assert SCHEMA_VERSION == 10
+    assert SCHEMA_VERSION == 11
 
 
 def test_principle_grades_table_exists(tmp_path: Path) -> None:
@@ -51,7 +51,7 @@ def test_principle_grades_columns(tmp_path: Path) -> None:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(principle_grades)")}
     assert cols == {
         "dimension", "principle_id", "score", "grade",
-        "finding_count", "dismissed_count", "completed_at",
+        "finding_count", "dismissed_count", "confidence", "completed_at",
     }
 
 

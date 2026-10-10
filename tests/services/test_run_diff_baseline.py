@@ -60,3 +60,20 @@ def test_no_baseline_is_signalled_per_dimension(tmp_path: Path) -> None:
 
     assert out["dimensions"][_DIM]["againstRunId"] is None
     assert out["againstRunId"] is None
+
+
+def test_each_older_run_state_is_read_once_across_dimensions(tmp_path: Path, monkeypatch) -> None:
+    from quodeq.services import run_diff  # noqa: PLC0415
+
+    both = {_DIM: [_v("M-REU-1")], _OTHER_DIM: [_v("S-CON-1")]}
+    _run(tmp_path, "r-old", "2026-09-10T00:00:00Z", "done", both)
+    _run(tmp_path, "r-mid", "2026-09-15T00:00:00Z", "done", both)
+    _run(tmp_path, "r-curr", "2026-09-26T00:00:00Z", "done", both)
+    reads: list[str] = []
+    original = run_diff._state_of
+    monkeypatch.setattr(run_diff, "_state_of", lambda d: reads.append(d.name) or original(d))
+
+    out = diff_runs(tmp_path, _PROJECT, "r-curr", None)
+
+    assert {d["againstRunId"] for d in out["dimensions"].values()} == {"r-mid"}
+    assert sorted(reads) == ["r-mid", "r-old"]

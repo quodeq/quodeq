@@ -53,7 +53,7 @@ export function LauncherButton({ btnRef, open, ariaLabel, label, onToggle }) {
     <button
       ref={btnRef}
       type="button"
-      className="compare-dueltrigger__btn compare-dueltrigger__btn--launcher"
+      className="term-btn"
       aria-haspopup="menu"
       aria-expanded={open}
       aria-label={ariaLabel}

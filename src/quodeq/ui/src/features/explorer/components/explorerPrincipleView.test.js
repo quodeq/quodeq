@@ -8,8 +8,18 @@ test('buildRadialPrinciples: flags insufficient-evidence grades and keeps a real
     { principle: 'B', grade: 'A', score: 85 },
   ];
   const points = buildRadialPrinciples(grades);
-  assert.deepEqual(points[0], { name: 'A', score: null, hasEvidence: false });
-  assert.deepEqual(points[1], { name: 'B', score: 85, hasEvidence: true });
+  assert.deepEqual(points[0], { name: 'A', score: null, hasEvidence: false, thin: false });
+  assert.deepEqual(points[1], { name: 'B', score: 85, hasEvidence: true, thin: false });
+});
+
+test('a low-confidence principle keeps its score and is flagged thin', () => {
+  const [p] = buildRadialPrinciples([{ principle: 'Availability', score: '10.0/10', grade: 'Exemplary', confidence: 'low' }]);
+  assert.deepEqual(p, { name: 'Availability', score: 10, hasEvidence: true, thin: true });
+});
+
+test('a legacy Insufficient grade still has no point', () => {
+  const [p] = buildRadialPrinciples([{ principle: 'X', score: null, grade: 'Insufficient' }]);
+  assert.equal(p.hasEvidence, false);
 });
 
 test('buildEnrichedPrinciples: groups violations by principle and counts them per principle grade', () => {

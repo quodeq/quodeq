@@ -84,7 +84,7 @@ export default function ScopePicker({
     <span className="compare-picker" ref={rootRef}>
       <button
         type="button"
-        className={`compare-picker__toggle${allSelected ? '' : ' compare-picker__toggle--filtered'}`}
+        className={`term-btn compare-picker__toggle${allSelected ? '' : ' compare-picker__toggle--filtered'}`}
         onClick={() => setPickerOpen(!pickerOpen)}
         aria-expanded={pickerOpen}
       >

@@ -54,6 +54,7 @@ def build_dimension_dict(
             principle=p["principle_id"],
             score=f"{p['score']}/10" if p.get("score") is not None else None,
             grade=p.get("grade"),
+            confidence=p.get("confidence"),
         )
         for p in p_rows
     ]
@@ -70,6 +71,7 @@ def build_dimension_dict(
         compliance=compliance,
         totals=totals,
         files_read=files_read,
+        confidence=dim_row.get("confidence"),
     )
     return to_camel_dict(dim)
 

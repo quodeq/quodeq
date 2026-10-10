@@ -117,8 +117,8 @@ def _run_cli_analysis(
     if mcp_style == MCP_STYLE_CLI_REGISTER and cfg.jsonl_file is not None:
         # Prefer the field carried directly on this AnalysisConfig (every
         # builder fills it from the run's RunConfig, including the
-        # single-agent fallback and consolidated mode, which don't set
-        # run_config), then run_config's registry, then the process default.
+        # single-agent fallback, which doesn't set run_config), then
+        # run_config's registry, then the process default.
         if cfg.mcp_registry is not None:
             mcp_registry = cfg.mcp_registry
         elif cfg.run_config is not None:

@@ -10,12 +10,13 @@
       "fromRunId": "20260210T000000",
       "openTypes": 5,
       "overallGrade": "Exemplary",
-      "overallScore": "9.4/10",
+      "overallScore": "9.1/10",
       "principles": [
         {
+          "confidence": "medium",
           "grade": "Exemplary",
           "principle": "Confidentiality",
-          "score": "9.4/10"
+          "score": "9.1/10"
         }
       ],
       "quarantinedCount": 0,
@@ -45,7 +46,7 @@
   },
   "summary": {
     "dimensionCount": 1,
-    "numericAverage": 9.4,
+    "numericAverage": 9.1,
     "overallGrade": "Exemplary",
     "previousNumericAverage": null,
     "severity": {
@@ -65,7 +66,7 @@
       "dimensionDetails": [
         {
           "dimension": "security",
-          "score": 9.4
+          "score": 9.1
         }
       ],
       "dimensions": [
@@ -73,11 +74,11 @@
       ],
       "dimensionsCount": 1,
       "majors": 5,
-      "numericAverage": 9.4,
+      "numericAverage": 9.1,
       "openTypes": 5,
       "overallGrade": "Exemplary",
       "runId": "20260210T000000",
-      "runNumericAverage": 9.4,
+      "runNumericAverage": 9.1,
       "runOverallGrade": "Exemplary",
       "status": "done",
       "violations": 5

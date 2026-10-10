@@ -11,7 +11,7 @@ def _run_options(tmp_path):
     from quodeq.cli import ResolvedInputs, build_run_config
 
     args = argparse.Namespace(
-        dimensions=None, no_consolidated=False, no_verify=False, max_turns=None,
+        dimensions=None, no_verify=False, max_turns=None,
         max_duration=None, n_subagents=1, pool_budget=None, clean_scan=False,
         legacy_incremental=False,
     )

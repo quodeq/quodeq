@@ -4,39 +4,28 @@ import ScopePicker from './ScopePicker.jsx';
 import DuelTrigger from './DuelTrigger.jsx';
 import DimensionTrigger from './DimensionTrigger.jsx';
 import { nf } from '../compareFormatters.js';
-import { SORT_DIR } from '../../../vocab/sortDirection.js';
 
 
-/** Title + subtitle, and the header controls: duel/dimension launchers,
- * the sort toggle, and the scope picker. */
+/** Title + subtitle, and the header controls: duel/dimension launchers and
+ * the scope picker. (Ranking lives in the tables' column headers.) */
 export default function CompareFleetHeader({
   scopeCount, totalFiles, scoredRows, openDuelPair, openDuel, board, openDimension,
-  sortDir, toggleSortDir, rows, scopeIds, toggleProject, selectAll, selectFlagged,
+  rows, scopeIds, toggleProject, selectAll, selectFlagged,
   pickerOpen, setPickerOpen,
 }) {
   return (
-    <div className="compare-page__top">
+    <div className="term-page-top compare-page__top">
       <TermHeader
         name={t('compare.title')}
         sub={t('compare.subtitle', { count: scopeCount, files: nf(totalFiles) })}
       />
-      <div className="compare-header__controls">
+      <div className="term-page-top__controls">
         {openDuelPair && scoredRows.length >= 2 && (
           <DuelTrigger targets={scoredRows} onStart={openDuelPair} openDirect={openDuel} />
         )}
         {board.length > 0 && (
           <DimensionTrigger board={board} onOpen={openDimension} />
         )}
-        <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
-          <button
-            type="button"
-            className="compare-sort__btn compare-sort__btn--on"
-            onClick={toggleSortDir}
-            aria-label={t('compare.sortToggleAria')}
-          >
-            {t('compare.sortScore')} {sortDir === SORT_DIR.DESC ? '↓' : '↑'}
-          </button>
-        </span>
         <ScopePicker
           rows={rows}
           scopeIds={scopeIds}

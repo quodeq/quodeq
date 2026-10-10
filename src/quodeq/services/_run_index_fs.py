@@ -90,3 +90,22 @@ def external_job_is_complete(run_dir: Path) -> bool:
     # run_dir is already resolved; pass its parent straight through
     # instead of splitting it into names and rejoining them.
     return resolve_external_pid(run_dir.parent, run_dir.name) is None
+
+
+def indexed_run_dir(index_db_path: Path | None, job_id: str) -> Path | None:
+    """The run_dir the index recorded for *job_id*, when it still exists.
+
+    A blank run_dir counts as unknown: ``Path("")`` is ``Path(".")``, whose
+    ``is_dir()`` is True.
+    """
+    if index_db_path is None:
+        return None
+    db = _run_index.open_index(index_db_path)
+    try:
+        row = _run_index.get_run(db, job_id)
+    finally:
+        db.close()
+    if row is None or not row.run_dir:
+        return None
+    candidate = Path(row.run_dir)
+    return candidate if candidate.is_dir() else None

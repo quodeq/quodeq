@@ -33,25 +33,30 @@ export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanS
   return payload;
 }
 
+// The ids of *wanted* that map to a real (visible) chip, matched
+// case-insensitively.
+function matchVisible(allDimensions, wanted) {
+  const byLowerId = new Map(allDimensions.map((d) => [String(d.id).toLowerCase(), d.id]));
+  const seed = new Set();
+  for (const id of wanted) {
+    const match = byLowerId.get(String(id).toLowerCase());
+    if (match) seed.add(match);
+  }
+  return seed;
+}
+
 // Seed the selection once from the navigation context (e.g. arriving from a
-// dimension or principle detail). Runs in an effect rather than the useState
-// initializer because the chips (allDimensions) load asynchronously. The ref
-// guards it to a single seed per mount so later re-renders never clobber the
-// user's own toggles. Ids are matched case-insensitively and only kept when
-// they map to a real (visible) chip.
+// dimension or principle detail). Entering Evaluate any other way starts
+// with nothing selected. Runs in an effect because the chips
+// (allDimensions) load asynchronously; the ref keeps it to one seed per
+// mount, so later re-renders never clobber the user's own toggles.
 function useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims) {
   const seededRef = useRef(false);
   useEffect(() => {
-    if (seededRef.current) return;
-    if (!preselectDims || preselectDims.length === 0) return;
+    if (seededRef.current || !preselectDims || preselectDims.length === 0) return;
     if (allDimensions.length === 0) return;
-    const byLowerId = new Map(allDimensions.map((d) => [String(d.id).toLowerCase(), d.id]));
-    const seed = new Set();
-    for (const id of preselectDims) {
-      const match = byLowerId.get(String(id).toLowerCase());
-      if (match) seed.add(match);
-    }
     seededRef.current = true;
+    const seed = matchVisible(allDimensions, preselectDims);
     if (seed.size > 0) setSelectedDims(seed);
   }, [allDimensions, preselectDims]);
 }

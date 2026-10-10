@@ -6,19 +6,20 @@ import { HeroPanel, ComplianceAndRatioStats, ScoreStat, heroCardHandlers, ratioD
 import LastFetchedLine from '../../../components/LastFetchedLine.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import SeverityBadgeRow from './SeverityBadgeRow.jsx';
-import { t } from '../../../strings/index.js';
+import { t, LOCALE } from '../../../strings/index.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 const MAX_LANGS_IN_SUB = 5;
 
+// The project's size first ("3,925 files"), then its top languages.
 function buildLanguageSub(projectInfo) {
+  const files = projectInfo?.filesCount;
+  const total = files != null ? t('overview.filesTotal', { count: files.toLocaleString(LOCALE) }) : null;
   const stats = projectInfo?.languageStats;
-  if (!stats) return null;
-  const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, MAX_LANGS_IN_SUB);
-  if (sorted.length === 0) return null;
-  return sorted
-    .map(([lang, count]) => `${count} ${extDisplayName(lang).toLowerCase()}`)
-    .join('  ');
+  const sorted = stats ? Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, MAX_LANGS_IN_SUB) : [];
+  const langs = sorted.map(([lang, count]) => `${count} ${extDisplayName(lang).toLowerCase()}`).join('  ');
+  if (!total) return langs || null;
+  return langs ? `${total}  ·  ${langs}` : total;
 }
 
 function AccumulatedStatStrip({ scoreDisplay, scoreDelta, grade, customFormula, violations, compliance, totalChecks, ratio, handleViolations, handleCompliance, handleSeverity, severity, deltas, density }) {
@@ -60,7 +61,7 @@ function accumulatedStats(summary) {
   };
 }
 
-/** Sub-line under the term header: the language mix, else the last run date. */
+/** Sub-line under the term header: the size and language mix, else the last run date. */
 function heroSubLine(projectInfo, lastDate) {
   return buildLanguageSub(projectInfo)
     || (lastDate ? t('overview.lastEvaluated', { date: lastDate }) : null);

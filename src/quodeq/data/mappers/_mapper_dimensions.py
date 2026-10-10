@@ -51,6 +51,7 @@ def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
         from_date_iso=get_opt_str(raw.get("fromDateIso")),
         from_date_label=get_opt_str(raw.get("fromDateLabel")),
         run_id=get_opt_str(raw.get("runId")),
+        confidence=get_opt_str(raw.get("confidence")),
     )
 
 

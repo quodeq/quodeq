@@ -6,6 +6,13 @@ import NavBreadcrumb, { labelFor } from './NavBreadcrumb.jsx';
 // Map drill-down entries carry their folder path as a route param (see
 // App.jsx's map renderer); the crumb must read as the folder name so the
 // trail reads map / src / components instead of map / map / map.
+describe('labelFor — explorer entries', () => {
+  it('names the project of a cross-project entry, since the root crumb is the selection', () => {
+    expect(labelFor({ page: 'explorer', dimension: 'Security', fromProjectName: 'benchmark' })).toBe('security · benchmark');
+    expect(labelFor({ page: 'explorer', dimension: 'Security' })).toBe('security');
+  });
+});
+
 describe('labelFor — map drill-down entries', () => {
   it('root map entry (no path) keeps the tab label', () => {
     expect(labelFor({ page: 'map' })).toBe('map');

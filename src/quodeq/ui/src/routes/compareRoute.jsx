@@ -13,6 +13,9 @@ export function compareRoute(params, props) {
     <ComparePage
       projects={props.navigation.projects}
       projectsLoaded={props.navigation.projectsLoaded}
+      // The dimension drill-down highlights this project by default (radar
+      // polygon, standings row, matrix row) until a row is hovered.
+      selectedProject={props.navigation.selectedProject}
       dimension={params.dimension || null}
       onOpenProject={(id, source = PROJECT_SOURCE.LOCAL) => {
         // Remote fleet rows open through the shared source; the same
@@ -36,6 +39,9 @@ export function compareRoute(params, props) {
         runId: target.runId,
         dateLabel: target.dateLabel,
         fromProject: target.id,
+        // Named in the crumb: the root crumb is still the global selection,
+        // so without it the trail never says whose dimension this is.
+        fromProjectName: target.name,
         // The entry's own source, like its own project: the explorer must
         // read a local fromProject from the local API even while the
         // global selection sits on the shared source (and vice versa).

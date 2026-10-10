@@ -30,7 +30,7 @@ export { shouldShowStartupLoader } from './hooks/useStartupTheme.js';
 export default function App() {
   const { dismissFinding } = useApi();
   const state = useAppState();
-  const { sharedSignal, sidebarPinned, setSidebarPinned, dismissRefreshKey, bumpDismissRefresh, applyDelta } =
+  const { sharedSignal, sidebarPinned, setSidebarPinned, applyDelta, recordDismissed } =
     useAppDismissBridge(state);
   const APP_VERSION = state.serverVersion;
 
@@ -46,7 +46,7 @@ export default function App() {
 
   const shell = buildAppShell({
     state, sharedSignal, navTab, navStack, activeTab, activePage, isEvaluating, showToast, setWizardEntry,
-    dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo, showEvaluate,
+    dismissFinding, applyDelta, recordDismissed, selectedProjectInfo, showEvaluate,
     assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel,
     navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, wizardEntry, wizardHandlers,
     filteredAccumulated, filteredTrend,

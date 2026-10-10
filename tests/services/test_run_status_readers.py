@@ -32,21 +32,21 @@ def test_reads_status_json_once_for_all_four_fields(tmp_path: Path):
         return real_read_text(self, *a, **kw)
 
     with patch("pathlib.Path.read_text", counting_read_text):
-        logs, dims, deadline, provider, model, limit = _read_enriched_status_fields(run_dir)
+        f = _read_enriched_status_fields(run_dir)
 
-    assert dims == ["security", "performance"]
-    assert deadline == "2026-09-02T20:00:00+00:00"
-    assert provider == "claude"
-    assert model == "sonnet"
-    assert limit == 3600
+    assert f.dimensions == ["security", "performance"]
+    assert f.deadline_at == "2026-09-02T20:00:00+00:00"
+    assert f.ai_provider == "claude"
+    assert f.ai_model == "sonnet"
+    assert f.time_limit_s == 3600
     assert read_count["n"] == 1, f"expected 1 status.json read, got {read_count['n']}"
 
 
 def test_missing_status_json_returns_all_nones(tmp_path: Path):
     run_dir = tmp_path / "run"
     run_dir.mkdir()
-    logs, dims, deadline, provider, model, limit = _read_enriched_status_fields(run_dir)
-    assert (dims, deadline, provider, model, limit) == (None, None, None, None, None)
+    f = _read_enriched_status_fields(run_dir)
+    assert (f.dimensions, f.deadline_at, f.ai_provider, f.ai_model, f.time_limit_s) == (None, None, None, None, None)
 
 
 class _ReadSpy:

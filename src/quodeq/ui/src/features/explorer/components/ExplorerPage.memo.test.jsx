@@ -4,6 +4,8 @@ import { render } from '@testing-library/react';
 const calls = vi.hoisted(() => ({ radial: 0, enriched: 0, rootFile: 0 }));
 const data = vi.hoisted(() => ({ d: null }));
 
+// The page's own-trend query needs a QueryClient; these render it bare.
+vi.mock('./useExplorerTrend.js', () => ({ useExplorerTrend: (_p, _s, trend) => trend ?? [] }));
 vi.mock('./explorerDataHooks.js', () => ({
   useExplorerData: () => data.d,
   buildEvalPrincipalFn: () => () => ({}),

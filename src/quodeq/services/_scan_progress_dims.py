@@ -1,8 +1,8 @@
 """Per-dimension progress row construction for live scan progress.
 
 Split from ``scan_progress.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim (``_dim_state``, ``_active_agents``,
-``consolidated_dim_progress``), plus ``_dim_files_summary`` and
+300-line cap. Moved verbatim (``_dim_state``, ``_active_agents``), plus
+``_dim_files_summary`` and
 ``build_dim_progress`` extracted from ``build_scan_progress``'s per-dim
 loop body (no logic change, same values, same order). The live-tally memo
 (``_GuardedTally`` and its bounded store) moved out to
@@ -31,7 +31,6 @@ from quodeq.services.wiring import (
     read_req_to_principle_map,
 )
 from quodeq.services.suppression import build_matcher
-from quodeq.shared.constants import CONSOLIDATED_DIMENSION_KEY, EVIDENCE_DIRNAME
 
 _AGENT_ACTIVE_WINDOW_S = 30
 
@@ -163,31 +162,6 @@ def _queue_file_counts(queue: dict) -> dict[str, int]:
             taken += len(fs)
     pending = len(queue.get("pending") or [])
     return {"taken": taken, "total": taken + pending}
-
-
-def consolidated_dim_progress(run_dir: Path, *, memo: LiveTallyMemo | None = None) -> DimProgress:
-    """Progress row for a live consolidated (grouped) pass.
-
-    Evidence counters are the raw cross-dimension tally: suppression netting is per-dimension
-    and cannot be applied to the combined stream, so the live numbers may slightly over-read
-    what the finished reports will show. ``memo`` defaults to the one process-wide
-    :data:`DEFAULT_LIVE_TALLY_MEMO`.
-    """
-    evidence_dir = run_dir / EVIDENCE_DIRNAME
-    queue = read_queue_state(dimension_queue_file(run_dir, CONSOLIDATED_DIMENSION_KEY)) or {}
-    tally = live_tally(evidence_dir / "consolidated_evidence.jsonl",
-                       suppressed=None, make_resolver=None, memo_key=(CONSOLIDATED_DIMENSION_KEY,),
-                       memo=memo)
-    return DimProgress(
-        id=CONSOLIDATED_DIMENSION_KEY,
-        state=DimState.RUNNING,
-        files=_queue_file_counts(queue),
-        violations=tally.violations,
-        compliance=tally.compliance,
-        duplicates=tally.duplicates,
-        elapsed_s=dim_elapsed_s(CONSOLIDATED_DIMENSION_KEY, run_dir, DimState.RUNNING),
-        active_agents=_active_agents(evidence_dir, CONSOLIDATED_DIMENSION_KEY),
-    )
 
 
 def _dim_files_summary(queue: dict | None, d_state: DimState, dim_estimates: dict, dim_id: str) -> dict:

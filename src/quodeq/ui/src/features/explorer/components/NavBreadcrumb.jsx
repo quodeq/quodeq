@@ -1,9 +1,12 @@
-import { Fragment, useRef, useState } from 'react';
-import { collapseCrumbs, isRunDateEntry, ELLIPSIS_OPEN_KEY } from './crumbModel.js';
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
+import { collapseCrumbs, isRunDateEntry, ELLIPSIS_OPEN_KEY, SWITCHER_OPEN_KEY } from './crumbModel.js';
 import { useBreadcrumbDismiss } from './useBreadcrumbDismiss.js';
 import { useHoldToOpen } from './useHoldToOpen.js';
 import NavBreadcrumbEllipsisMenu from './NavBreadcrumbEllipsisMenu.jsx';
 import NavBreadcrumbSegmentMenu from './NavBreadcrumbSegmentMenu.jsx';
+import ProjectSwitcherCrumb from './ProjectSwitcher.jsx';
+import { buildSwitcherRows } from './projectSwitcherModel.js';
+import { useProjectSwitcherHotkey } from '../../../hooks/useProjectSwitcherHotkey.js';
 import { t } from '../../../strings/index.js';
 import { NAV_TAB } from '../../../vocab/navTab.js';
 
@@ -20,6 +23,11 @@ const PAGE_LABELS = {
   help: t('explorer.helpCrumb'),
 };
 
+function explorerLabel(e) {
+  const dim = e.dimension?.toLowerCase();
+  return dim && e.fromProjectName ? t('explorer.dimensionInProject', { dim, project: e.fromProjectName }) : dim;
+}
+
 /**
  * Per-page crumb label: `[read, fallback]`. `read` pulls whatever that page's
  * stack entry carries; when it comes back empty the fallback label is used.
@@ -28,7 +36,9 @@ const PAGE_LABELS = {
 const ENTRY_LABELS = {
   run:           [(e) => e.label || e.runId, t('explorer.runFallback')],
   'history-run': [(e) => e.dateLabel || e.runId, t('explorer.runFallback')],
-  explorer:      [(e) => e.dimension?.toLowerCase(), t('explorer.dimensionFallback')],
+  // A cross-project entry (Compare) names its project: the root crumb is
+  // the global selection, not the project this dimension belongs to.
+  explorer:      [explorerLabel, t('explorer.dimensionFallback')],
   violation:     [(e) => e.label || e.principle?.name, t('explorer.violationFallback')],
   file:          [(e) => e.label || e.file?.path, t('explorer.fileFallback')],
   principle:     [(e) => e.label, t('explorer.principleFallback')],
@@ -73,7 +83,7 @@ function buildCrumbs(stack, projectName) {
 
 /** One rendered segment: the ellipsis chip, a sibling-menu segment, or a
  * plain (possibly clickable) crumb. */
-function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey, goTo, onGoTo, holder, onSelectProject }) {
+function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey, goTo, onGoTo, holder, onSelectProject, switcher }) {
   if (seg.ellipsis) {
     return (
       <NavBreadcrumbEllipsisMenu
@@ -87,6 +97,18 @@ function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey,
   const crumbClass = `nav-breadcrumb__crumb${isLast ? ' is-current' : ''}${
     seg.isProject ? ' nav-breadcrumb__crumb--project' : ''
   }${hasMenu ? ' nav-breadcrumb__crumb--menu' : ''}`;
+
+  // With projects to switch between, the project root opens the switcher;
+  // with none it keeps navigating to Repositories (below).
+  if (seg.isProject && switcher) {
+    return (
+      <ProjectSwitcherCrumb
+        seg={seg} sep={sep} crumbClass={crumbClass} switcher={switcher}
+        open={openKey === SWITCHER_OPEN_KEY}
+        setOpen={(next) => setOpenKey(next ? SWITCHER_OPEN_KEY : null)}
+      />
+    );
+  }
 
   if (hasMenu) {
     const menuKey = `seg-${seg.index}`;
@@ -120,6 +142,23 @@ function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey,
   );
 }
 
+/** The switcher's rows and handlers, or null when there is no project crumb
+ * or no project to list (the crumb then keeps its plain navigation). */
+function useSwitcher(projectSwitcher, hasProjectCrumb) {
+  const projects = projectSwitcher?.projects;
+  const sharedProjects = projectSwitcher?.sharedProjects;
+  const rows = useMemo(() => buildSwitcherRows(projects, sharedProjects), [projects, sharedProjects]);
+  if (!projectSwitcher || !hasProjectCrumb || rows.length === 0) return null;
+  const { selectedProject, onPick, onAllRepositories, onAddProject } = projectSwitcher;
+  return {
+    rows,
+    currentId: selectedProject ?? null,
+    onPick: (row) => onPick(row.id, row.source),
+    onAllRepositories,
+    onAddProject,
+  };
+}
+
 /**
  * NavBreadcrumb — the app's address bar, in the TopBar on desktop.
  *
@@ -139,13 +178,20 @@ function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey,
  * Ancestor menus are a path, sibling menus are a choice — they're styled
  * differently on purpose.
  *
+ * Project switcher: given `projectSwitcher` and at least one project, local
+ * or remote, the project root opens a searchable project list (also on Cmd/Ctrl+P)
+ * instead of navigating to Repositories; see ProjectSwitcher.jsx.
+ *
  * Segments never wrap; only the current (last) segment may shrink.
  */
-export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelectProject, siblingsFor }) {
+export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelectProject, siblingsFor, projectSwitcher }) {
   const [openKey, setOpenKey] = useState(null);
   const rootRef = useRef(null);
   useBreadcrumbDismiss(openKey, setOpenKey, rootRef);
   const holder = useHoldToOpen(setOpenKey);
+  const switcher = useSwitcher(projectSwitcher, !!projectName);
+  const openSwitcher = useCallback(() => setOpenKey(SWITCHER_OPEN_KEY), []);
+  useProjectSwitcherHotkey(!!switcher, openSwitcher);
 
   const crumbs = buildCrumbs(stack, projectName);
   if (crumbs.length === 0) return null;
@@ -169,7 +215,7 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
               <BreadcrumbSegment
                 seg={seg} sep={sep} isLast={seg === lastCrumb} siblingsFor={siblingsFor}
                 openKey={openKey} setOpenKey={setOpenKey} goTo={goTo} onGoTo={onGoTo}
-                holder={holder} onSelectProject={onSelectProject}
+                holder={holder} onSelectProject={onSelectProject} switcher={switcher}
               />
             </Fragment>
           );

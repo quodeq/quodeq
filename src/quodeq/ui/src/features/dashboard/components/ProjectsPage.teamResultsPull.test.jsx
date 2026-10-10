@@ -11,7 +11,7 @@ const tooLarge = (finishedAt) => ({
   state: 'error', phase: SYNC_PHASE.ERROR, project: SHARED.id, code: 'PULL_TOO_LARGE',
   error: 'Project exceeds maximum export size of 500 MB compressed.', finishedAt,
 });
-const cardOf = (text) => screen.getByText(text).closest('.project-card');
+const cardOf = (text) => screen.getByText(text).closest('.projects-row-group');
 
 afterEach(() => { vi.clearAllMocks(); });
 

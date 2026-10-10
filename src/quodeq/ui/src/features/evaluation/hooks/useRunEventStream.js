@@ -40,13 +40,25 @@ const MAX_FINDINGS_IN_CACHE = 5000;
 // block at a time pays that once per block instead.
 const FINDINGS_TRIM_SLACK = 1000;
 
-function appendBoundedFinding(prev, data) {
-  if (prev.length >= MAX_FINDINGS_IN_CACHE + FINDINGS_TRIM_SLACK) {
-    const trimmed = prev.slice(prev.length - MAX_FINDINGS_IN_CACHE + 1);
-    trimmed.push(data);
-    return trimmed;
+// Findings are written to the cache in batches, at most one write per this
+// many ms. Every write regroups the list and re-renders the feed, and a
+// replayed run delivers thousands of frames back to back.
+export const FINDINGS_FLUSH_MS = 100;
+// EventSource.CLOSED. A closed source's pending rows are dropped: the next
+// connection replays the run from its first event.
+const SOURCE_CLOSED = 2;
+
+// Each row is stamped with its place in the stream. The feed's per-dimension
+// grouping loses the order across dimensions, and the live ticker needs it to
+// show the latest findings whichever dimension they came from.
+function appendBoundedFindings(prev, findings) {
+  let seq = prev.at(-1)?.arrivalSeq ?? 0;
+  const stamped = findings.map((f) => ({ ...f, arrivalSeq: ++seq }));
+  const total = prev.length + stamped.length;
+  if (total > MAX_FINDINGS_IN_CACHE + FINDINGS_TRIM_SLACK) {
+    return [...prev, ...stamped].slice(total - MAX_FINDINGS_IN_CACHE);
   }
-  return [...prev, data];
+  return [...prev, ...stamped];
 }
 
 // A dimension just scored. The run's own pages (opened from a running
@@ -60,7 +72,29 @@ function invalidateRunQueries(queryClient, jobId) {
   queryClient.invalidateQueries({ predicate: (query) => isRunQueryKey(query.queryKey, runId) });
 }
 
+// Holds finding frames and writes them to the cache together, one write per
+// FINDINGS_FLUSH_MS at most. `flush` lands whatever is pending right away.
+function createFindingBatcher({ source, jobId, writeCache }) {
+  let pending = [];
+  let timer = null;
+  const flush = () => {
+    clearTimeout(timer);
+    timer = null;
+    const batch = pending;
+    pending = [];
+    if (!batch.length || source.readyState === SOURCE_CLOSED) return;
+    writeCache(evaluationKeys.findings(jobId), (prev) => appendBoundedFindings(prev ?? [], batch));
+  };
+  const push = (finding) => {
+    pending.push(finding);
+    timer ??= setTimeout(flush, FINDINGS_FLUSH_MS);
+  };
+  return { push, flush };
+}
+
 function wireRunEventSource({ source, finish, jobId, writeCache, queryClient }) {
+  const findings = createFindingBatcher({ source, jobId, writeCache });
+
   source.addEventListener(SSE_EVENT.STATUS, (e) => {
     try {
       // The frame is the raw snake_case status.json, whose `state` is a
@@ -108,17 +142,14 @@ function wireRunEventSource({ source, finish, jobId, writeCache, queryClient }) 
       // the raw frame rather than replacing it, so id/verdict/confidence,
       // which the model does not carry, survive for other readers.
       const raw = JSON.parse(e.data);
-      const data = { ...raw, ...createViolation(raw) };
-      writeCache(
-        evaluationKeys.findings(jobId),
-        (prev = []) => appendBoundedFinding(prev, data),
-      );
+      findings.push({ ...raw, ...createViolation(raw) });
     } catch (err) {
       console.warn("[useRunEventStream] could not parse finding frame:", err);
     }
   });
 
-  source.addEventListener(SSE_EVENT.DONE, finish);
+  // Pending findings land before the run reads as finished.
+  source.addEventListener(SSE_EVENT.DONE, () => { findings.flush(); finish(); });
 }
 
 /**

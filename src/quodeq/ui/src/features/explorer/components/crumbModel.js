@@ -18,6 +18,8 @@ import { NAV_TAB } from '../../../vocab/navTab.js';
 // opposed to a numbered `seg-<index>` sibling-menu key. Shared by
 // NavBreadcrumb.jsx and NavBreadcrumbEllipsisMenu.jsx, which open/close it.
 export const ELLIPSIS_OPEN_KEY = 'ellipsis';
+// openKey sentinel for the project root's switcher popover (ProjectSwitcher.jsx).
+export const SWITCHER_OPEN_KEY = 'project-switcher';
 
 const RUN_DATE_PAGES = new Set([NAV_TAB.RUN, NAV_TAB.HISTORY_RUN]);
 

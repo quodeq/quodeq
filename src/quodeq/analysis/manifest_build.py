@@ -9,6 +9,7 @@ from typing import TypeVar
 
 from quodeq.analysis._ignore import load_ignore_patterns
 from quodeq.analysis.manifest_build_scope import build_multi_scope_manifest
+from quodeq.analysis.manifest_lines import count_source_lines
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.analysis.manifest_targets import (
     MIN_FILES_PER_TARGET,
@@ -133,6 +134,9 @@ def _build_single_scope_manifest(
         language_stats=dict(ext_counts),
         skipped_untracked=skipped,
         unreadable_dirs=unreadable,
+        total_lines=count_source_lines(
+            src, (rel for lang_files in files_by_lang.values() for rel in lang_files),
+        ) if walk.count_lines else None,
     )
 
 
@@ -175,6 +179,7 @@ def build_manifest(
     scope_path: str | None = None,
     *,
     tracked_files: set[Path] | None = None,
+    count_lines: bool = True,
 ) -> SourceManifest:
     """Walk a repository and build a SourceManifest.
 
@@ -207,6 +212,9 @@ def build_manifest(
     mid-walk) are reported on the manifest as ``unreadable_dirs`` and logged
     once at warning when non-zero, so a partially-scanned repo does not look
     identical to a fully-scanned one.
+
+    *count_lines* False skips reading every source file for ``total_lines``
+    (left None), for callers that only count files.
     """
     walk = ManifestWalkSpec(
         ext_map=detection.get("extensions", {}),
@@ -214,6 +222,7 @@ def build_manifest(
         skip_patterns=detection.get("skip_patterns", []),
         ignore_patterns=load_ignore_patterns(src),
         tracked_files=tracked_files if tracked_files is not None else list_tracked_files(src),
+        count_lines=count_lines,
     )
     manifest = _dispatch_manifest_build(src, walk, disciplines_conf, scope_path)
     _log_manifest_diagnostics(manifest, src)

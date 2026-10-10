@@ -50,7 +50,7 @@ def _resolve_exit_reason(evidence_list: list[Evidence]) -> str | None:
 
 def merge_evidence(
     evidence_list: list[Evidence], source_file_count: int, src: str, language: str,
-    module: str = "",
+    module: str = "", source_line_count: int | None = None,
 ) -> Evidence:
     """Merge per-dimension Evidence objects into a single Evidence."""
     merged_principles, total_files_read, total_dismissed = _merge_principles(
@@ -75,5 +75,6 @@ def merge_evidence(
         dismissed_count=total_dismissed,
         exit_reason=merged_exit_reason,
         module=module,
+        source_line_count=source_line_count,
     )
     return merged

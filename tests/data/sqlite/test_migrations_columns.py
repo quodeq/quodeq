@@ -8,7 +8,7 @@ def test_schema_version_is_pinned():
     # The v5 baseline DDL and the per-version upgrade cases below (and v10 in
     # test_migrations_unmapped.py) target v10;
     # bumping SCHEMA_VERSION without extending them leaves the new path untested.
-    assert SCHEMA_VERSION == 10
+    assert SCHEMA_VERSION == 11
 
 
 # The findings table at SCHEMA_VERSION=5, before issue #656 added

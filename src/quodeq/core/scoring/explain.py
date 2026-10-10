@@ -1,39 +1,45 @@
-"""The stage values behind one principle's score, for the help page's worked example."""
+"""The stage values behind one principle's score, for the Help page and the Settings editor."""
 from __future__ import annotations
 
 from typing import Any
 
-from quodeq.core.scoring._tallies import weighted_sum
 from quodeq.core.scoring.internals import (
-    principle_stages,
-    score_to_grade_label,
-    severity_grade_floor,
-    violation_ceiling,
+    principle_stages, score_to_grade_label, severity_grade_floor, violation_ceiling,
 )
+from quodeq.core.scoring.mass import PrincipleMass, ViolationRow
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.severity import Severity
 
-_SEVERITIES = (Severity.CRITICAL, Severity.MAJOR, Severity.MINOR)
 
-
-def explain_principle(
-    vt_counts: dict[str, int], ct_counts: dict[str, int],
-    *, params: ScoringParams = DEFAULT_PARAMS,
-) -> dict[str, Any]:
-    """Every intermediate of ``principle_score_and_grade`` for one principle.
-
-    Same functions, same order, so ``final`` and ``grade`` equal what the
-    grade tables hold for the same tallies and parameters."""
-    base, lift, raw, final = principle_stages(vt_counts, ct_counts, params=params)
+def _requirement_entry(row: ViolationRow) -> dict[str, Any]:
     return {
-        "types": {str(sev): int(vt_counts.get(sev, 0)) for sev in _SEVERITIES},
-        "complianceTypes": int(sum(ct_counts.values())),
-        "weightedViolations": weighted_sum(vt_counts, params.severity_weight),
+        "req": row.req,
+        "filesAtLeastMinor": row.files_at_least[Severity.MINOR],
+        "filesAtLeastMajor": row.files_at_least[Severity.MAJOR],
+        "filesAtLeastCritical": row.files_at_least[Severity.CRITICAL],
+        "spreadMinor": row.spread_at_least[Severity.MINOR],
+        "spreadMajor": row.spread_at_least[Severity.MAJOR],
+        "spreadCritical": row.spread_at_least[Severity.CRITICAL],
+        "weight": row.weight,
+    }
+
+
+def explain_principle(mass: PrincipleMass, *, params: ScoringParams = DEFAULT_PARAMS) -> dict[str, Any]:
+    """Every intermediate of ``principle_score_and_grade`` for one principle."""
+    base, lift, raw, final = principle_stages(mass, params=params)
+    return {
+        "violationRules": len(mass.violations),
+        "complianceRules": len(mass.compliance),
+        "violationMass": mass.violation_mass,
+        "complianceMass": mass.compliance_mass,
+        "observation": mass.observation,
+        "requirements": [_requirement_entry(r) for r in mass.violations],
+        "compliance": [{"req": c.req, "filesOk": c.files_ok, "spread": c.spread} for c in mass.compliance],
         "base": base,
         "lift": lift,
         "raw": raw,
-        "ceiling": violation_ceiling(vt_counts, params=params),
-        "floor": severity_grade_floor(vt_counts, params=params),
+        "ceiling": violation_ceiling(mass.violation_mass, params=params),
+        "floor": severity_grade_floor(mass.worst, params=params),
         "final": final,
         "grade": score_to_grade_label(final, params=params),
     }

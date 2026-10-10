@@ -65,7 +65,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     restoreFinding.mockResolvedValueOnce({ ok: true });
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -80,7 +80,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     restoreFinding.mockRejectedValueOnce(new Error('boom'));
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -96,7 +96,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -111,7 +111,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     deleteFinding.mockResolvedValueOnce({ ok: true, swept: 1 });
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -127,7 +127,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     deleteAllFindings.mockResolvedValueOnce({ ok: true, deleted: 2 });
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -142,7 +142,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     confirmDialog.mockResolvedValueOnce(false);
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -163,7 +163,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
 
     await act(async () => { await result.current.handleRestore(sampleA); });
 
-    expect(result.current.dismissed).toEqual([sampleB]);
+    await waitFor(() => expect(result.current.dismissed).toEqual([sampleB]));
   });
 });
 
@@ -177,7 +177,7 @@ describe('useDismissedFindings — shared source', () => {
   it('reads the dismissed list via the shared endpoint instead of the local one', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -189,7 +189,7 @@ describe('useDismissedFindings — shared source', () => {
   it('handleRestore no-ops and never calls the local restore endpoint', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -197,13 +197,13 @@ describe('useDismissedFindings — shared source', () => {
     await act(async () => { await result.current.handleRestore(sampleA); });
 
     expect(restoreFinding).not.toHaveBeenCalled();
-    expect(result.current.dismissed).toEqual([sampleA]);
+    await waitFor(() => expect(result.current.dismissed).toEqual([sampleA]));
   });
 
   it('handleRestoreAll no-ops and never calls the local restore-all endpoint', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -211,13 +211,13 @@ describe('useDismissedFindings — shared source', () => {
     await act(async () => { await result.current.handleRestoreAll(); });
 
     expect(restoreAllFindings).not.toHaveBeenCalled();
-    expect(result.current.dismissed).toEqual([sampleA, sampleB]);
+    await waitFor(() => expect(result.current.dismissed).toEqual([sampleA, sampleB]));
   });
 
   it('handleDelete no-ops and never calls the local delete endpoint', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -225,13 +225,13 @@ describe('useDismissedFindings — shared source', () => {
     await act(async () => { await result.current.handleDelete(sampleA); });
 
     expect(deleteFinding).not.toHaveBeenCalled();
-    expect(result.current.dismissed).toEqual([sampleA]);
+    await waitFor(() => expect(result.current.dismissed).toEqual([sampleA]));
   });
 
   it('handleDeleteAll no-ops and never opens the confirm dialog', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -240,7 +240,7 @@ describe('useDismissedFindings — shared source', () => {
 
     expect(confirmDialog).not.toHaveBeenCalled();
     expect(deleteAllFindings).not.toHaveBeenCalled();
-    expect(result.current.dismissed).toEqual([sampleA]);
+    await waitFor(() => expect(result.current.dismissed).toEqual([sampleA]));
   });
 
   it('defaults to local source when selectedSource is omitted', async () => {

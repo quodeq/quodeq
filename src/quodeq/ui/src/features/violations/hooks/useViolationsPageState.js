@@ -35,7 +35,7 @@ export function useViolationsTabKeyReset({ tabKey, selectedProject, cache }) {
  * summary state: the visible dimensions, their rolled-up counts, and the
  * currently browsed path (cached per project so a round trip resumes there).
  */
-export function useViolationsData({ accumulatedDimensions, selectedProject, onReconcile, initialFilePath, dismissRefreshKey, selectedSource, cache }) {
+export function useViolationsData({ accumulatedDimensions, selectedProject, onReconcile, initialFilePath, selectedSource, cache }) {
   const [fileCurrentPath, _setFileCurrentPath] = useState(initialFilePath);
   const write = cache ? cache.writeCachedState : writeCachedState;
   const setFileCurrentPath = (v) => {
@@ -44,12 +44,10 @@ export function useViolationsData({ accumulatedDimensions, selectedProject, onRe
   };
 
   const [restoreError, setRestoreError] = useState(null);
-  // dismissRefreshKey is bumped by App.jsx after a dismiss POST elsewhere.
-  // useDismissedFindings refetches when this changes, so the dismissed
-  // sub-tab reflects new entries without needing the user to re-open the
-  // page or switch projects.
-  const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } =
-    useDismissedFindings({ selectedProject, setRestoreError, refreshKey: dismissRefreshKey, selectedSource, onReconcile });
+  // The dismissed list is a project query: a dismiss made elsewhere prepends
+  // its entry to it and the reconcile refetches it (see useDismissedFindings).
+  const { dismissed, loading: dismissedLoading, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } =
+    useDismissedFindings({ selectedProject, setRestoreError, selectedSource, onReconcile });
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -70,6 +68,7 @@ export function useViolationsData({ accumulatedDimensions, selectedProject, onRe
 
   return {
     dismissed,
+    dismissedLoading,
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
     restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
@@ -98,14 +97,13 @@ function countDistinctViolationField(dimensions, field) {
  * page-state cache; omit it in production, where the page shares the
  * module-level default (see pageStateCache.js).
  */
-export function useViolationsPageState({ tabKey, selectedProject, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource, cache }) {
+export function useViolationsPageState({ tabKey, selectedProject, onReconcile, accumulatedDimensions, selectedSource, cache }) {
   const cached = useViolationsTabKeyReset({ tabKey, selectedProject, cache });
   return useViolationsData({
     accumulatedDimensions,
     selectedProject,
     onReconcile,
     initialFilePath: cached.fileCurrentPath,
-    dismissRefreshKey,
     selectedSource,
     cache,
   });

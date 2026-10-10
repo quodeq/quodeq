@@ -20,7 +20,7 @@
           "id": "R-MAT-1",
           "source": "iso25010",
           "text": "All public functions MUST have corresponding test files",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -35,7 +35,7 @@
           "id": "R-MAT-2",
           "source": "iso25010",
           "text": "Edge cases (empty input, boundary values) MUST be tested explicitly",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -62,7 +62,7 @@
           "id": "R-MAT-3",
           "source": "iso25010",
           "text": "Error paths MUST be tested, not only happy paths",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -89,7 +89,7 @@
           "id": "R-MAT-4",
           "source": "iso25010",
           "text": "Deprecated APIs MUST NOT be used; use supported alternatives",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -110,7 +110,7 @@
           "id": "R-MAT-5",
           "source": "iso25010",
           "text": "Type annotations MUST be used on public function signatures",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -125,7 +125,7 @@
           "id": "R-MAT-6",
           "source": "iso25010",
           "text": "Resources MUST be properly initialized before use",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -152,7 +152,7 @@
           "id": "R-MAT-7",
           "source": "iso25010",
           "text": "Concurrent access to shared resources MUST be properly synchronized",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -233,7 +233,7 @@
           "id": "R-MAT-8",
           "source": "iso25010",
           "text": "Calculations and comparisons MUST be correct and avoid undefined behavior",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -261,7 +261,7 @@
           "id": "R-AVL-1",
           "source": "iso25010",
           "text": "Health-check endpoints MUST be implemented for long-running services",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -282,7 +282,7 @@
           "id": "R-AVL-2",
           "source": "iso25010",
           "text": "Circuit breakers MUST be used for external service calls",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -297,7 +297,7 @@
           "id": "R-AVL-3",
           "source": "iso25010",
           "text": "Retry logic MUST use exponential backoff with jitter",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -312,7 +312,7 @@
           "id": "R-AVL-4",
           "source": "iso25010",
           "text": "Timeouts MUST be set on all external HTTP and database calls",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -327,7 +327,7 @@
           "id": "R-AVL-5",
           "source": "iso25010",
           "text": "Graceful shutdown handlers MUST be implemented for server processes",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -367,7 +367,7 @@
           "id": "R-FT-1",
           "source": "iso25010",
           "text": "Exceptions MUST be caught and handled; empty catch blocks are forbidden",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -394,7 +394,7 @@
           "id": "R-FT-2",
           "source": "iso25010",
           "text": "Null/undefined dereferences MUST be guarded before use",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -421,7 +421,7 @@
           "id": "R-FT-3",
           "source": "iso25010",
           "text": "Async operations MUST handle rejection/error paths explicitly",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -442,7 +442,7 @@
           "id": "R-FT-4",
           "source": "iso25010",
           "text": "Input from external sources MUST be validated before processing",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -457,7 +457,7 @@
           "id": "R-FT-5",
           "source": "iso25010",
           "text": "Fallback values MUST be provided for optional configuration",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -472,7 +472,7 @@
           "id": "R-FT-6",
           "source": "iso25010",
           "text": "Return values from fallible operations MUST be checked",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -493,7 +493,7 @@
           "id": "R-FT-7",
           "source": "iso25010",
           "text": "Catch blocks MUST target specific exception types, not generic Exception. A generic catch is compliant only when it re-raises the caught exception (or checks its type and rethrows every other one), or at a fault-isolation boundary (a thread or task entry point, one iteration of an event loop or work queue, or a third-party or plugin callback) that records the error with its stack trace at warning level or above and does not continue with partially-updated state; a generic catch around ordinary logic is a violation",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -514,7 +514,7 @@
           "id": "R-FT-8",
           "source": "iso25010",
           "text": "Throw declarations MUST specify concrete exception types",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -541,7 +541,7 @@
           "id": "R-FT-9",
           "source": "iso25010",
           "text": "Boundary and edge-case conditions MUST be checked explicitly",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -568,7 +568,7 @@
           "id": "R-FT-10",
           "source": "iso25010",
           "text": "Control flow MUST be structured and predictable; no unreachable statements",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -589,7 +589,7 @@
           "id": "R-FT-11",
           "source": "iso25010",
           "text": "Recursive functions MUST have verifiable termination conditions",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -610,7 +610,7 @@
           "id": "R-FT-12",
           "source": "iso25010",
           "text": "All loops MUST have reachable termination conditions",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -631,7 +631,7 @@
           "id": "R-FT-13",
           "source": "iso25010",
           "text": "Temporary files MUST be created using secure APIs (mktemp) to prevent race conditions",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -646,7 +646,7 @@
           "id": "R-FT-14",
           "source": "iso25010",
           "text": "Error conditions MUST be detected and handled, not silently ignored",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -745,7 +745,7 @@
           "id": "R-FT-15",
           "source": "iso25010",
           "text": "Switch statements MUST include default cases and break statements",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -766,7 +766,7 @@
           "id": "R-FT-16",
           "source": "iso25010",
           "text": "Incorrect operators and type conversions MUST be avoided",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -799,7 +799,7 @@
           "id": "R-FT-17",
           "source": "iso25010",
           "text": "Custom error pages MUST be configured to prevent default framework error pages from being served",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -821,7 +821,7 @@
           "id": "R-REC-1",
           "source": "iso25010",
           "text": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -854,7 +854,7 @@
           "id": "R-REC-2",
           "source": "iso25010",
           "text": "Database transactions MUST be rolled back on error",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -887,7 +887,7 @@
           "id": "R-REC-3",
           "source": "iso25010",
           "text": "Temporary files MUST be cleaned up in finally/defer blocks",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -926,7 +926,7 @@
           "id": "R-REC-4",
           "source": "iso25010",
           "text": "Persistent operations MUST be idempotent or use transaction guards",
-          "severity": null,
+          "severity": "major",
           "scope": null,
           "refs": [
             {
@@ -959,7 +959,7 @@
           "id": "R-REC-5",
           "source": "iso25010",
           "text": "Error messages MUST include enough context for diagnosis (operation, input, state)",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {
@@ -980,7 +980,7 @@
           "id": "R-REC-6",
           "source": "iso25010",
           "text": "Resources MUST be properly released and cleaned up after use",
-          "severity": null,
+          "severity": "minor",
           "scope": null,
           "refs": [
             {

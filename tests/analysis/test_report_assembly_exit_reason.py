@@ -35,3 +35,15 @@ def test_report_dict_exit_reason_none_when_evidence_missing_field():
     data.evidence.pop("exit_reason")
     report = assemble_report_dict(data)
     assert report.get("exitReason") is None
+
+
+def test_report_meta_names_the_grade_formula_version():
+    from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
+
+    data = ReportData(
+        dimension="security", evidence=_evidence_dict(None),
+        top_score=None, top_grade=None,
+        principle_rows=[], flat_violations=[], flat_compliance=[],
+        sev_tally={"critical": 0, "major": 0, "minor": 0},
+    )
+    assert assemble_report_dict(data)["meta"]["gradeAlgoVersion"] == GRADE_ALGO_VERSION

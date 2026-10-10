@@ -5,10 +5,13 @@ Split from test_grade_formula.py.
 from __future__ import annotations
 
 import dataclasses
+import json
 
 import pytest
 
-from quodeq.core.scoring.params import DEFAULT_PARAMS
+from quodeq.core.scoring.params import DEFAULT_PARAMS, params_to_dict
+from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
+from quodeq.data.fs.grade_formula_store import ALGO_VERSION_KEY
 from quodeq.services import grade_formula
 
 from tests.services._grade_formula_fixtures import formula_path  # noqa: F401 -- pytest fixture
@@ -25,6 +28,24 @@ def test_save_then_load_round_trips(formula_path):
     assert formula_path.is_file()
     assert grade_formula.load_params() == custom
     assert grade_formula.is_custom() is True
+
+
+def test_save_stamps_the_grade_algorithm_version(formula_path):
+    grade_formula.save_params(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
+    saved = json.loads(formula_path.read_text())
+    assert saved[ALGO_VERSION_KEY] == GRADE_ALGO_VERSION
+
+
+def test_formula_saved_under_an_older_algorithm_is_retired(formula_path):
+    """Constants tuned for the previous mechanics must not drive the new ones:
+    the file is ignored, the defaults apply and the UI shows no custom badge."""
+    old = params_to_dict(dataclasses.replace(DEFAULT_PARAMS, base_k=0.12, floor_minor=8.0))
+    formula_path.write_text(json.dumps(old))
+    assert grade_formula.load_params() == DEFAULT_PARAMS
+    assert grade_formula.is_custom() is False
+    formula_path.write_text(json.dumps(old | {ALGO_VERSION_KEY: GRADE_ALGO_VERSION - 1}))
+    assert grade_formula.load_params() == DEFAULT_PARAMS
+    assert grade_formula.is_custom() is False
 
 
 def test_load_falls_back_to_defaults_on_corrupt_file(formula_path):

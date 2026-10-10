@@ -24,6 +24,14 @@ export function CopyIcon() {
   );
 }
 
+export function CheckIcon() {
+  return (
+    <Icon size={ICON_SIZE} strokeWidth="2.4">
+      <polyline points="20 6 9 17 4 12" />
+    </Icon>
+  );
+}
+
 export function FileTextIcon() {
   return (
     <Icon size={ICON_SIZE}>

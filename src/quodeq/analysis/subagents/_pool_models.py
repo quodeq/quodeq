@@ -48,7 +48,7 @@ class PoolOptions:
     """Grouped behavioral configuration for the subagent pool."""
     n_agents: int
     prompt: str
-    dimension: str | list[str]
+    dimension: str
     scout_first: bool = True
     phase: str = "ANALYSIS"
     # The run's AnalysisOptions.agent_failure_streak_limit.

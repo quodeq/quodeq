@@ -16,7 +16,7 @@ export const dimensionTabId = (key) => `compare-dimension-tab-${key}`;
  * dimensions without a local back button — the app breadcrumb walks back). */
 export default function CompareDimensionHeader({ view, board, onOpenDimension }) {
   return (
-    <div className="compare-page__top">
+    <div className="term-page-top compare-page__top">
       <div className="compare-page__titles">
         <TermHeader
           name={view.label}
@@ -35,11 +35,11 @@ export default function CompareDimensionHeader({ view, board, onOpenDimension })
           )}
         />
       </div>
-      <div className="compare-header__controls">
+      <div className="term-page-top__controls">
         {/* A tab bar in behaviour as well as looks: each button switches the
             screen below it, so the open dimension needs aria-selected and not
             just the --on class to be announced (U-ACC-1). */}
-        <span className="compare-sort" role="tablist" aria-label={t('compare.dimensionTabsAria')}>
+        <span className="term-seg" role="tablist" aria-label={t('compare.dimensionTabsAria')}>
           {board.map((b) => {
             const isSelected = b.key === view.key;
             return (
@@ -53,7 +53,7 @@ export default function CompareDimensionHeader({ view, board, onOpenDimension })
                 /* The visible text is clipped to five characters, so the
                    whole dimension name has to come from the label. */
                 aria-label={b.label}
-                className={`compare-sort__btn${isSelected ? ' compare-sort__btn--on' : ''}`}
+                className={`term-btn${isSelected ? ' term-btn--on' : ''}`}
                 onClick={() => onOpenDimension(b.key)}
               >
                 {b.label.slice(0, TAB_LABEL_CHARS)}

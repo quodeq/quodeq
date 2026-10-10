@@ -22,7 +22,6 @@ def _minimal_config(diff_from: str | None, skip_scoring: bool, incremental: bool
             skip_scoring=skip_scoring,
             incremental=incremental,
             incremental_file_filter={"a.py"} if diff_from else None,
-            consolidated=False,
             max_subagents=1,
         ),
     )

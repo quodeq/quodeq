@@ -31,13 +31,12 @@ import { COMPARE_VIEW_FLEET } from '../compareModel.js';
 import { projectId } from '../../../utils/projectIdentity.js';
 
 function buildSharedProps({
-  rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir, setSortDir,
+  rows, orderedRows, scopeRows, fleet, board, attention, errorsById,
   hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount, toggleProject, selectAll,
   selectFlagged, openDimension, onOpenProjectDimension, onOpenDuel, openProject, now,
 }) {
   return {
-    rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir,
-    toggleSortDir: () => setSortDir((d) => (d === SORT_DIR.DESC ? SORT_DIR.ASC : SORT_DIR.DESC)),
+    rows, orderedRows, scopeRows, fleet, board, attention, errorsById,
     hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount, toggleProject,
     selectAll, selectFlagged, openDimension,
     // Expanded-row dimension chips jump to that project's own dimension
@@ -95,9 +94,8 @@ function useComparePageState({
   onSwitchDimension, onOpenEvalPrincipal,
 }) {
   const view = dimension || COMPARE_VIEW_FLEET;
-  // Score is the only table ordering (consequence ranked near-inverse of it
-  // on real fleets); the toggle flips best-first / worst-first.
-  const [sortDir, setSortDir] = useState(SORT_DIR.DESC);
+  // Rows arrive best-first; the fleet tables re-rank by their own column headers.
+  const sortDir = SORT_DIR.DESC;
   const [pickerOpen, setPickerOpen] = useState(false);
   // null scope = everything (including projects added later); an array is an
   // explicit selection.
@@ -116,7 +114,7 @@ function useComparePageState({
   }, [dimension, onOpenDimension, onSwitchDimension]);
 
   return {
-    view, sortDir, setSortDir, pickerOpen, setPickerOpen, scopeIds, now,
+    view, pickerOpen, setPickerOpen, scopeIds, now,
     ...rowsState, toggleProject, selectAll, selectFlagged, openPrinciple, openDimension,
   };
 }
@@ -148,17 +146,19 @@ function comparePageStatus(projectsLoaded, fleetProjects, rootRef) {
 
 /** Picks the active view: duel, dimension drill-down, or the fleet landing
  * page. */
-function ComparePageBody({ duelView, dimensionView, board, openDimension, openProject, openPrinciple, onOpenProjectDimension, shared }) {
+function ComparePageBody({ duelView, dimensionView, board, selectedProject, openDimension, openProject, openPrinciple, onOpenProjectDimension, shared }) {
   if (duelView) return <CompareDuelView duel={duelView} onOpenProject={openProject} />;
   if (dimensionView) {
     return (
       <CompareDimensionView
         view={dimensionView}
         board={board}
+        selectedProject={selectedProject}
         onOpenDimension={openDimension}
         onOpenProject={openProject}
         onOpenPrinciple={openPrinciple}
         onOpenProjectDimension={onOpenProjectDimension}
+        scopeCount={shared.scopeCount}
       />
     );
   }
@@ -167,6 +167,7 @@ function ComparePageBody({ duelView, dimensionView, board, openDimension, openPr
 
 export default function ComparePage({
   projects, projectsLoaded, onOpenProject,
+  selectedProject = null,
   dimension = null,
   onOpenDimension,
   onSwitchDimension,
@@ -178,7 +179,7 @@ export default function ComparePage({
   const { fleetProjects } = useFleetProjects(projects);
   const { summariesById, errorsById } = useCompareData(fleetProjects);
   const {
-    view, sortDir, setSortDir, pickerOpen, setPickerOpen, scopeIds, now,
+    view, pickerOpen, setPickerOpen, scopeIds, now,
     rows, openProject, scopeSet, scopeRows, fleet, board, attention,
     orderedRows, dimensionView, duelView,
     toggleProject, selectAll, selectFlagged, openPrinciple, openDimension,
@@ -199,7 +200,7 @@ export default function ComparePage({
 
   const scopeCount = scopeSet && scopeSet.size ? scopeRows.length : rows.length;
   const shared = buildSharedProps({
-    rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir, setSortDir,
+    rows, orderedRows, scopeRows, fleet, board, attention, errorsById,
     hasCoverage: scopeRows.some((r) => r.coveragePct != null),
     pickerOpen, setPickerOpen, scopeIds, scopeCount, toggleProject, selectAll, selectFlagged,
     openDimension, onOpenProjectDimension, onOpenDuel, openProject, now,
@@ -208,7 +209,7 @@ export default function ComparePage({
   return (
     <div className="compare-page dashboard-fade" ref={rootRef}>
       <ComparePageBody
-        duelView={duelView} dimensionView={dimensionView} board={board}
+        duelView={duelView} dimensionView={dimensionView} board={board} selectedProject={selectedProject}
         openDimension={openDimension} openProject={openProject} openPrinciple={openPrinciple}
         onOpenProjectDimension={onOpenProjectDimension} shared={shared}
       />

@@ -23,7 +23,7 @@ from quodeq.services.wiring import run_index as _run_index
 from quodeq.services._external_jobs import sync_external_run, sync_indexed_run
 from quodeq.services.jobs import JobManager
 from quodeq.services._run_index_fs import (
-    external_job_is_complete, merge_internal_jobs, remove_run_directory,
+    external_job_is_complete, indexed_run_dir, merge_internal_jobs, remove_run_directory,
     scan_reports_root_for_run,
 )
 from quodeq.services._run_status_readers import build_job_snapshot
@@ -233,7 +233,11 @@ class EvaluationsIndex:
                         return candidate
 
         # Filesystem fallback: scan reports_root for <project>/<run_id>/.
-        return scan_reports_root_for_run(self._resolve_reports_root(), run_id)
+        found = scan_reports_root_for_run(self._resolve_reports_root(), run_id)
+        if found is not None or not is_external_job_id(job_id):
+            return found
+        # A PR review in $RUNNER_TEMP is known only by its index row's run_dir.
+        return indexed_run_dir(self._index_db_path, job_id)
 
     def rebuild(self, reports_root: Path | None = None) -> tuple[int, int]:
         """Rebuild the index from scratch by walking *reports_root*.

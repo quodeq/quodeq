@@ -86,3 +86,15 @@ def test_stream_terminal_state_logs_debug_on_corrupt_status_json(tmp_path) -> No
     assert state == JobStatus.DONE
     assert debug.called
     assert debug.call_args.args[1] == "job-123"
+
+
+def test_read_tail_offset_counts_raw_bytes_past_invalid_utf8(tmp_path):
+    """The lossy decode must not inflate the offset and skip the next lines."""
+    log = tmp_path / "run.log"
+    first = b"bad \xff byte\n"
+    log.write_bytes(first + b"partial")
+
+    lines, offset = log_tail_helpers.read_tail(log, 0)
+
+    assert lines == ["bad � byte"]
+    assert offset == len(first)
