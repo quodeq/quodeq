@@ -6,5 +6,5 @@
  */
 export function openProjectDimension(row, dim, onOpenProject, onOpenProjectDimension) {
   if (!dim || row.remote || !dim.fromRunId || !onOpenProjectDimension) return onOpenProject(row.id);
-  return onOpenProjectDimension({ id: row.id, source: row.source, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel });
+  return onOpenProjectDimension({ id: row.id, name: row.name, source: row.source, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel });
 }

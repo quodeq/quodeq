@@ -691,6 +691,7 @@
   "explorer.dimScoreHistoryAria": "{dimension} score history",
   "explorer.dimScoreHistoryKbd": "{dimension} score history. Tab to a run, Enter to open it",
   "explorer.dimensionFallback": "dimension",
+  "explorer.dimensionInProject": "{dim} · {project}",
   "explorer.dimensionsStat": "DIMENSIONS",
   "explorer.dismissFinding": "Dismiss this finding (exclude from scoring)",
   "explorer.downgradedFromCritical": "downgraded from critical",

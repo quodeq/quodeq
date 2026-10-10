@@ -5,6 +5,8 @@ import '@testing-library/jest-dom/vitest';
 const data = vi.hoisted(() => ({ d: null }));
 const statsProps = vi.hoisted(() => ({ last: null }));
 
+// The page's own-trend query needs a QueryClient; these render it bare.
+vi.mock('./useExplorerTrend.js', () => ({ useExplorerTrend: (_p, _s, trend) => trend ?? [] }));
 vi.mock('./explorerDataHooks.js', () => ({
   useExplorerData: () => data.d,
   buildEvalPrincipalFn: () => () => ({}),
