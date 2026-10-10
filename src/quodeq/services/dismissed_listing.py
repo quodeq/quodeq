@@ -128,13 +128,17 @@ def _listing_stamp(project_dir: Path) -> tuple:
     return (file_stamp(project_dir / ACTIONS_LOG_FILENAME), newest, len(runs))
 
 
-def _all_dismissed_details(
-    project_dir: Path, entries: tuple[DismissedEntry, ...],
+def _page_details(
+    project_dir: Path, page: tuple[DismissedEntry, ...], offset: int, limit: int | None,
 ) -> dict[DismissKey, dict]:
-    """The memoized detail map for every net-dismissed entry of the project."""
+    """The memoized detail map for the entries of one page of the listing.
+
+    Keyed per page so a page asks the runs only about its own entries; the
+    stamp drops the map when the actions log or the run list changes.
+    """
     details = memoized_by_stamp(
-        str(project_dir), _listing_stamp(project_dir),
-        lambda: _collect_dismissed_details(project_dir, entries),
+        f"{project_dir}|{offset}|{limit}", _listing_stamp(project_dir),
+        lambda: _collect_dismissed_details(project_dir, page),
         cache=_DETAILS,
     )
     return details if details is not None else {}
@@ -177,8 +181,10 @@ def load_dismissed(
 ) -> list[dict]:
     """List dismissed findings as dicts (shape matches /api/findings/dismissed response).
 
-    The detail map covers every entry and is memoized per project, so paging
-    only slices the entries; the items are one-to-one with them.
+    Only the entries on the requested page are looked up in the runs, and
+    the result is kept per page while nothing changes; the items are
+    one-to-one with the entries, so paging the entries first gives the same
+    page as paging the full listing would.
     """
     if not project_dir.is_dir():
         return []
@@ -188,7 +194,7 @@ def load_dismissed(
     page = _page(state.entries, offset, limit)
     if not page:
         return []
-    return _dismissed_items(page, _all_dismissed_details(project_dir, state.entries))
+    return _dismissed_items(page, _page_details(project_dir, page, offset, limit))
 
 
 def dismissed_item(project_dir: Path, req: str, file: str, line: int) -> dict | None:
@@ -206,7 +212,7 @@ def dismissed_item(project_dir: Path, req: str, file: str, line: int) -> dict | 
     if not entries:
         return None
     entry = next((e for e in entries if e.fingerprint), entries[0])
-    (item,) = _dismissed_items((entry,), _all_dismissed_details(project_dir, state.entries))
+    (item,) = _dismissed_items((entry,), _collect_dismissed_details(project_dir, (entry,)))
     return item
 
 

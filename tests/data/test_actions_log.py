@@ -26,7 +26,7 @@ def test_writer_appends_event(tmp_path: Path) -> None:
     data = json.loads(lines[0])
     assert data["event_type"] == "FINDING_DISMISSED"
     assert data["payload"] == {
-        "req": "R1", "file": "a.py", "line": 1, "reason": None, "fingerprint": None,
+        "req": "R1", "file": "a.py", "line": 1, "reason": None, "fingerprint": None, "run_id": None,
     }
 
 
