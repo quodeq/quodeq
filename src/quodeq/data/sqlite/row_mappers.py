@@ -115,7 +115,7 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
             row.get("practice_id"), row.get("file"),
         )
         raw_refs = []
-    req_refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in raw_refs if isinstance(r, dict)]
+    req_refs = [ReqRef.from_dict(r) for r in raw_refs if isinstance(r, dict)]
 
     scope_downgrade_json = row.get("scope_downgrade_json")
     scope_downgrade: dict[str, Any] | None = None

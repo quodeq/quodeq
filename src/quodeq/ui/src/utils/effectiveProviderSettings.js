@@ -12,7 +12,7 @@ import {
   ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S, providerKey, PROVIDER_SETTING_KEY,
 } from '../constants.js';
 import { LOCAL_API_PROVIDERS } from '../vocab/provider.js';
-import { readString, STORED_TRUE, STORED_FALSE } from '../adapters/storage.js';
+import { readString, STORED_FALSE } from '../adapters/storage.js';
 
 /**
  * Effective defaults for a provider when no key was ever written.
@@ -25,9 +25,6 @@ export function effectiveProviderDefaults(providerId) {
   return {
     subagents: isLocalApi ? 1 : DEFAULT_MAX_SUBAGENTS,
     timeLimitS: isLocalApi ? 0 : DEFAULT_TIME_LIMIT_S,
-    // The scan engine defaults to one grouped (consolidated) pass; the
-    // display must say so instead of claiming per-dimension.
-    perDimension: false,
     verify: true,
   };
 }
@@ -66,14 +63,10 @@ export function resolveProviderSettings(providerId, storage) {
   // Read the new key first; fall back to the legacy 'pool-budget' key.
   const timeLimitS = readInt(storage, providerId, PROVIDER_SETTING_KEY.TIME_LIMIT)
     ?? readInt(storage, providerId, PROVIDER_SETTING_KEY.POOL_BUDGET);
-  const perDimensionRaw = get(PROVIDER_SETTING_KEY.PER_DIMENSION);
   const verifyRaw = get(PROVIDER_SETTING_KEY.VERIFY);
   return {
     subagents: subagents ?? defaults.subagents,
     timeLimitS: timeLimitS ?? defaults.timeLimitS,
-    perDimension: perDimensionRaw === null || perDimensionRaw === undefined
-      ? defaults.perDimension
-      : perDimensionRaw === STORED_TRUE,
     verify: verifyRaw === null || verifyRaw === undefined
       ? defaults.verify
       : verifyRaw !== STORED_FALSE,

@@ -30,9 +30,6 @@ from quodeq.analysis.subagents._evidence_collector import (
     collect_evidence,
 )
 from quodeq.analysis.subagents.file_queue import FileQueue
-from quodeq.analysis.subagents._consolidated import (
-    process_consolidated_dimensions as _process_consolidated_impl,
-)
 
 
 @dataclass
@@ -61,14 +58,6 @@ class _PoolExecutionParams:
     """Grouped parameters for pool execution and evidence collection."""
     queue_path: Path
     files_per_agent: int
-
-
-def process_consolidated_dimensions(
-    config: RunConfig, dimensions: list[str], ctx: AnalysisContext,
-    *, log: LogSink = NULL_LOG,
-) -> dict[str, Evidence]:
-    """Run all dimensions in a single pass -- files read once, not per dimension."""
-    return _process_consolidated_impl(config, dimensions, ctx, log=log)
 
 
 def _prepare_findings_and_queue(

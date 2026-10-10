@@ -51,7 +51,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
     req_refs: list[ReqRef] = []
     if spec.req_refs:
         req_refs = [
-            ReqRef(label=ref.get("label", ""), url=ref.get("url", ""))
+            ReqRef.from_dict(ref)
             for ref in spec.req_refs
         ]
     return Finding(

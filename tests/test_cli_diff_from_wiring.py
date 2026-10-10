@@ -44,7 +44,6 @@ def _args(repo: Path, **overrides) -> argparse.Namespace:
         n_subagents=1,
         no_verify=False,
         pool_budget=None,
-        no_consolidated=False,
         clean_scan=True,
         legacy_incremental=False,
         diff_from=None,

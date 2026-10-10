@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
+from quodeq.core.standards.refs import ref_label
 from quodeq.config.paths import default_paths
 from quodeq.data.fs.standard_index_loader import load_standard_catalog
 from quodeq.core.admission import (
@@ -107,7 +108,9 @@ def apply_admission(
     finding["p"] = placed.principle
     finding["d"] = placed.dimension
     if placed.refs:
-        finding["req_refs"] = select_best_refs(list(placed.refs), args.get("w", ""), args.get("reason", ""))
+        best = select_best_refs(list(placed.refs), args.get("w", ""), args.get("reason", ""))
+        # The standard's refs carry source/id but no label; the card names its links by label.
+        finding["req_refs"] = [{**r, "label": r.get("label") or ref_label(r)} for r in best]
     else:
         finding.pop("req_refs", None)
     return None

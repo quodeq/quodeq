@@ -166,12 +166,6 @@ class TestBuildEvalEnv:
         env = m._build_eval_env(opts, env={})
         assert env["QUODEQ_TIME_LIMIT"] == "0"
 
-    def test_per_dimension(self):
-        m = self._mixin()
-        opts = EvaluationOptions(per_dimension=True)
-        env = m._build_eval_env(opts, env={})
-        assert env["QUODEQ_NO_CONSOLIDATE"] == "1"
-
     def test_context_size(self):
         m = self._mixin()
         opts = EvaluationOptions(context_size=128000)

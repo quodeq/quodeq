@@ -54,7 +54,6 @@ class AnalysisOptions:
     subagent_model: str | None = None
     ai_model: str | None = None
     verify_findings: bool = True
-    consolidated: bool = True
     time_limit: int | None = None
     deadline_at: float | None = None
     # The whole-run deadline while ``deadline_at`` holds one dimension's slice

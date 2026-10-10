@@ -117,25 +117,3 @@ class FileQueue:
             state = read_state(self._path)
         taken = sum(len(e[_KEY_FILES]) for e in state["taken"])
         return len(state["pending"]), taken
-
-    def taken_log(self) -> list[dict]:
-        """Return the full take log for audit / crash recovery.
-
-        Example::
-
-            log = queue.taken_log()  # [{"files": [...], "agent": "a1", "ts": ...}, ...]
-        """
-        with locked(self._lock_path):
-            return list(read_state(self._path)["taken"])
-
-    def all_taken_files(self) -> list[str]:
-        """Return flat list of every file that was taken, in order.
-
-        Example::
-
-            files = queue.all_taken_files()  # ["a.py", "b.py", ...]
-        """
-        result: list[str] = []
-        for entry in self.taken_log():
-            result.extend(entry["files"])
-        return result

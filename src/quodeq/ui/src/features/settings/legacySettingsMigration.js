@@ -8,7 +8,6 @@ export const LEGACY_SETTING_MIGRATIONS = {
   // Legacy global key — migrate to provider-scoped 'time-limit' suffix.
   'cc-pool-budget': PROVIDER_SETTING_KEY.TIME_LIMIT,
   'cc-time-limit': PROVIDER_SETTING_KEY.TIME_LIMIT,
-  'cc-per-dimension': PROVIDER_SETTING_KEY.PER_DIMENSION,
   'cc-ai-model': PROVIDER_SETTING_KEY.MODEL,
 };
 

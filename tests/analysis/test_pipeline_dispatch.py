@@ -50,32 +50,28 @@ _COMMON_SEAMS = ("run_incremental_loop", "run_per_dimension_loop",
 
 def test_default_run_uses_incremental_loop(patched_pipeline):
     """Default (incremental=True, no diff_from) -> run_incremental_loop."""
-    with patched_pipeline(*_COMMON_SEAMS, "process_consolidated_dimensions") as m:
+    with patched_pipeline(*_COMMON_SEAMS) as m:
         m.load_analysis_context.return_value = (["security"], MagicMock())
         m.run_incremental_loop.return_value = {}
         m.run_per_dimension_loop.return_value = {}
-        m.process_consolidated_dimensions.return_value = {}
 
         _run_dimensions(_make_config(incremental=True))
 
         assert m.run_incremental_loop.called, "Default run did not reach run_incremental_loop"
         assert not m.run_per_dimension_loop.called
-        assert not m.process_consolidated_dimensions.called
 
 
 def test_clean_scan_skips_incremental_loop(patched_pipeline):
-    """Clean scan (incremental=False) skips run_incremental_loop."""
-    with patched_pipeline(*_COMMON_SEAMS, "process_consolidated_dimensions",
-                          "get_provider_type") as m:
+    """Clean scan (incremental=False) runs the per-dimension loop, never the incremental one."""
+    with patched_pipeline(*_COMMON_SEAMS) as m:
         m.load_analysis_context.return_value = (["security"], MagicMock())
         m.run_incremental_loop.return_value = {}
         m.run_per_dimension_loop.return_value = {}
-        m.process_consolidated_dimensions.return_value = {}
-        m.get_provider_type.return_value = "api"
 
         _run_dimensions(_make_config(incremental=False))
 
         assert not m.run_incremental_loop.called, "Clean scan unexpectedly used run_incremental_loop"
+        assert m.run_per_dimension_loop.called, "Clean scan did not reach run_per_dimension_loop"
 
 
 def test_diff_from_uses_per_dim_loop(patched_pipeline):

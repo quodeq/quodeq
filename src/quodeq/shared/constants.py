@@ -86,12 +86,6 @@ GIT_DIR_NAME = ".git"  # a checkout's metadata directory (also a path segment th
 
 ENV_TRUTHY = "1"  # the spelling quodeq's on/off env flags use (QUODEQ_VERBOSE, QUODEQ_NO_VERIFY, ...)
 
-# Synthetic dimension id for a consolidated run (multiple dimensions handled
-# by one agent pool/prompt instead of one pool per dimension). Used as the
-# evidence-file prefix and progress-tracking id by analysis/subagents/pool.py
-# and read back by services/_scan_progress_dims.py.
-CONSOLIDATED_DIMENSION_KEY = "consolidated"
-
 # Suffix of a run's per-dimension scored report files under its evaluation/
 # directory. Checked by data/fs/report_parser and services/scoring alike.
 JSON_SUFFIX = ".json"

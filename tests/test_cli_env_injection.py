@@ -110,34 +110,13 @@ def test_resolve_limits_reads_every_cap_from_the_injected_env(monkeypatch):
     assert empty.dispatch_policy.ai_cmd == "claude"  # the packaged default
 
 
-def test_run_config_locals_read_consolidation_from_the_injected_env(monkeypatch):
-    from quodeq.cli_evaluation import _resolve_run_config_locals
-    from quodeq._cli_resolution import ResolvedInputs
-
-    monkeypatch.setenv("QUODEQ_NO_CONSOLIDATE", "1")
-    args = argparse.Namespace(no_consolidated=False, diff_from=None, _diff_files=None)
-    inputs = ResolvedInputs(
-        src=".", language="python", manifest=None, dims_data=None, single_file=None,
-    )
-
-    off = _resolve_run_config_locals(args, inputs, {"QUODEQ_NO_CONSOLIDATE": "1"})
-    assert off.consolidated is False
-    # Empty mapping: the exported opt-out must not be consulted.
-    on = _resolve_run_config_locals(args, inputs, {})
-    assert on.consolidated is True
-
-
 def test_run_config_locals_read_the_subagent_model_from_the_injected_env(monkeypatch):
     from quodeq.cli_evaluation import _resolve_run_config_locals
-    from quodeq._cli_resolution import ResolvedInputs
 
     monkeypatch.setenv("SUBAGENT_MODEL", "from-process")
-    args = argparse.Namespace(no_consolidated=False, diff_from=None, _diff_files=None)
-    inputs = ResolvedInputs(
-        src=".", language="python", manifest=None, dims_data=None, single_file=None,
-    )
+    args = argparse.Namespace(diff_from=None, _diff_files=None)
 
-    injected = _resolve_run_config_locals(args, inputs, {"SUBAGENT_MODEL": "m-1"})
+    injected = _resolve_run_config_locals(args, {"SUBAGENT_MODEL": "m-1"})
     assert injected.subagent_model == "m-1"
     # Empty mapping: the exported override must not be consulted.
-    assert _resolve_run_config_locals(args, inputs, {}).subagent_model is None
+    assert _resolve_run_config_locals(args, {}).subagent_model is None
