@@ -6,6 +6,7 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 
+from quodeq.analysis.prompts._severity_advice import advised_class
 from quodeq.core.standards.overrides import resolve_requirement_text
 from quodeq.shared.utils import read_json
 
@@ -93,9 +94,20 @@ def render_compiled_standards(
             req_line = f"- **{req_id}**: {text}"
             if req.get("description"):
                 req_line += f" — {req['description']}"
+            advised = advised_class(req, (overrides or {}).get(req_id))
+            if advised:
+                req_line += f" [suggested severity: {advised}]"
             lines.append(req_line)
         lines.append("")
     return "\n".join(lines)
+
+
+def _compact_entry(req: dict, req_id: object, text: str, override: dict | None) -> dict:
+    entry = {"id": req_id, "rule": text}
+    advised = advised_class(req, override)
+    if advised:
+        entry["severity"] = advised
+    return entry
 
 
 def render_compact_standards(
@@ -115,8 +127,8 @@ def render_compact_standards(
     checklist = []
     for principle, reqs in _principles_with_requirements(data):
         requirements = [
-            {"id": req_id, "rule": text}
-            for _req, req_id, text in _resolved_requirements(reqs, overrides)
+            _compact_entry(req, req_id, text, (overrides or {}).get(req_id))
+            for req, req_id, text in _resolved_requirements(reqs, overrides)
         ]
         checklist.append({
             "principle": principle.get("name", "Unknown"),

@@ -22,6 +22,8 @@ DROP speculative concerns: "could", "might", "should consider".
 - **major** — Real quality or security issue. Should be fixed. Not directly exploitable.
 - **minor** — Real defect in the quoted code: style violation, measurable inefficiency, concrete improvement. NOT a fallback for findings that fail the higher bar.
 
+A requirement in the checklist may carry `severity`: the severity the standard suggests for a violation of that rule. It is a suggestion, not a verdict. Start from it, then decide the impact of this instance and change the severity when the impact here is different. Lower it when no untrusted source reaches the line, the value is operator-controlled or internal, or the file is a test. Raise it when the breach is far beyond the limit, the code sits on a hot or shared path, or an untrusted source makes it exploitable as written. Say why in `reason` whenever you depart from the suggested severity. A requirement without `severity` is rated by the rules above alone.
+
 Compliance uses the same scale to mark importance of what's done right.
 
 ## Reachable input (provenance)
