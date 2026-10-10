@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   listDismissedFindings,
   restoreFinding,
@@ -9,6 +9,7 @@ import {
   sharedListDismissedFindings,
 } from '../../../api/index.js';
 import { applyMutationDelta } from '../../../api/applyMutationDelta.js';
+import { projectKeys } from '../../../api/queryKeys.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
@@ -19,7 +20,6 @@ import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
  * @param {object} options
  * @param {string} options.selectedProject
  * @param {Function} [options.setRestoreError]
- * @param {number} [options.refreshKey=0]
  * @param {'local'|'shared'} [options.selectedSource='local'] - Shared projects have no
  *   mutation routes on the backend (dismiss/restore/delete are local-only by
  *   design). When shared, the list reads from the shared-repo mirror endpoint
@@ -35,6 +35,12 @@ import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
  *   window -- restore-all/delete-all return a payload applyMutationDelta's
  *   gates can't patch (scores:null, delta.isLatest:false), and mark-stale
  *   alone never reaches the always-mounted Overview observer.
+ *
+ * The list lives in the query cache under projectKeys.dismissed, inside the
+ * project subtree: the reconcile above refreshes it like every other
+ * project query, and a dismiss made anywhere prepends its entry through
+ * api/dismissedListCache.js, so the tab shows the finding at once instead
+ * of refetching the whole list on a counter bump.
  */
 function makeHandleRestore({ selectedProject, isShared, applyDelta, setDismissed, onReconcile, setRestoreError }) {
   return async (d) => {
@@ -107,18 +113,6 @@ function makeHandleDelete({ selectedProject, isShared, applyDelta, setDismissed,
   };
 }
 
-// Mirrors the console.error + setRestoreError convention every mutation
-// handler above uses -- a failed load used to fall back to [] silently,
-// leaving the user staring at an empty list with no explanation.
-function loadDismissed({ selectedProject, isShared, setDismissed, setRestoreError }) {
-  const fetchDismissed = isShared ? sharedListDismissedFindings : listDismissedFindings;
-  fetchDismissed(selectedProject).then(setDismissed).catch((err) => {
-    console.error('Failed to load dismissed findings:', err);
-    setDismissed([]);
-    setRestoreError?.(t('violations.dismissedLoadFailed'));
-  });
-}
-
 function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyDelta, setDismissed, onReconcile, setRestoreError }) {
   return async () => {
     if (isShared) return;
@@ -145,10 +139,50 @@ function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyD
   };
 }
 
-export function useDismissedFindings({ selectedProject, setRestoreError, refreshKey = 0, selectedSource = PROJECT_SOURCE.LOCAL, onReconcile }) {
-  const [dismissed, setDismissed] = useState([]);
+/**
+ * The project's dismissed list as a query, plus the in-place splice the
+ * mutation handlers use: `loading` covers the first fetch, a failed load
+ * logs and reports the way the handlers do, and `setDismissed` writes the
+ * cached list so a restore or delete shows at once.
+ */
+function useDismissedList({ selectedProject, selectedSource, setRestoreError }) {
   const queryClient = useQueryClient();
   const isShared = selectedSource === PROJECT_SOURCE.SHARED;
+  const query = useQuery({
+    queryKey: projectKeys.dismissed(selectedProject, selectedSource),
+    queryFn: () => (isShared ? sharedListDismissedFindings : listDismissedFindings)(selectedProject),
+    enabled: Boolean(selectedProject),
+  });
+
+  // Mirrors the console.error + setRestoreError convention every mutation
+  // handler uses -- a failed load used to fall back to [] silently, leaving
+  // the user staring at an empty list with no explanation. setRestoreError
+  // excluded from the deps: callers don't memoize it.
+  useEffect(() => {
+    if (!query.error) return;
+    console.error('Failed to load dismissed findings:', query.error);
+    setRestoreError?.(t('violations.dismissedLoadFailed'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.error]);
+
+  const setDismissed = useCallback((next) => {
+    queryClient.setQueryData(
+      projectKeys.dismissed(selectedProject, selectedSource),
+      (prev) => (typeof next === 'function' ? next(prev ?? []) : next),
+    );
+  }, [queryClient, selectedProject, selectedSource]);
+
+  return {
+    dismissed: query.data ?? [],
+    loading: Boolean(selectedProject) && query.isPending,
+    setDismissed,
+  };
+}
+
+export function useDismissedFindings({ selectedProject, setRestoreError, selectedSource = PROJECT_SOURCE.LOCAL, onReconcile }) {
+  const queryClient = useQueryClient();
+  const isShared = selectedSource === PROJECT_SOURCE.SHARED;
+  const { dismissed, loading, setDismissed } = useDismissedList({ selectedProject, selectedSource, setRestoreError });
 
   // Fold the mutation-delta from a restore/delete response into the React Query
   // caches so dimension scores/grades update instantly and the run-detail
@@ -163,33 +197,25 @@ export function useDismissedFindings({ selectedProject, setRestoreError, refresh
     });
   }, [queryClient, selectedProject]);
 
-  // refreshKey lets the parent force a refetch when something dismissed an
-  // entry elsewhere. setRestoreError excluded: callers don't memoize it.
-  useEffect(() => {
-    if (!selectedProject) return;
-    loadDismissed({ selectedProject, isShared, setDismissed, setRestoreError });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProject, refreshKey, isShared]);
-
   const handleRestore = useCallback(
     makeHandleRestore({ selectedProject, isShared, applyDelta, setDismissed, onReconcile, setRestoreError }),
-    [selectedProject, onReconcile, setRestoreError, applyDelta, isShared],
+    [selectedProject, onReconcile, setRestoreError, applyDelta, setDismissed, isShared],
   );
 
   const handleRestoreAll = useCallback(
     makeHandleRestoreAll({ selectedProject, isShared, dismissedCount: dismissed.length, applyDelta, setDismissed, onReconcile, setRestoreError }),
-    [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared],
+    [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, setDismissed, isShared],
   );
 
   const handleDelete = useCallback(
     makeHandleDelete({ selectedProject, isShared, applyDelta, setDismissed, onReconcile, setRestoreError }),
-    [selectedProject, onReconcile, setRestoreError, applyDelta, isShared],
+    [selectedProject, onReconcile, setRestoreError, applyDelta, setDismissed, isShared],
   );
 
   const handleDeleteAll = useCallback(
     makeHandleDeleteAll({ selectedProject, isShared, dismissedCount: dismissed.length, applyDelta, setDismissed, onReconcile, setRestoreError }),
-    [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared],
+    [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, setDismissed, isShared],
   );
 
-  return { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll };
+  return { dismissed, loading, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll };
 }

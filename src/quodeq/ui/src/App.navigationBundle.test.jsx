@@ -191,7 +191,6 @@ describe('map/violations view state lives in the nav stack', () => {
         selectedProject: 'p1', selectedSource: 'local', projects: [], projectsLoaded: true,
         handleNavigate: vi.fn(), handleNavigateReplace: vi.fn(), navStackLength: 1,
       },
-      dismissRefreshKey: 0,
       refreshDashboard: vi.fn(),
       scheduleDashboardReconcile: vi.fn(),
     };

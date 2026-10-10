@@ -6,9 +6,7 @@ import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 export default function ByTypeSubTab({ dimensions, project, selectedSource, callbacks }) {
   const { diffsByRun, standardsByDim, loading } = useByTypeData({ project, dimensions, selectedSource });
-  const { dismissType, error, notice } = useDismissByType({
-    project, selectedSource, onReconcile: callbacks.onReconcile, bumpDismissRefresh: callbacks.onBumpDismissRefresh,
-  });
+  const { dismissType, error, notice } = useDismissByType({ project, selectedSource, onReconcile: callbacks.onReconcile });
   const canDismiss = selectedSource !== PROJECT_SOURCE.SHARED;
   return (
     <>

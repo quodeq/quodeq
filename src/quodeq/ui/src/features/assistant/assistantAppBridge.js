@@ -22,7 +22,7 @@ export function buildAssistantSessionPayload({ provider, model, projectId, runId
  *
  * @param {{
  *   applyDelta: (project: string, scores: Object, delta: Object) => void,
- *   bumpDismissRefresh: () => void,
+ *   recordDismissed?: (project: string, entry: Object) => void,
  *   scheduleDashboardReconcile?: () => void,
  *   selectedProject: string,
  * }} deps
@@ -30,7 +30,7 @@ export function buildAssistantSessionPayload({ provider, model, projectId, runId
  */
 export function buildAssistantActionAppliedHandler({
   applyDelta,
-  bumpDismissRefresh,
+  recordDismissed,
   scheduleDashboardReconcile,
   selectedProject,
 }) {
@@ -55,7 +55,9 @@ export function buildAssistantActionAppliedHandler({
         console.warn('[assistantAppBridge] applyDelta failed:', err);
       }
     }
-    bumpDismissRefresh();
+    // The Dismissed tab's item for the finding, when the apply carried one;
+    // the reconcile below refetches the list either way.
+    recordDismissed?.(event.detail.delta?.project || selectedProject, event.detail.dismissedEntry);
     // Reconcile exactly as the manual dismiss handlers do: the call below
     // marks the project queries stale synchronously (so frozen run views
     // refetch on their next mount) and then actively refetches after the

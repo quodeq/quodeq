@@ -56,8 +56,8 @@ test('resolveDismissTargetProject falls back to the selected project', () => {
 
 // ── dismissWithReconcile ───────────────────────────────────────────────
 
-function makeDeps(result = { scores: { dimensions: [] }, delta: { d: 1 } }) {
-  const calls = { dismiss: [], applyDelta: [], reconcile: 0, bump: 0 };
+function makeDeps(result = { scores: { dimensions: [] }, delta: { d: 1 }, dismissedEntry: { req: 'P', file: 'a.py', line: 1 } }) {
+  const calls = { dismiss: [], applyDelta: [], reconcile: 0, recorded: [] };
   return {
     calls,
     result,
@@ -65,7 +65,7 @@ function makeDeps(result = { scores: { dimensions: [] }, delta: { d: 1 } }) {
       dismissFinding: async (project, payload) => { calls.dismiss.push([project, payload]); return result; },
       applyDelta: (project, scores, delta) => calls.applyDelta.push([project, scores, delta]),
       scheduleDashboardReconcile: () => { calls.reconcile += 1; },
-      bumpDismissRefresh: () => { calls.bump += 1; },
+      recordDismissed: (project, entry) => calls.recorded.push([project, entry]),
     },
   };
 }
@@ -89,7 +89,8 @@ test('dismissWithReconcile posts into the resolved project with run_id and runs 
   // The delta patch targets the SAME resolved project as the POST.
   assert.deepEqual(calls.applyDelta, [['other-proj', result.scores, result.delta]]);
   assert.equal(calls.reconcile, 1);
-  assert.equal(calls.bump, 1);
+  // The entry lands in the SAME resolved project's list as the POST.
+  assert.deepEqual(calls.recorded, [['other-proj', result.dismissedEntry]]);
 });
 
 test('dismissWithReconcile falls back to the selected project when the entry carries none', async () => {
@@ -128,5 +129,5 @@ test('dismissWithReconcile skips the tail entirely when the POST rejects', async
   );
   assert.equal(calls.applyDelta.length, 0);
   assert.equal(calls.reconcile, 0);
-  assert.equal(calls.bump, 0);
+  assert.equal(calls.recorded.length, 0);
 });

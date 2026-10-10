@@ -12,7 +12,6 @@ function routeProps(acc) {
   return {
     dashboardData: { latestAccumulated: acc, accumulated: null, selectedDisplayName: 'p1', loading: false, isFetching: false },
     navigation: { selectedProject: 'proj1', selectedSource: 'local', projects: [], projectsLoaded: true, handleNavigate: vi.fn(), navStackLength: 1 },
-    dismissRefreshKey: 0,
     refreshDashboard: vi.fn(),
     scheduleDashboardReconcile: vi.fn(),
   };

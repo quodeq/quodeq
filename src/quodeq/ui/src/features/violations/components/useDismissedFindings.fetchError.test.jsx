@@ -42,13 +42,13 @@ describe('useDismissedFindings -- fetch failure on mount', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError, refreshKey: 0, selectedSource: 'local' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError, selectedSource: 'local' }),
       withQueryClient(),
     );
 
     await waitFor(() => expect(setRestoreError).toHaveBeenCalledTimes(1));
     expect(errorSpy).toHaveBeenCalledWith('Failed to load dismissed findings:', err);
-    expect(result.current.dismissed).toEqual([]);
+    await waitFor(() => expect(result.current.dismissed).toEqual([]));
 
     errorSpy.mockRestore();
   });

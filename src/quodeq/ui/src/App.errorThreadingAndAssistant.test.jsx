@@ -19,7 +19,6 @@ describe('error/onRetry threading to Violations/Map/History (P4-T2)', () => {
         loading: false, isFetching: false, error: 'boom', onRetry: vi.fn(),
       },
       navigation: { selectedProject: 'proj1', selectedSource: 'local', projects: [], projectsLoaded: true, handleNavigate: vi.fn(), navStackLength: 1 },
-      dismissRefreshKey: 0,
       refreshDashboard: vi.fn(),
       scheduleDashboardReconcile: vi.fn(),
     };
@@ -65,7 +64,7 @@ describe('error/onRetry threading to Violations/Map/History (P4-T2)', () => {
 
 // An assistant-applied dismiss mutates exactly the payloads a manual dismiss
 // does, so it owes the same convergence follow-ups the manual paths got: the
-// instant delta patch, the dismissed-list bump, the lazy mark-stale, AND the
+// instant delta patch, the dismissed-list entry, the lazy mark-stale, AND the
 // debounced ACTIVE reconcile. The reconcile is the one that reaches the
 // Overview -- its useDashboard observer is mounted at the app root and never
 // remounts, and pywebview never fires a focus-refetch -- so without it, any
@@ -75,7 +74,7 @@ describe('buildAssistantActionAppliedHandler', () => {
   function deps(overrides = {}) {
     return {
       applyDelta: vi.fn(),
-      bumpDismissRefresh: vi.fn(),
+      recordDismissed: vi.fn(),
       scheduleDashboardReconcile: vi.fn(),
       selectedProject: 'proj1',
       ...overrides,
@@ -90,10 +89,11 @@ describe('buildAssistantActionAppliedHandler', () => {
     expect(d.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
   });
 
-  it('bumps the dismissed list alongside the reconcile', () => {
-    const d = deps();
-    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {} }));
-    expect(d.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+  it('records the dismissed entry the apply carried, against the delta\'s project', () => {
+    const d = deps({ selectedProject: 'proj2' });
+    const entry = { req: 'R1', file: 'a.py', line: 1 };
+    buildAssistantActionAppliedHandler(d)(dismissEvent({ delta: { project: 'proj1' }, scores: {}, dismissedEntry: entry }));
+    expect(d.recordDismissed).toHaveBeenCalledWith('proj1', entry);
   });
 
   // The regression this pins: a dismiss whose response carries no delta at
@@ -134,7 +134,7 @@ describe('buildAssistantActionAppliedHandler', () => {
     const d = deps();
     buildAssistantActionAppliedHandler(d)({ detail: { actionType: 'verify_finding', delta: {} } });
     expect(d.applyDelta).not.toHaveBeenCalled();
-    expect(d.bumpDismissRefresh).not.toHaveBeenCalled();
+    expect(d.recordDismissed).not.toHaveBeenCalled();
     expect(d.scheduleDashboardReconcile).not.toHaveBeenCalled();
   });
 

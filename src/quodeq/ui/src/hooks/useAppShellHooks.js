@@ -46,14 +46,7 @@ export function useAppBootExtras({ onCloneLanded } = {}) {
   const sharedSignal = useSharedContentSignal();
   useCloneTransitions({ onLanded: onCloneLanded });
   const [sidebarPinned, setSidebarPinned] = useState(false);
-  // Incremented after every successful dismiss POST so the violations
-  // page's dismissed sub-tab knows to refetch its list. Without this, a
-  // dismiss made on the principle / file detail page never appeared in the
-  // dismissed list until the user switched projects — the list was only
-  // fetched once on mount.
-  const [dismissRefreshKey, setDismissRefreshKey] = useState(0);
-  const bumpDismissRefresh = () => setDismissRefreshKey((k) => k + 1);
-  return { sharedSignal, sidebarPinned, setSidebarPinned, dismissRefreshKey, bumpDismissRefresh };
+  return { sharedSignal, sidebarPinned, setSidebarPinned };
 }
 
 /**
