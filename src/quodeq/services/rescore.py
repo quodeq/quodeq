@@ -26,28 +26,26 @@ from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.services.suppression_keys import SuppressionKeys
 
 
+def _dismissed(v: Finding, keys: SuppressionKeys) -> bool:
+    return is_dismissed(keys.dismissed, FindingRef(
+        req=v.req, principle=v.practice_id, file=v.file, line=v.line,
+        snippet=v.snippet), rules=keys.rules)
+
+
+def _deleted(v: Finding, dim_id: str, keys: SuppressionKeys) -> bool:
+    return is_deleted(keys.deleted, dimension=dim_id, principle=v.practice_id, file=v.file)
+
+
 def filter_excluded_violations(dim: DimensionResult, keys: SuppressionKeys) -> list[Finding]:
     """Violations minus anything dismissed or deleted."""
     dim_id = dim.dimension or ""
-    return [
-        v for v in dim.violations
-        if not is_dismissed(keys.dismissed, FindingRef(
-            req=v.req, principle=v.practice_id, file=v.file, line=v.line,
-            snippet=v.snippet), rules=keys.rules)
-        and not is_deleted(keys.deleted, dimension=dim_id, principle=v.practice_id, file=v.file)
-    ]
+    return [v for v in dim.violations if not _dismissed(v, keys) and not _deleted(v, dim_id, keys)]
 
 
 def dismissed_violations(dim: DimensionResult, keys: SuppressionKeys) -> list[Finding]:
     """Violations the project dismissed (and did not delete): no penalty, still observed."""
     dim_id = dim.dimension or ""
-    return [
-        v for v in dim.violations
-        if is_dismissed(keys.dismissed, FindingRef(
-            req=v.req, principle=v.practice_id, file=v.file, line=v.line,
-            snippet=v.snippet), rules=keys.rules)
-        and not is_deleted(keys.deleted, dimension=dim_id, principle=v.practice_id, file=v.file)
-    ]
+    return [v for v in dim.violations if _dismissed(v, keys) and not _deleted(v, dim_id, keys)]
 
 
 def _compliance_count(dim: DimensionResult) -> int:
