@@ -4,8 +4,9 @@
 One row per broken requirement, weighted by how many of the project's files it
 touches. Severity is cumulative over per-file worst severities, so a rule that
 is minor in 100 files and major in 20 adds the spread of 120 files at the minor
-weight plus the spread of 20 files at the major increment. A rule the standard
-classes takes the class in every file; the model's rating is not used for it.
+weight plus the spread of 20 files at the major increment. The severity of a
+finding is the one it carries: the model's rating, as gated at scan time. The
+standard's suggested severity is shown to the model, never applied here.
 """
 from __future__ import annotations
 
@@ -71,7 +72,6 @@ class ViolationRow:
     """One broken requirement: files reached at each severity level and the resulting weight."""
 
     req: str
-    severity_class: str | None
     files_at_least: Mapping[str, int]
     spread_at_least: Mapping[str, float]
     weight: float
@@ -113,31 +113,29 @@ def _increments(params: ScoringParams) -> dict[str, float]:
 
 
 def requirement_mass(
-    file_severities: Mapping[str, str], severity_class: str | None, project_files: int,
+    file_severities: Mapping[str, str], project_files: int,
     *, params: ScoringParams = DEFAULT_PARAMS,
 ) -> ViolationRow:
-    """Cumulative mass of one rule from its per-file severities (or its class)."""
+    """Cumulative mass of one rule from its per-file worst severities."""
     incs = _increments(params)
-    effective = {f: (severity_class if severity_class in _RANK else s) for f, s in file_severities.items()}
-    files_at_least = {lvl: sum(1 for s in effective.values() if _RANK[s] >= _RANK[lvl]) for lvl in LADDER}
+    files_at_least = {lvl: sum(1 for s in file_severities.values() if _RANK[s] >= _RANK[lvl]) for lvl in LADDER}
     spread_at_least = {lvl: spread(n, project_files) for lvl, n in files_at_least.items()}
     weight = sum(incs[lvl] * spread_at_least[lvl] for lvl in LADDER)
-    worst = max(effective.values(), key=lambda s: _RANK[s], default=Severity.MINOR)
+    worst = max(file_severities.values(), key=lambda s: _RANK[s], default=Severity.MINOR)
     return ViolationRow(
-        req="", severity_class=severity_class if severity_class in _RANK else None,
-        files_at_least=files_at_least, spread_at_least=spread_at_least, weight=weight, worst=worst,
+        req="", files_at_least=files_at_least, spread_at_least=spread_at_least, weight=weight, worst=worst,
     )
 
 
 def principle_mass(
-    rows: RequirementRows, project_files: int, classes: Mapping[str, str],
+    rows: RequirementRows, project_files: int,
     *, params: ScoringParams = DEFAULT_PARAMS,
 ) -> PrincipleMass:
     """Sum the rule masses of a principle; observation is the spread of every observed rule."""
     violations: list[ViolationRow] = []
     worst: str | None = None
     for req in sorted(rows.violations):
-        row = requirement_mass(rows.violations[req], classes.get(req), project_files, params=params)
+        row = requirement_mass(rows.violations[req], project_files, params=params)
         violations.append(replace(row, req=req))
         if worst is None or _RANK[row.worst] > _RANK[worst]:
             worst = row.worst

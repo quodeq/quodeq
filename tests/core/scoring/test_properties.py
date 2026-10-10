@@ -19,14 +19,13 @@ from quodeq.core.scoring.mass import principle_mass, requirement_rows
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 
 LEVELS = ("minor", "major", "critical")
-CLASSES = {"A-1": "critical", "A-2": "major", "A-3": "minor"}
 RULES = ("A-1", "A-2", "A-3", "U-1", "U-2", "U-3")
 TRIALS = 1500
 EPS = 1e-9
 
 
 def _score(v, c, files):
-    mass = principle_mass(requirement_rows(v, c), files, CLASSES, params=DEFAULT_PARAMS)
+    mass = principle_mass(requirement_rows(v, c), files, params=DEFAULT_PARAMS)
     return principle_score_and_grade(mass, params=DEFAULT_PARAMS)[0], mass
 
 
@@ -93,12 +92,12 @@ def test_p5_doubling_the_project_changes_nothing(cases):
         assert abs(_score(v2, c2, files * 2)[0] - s0) < EPS
 
 
-def test_p6_model_severities_do_not_move_a_classed_rule(cases):
+def test_p6_raising_a_rating_never_raises_the_score(cases):
     rng = random.Random(6)
     for v, c, files in cases:
         s0, _ = _score(v, c, files)
-        rerated = [dict(x, severity=rng.choice(LEVELS)) if x["req"] in CLASSES else x for x in v]
-        assert abs(_score(rerated, c, files)[0] - s0) < EPS
+        harsher = [dict(x, severity="critical") if rng.random() < 0.3 else x for x in v]
+        assert _score(harsher, c, files)[0] <= s0 + EPS
 
 
 def test_p8_label_never_beats_the_floor(cases):

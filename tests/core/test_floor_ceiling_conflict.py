@@ -32,7 +32,7 @@ def test_a_pile_of_minor_rules_cannot_read_above_the_ceiling() -> None:
         {"req": f"U-LRN-{i}", "file": f"f{j}.py", "severity": "minor"}
         for i in range(1000) for j in range(files)
     ]
-    mass = principle_mass(requirement_rows(violations, []), files, {}, params=DEFAULT_PARAMS)
+    mass = principle_mass(requirement_rows(violations, []), files, params=DEFAULT_PARAMS)
     floor = severity_grade_floor(mass.worst, params=DEFAULT_PARAMS)
     ceil = violation_ceiling(mass.violation_mass, params=DEFAULT_PARAMS)
     assert ceil < floor, "the minor-only floor sits above the volume ceiling"

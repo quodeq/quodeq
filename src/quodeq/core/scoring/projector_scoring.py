@@ -54,7 +54,7 @@ from quodeq.core.types.scoring import ConfidenceLevel
 # 3: tally groups findings by req before vt (issue #1274).
 # 4: requirement spread, standard-owned severity classes, observation-weighted
 #    principles, thin evidence scored instead of gated (spec 2026-10-09).
-GRADE_ALGO_VERSION = 4
+GRADE_ALGO_VERSION = 5
 
 # A dimension is flagged low confidence when more than this share of its
 # observation comes from low-confidence principles.
@@ -99,7 +99,7 @@ def compute_principle_grade(
         [finding_to_scoring_dict(v) for v in findings],
         [finding_to_scoring_dict(c) for c in compliance],
     )
-    mass = principle_mass(rows, scale.source_file_count, scale.classes, params=scale.params)
+    mass = principle_mass(rows, scale.source_file_count, params=scale.params)
     final, grade = principle_score_and_grade(mass, params=scale.params)
     return {
         "principle_id": principle_id,

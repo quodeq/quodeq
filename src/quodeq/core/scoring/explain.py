@@ -13,7 +13,7 @@ from quodeq.core.types.severity import Severity
 
 def _requirement_entry(row: ViolationRow) -> dict[str, Any]:
     return {
-        "req": row.req, "class": row.severity_class,
+        "req": row.req,
         "filesAtLeastMinor": row.files_at_least[Severity.MINOR],
         "filesAtLeastMajor": row.files_at_least[Severity.MAJOR],
         "filesAtLeastCritical": row.files_at_least[Severity.CRITICAL],

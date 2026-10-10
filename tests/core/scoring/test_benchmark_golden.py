@@ -16,10 +16,8 @@ from pathlib import Path
 from quodeq.core.scoring.internals import principle_score_and_grade
 from quodeq.core.scoring.mass import RequirementRows, principle_mass
 from quodeq.core.scoring.projector_scoring import compute_dimension_score
-from quodeq.data.fs.standards_loader import read_severity_classes
 
 _FIXTURE = Path(__file__).with_name("benchmark_java_sonnet_security.json")
-_COMPILED = Path(__file__).resolve().parents[3] / "src" / "quodeq" / "data" / "standards" / "compiled"
 _BENCHMARK_CEILING = 2.6
 _SEVERITIES = ("critical", "major", "minor")
 
@@ -41,10 +39,9 @@ def _rows(principle: dict) -> RequirementRows:
 
 def _dimension_score() -> dict:
     data = json.loads(_FIXTURE.read_text(encoding="utf-8"))
-    classes = read_severity_classes(_COMPILED)
     grades = []
     for name, principle in sorted(data["principles"].items()):
-        mass = principle_mass(_rows(principle), data["sourceFileCount"], classes)
+        mass = principle_mass(_rows(principle), data["sourceFileCount"])
         score, grade = principle_score_and_grade(mass)
         grades.append({"principle_id": name, "score": score, "grade": grade,
                        "observation": mass.observation, "confidence": None})
@@ -56,11 +53,3 @@ def test_benchmark_java_security_grades_at_or_below_the_benchmark_ceiling() -> N
     out = _dimension_score()
     assert out["score"] <= _BENCHMARK_CEILING
     assert out["score"] < data["storedOverallScore"]
-
-
-def test_the_fixture_uses_classed_security_rules() -> None:
-    """Guard against a vacuous golden: the real classes reach the fixture's rules."""
-    data = json.loads(_FIXTURE.read_text(encoding="utf-8"))
-    classes = read_severity_classes(_COMPILED)
-    reqs = {req for p in data["principles"].values() for req in p["violations"]}
-    assert reqs & set(classes)

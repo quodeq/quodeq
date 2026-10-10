@@ -17,8 +17,8 @@ K = DEFAULT_PARAMS.base_k
 W = DEFAULT_PARAMS.severity_weight
 
 
-def _mass(violations, compliance=(), files=1000, classes=None):
-    return principle_mass(requirement_rows(list(violations), list(compliance)), files, classes or {}, params=DEFAULT_PARAMS)
+def _mass(violations, compliance=(), files=1000):
+    return principle_mass(requirement_rows(list(violations), list(compliance)), files, params=DEFAULT_PARAMS)
 
 
 class TestViolationBase:
@@ -79,11 +79,12 @@ class TestStages:
         final, grade = principle_score_and_grade(_mass([], [{"req": "R-1", "file": "a"}]), params=DEFAULT_PARAMS)
         assert (final, grade) == (10.0, "Exemplary")
 
-    def test_class_pins_the_floor_and_the_weight(self):
-        rows = [{"req": "S-INT-2", "file": f"f{i}", "severity": "minor"} for i in range(294)]
-        unclassed, _ = principle_score_and_grade(_mass(rows, files=2803), params=DEFAULT_PARAMS)
-        classed, _ = principle_score_and_grade(_mass(rows, files=2803, classes={"S-INT-2": "critical"}), params=DEFAULT_PARAMS)
-        assert classed < unclassed and classed < 5.0  # one critical rule over 294 files: 4.1, not under 3.0
+    def test_a_critical_rule_over_many_files_reads_well_below_a_minor_one(self):
+        minor = [{"req": "S-INT-2", "file": f"f{i}", "severity": "minor"} for i in range(294)]
+        critical = [dict(r, severity="critical") for r in minor]
+        loose, _ = principle_score_and_grade(_mass(minor, files=2803), params=DEFAULT_PARAMS)
+        harsh, _ = principle_score_and_grade(_mass(critical, files=2803), params=DEFAULT_PARAMS)
+        assert harsh < loose and harsh < 5.0  # one critical rule over 294 files: 4.1, not under 3.0
 
 
 class TestNonDefaultParams:

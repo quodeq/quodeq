@@ -9,8 +9,8 @@ structural and these tests guard against drift. Thin evidence is scored (and
 marked low confidence) by both rather than gated to Insufficient.
 
 The wide test is parametrized over project size (unknown, small, large),
-rules hit in several files at mixed severities, a standard's severity
-classes, and a principle whose every finding was dismissed (it stays in the
+rules hit in several files at mixed severities, and a principle whose every
+finding was dismissed (it stays in the
 engine's evidence, empty). Per principle the score and the confidence must
 match; per dimension the score must match. The projector's ``None``
 confidence on an Insufficient principle reads ``low`` in the engine, as in
@@ -127,7 +127,6 @@ def test_dimension_score_weighs_by_observation_and_flags_thin_dimensions() -> No
     assert thin_only["confidence"] == "low"
 
 
-_CLASSES = {"R-A": "critical", "R-B": "minor", "R-D": "critical"}
 _EMPTY = "P-dismissed"
 
 
@@ -155,7 +154,7 @@ def _by_principle(findings) -> dict[str, list]:
     return out
 
 
-def _engine(source_file_count: int, classes):
+def _engine(source_file_count: int):
     violations, compliance = _by_principle(_VIOLATIONS), _by_principle(_COMPLIANCE)
     principles = {_EMPTY: {"violations": [], "compliance": [],
                            "metrics": {"confidence_level": classify_confidence_level(0, 0)}}}
@@ -165,12 +164,12 @@ def _engine(source_file_count: int, classes):
         principles[key] = {"violations": v, "compliance": c, "metrics": {
             "confidence_level": classify_confidence_level(len(v), len(c), source_file_count=source_file_count)}}
     evidence = {"source_file_count": source_file_count, "files_read": 0, "principles": principles}
-    return run_scoring(evidence, MODE_NUMERICAL, classes=classes)
+    return run_scoring(evidence, MODE_NUMERICAL)
 
 
-def _projector(source_file_count: int, classes):
+def _projector(source_file_count: int):
     violations, compliance = _by_principle(_VIOLATIONS), _by_principle(_COMPLIANCE)
-    scale = PrincipleGradeScale(source_file_count=source_file_count, classes=classes)
+    scale = PrincipleGradeScale(source_file_count=source_file_count)
     grades = [
         compute_principle_grade(principle_id=key, findings=violations.get(key, []),
                                 compliance=compliance.get(key, []), scale=scale)
@@ -179,11 +178,10 @@ def _projector(source_file_count: int, classes):
     return grades, compute_dimension_score(dimension="Security", principle_grades=grades)
 
 
-@pytest.mark.parametrize("classes", [{}, _CLASSES], ids=["model-severity", "classed"])
 @pytest.mark.parametrize("source_file_count", [0, 100, 3000])
-def test_engine_and_projector_agree(source_file_count, classes) -> None:
-    engine = _engine(source_file_count, classes)
-    grades, dimension = _projector(source_file_count, classes)
+def test_engine_and_projector_agree(source_file_count) -> None:
+    engine = _engine(source_file_count)
+    grades, dimension = _projector(source_file_count)
     for grade in grades:
         core = engine.principles[grade["principle_id"]]
         assert core.final_score == grade["score"], grade["principle_id"]
@@ -194,10 +192,9 @@ def test_engine_and_projector_agree(source_file_count, classes) -> None:
     assert engine.overall.grade == dimension["grade"]
 
 
-def test_classes_and_size_change_the_numbers() -> None:
-    """Guard against a vacuous parametrization: the axes really move the score."""
-    scores = {(n, bool(c)): _projector(n, c)[1]["score"] for n in (0, 100, 3000) for c in ({}, _CLASSES)}
+def test_size_changes_the_numbers() -> None:
+    """Guard against a vacuous parametrization: the size axis really moves the score."""
+    scores = {n: _projector(n)[1]["score"] for n in (0, 100, 3000)}
     assert len(set(scores.values())) > 1
-    assert scores[(100, True)] != scores[(100, False)]
-    confidences = {g["confidence"] for g in _projector(100, {})[0]}
+    confidences = {g["confidence"] for g in _projector(100)[0]}
     assert {"low", "medium", "high"} <= confidences

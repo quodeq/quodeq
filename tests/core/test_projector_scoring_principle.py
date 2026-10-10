@@ -18,15 +18,6 @@ def test_nothing_at_all_is_insufficient() -> None:
     assert (result["grade"], result["score"], result["dismissed_count"]) == ("Insufficient", None, 2)
 
 
-def test_classes_from_the_scale_pin_the_rule() -> None:
-    findings = [_f("S-INT-2", "P1", severity="minor", file=f"f{i}.py") for i in range(20)]
-    loose = compute_principle_grade(principle_id="P1", findings=findings, compliance=[],
-                                    scale=PrincipleGradeScale(source_file_count=1000))["score"]
-    pinned = compute_principle_grade(principle_id="P1", findings=findings, compliance=[],
-                                     scale=PrincipleGradeScale(source_file_count=1000, classes={"S-INT-2": "critical"}))["score"]
-    assert pinned < loose
-
-
 def test_unknown_project_size_scores_like_the_unspread_formula() -> None:
     findings = [_f("R1", "P1", severity="major", file=f"f{i}.py") for i in range(30)]
     spread_on = compute_principle_grade(principle_id="P1", findings=findings, compliance=[], scale=PrincipleGradeScale(source_file_count=100))["score"]
