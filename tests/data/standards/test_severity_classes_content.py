@@ -1,4 +1,4 @@
-"""Every requirement of the built-in standards carries the class its source declares."""
+"""Every requirement of the built-in standards carries the suggested severity its source declares."""
 from __future__ import annotations
 
 import json
@@ -30,5 +30,5 @@ def test_compiled_severity_matches_source_and_is_on_the_ladder(dimension):
         assert is_severity_class(value), (dimension, req_id, value)
 
 
-def test_security_is_fully_classed():
+def test_security_suggests_a_severity_on_every_requirement():
     assert all(r.get("severity") for r in _reqs(ROOT / "compiled" / "security.json"))

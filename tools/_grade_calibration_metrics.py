@@ -17,7 +17,7 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from _grade_calibration_load import Report  # noqa: E402
 from quodeq.core.scoring.internals import principle_score_and_grade, score_to_grade_label  # noqa: E402
-from quodeq.core.scoring.mass import LADDER, principle_mass, requirement_rows  # noqa: E402
+from quodeq.core.scoring.mass import principle_mass, requirement_rows  # noqa: E402
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams  # noqa: E402
 from quodeq.core.scoring.projector_scoring import compute_dimension_score, compute_run_score  # noqa: E402
 from quodeq.core.scoring.report_grades import NUMERIC_GRADE_ORDER  # noqa: E402
@@ -31,9 +31,7 @@ DIGITS = 3
 BENCHMARK_PREFIX = "benchmark"
 BENCHMARK_DIMENSION = "security"
 NO_MODEL = "None"
-COMPILED_SUBDIR = "compiled"
 GRADES = tuple(reversed(NUMERIC_GRADE_ORDER))
-_RANK = {sev: i for i, sev in enumerate(LADDER)}
 
 
 def short(name: str) -> str:

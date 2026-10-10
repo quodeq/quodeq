@@ -201,8 +201,7 @@ def recompute_grades(
     # run graded with older scoring apart from one that is merely unchanged,
     # and the reports the coverage came from, so a report written after the
     # last event re-derives the tables instead of leaving coverage at zero.
-    # The class fingerprint does the same for a standard or override edit.
-    # One held connection for the three stamps.
+    # One held connection for the two stamps.
     with store.connection():
         store.save_grades_algo_version(GRADE_ALGO_VERSION)
         store.save_coverage_stamp(report_stamp(run_dir))

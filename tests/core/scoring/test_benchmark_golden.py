@@ -4,8 +4,8 @@ The fixture is a real Sonnet run of BenchmarkJava v1.2 (2803 source files),
 reduced to per-rule file counts by severity and per-rule compliance file
 counts. The project is a deliberately vulnerable benchmark, so its security
 grade must sit low; the pre-v4 formula stored 3.5. Each principle is rebuilt
-as requirement rows over synthetic file names, scored with the real compiled
-security severity classes, and rolled up by observation weight, exactly the
+as requirement rows over synthetic file names with the severities the model
+gave, and rolled up by observation weight, exactly the
 production path minus the database.
 """
 from __future__ import annotations

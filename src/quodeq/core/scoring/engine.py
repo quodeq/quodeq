@@ -1,7 +1,6 @@
 """Public scoring API, delegates principle-level work to principle."""
 from __future__ import annotations
 
-
 from quodeq.core.types import ScaleInfo, ScoringResult
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.scoring.overall import weighted_overall

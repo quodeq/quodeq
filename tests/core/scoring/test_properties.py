@@ -3,7 +3,7 @@
 
 Adding a violation never raises a score and removing one never lowers it. Adding compliance
 never lowers it. Raising a severity never raises it. Repeats change nothing. Doubling the
-project changes nothing. Model severities do not move a classed rule. The label never beats
+project changes nothing. Raising a rating never raises the score. The label never beats
 the worst severity's floor, except where the volume ceiling takes over.
 """
 from __future__ import annotations
