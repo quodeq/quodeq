@@ -114,7 +114,7 @@ describe('ComparePage', () => {
     const matrix = await screen.findByLabelText('Score matrix');
     await userEvent.click(within(matrix).getByTitle('open security in alpha'));
     expect(onOpenProjectDimension).toHaveBeenCalledWith({
-      id: 'alpha', source: 'local', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
+      id: 'alpha', name: 'alpha', source: 'local', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
     });
     expect(screen.queryByText(/PRINCIPLE_MATRIX/)).toBeNull();
   });

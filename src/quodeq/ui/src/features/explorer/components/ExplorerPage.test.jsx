@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import ExplorerPage from './ExplorerPage.jsx';
 
+// The page's own-trend query needs a QueryClient; these render it bare.
+vi.mock('./useExplorerTrend.js', () => ({ useExplorerTrend: (_p, _s, trend) => trend ?? [] }));
 vi.mock('./explorerDataHooks.js', () => ({
   useExplorerData: () => ({ loading: true, evalData: null, allViolations: [] }),
   buildEvalPrincipalFn: () => () => ({}),

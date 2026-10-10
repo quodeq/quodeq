@@ -39,6 +39,9 @@ export function compareRoute(params, props) {
         runId: target.runId,
         dateLabel: target.dateLabel,
         fromProject: target.id,
+        // Named in the crumb: the root crumb is still the global selection,
+        // so without it the trail never says whose dimension this is.
+        fromProjectName: target.name,
         // The entry's own source, like its own project: the explorer must
         // read a local fromProject from the local API even while the
         // global selection sits on the shared source (and vice versa).

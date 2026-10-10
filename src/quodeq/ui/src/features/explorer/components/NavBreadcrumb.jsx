@@ -23,6 +23,11 @@ const PAGE_LABELS = {
   help: t('explorer.helpCrumb'),
 };
 
+function explorerLabel(e) {
+  const dim = e.dimension?.toLowerCase();
+  return dim && e.fromProjectName ? t('explorer.dimensionInProject', { dim, project: e.fromProjectName }) : dim;
+}
+
 /**
  * Per-page crumb label: `[read, fallback]`. `read` pulls whatever that page's
  * stack entry carries; when it comes back empty the fallback label is used.
@@ -31,7 +36,9 @@ const PAGE_LABELS = {
 const ENTRY_LABELS = {
   run:           [(e) => e.label || e.runId, t('explorer.runFallback')],
   'history-run': [(e) => e.dateLabel || e.runId, t('explorer.runFallback')],
-  explorer:      [(e) => e.dimension?.toLowerCase(), t('explorer.dimensionFallback')],
+  // A cross-project entry (Compare) names its project: the root crumb is
+  // the global selection, not the project this dimension belongs to.
+  explorer:      [explorerLabel, t('explorer.dimensionFallback')],
   violation:     [(e) => e.label || e.principle?.name, t('explorer.violationFallback')],
   file:          [(e) => e.label || e.file?.path, t('explorer.fileFallback')],
   principle:     [(e) => e.label, t('explorer.principleFallback')],

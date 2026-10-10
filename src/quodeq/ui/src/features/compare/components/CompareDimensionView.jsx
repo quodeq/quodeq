@@ -87,7 +87,7 @@ function projectDimensionOpener(view, onOpenProjectDimension, onOpenProject) {
   return (id) => {
     const s = view.standings.find((x) => x.row.id === id);
     if (s && s.runId && onOpenProjectDimension && !s.row.remote) {
-      onOpenProjectDimension({ id, source: s.row.source, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel });
+      onOpenProjectDimension({ id, name: s.row.name, source: s.row.source, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel });
     } else {
       onOpenProject(id);
     }

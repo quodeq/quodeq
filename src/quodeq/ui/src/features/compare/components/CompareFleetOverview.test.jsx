@@ -53,7 +53,7 @@ describe('CompareFleetMatrix', () => {
     const onOpenProjectDimension = vi.fn();
     renderMatrix({ onOpenProjectDimension });
     await userEvent.click(screen.getByTitle('open security in beta'));
-    expect(onOpenProjectDimension).toHaveBeenCalledWith({ id: 'beta', source: 'local', runId: 'r1', dimName: 'security', dateLabel: '1 Oct' });
+    expect(onOpenProjectDimension).toHaveBeenCalledWith({ id: 'beta', name: 'beta', source: 'local', runId: 'r1', dimName: 'security', dateLabel: '1 Oct' });
   });
 
   it('a header ranks by its dimension; again reverses; unscored projects stay last', async () => {
@@ -94,7 +94,7 @@ describe('CompareAttentionList', () => {
     expect(screen.getByText('security at 5.0')).toBeInTheDocument();
     expect(screen.getByText('12 commits behind')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /open security/ }));
-    expect(onOpenProjectDimension).toHaveBeenCalledWith({ id: 'beta', source: 'local', runId: 'r1', dimName: 'security', dateLabel: '1 Oct' });
+    expect(onOpenProjectDimension).toHaveBeenCalledWith({ id: 'beta', name: 'beta', source: 'local', runId: 'r1', dimName: 'security', dateLabel: '1 Oct' });
   });
 
   it('opens the dimension from anywhere on the row, the project when it has no weakest dimension', async () => {

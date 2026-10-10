@@ -132,7 +132,7 @@ def _touch(path: Path) -> None:
         _logger.debug("cache touch failed for %s: %s", path, exc)
 
 
-def _prune_lru(root: Path, *, keep: int) -> None:
+def _prune_lru(root: Path, *, keep: int, current: Path) -> None:
     """Remove the least-recently-used cache entries beyond *keep*.
 
     "Recently used" = mtime of the entry directory itself, kept current by
@@ -142,12 +142,17 @@ def _prune_lru(root: Path, *, keep: int) -> None:
     can still be picked for eviction and ``rmtree``'d out from under it.
     Accepted trade-off for this tool's usage pattern (evaluations are
     normally sequential), not a hard guarantee.
+
+    *current* (the entry this call just used) is never evicted: a coarse
+    mtime (Windows) can tie it with older entries, and the sort would then
+    pick it as easily as any of them.
     """
     entries = [e for e in root.iterdir() if e.is_dir()]
     if len(entries) <= keep:
         return
-    entries.sort(key=lambda e: e.stat().st_mtime)
-    for stale in entries[: len(entries) - keep]:
+    others = [e for e in entries if e != current]
+    others.sort(key=lambda e: e.stat().st_mtime)
+    for stale in others[: len(entries) - keep]:
         shutil.rmtree(stale, ignore_errors=True)
 
 
@@ -168,7 +173,7 @@ def ensure_clone(url: str) -> Path | None:
         # this counts as "just used" for LRU purposes.
         _refresh_existing(repo)
         _touch(cache_dir_for_url(url))
-        _prune_lru(cache_root(), keep=_MAX_CACHED_REPOS)
+        _prune_lru(cache_root(), keep=_MAX_CACHED_REPOS, current=cache_dir_for_url(url))
         return repo
 
     # First-time clone — shallow, single-branch, default ref.
@@ -177,7 +182,7 @@ def ensure_clone(url: str) -> Path | None:
         shutil.rmtree(repo, ignore_errors=True)
         return None
     _touch(cache_dir_for_url(url))
-    _prune_lru(cache_root(), keep=_MAX_CACHED_REPOS)
+    _prune_lru(cache_root(), keep=_MAX_CACHED_REPOS, current=cache_dir_for_url(url))
     return repo
 
 
