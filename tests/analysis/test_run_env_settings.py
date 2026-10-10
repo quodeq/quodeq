@@ -127,7 +127,7 @@ def _cli_run_config(tmp_path: Path):
     from quodeq.cli import ResolvedInputs, build_run_config
 
     args = argparse.Namespace(
-        dimensions=None, no_consolidated=False, no_verify=False,
+        dimensions=None, no_verify=False,
         max_turns=None, max_duration=None, n_subagents=1,
         pool_budget=None, clean_scan=False, legacy_incremental=False,
     )
@@ -178,7 +178,7 @@ class TestAgentFailureStreakReachesThePool:
         monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "9")
         assert run_config.options.agent_failure_streak_limit == 2
 
-    def test_both_launchers_hand_it_to_the_pool(self, tmp_path, monkeypatch):
+    def test_the_launcher_hands_it_to_the_pool(self, tmp_path, monkeypatch):
         from quodeq.analysis.subagents import runner as subagent_runner
 
         monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "3")
@@ -192,18 +192,12 @@ class TestAgentFailureStreakReachesThePool:
             return MagicMock(run=MagicMock(side_effect=RuntimeError("stop here")))
 
         with patch("quodeq.analysis.subagents._pool_launcher.SubagentPool", side_effect=fake_pool), \
-             patch("quodeq.analysis.subagents._consolidated.SubagentPool", side_effect=fake_pool), \
-             patch("quodeq.analysis.subagents._consolidated._build_prompt", return_value="p"), \
              patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
             with pytest.raises(RuntimeError, match="stop here"):
                 subagent_runner.launch_pool(run_config, "security", subagent_runner.LaunchPoolParams(
                     evidence_dir=tmp_path, queue_path=tmp_path / "q.json", prompt="p", all_files=["a.py"],
                 ))
-            with pytest.raises(RuntimeError, match="stop here"):
-                subagent_runner.process_consolidated_dimensions(
-                    run_config, ["security"], SimpleNamespace(total=1),
-                )
-        assert seen == [3, 3]
+        assert seen == [3]
 
     @pytest.mark.parametrize("scout_first", [False, True])
     def test_the_pool_cancels_after_the_runs_limit(self, tmp_path, scout_first):

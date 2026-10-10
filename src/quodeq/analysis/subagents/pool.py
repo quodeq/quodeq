@@ -24,7 +24,7 @@ from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.shared import cancellation
-from quodeq.shared.constants import CONSOLIDATED_DIMENSION_KEY, DEFAULT_TIME_LIMIT
+from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 
 # Re-export public API so existing imports keep working.
@@ -47,12 +47,8 @@ class SubagentPool:
         self._evidence_dir, self._queue_path = paths.evidence_dir, paths.queue_path
         self._queue = queue
         dimension = options.dimension
-        if isinstance(dimension, list):
-            self._dimensions, self._dimension = dimension, ",".join(dimension)
-            self._dimension_key = CONSOLIDATED_DIMENSION_KEY
-        else:
-            self._dimensions = [dimension] if dimension else []
-            self._dimension, self._dimension_key = dimension, dimension
+        self._dimensions = [dimension] if dimension else []
+        self._dimension, self._dimension_key = dimension, dimension
         self._base_config = config or AnalysisConfig()
         self._worker_ctx = WorkerContext(
             dimension=self._dimension, dimension_key=self._dimension_key,
@@ -100,13 +96,10 @@ class SubagentPool:
         no extra file reads. Suppression state is project-scoped and the
         evidence dir is ``<project>/<run>/evidence``.
 
-        Returns None when the project has no suppressions, when the layout
-        isn't the expected one, or for consolidated runs — whose synthetic
-        dimension key would never match a real delete key anyway. The counts
-        then stay raw, which is the pre-existing behaviour.
+        Returns None when the project has no suppressions or when the layout
+        isn't the expected one. The counts then stay raw, which is the
+        pre-existing behaviour.
         """
-        if self._dimension_key == CONSOLIDATED_DIMENSION_KEY:
-            return None
         try:
             from quodeq.services.suppression import matcher_for  # noqa: PLC0415
             project_dir = self._evidence_dir.parent.parent

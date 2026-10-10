@@ -13,7 +13,7 @@ vi.mock('../../../constants.js', () => ({
   DEFAULT_MAX_SUBAGENTS: 5,
   PROVIDER_SETTING_KEY: {
     MODEL: 'model', MODEL_ANALYSIS: 'model-analysis', SUBAGENTS: 'subagents', TIME_LIMIT: 'time-limit',
-    PER_DIMENSION: 'per-dimension', VERIFY: 'verify', POOL_BUDGET: 'pool-budget',
+    VERIFY: 'verify', POOL_BUDGET: 'pool-budget',
   },
   providerKey: (p, k) => `${p}-${k}`,
 }));

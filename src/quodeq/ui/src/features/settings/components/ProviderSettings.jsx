@@ -10,14 +10,6 @@ const MIN_MINUTES = 1;
 const MAX_MINUTES = 60;
 const DEFAULT_TIME_LIMIT_MINUTES = Math.max(MIN_MINUTES, Math.round(DEFAULT_TIME_LIMIT_S / SECONDS_PER_MINUTE));
 
-const ANALYSIS_MODE_HINT = (
-  <>
-    <p>{t('settings.analysisModeHintIntro')}</p>
-    <p><strong>{t('settings.analysisModeHintPerDimTerm')}</strong> {t('settings.analysisModeHintPerDimBody')}</p>
-    <p><strong>{t('settings.analysisModeHintGroupedTerm')}</strong> {t('settings.analysisModeHintGroupedBody')}</p>
-  </>
-);
-
 const VERIFY_HINT = (
   <>
     <p>{t('settings.verifyHintIntro')}</p>
@@ -80,24 +72,10 @@ export function TimeLimitSetting({ state, update, providerType }) {
 }
 
 export function AdvancedAnalysisSettings({ state, update }) {
-  const perDimension = state[PROVIDER_SETTING_KEY.PER_DIMENSION] !== STORED_FALSE;
   const verify = state[PROVIDER_SETTING_KEY.VERIFY] !== STORED_FALSE;
 
   return (
     <>
-      <div className="settings-row">
-        <SettingsRowLabel
-          label={t('settings.analysisMode')}
-          hint={ANALYSIS_MODE_HINT}
-          hintAria={t('settings.analysisModeHelpAria')}
-          description={t('settings.analysisModeDesc')}
-        />
-        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.violationGroupingAria')}>
-          <button type="button" role="radio" aria-checked={perDimension} className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.PER_DIMENSION, STORED_TRUE)}>{t('settings.perDimension')}</button>
-          <button type="button" role="radio" aria-checked={!perDimension} className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.PER_DIMENSION, STORED_FALSE)}>{t('settings.grouped')}</button>
-        </div>
-      </div>
-
       <div className="settings-row">
         <SettingsRowLabel
           label={t('settings.verifyFindings')}

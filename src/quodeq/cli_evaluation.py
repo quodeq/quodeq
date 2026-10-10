@@ -42,7 +42,7 @@ from quodeq.services.evidence_rescore import (  # noqa: F401 — facade patch ta
     rescore_dimension_from_evidence, score_dimension_from_evidence,
 )
 from quodeq.data.fs.project_resolver import resolve_project_uuid  # facade patch target
-from quodeq.shared.logging import log_error, log_info, log_warning
+from quodeq.shared.logging import log_error, log_warning
 from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo  # facade patch targets
 from quodeq.data.fs.repo_handler import cleanup_cloned_repo  # facade patch target
 from quodeq.analysis.runner_markers import emit_marker  # facade patch target
@@ -51,7 +51,7 @@ from quodeq.analysis.diff_resolver import resolve_diff_files  # facade patch tar
 
 # Re-export resolution / lifecycle / scoring helpers — keep the public API stable
 from quodeq._cli_env import (  # noqa: F401 — ENV_*/cli_env_int/no_verify re-exported for quodeq.cli
-    ENV_MAX_DURATION, ENV_MAX_TURNS, ENV_NO_CONSOLIDATE, ENV_POOL_BUDGET,
+    ENV_MAX_DURATION, ENV_MAX_TURNS, ENV_POOL_BUDGET,
     cli_env_int, cli_environ, no_verify, subagent_model,
 )
 from quodeq._cli_run_config import (
@@ -81,9 +81,8 @@ class RunConfigLocals(NamedTuple):
 
     Named rather than a bare tuple so `_cli_run_config.build_analysis_options`
     reads them by attribute: reordering these fields can no longer silently
-    swap, say, `consolidated` and `skip_scoring` at the call site.
+    swap, say, `diff_from` and `skip_scoring` at the call site.
     """
-    consolidated: bool
     effective_ai_model: str | None
     subagent_model: str | None
     diff_from: str | None
@@ -92,15 +91,9 @@ class RunConfigLocals(NamedTuple):
 
 
 def _resolve_run_config_locals(
-    args: argparse.Namespace, inputs: ResolvedInputs, env: dict[str, str] | None,
+    args: argparse.Namespace, env: dict[str, str] | None,
 ) -> RunConfigLocals:
     """Resolve the per-run scalars build_run_config needs before assembling RunConfig."""
-    _env = cli_environ(env)
-    consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get(ENV_NO_CONSOLIDATE))
-    if inputs.single_file:
-        consolidated = False
-        log_info("Single-file mode: per-dimension analysis for deeper coverage")
-
     ai_model = get_ai_model(env=env)
     subagent_model_val = subagent_model(env=env)
     effective_ai_model = ai_model or subagent_model_val
@@ -109,7 +102,6 @@ def _resolve_run_config_locals(
     diff_files: set[str] | None = getattr(args, "_diff_files", None)
     skip_scoring = diff_from is not None
     return RunConfigLocals(
-        consolidated=consolidated,
         effective_ai_model=effective_ai_model,
         subagent_model=subagent_model_val,
         diff_from=diff_from,
@@ -125,7 +117,7 @@ def build_run_config(
     """Assemble a RunConfig from CLI args and resolved inputs."""
     standards_dir = default_paths().standards_dir
     dimensions_filter = dimensions_filter_for(args)
-    resolved = _resolve_run_config_locals(args, inputs, env)
+    resolved = _resolve_run_config_locals(args, env)
     limits = resolve_limits(args, env)
 
     return RunConfig(

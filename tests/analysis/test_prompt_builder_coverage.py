@@ -8,7 +8,6 @@ from unittest.mock import patch
 from quodeq.analysis.prompts.builder import (
     PromptContext,
     build_analysis_prompt,
-    build_consolidated_prompt,
     render_previous_findings_section,
     load_evaluation_rules,
 )
@@ -77,7 +76,6 @@ _COMMON_SLOTS = (
     "ANALYSIS_GUIDANCE", "PROMPT_HASH", "SOURCE_MANIFEST", "EVALUATION_RULES",
 )
 _ANALYSIS_SLOTS = (*_COMMON_SLOTS, "DIMENSION", "STANDARDS_CHECKLIST", "DIMENSIONS")
-_CONSOLIDATED_SLOTS = (*_COMMON_SLOTS, "DIMENSION_LIST", "STANDARDS_CHECKLISTS")
 
 
 def _template(slots: tuple[str, ...], prefix: str = "") -> str:
@@ -147,50 +145,3 @@ class TestBuildAnalysisPrompt:
         # Must render the compiled principle, not fall back to the sentinel.
         assert "No compiled standards" not in result
         assert "Auth" in result
-
-
-# ---------------------------------------------------------------------------
-# build_consolidated_prompt
-# ---------------------------------------------------------------------------
-
-class TestBuildConsolidatedPrompt:
-    @staticmethod
-    def _make_context(**kwargs) -> PromptContext:
-        defaults = dict(
-            language="python",
-            repo_name="test",
-            date_str="2026-04-09",
-            dimension="consolidated",
-            source_file_count=10,
-            dimensions_data={},
-        )
-        defaults.update(kwargs)
-        return PromptContext(**defaults)
-
-    def test_basic_rendering(self):
-        template = _template(_CONSOLIDATED_SLOTS, "Dimensions: ")
-        ctx = self._make_context(
-            language="typescript", repo_name="my-app", source_file_count=100,
-        )
-        result = build_consolidated_prompt(["security", "reliability"], ctx, template=template)
-        assert "security, reliability" in result
-        assert "typescript" in result
-
-    def test_no_standards_without_dir(self):
-        template = _template(_CONSOLIDATED_SLOTS, "Standards: ")
-        ctx = self._make_context(standards_dir=None)
-        result = build_consolidated_prompt(["security"], ctx, template=template)
-        assert "No compiled standards" in result
-
-    def test_extra_vars(self):
-        template = _template(_CONSOLIDATED_SLOTS, "Custom: {{MY_VAR}} ")
-        ctx = self._make_context(extra_vars={"MY_VAR": "world"})
-        result = build_consolidated_prompt(["security"], ctx, template=template)
-        assert "world" in result
-
-    def test_loads_default_template_when_none(self):
-        ctx = self._make_context()
-        # Should not raise — loads template from disk
-        result = build_consolidated_prompt(["security"], ctx)
-        assert isinstance(result, str)
-        assert len(result) > 0

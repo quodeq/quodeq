@@ -75,8 +75,7 @@ def dim_elapsed_s(dim_id: str, run_dir: Path, state: DimState, record: dict | No
     Prefers the transition timestamps stamped in dimensions.json (see
     _stamped_elapsed_s). The queue-state reconstruction below remains as a
     fallback for run dirs written before those stamps were preserved,
-    external runs from older CLI versions, the consolidated pseudo-dim
-    (which has no dimensions.json entry), and dims that died without a
+    external runs from older CLI versions, and dims that died without a
     terminal transition.
 
     Reconstruction notes: the queue file is atomically rewritten on every

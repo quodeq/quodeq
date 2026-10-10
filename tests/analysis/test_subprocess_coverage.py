@@ -154,7 +154,7 @@ class TestRunCliAnalysis:
         mock_default_reg.assert_not_called()
 
     def test_registers_on_the_configs_own_registry_when_no_run_config(self, tmp_path):
-        """I1: the single-agent fallback and consolidated builders carry the
+        """I1: the single-agent fallback builder carries the
         run's registry directly on AnalysisConfig.mcp_registry without
         setting run_config. That field must win over both run_config and
         the process default."""

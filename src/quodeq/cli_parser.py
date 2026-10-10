@@ -76,10 +76,6 @@ def _add_evaluate_run_args(parser: argparse.ArgumentParser) -> None:
              "--pool-budget is a deprecated alias.",
     )
     parser.add_argument(
-        "--no-consolidated", action="store_true",
-        help="Disable multi-dimension consolidation (evaluate dimensions separately)",
-    )
-    parser.add_argument(
         "--clean-scan", action="store_true", dest="clean_scan",
         help="Force a full re-analysis, ignoring any cached findings from prior runs. "
              "By default Quodeq carries forward findings for unchanged files.",

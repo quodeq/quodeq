@@ -90,7 +90,6 @@ def build_evaluation_options(payload: dict) -> EvaluationOptions:
         max_subagents=limits.max_subagents,
         time_limit=limits.time_limit,
         clean_scan=flags.clean_scan,
-        per_dimension=bool_flag(payload, "perDimension", False),
         context_size=clamp(context_size, 0, _MAX_CONTEXT_SIZE),
         branch=payload.get("branch") or None,
         scope_path=flags.scope_path,

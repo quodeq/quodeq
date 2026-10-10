@@ -10,15 +10,13 @@ if TYPE_CHECKING:
 def shared_analysis_config_kwargs(config: "RunConfig") -> dict[str, Any]:
     """Return the AnalysisConfig fields common to every subagent launch mode.
 
-    Both the consolidated-mode builder (``_consolidated._build_consolidated_config``)
-    and the per-dimension pool builder (``_pool_launcher._build_pool_config``)
-    spread this into their ``AnalysisConfig(...)`` call. ``compiled_dir`` and
-    ``ai_model`` are deliberately excluded: each caller computes those
-    differently and passes its own value in.
+    The pool builder (``_pool_launcher._build_pool_config``) spreads this
+    into its ``AnalysisConfig(...)`` call. ``compiled_dir`` and ``ai_model``
+    are deliberately excluded: the caller computes those and passes its own
+    value in.
 
-    ``drop_counter`` and ``mcp_registry`` are filled here too, so both modes
-    reach the run's owners even when a caller (the consolidated builder)
-    deliberately leaves ``run_config`` unset.
+    ``drop_counter`` and ``mcp_registry`` are filled here too, so a caller
+    that leaves ``run_config`` unset still reaches the run's owners.
     """
     return {
         "analysis_budget": config.options.analysis_budget,

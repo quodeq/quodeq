@@ -26,7 +26,6 @@ test('LEGACY_SETTING_MIGRATIONS is the verbatim key map', () => {
     'cc-max-subagents': 'subagents',
     'cc-pool-budget': 'time-limit',
     'cc-time-limit': 'time-limit',
-    'cc-per-dimension': 'per-dimension',
     'cc-ai-model': 'model',
   });
 });
@@ -62,10 +61,10 @@ test(`targets readString(${LEGACY_AI_CMD_KEY}) when present, over clients[0].id`
 });
 
 test("oldVal !== null (NOT truthiness) — '0' and '' must migrate", () => {
-  const s = fakeStorage({ 'cc-max-subagents': '0', 'cc-per-dimension': '' });
+  const s = fakeStorage({ 'cc-max-subagents': '0', 'cc-ai-model': '' });
   migrateLegacyProviderSettings([{ id: 'claude' }], s);
   assert.equal(s._store['cc-claude-subagents'], '0');
-  assert.equal(s._store['cc-claude-per-dimension'], '');
+  assert.equal(s._store['cc-claude-model'], '');
 });
 
 test('an unset legacy key is left alone (not migrated as an empty write)', () => {
@@ -86,18 +85,16 @@ test('migrates every configured legacy key present and reports movedKeys', () =>
   const s = fakeStorage({
     'cc-max-subagents': '3',
     'cc-pool-budget': '900',
-    'cc-per-dimension': 'true',
     'cc-ai-model': 'gpt-5',
   });
   const result = migrateLegacyProviderSettings([{ id: 'claude' }], s);
   assert.equal(s._store['cc-claude-subagents'], '3');
   assert.equal(s._store['cc-claude-time-limit'], '900');
-  assert.equal(s._store['cc-claude-per-dimension'], 'true');
   assert.equal(s._store['cc-claude-model'], 'gpt-5');
   assert.equal(result.migrated, true);
   assert.deepEqual(
     result.movedKeys.sort(),
-    ['cc-ai-model', 'cc-max-subagents', 'cc-per-dimension', 'cc-pool-budget'].sort(),
+    ['cc-ai-model', 'cc-max-subagents', 'cc-pool-budget'].sort(),
   );
 });
 
@@ -135,7 +132,7 @@ test('a single failed key write must NOT mark the migration done, so it retries 
   // Two legacy keys present; only the write for 'cc-max-subagents' fails.
   // Final review Minor 16: the old unconditional MIGRATION_DONE_KEY write
   // stranded 'cc-max-subagents' forever once one key quota-failed.
-  const store = { 'cc-max-subagents': '4', 'cc-per-dimension': 'true' };
+  const store = { 'cc-max-subagents': '4', 'cc-ai-model': 'gpt-5' };
   let subagentsWriteAttempts = 0;
   const s = {
     getItem: (key) => (key in store ? store[key] : null),
@@ -151,7 +148,7 @@ test('a single failed key write must NOT mark the migration done, so it retries 
   migrateLegacyProviderSettings([{ id: 'claude' }], s);
 
   // The succeeding key still migrates...
-  assert.equal(store['cc-claude-per-dimension'], 'true');
+  assert.equal(store['cc-claude-model'], 'gpt-5');
   // ...but the done-flag is withheld because not every key wrote.
   assert.equal(MIGRATION_DONE_KEY in store, false);
 

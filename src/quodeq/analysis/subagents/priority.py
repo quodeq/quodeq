@@ -62,7 +62,7 @@ class PriorityContext:
 def prioritize_files(
     files: list[str],
     src: Path,
-    dimension: str | list[str],
+    dimension: str,
     *,
     context: PriorityContext | None = None,
 ) -> list[str]:
@@ -97,7 +97,7 @@ def prioritize_files(
 
 
 def _score_files(
-    files: list[str], src: Path, dimension: str | list[str], category: str | None,
+    files: list[str], src: Path, dimension: str, category: str | None,
     inputs: ScoringInputs,
 ) -> list[tuple[float, str]]:
     """Compute composite priority scores for each file."""

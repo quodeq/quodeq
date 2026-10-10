@@ -155,7 +155,6 @@ def test_diff_from_forces_clean_scan_internally(tmp_path):
         n_subagents=1,
         no_verify=False,
         pool_budget=None,
-        no_consolidated=False,
         clean_scan=False,
         legacy_incremental=False,
         diff_from="main",

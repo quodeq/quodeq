@@ -130,9 +130,9 @@ class TestCallApi:
         assert "call failed" in msgs
 
     def test_drop_counter_field_wins_over_run_configs_counter(self, tmp_path):
-        """I1: the single-agent fallback and consolidated builders carry the
+        """I1: the single-agent fallback builder carries the
         run's drop counter directly on the config (no run_config, so the
-        API cache writer stays off for those paths). That field must be
+        API cache writer stays off for that path). That field must be
         checked before run_config's counter."""
         from quodeq.analysis.run_types import RunConfig
 

@@ -75,7 +75,7 @@ class ApiRunnerConfig:
     module-default counter. Filled by ``build_batch_api_config``."""
     drop_counter: "DropStatsCounter | None" = None
     """Checked before ``run_config.drop_counter`` -- lets a caller that leaves
-    ``run_config`` unset (the fallback/consolidated builders) still reach it."""
+    ``run_config`` unset (the single-agent fallback builder) still reach it."""
 
 
 @functools.lru_cache(maxsize=_WARN_CACHE_MAX_BASES)

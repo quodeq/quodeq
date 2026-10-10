@@ -125,7 +125,7 @@ def _recording_fake(seen: list[AnalysisConfig]):
     return recording_run
 
 
-class TestMultiDimensionPool:
+class TestPoolDimension:
     def _run_pool(self, tmp_path, dimension):
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["a.py"])
@@ -142,21 +142,10 @@ class TestMultiDimensionPool:
         assert all(r.success for r in results)
         return seen
 
-    def test_single_dimension_backward_compat(self, tmp_path):
-        """Single dimension string still works as before."""
+    def test_dimension_names_the_worker_config_and_the_evidence_file(self, tmp_path):
         seen = self._run_pool(tmp_path, _TEST_DIMENSION)
         assert seen[0].dimension == _TEST_DIMENSION
         assert (tmp_path / f"{_TEST_DIMENSION}_evidence.jsonl").exists()
-
-    def test_multi_dimension_list(self, tmp_path):
-        """List of dimensions is joined into the worker config's dimension."""
-        seen = self._run_pool(tmp_path, [_TEST_DIMENSION, "maintainability"])
-        assert seen[0].dimension == f"{_TEST_DIMENSION},maintainability"
-
-    def test_multi_dimension_jsonl_path(self, tmp_path):
-        """Multi-dimension runs write the shared 'consolidated' JSONL."""
-        self._run_pool(tmp_path, [_TEST_DIMENSION, "maintainability"])
-        assert (tmp_path / "consolidated_evidence.jsonl").exists()
 
 
 class TestScoutThenScale:

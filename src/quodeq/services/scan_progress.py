@@ -27,7 +27,6 @@ from quodeq.config.paths import default_paths
 from quodeq.core.run.state import TERMINAL_STATES, RunState
 from quodeq.services._scan_progress_dims import (
     build_dim_progress,
-    consolidated_dim_progress,
     forget_live_tallies,
 )
 from quodeq.services._scan_progress_elapsed import parse_started_at
@@ -83,8 +82,7 @@ def _scan_progress(
 ) -> ScanProgress:
     """A progress snapshot: the run-level header from *ctx*, plus *dimensions*.
 
-    Both the consolidated-live and per-dim paths report the same header, so
-    the field list is written once here.
+    The field list is written once here so every caller reports the same header.
     """
     return ScanProgress(
         job_id=job_id,
@@ -99,30 +97,10 @@ def _scan_progress(
     )
 
 
-def _maybe_consolidated_live_progress(job_id: str, ctx: ProgressContext) -> ScanProgress | None:
-    """Consolidated (grouped) runs dispatch every dimension in one pass and
-    write consolidated_* files — there are no per-dim queues, so the per-dim
-    reader would report 0% / "estimating…" for the whole run. While such a
-    run is live, report the consolidated pass as one row with the real file
-    counts. Once the run is terminal the per-dim evaluation files exist and
-    normal per-dim classification applies. Returns None when this doesn't
-    apply (caller falls through to per-dim classification)."""
-    evidence_dir = ctx.evidence_dir
-    consolidated_queue = evidence_dir / "consolidated_queue.json"
-    if (
-        ctx.is_terminal
-        or not consolidated_queue.is_file()
-        or any((evidence_dir / f"{d}_queue.json").is_file() for d in ctx.dim_ids)
-    ):
-        return None
-    return _scan_progress(job_id, ctx, [consolidated_dim_progress(ctx.run_dir, memo=ctx.live_tallies)])
-
-
 def _gather_progress_context(
     status: dict, run_dir: Path, time_limit_s: int | None, compiled_dir: Path | None,
 ) -> ProgressContext:
-    """Resolve the run-level scalars build_scan_progress needs before
-    dispatching to the consolidated-live check or the per-dim loop."""
+    """Resolve the run-level scalars build_scan_progress needs before the per-dim loop."""
     state = status.get("state") or "unknown"
     dim_estimates, dim_records, dim_ids = _read_dimension_inputs(status, run_dir)
     return ProgressContext(
@@ -199,9 +177,4 @@ def build_scan_progress(
         return None
 
     ctx = _gather_progress_context(status, run_dir, time_limit_s, compiled_dir)
-
-    consolidated = _maybe_consolidated_live_progress(job_id, ctx)
-    if consolidated is not None:
-        return consolidated
-
     return _build_per_dim_progress(job_id, ctx)
