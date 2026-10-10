@@ -142,7 +142,7 @@ def score_all_principles(
     """Score every principle and return the per-principle dict.
 
     ``scale`` carries the project size, the confidence scale multiplier, the
-    scoring formula and the standard's severity classes, the same object the
+    scoring formula, the same object the
     projector's ``compute_principle_grade`` takes.
     """
     scorer = _score_numerical if mode == MODE_NUMERICAL else _score_graded

@@ -9,7 +9,6 @@ bugs at the cost of a few ms per call.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,10 +18,6 @@ from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.grade_formula_store import load_params
 from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_reports
 from quodeq.data.fs.run_files import read_run_manifest
-from quodeq.data.fs.severity_classes_store import (
-    load_severity_classes_for_run,
-    severity_classes_fingerprint,
-)
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
@@ -82,12 +77,10 @@ def _grade_all_principles(
     dismissed_counts: dict[tuple[str, str], int],
     source_file_count: int,
     params: ScoringParams,
-    classes: Mapping[str, str],
 ) -> tuple[list[tuple[str, dict]], dict[str, list[dict]]]:
     """Compute per-principle grades: flat rows (for persistence) plus the
     same grades grouped by dimension (for the dimension-score rollup)."""
-    scale = PrincipleGradeScale(
-        source_file_count=source_file_count, params=params, classes=classes)
+    scale = PrincipleGradeScale(source_file_count=source_file_count, params=params)
     principle_grades_by_dim: dict[str, list[dict]] = {}
     principle_rows: list[tuple[str, dict]] = []
     for dim, principle_id in sorted(set(violations_by) | set(compliance_by)):
@@ -140,7 +133,7 @@ def load_grade_inputs(run_dir: Path) -> GradeInputs:
 
 
 def compute_run_grades(
-    run_dir: Path, params: ScoringParams, classes: Mapping[str, str] | None = None,
+    run_dir: Path, params: ScoringParams,
 ) -> tuple[list[tuple[str, dict]], list[dict]]:
     """Compute (principle_rows, dimension_rows) from findings. Pure: no writes.
 
@@ -148,15 +141,12 @@ def compute_run_grades(
     dimension_rows: ``[{"dimension":..., "score":..., "grade":...}, ...]``
 
     ``recompute_grades`` layers persistence on top; ``preview_scores`` uses
-    the result directly. *classes* is the severity class per requirement; None
-    loads it for the run's project (standards plus the project's overrides).
+    the result directly.
     """
-    if classes is None:
-        classes = load_severity_classes_for_run(run_dir)
     inputs = load_grade_inputs(run_dir)
     principle_rows, principle_grades_by_dim = _grade_all_principles(
         inputs.violations_by, inputs.compliance_by, inputs.dismissed_counts,
-        inputs.source_file_count, params, classes,
+        inputs.source_file_count, params,
     )
     dimension_rows = [
         compute_dimension_score(dimension=dim, principle_grades=p_grades, params=params)
@@ -167,7 +157,6 @@ def compute_run_grades(
 
 def recompute_grades(
     run_dir: Path, params: ScoringParams | None = None,
-    classes: Mapping[str, str] | None = None,
 ) -> None:
     """Full recompute of dimension_scores + principle_grades from findings.
 
@@ -175,9 +164,7 @@ def recompute_grades(
     """
     if params is None:
         params = load_params()
-    if classes is None:
-        classes = load_severity_classes_for_run(run_dir)
-    principle_rows, dimension_rows = compute_run_grades(run_dir, params, classes)
+    principle_rows, dimension_rows = compute_run_grades(run_dir, params)
 
     # Carry the per-dim exit_reason (failure_streak, time_limit, ...) from the
     # authoritative dim-state file so the grade layer can flag/exclude
@@ -218,7 +205,6 @@ def recompute_grades(
     # One held connection for the three stamps.
     with store.connection():
         store.save_grades_algo_version(GRADE_ALGO_VERSION)
-        store.save_grades_classes_fingerprint(severity_classes_fingerprint(classes))
         store.save_coverage_stamp(report_stamp(run_dir))
 
 

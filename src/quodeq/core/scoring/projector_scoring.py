@@ -53,6 +53,7 @@ from quodeq.core.types.scoring import ConfidenceLevel
 # 2: ceiling beats floor in the principle-score clamp.
 # 3: tally groups findings by req before vt (issue #1274).
 # 4: requirement spread, standard-owned severity classes, observation-weighted
+# 5: the finding's own severity again; the standard only suggests, in the prompt
 #    principles, thin evidence scored instead of gated (spec 2026-10-09).
 GRADE_ALGO_VERSION = 5
 

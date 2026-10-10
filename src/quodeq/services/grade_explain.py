@@ -1,7 +1,6 @@
 """``explain_dimension`` shows the arithmetic behind each principle's grade."""
 from __future__ import annotations
 
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +11,6 @@ from quodeq.core.scoring.params import ScoringParams, params_to_dict
 from quodeq.core.scoring.mass import principle_mass, requirement_rows
 from quodeq.core.types.finding import Finding
 from quodeq.core.utils.io import resolve_child_dir
-from quodeq.services.severity_classes import load_severity_classes_for_run
 from quodeq.services.wiring import GradeInputs, load_grade_inputs, load_params
 
 
@@ -38,7 +36,6 @@ def _keys_for(inputs: GradeInputs, dimension: str) -> list[tuple[str, str]]:
 
 def _explain_one(
     inputs: GradeInputs, key: tuple[str, str], params: ScoringParams,
-    *, classes: Mapping[str, str],
 ) -> dict[str, Any]:
     findings: list[Finding] = inputs.violations_by.get(key, [])
     compliance: list[Finding] = inputs.compliance_by.get(key, [])
@@ -51,7 +48,7 @@ def _explain_one(
         return entry
     rows = requirement_rows([finding_to_scoring_dict(f) for f in findings],
                             [finding_to_scoring_dict(c) for c in compliance])
-    mass = principle_mass(rows, inputs.source_file_count, classes, params=params)
+    mass = principle_mass(rows, inputs.source_file_count, params=params)
     entry["insufficient"] = False
     entry["confidence"] = str(classify_confidence_level(
         len(findings), len(compliance), source_file_count=inputs.source_file_count))
@@ -69,7 +66,6 @@ def explain_dimension(
     run_dir = _run_dir(reports_root, project, run_id)
     active = params if params is not None else load_params()
     inputs = load_grade_inputs(run_dir)
-    classes = load_severity_classes_for_run(run_dir)
     keys = _keys_for(inputs, dimension)
     if not keys:
         raise DimensionNotFound(dimension)
@@ -77,5 +73,5 @@ def explain_dimension(
         "runId": run_id,
         "dimension": dimension,
         "params": params_to_dict(active),
-        "principles": [_explain_one(inputs, key, active, classes=classes) for key in keys],
+        "principles": [_explain_one(inputs, key, active) for key in keys],
     }

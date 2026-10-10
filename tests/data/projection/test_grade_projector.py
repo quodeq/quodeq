@@ -44,7 +44,7 @@ def test_recompute_grades_writes_dimension_and_principle_rows(tmp_path: Path) ->
     for i in range(5):
         _seed(store, req=f"P2-{i}", principle="P2", dimension="Security", severity="medium")
 
-    recompute_grades(tmp_path, classes={})
+    recompute_grades(tmp_path)
 
     dim_rows = store.read_dimension_scores()
     assert len(dim_rows) == 1
@@ -61,7 +61,7 @@ def test_recompute_grades_writes_dimension_and_principle_rows(tmp_path: Path) ->
 def test_recompute_grades_thin_principle_is_scored_and_marked(tmp_path: Path) -> None:
     store = SQLiteStateStore(tmp_path)
     _seed(store, req="R1", principle="P1", dimension="Security", severity="high")
-    recompute_grades(tmp_path, classes={})
+    recompute_grades(tmp_path)
     row = store.read_principle_grades()[0]
     assert row["score"] is not None and row["grade"] != "Insufficient" and row["confidence"] == "low"
     assert store.read_dimension_scores()[0]["confidence"] == "low"

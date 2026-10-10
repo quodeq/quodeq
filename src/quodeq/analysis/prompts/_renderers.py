@@ -6,7 +6,7 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 
-from quodeq.analysis.prompts._severity_advice import advised_class
+from quodeq.analysis.prompts.severity_advice import advised_class
 from quodeq.core.standards.overrides import resolve_requirement_text
 from quodeq.shared.utils import read_json
 

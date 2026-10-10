@@ -7,7 +7,6 @@ _rescore_from_evidence in rescore.py is preferred whenever a run's
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
 
 from quodeq.core.evidence.model import classify_confidence_level
 from quodeq.core.scoring.constants import Grade
@@ -22,7 +21,7 @@ from quodeq.core.types.scoring import ConfidenceLevel, PrincipleScore
 def _score_principle(
     violations: list[Finding], compliance: list[Finding],
     *, source_file_count: int = 0, scale_multiplier: int = 1,
-    params: ScoringParams = DEFAULT_PARAMS, classes: Mapping[str, str] | None = None,
+    params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[float | None, str, str | None, float]:
     """Score a single principle from its filtered violations and compliance lists.
 
@@ -42,7 +41,7 @@ def _score_principle(
     )
     rows = requirement_rows([finding_to_scoring_dict(v) for v in violations],
                             [finding_to_scoring_dict(c) for c in compliance])
-    mass = principle_mass(rows, source_file_count, classes or {}, params=params)
+    mass = principle_mass(rows, source_file_count, params=params)
     final, grade = principle_score_and_grade(mass, params=params)
     return final, grade, str(confidence), mass.observation
 
@@ -64,7 +63,6 @@ def score_all_principles(
     source_file_count: int = 0,
     scale_multiplier: int = 1,
     params: ScoringParams = DEFAULT_PARAMS,
-    classes: Mapping[str, str] | None = None,
 ) -> tuple[dict[str, PrincipleScore], list[PrincipleGrade]]:
     """Score each principle and return (scores_dict, grades_list)."""
     all_principle_names = set(principles_violations) | set(principles_compliance)
@@ -78,7 +76,7 @@ def score_all_principles(
             p_violations, p_compliance,
             source_file_count=source_file_count,
             scale_multiplier=scale_multiplier,
-            params=params, classes=classes,
+            params=params,
         )
         score_str = f"{final_score}/10" if final_score is not None else None
 

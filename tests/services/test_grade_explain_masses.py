@@ -14,12 +14,13 @@ def test_explain_one_scores_thin_principles_and_lists_rules() -> None:
         compliance_by={key: [_f("S-INT-1", "P1", severity="minor", verdict="compliance", file="b.py")]},
         dismissed_counts={}, source_file_count=1000,
     )
-    out = _explain_one(inputs, key, DEFAULT_PARAMS, classes={"S-INT-2": "critical"})
+    out = _explain_one(inputs, key, DEFAULT_PARAMS)
     assert out["insufficient"] is False and out["confidence"] == "low" and out["files"] == 1000
-    assert out["stages"]["requirements"][0] == {**out["stages"]["requirements"][0], "req": "S-INT-2", "class": "critical"}
+    first = out["stages"]["requirements"][0]
+    assert first["req"] == "S-INT-2" and first["filesAtLeastMinor"] == 1 and "class" not in first
 
 
 def test_explain_one_with_nothing_is_insufficient() -> None:
     inputs = GradeInputs(violations_by={}, compliance_by={}, dismissed_counts={}, source_file_count=0)
-    out = _explain_one(inputs, ("Security", "P1"), DEFAULT_PARAMS, classes={})
+    out = _explain_one(inputs, ("Security", "P1"), DEFAULT_PARAMS)
     assert out["insufficient"] is True and out["stages"] is None

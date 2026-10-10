@@ -2,9 +2,9 @@
 import json
 from pathlib import Path
 
-from quodeq.analysis._api_standards_text import render_standards_grouped
-from quodeq.analysis.prompts._renderers import render_compact_standards, render_compiled_standards
-from quodeq.analysis.prompts._severity_advice import advised_class
+from quodeq.analysis.prompts.builder import render_compact_standards, render_compiled_standards
+from quodeq.analysis.subprocess import render_standards_grouped
+from quodeq.analysis.prompts.severity_advice import advised_class
 from quodeq.analysis.prompts.builder import load_evaluation_rules
 
 COMPILED = Path(__file__).resolve().parents[3] / "src" / "quodeq" / "data" / "standards" / "compiled"
