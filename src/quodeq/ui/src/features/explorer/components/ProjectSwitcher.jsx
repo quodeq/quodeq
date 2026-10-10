@@ -4,6 +4,7 @@ import { useSwitcherListNav } from '../../../hooks/useSwitcherListNav.js';
 import { isMacPlatform } from '../../../hooks/useProjectSwitcherHotkey.js';
 import { KEY } from '../../../vocab/keyboard.js';
 import { activateOnKey } from '../../../utils/a11y.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { t } from '../../../strings/index.js';
 
 /** One project row. Mouse hover moves the keyboard highlight with it so
@@ -27,6 +28,7 @@ function SwitcherOption({ row, optionId, isActive, isCurrent, onPick, onHover })
       onMouseEnter={onHover}
     >
       <span className="project-switcher__name">{row.label}</span>
+      {row.source === PROJECT_SOURCE.SHARED && <span className="project-switcher__remote">{t('explorer.switcherRemoteTag')}</span>}
       <GradeChip grade={row.grade} />
     </li>
   );
@@ -86,7 +88,7 @@ function SwitcherPopover({ rows, currentId, onPick, onAllRepositories, onAddProj
 
 /**
  * The breadcrumb's project root as a switcher: the crumb opens a popover
- * listing every local project instead of navigating to Repositories.
+ * listing every local and remote project instead of navigating to Repositories.
  * Open state is the breadcrumb's own `openKey`, so it shares the other
  * crumb menus' outside-press and Escape dismissal and never stacks on them.
  */

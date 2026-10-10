@@ -50,6 +50,19 @@ describe('projectSwitcherModel', () => {
     expect(filterSwitcherRows(rows, 'new-repo').map((r) => r.id)).toEqual(['p-new']);
     expect(filterSwitcherRows(rows, '  ')).toBe(rows);
   });
+
+  it('adds the remote projects with no local copy, tagged shared', () => {
+    const shared = [
+      { id: 'p-new', name: 'new-repo', latestDate: '2026-09-01' },
+      { id: 's-team', name: 'team-repo', originUrl: 'https://github.com/acme/team', latestDate: '2026-07-01' },
+      { id: 's-pulled', name: 'pulled', originUrl: 'https://github.com/acme/old', latestDate: '2026-02-01' },
+    ];
+    const locals = [...PROJECTS, { id: 'p-pulled', name: 'old-clone', originUrl: 'git@github.com:acme/old.git' }];
+    const rows = buildSwitcherRows(locals, shared);
+    expect(rows.map((r) => [r.id, r.source])).toEqual([
+      ['p-new', 'local'], ['s-team', 'shared'], ['p-mid', 'local'], ['p-old', 'local'], ['p-pulled', 'local'],
+    ]);
+  });
 });
 
 describe('switchProject', () => {
@@ -106,7 +119,7 @@ describe('NavBreadcrumb project switcher', () => {
     fireEvent.keyDown(search(), { key: 'ArrowDown' });
     fireEvent.keyDown(search(), { key: 'ArrowUp' });
     fireEvent.keyDown(search(), { key: 'Enter' });
-    expect(switcher.onPick).toHaveBeenCalledWith('p-new');
+    expect(switcher.onPick).toHaveBeenCalledWith('p-new', 'local');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -115,7 +128,16 @@ describe('NavBreadcrumb project switcher', () => {
     fireEvent.click(crumb());
     fireEvent.change(search(), { target: { value: 'api' } });
     fireEvent.keyDown(search(), { key: 'Enter' });
-    expect(switcher.onPick).toHaveBeenCalledWith('p-mid');
+    expect(switcher.onPick).toHaveBeenCalledWith('p-mid', 'local');
+  });
+
+  it('a remote project is listed with its tag and picked as shared', () => {
+    const { switcher } = renderSwitcher({ sharedProjects: [{ id: 's-team', name: 'team-repo', latestDate: '2026-07-01' }] });
+    fireEvent.click(crumb());
+    const row = screen.getByRole('option', { name: /team-repo/ });
+    expect(within(row).getByText('remote')).toBeInTheDocument();
+    fireEvent.click(row);
+    expect(switcher.onPick).toHaveBeenCalledWith('s-team', 'shared');
   });
 
   it('picking the current project just closes', () => {

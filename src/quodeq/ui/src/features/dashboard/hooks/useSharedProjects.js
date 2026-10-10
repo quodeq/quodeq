@@ -185,6 +185,7 @@ export function useSharedProjects() {
 // who never open those pages. This is a per-observer option and does not
 // affect useSharedProjects' own observers on the same query keys.
 const SIGNAL_OBSERVER_OPTIONS = { refetchOnWindowFocus: false };
+const NO_PROJECTS = [];
 
 /**
  * useSharedContentSignal — passive "does the shared repo have anything to
@@ -211,7 +212,9 @@ export function useSharedContentSignal() {
   const statusSettled = statusQuery.isSuccess || statusQuery.isError;
   const listSettled = listQuery.isSuccess || listQuery.isError;
   const settled = statusSettled && (!configured || listSettled);
-  const publishedCount = configured ? (listQuery.data?.projects?.length ?? 0) : 0;
+  // Gated on `configured` like useSharedProjects: a cached list from before a disconnect is not shown.
+  const projects = (configured && listQuery.data?.projects) || NO_PROJECTS;
+  const publishedCount = projects.length;
   const hasContent = publishedCount > 0;
   // What the server itself said about the repository: true or false once
   // the status loaded, null while unknown or when the fetch failed. A failed
@@ -219,7 +222,7 @@ export function useSharedContentSignal() {
   // selection is dropped on that answer (useDeadSharedSelectionEffect).
   const connected = statusQuery.isSuccess ? configured : null;
 
-  return { settled, hasContent, publishedCount, connected };
+  return { settled, hasContent, publishedCount, connected, projects };
 }
 
 /**
