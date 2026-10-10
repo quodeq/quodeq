@@ -6,6 +6,7 @@ from pathlib import Path
 
 from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.analysis.mcp.findings_server import CompiledContext
+from quodeq.core.admission import StandardCatalog, StandardIndex
 
 
 def _message_and_dup(receipt):
@@ -25,6 +26,19 @@ class TestFindingsRouter:
         assert "Finding #1" in msg
         written = json.loads(findings_file.read_text().strip())
         assert written["req_refs"] == [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}]
+
+    def test_standard_shaped_refs_are_written_with_a_label(self, tmp_path: Path) -> None:
+        """The live catalog holds the standard's refs (source/id/name/url, no label)."""
+        findings_file = tmp_path / "findings.jsonl"
+        catalog = StandardCatalog.of([StandardIndex("maintainability", {"M-ANA-1": "Analyzability"}, {"M-ANA-1": (
+            {"source": "cwe", "id": "1080", "name": "Excessive lines", "url": "https://cwe.mitre.org/data/definitions/1080.html"},
+            {"source": "cisq", "id": None, "name": "Line limits", "url": "https://www.it-cisq.org/coding-rules/"},
+        )})])
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh, CompiledContext(catalog=catalog, dimension="maintainability"))
+            router.receive({"p": "Analyzability", "t": "violation", "d": "maintainability", "w": "Big file", "req": "M-ANA-1"})
+        written = json.loads(findings_file.read_text().strip())
+        assert [r["label"] for r in written["req_refs"]] == ["CWE-1080", "CISQ"]
 
     def test_no_enrichment_without_matching_req(self, tmp_path: Path) -> None:
         findings_file = tmp_path / "findings.jsonl"

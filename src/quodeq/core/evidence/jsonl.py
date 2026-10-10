@@ -45,7 +45,7 @@ def parse_jsonl_line(
     req_refs: list[ReqRef] = []
     if isinstance(pre_resolved, list):
         req_refs = [
-            ReqRef(label=r.get("label", ""), url=r.get("url", ""))
+            ReqRef.from_dict(r)
             for r in pre_resolved if isinstance(r, dict)
         ]
 

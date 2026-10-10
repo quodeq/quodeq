@@ -24,7 +24,7 @@ def _coerce_req_refs(raw: Any) -> list[ReqRef]:
         if isinstance(r, ReqRef):
             refs.append(r)
         elif isinstance(r, dict):
-            refs.append(ReqRef(label=r.get("label", ""), url=r.get("url", "")))
+            refs.append(ReqRef.from_dict(r))
     return refs
 
 

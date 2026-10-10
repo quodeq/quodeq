@@ -11,6 +11,8 @@ functions.
 """
 from __future__ import annotations
 
+import re
+
 from quodeq.core.standards.overrides import resolve_requirement_text
 
 _SOURCE_CWE = "cwe"
@@ -38,6 +40,30 @@ def ref_label(ref: dict) -> str:
     if ref_id:
         return ref_id
     return source.upper() if source else "REF"
+
+
+_CWE_URL = re.compile(r"cwe\.mitre\.org/data/definitions/(\d+)")
+_SEI_URL = re.compile(r"wiki\.sei\.cmu\.edu/confluence/display/\w+/([A-Z]{3}\d{2}-[A-Z]+)")
+_HOST_LABELS = (
+    ("it-cisq.org", "CISQ"),
+    ("application-security-verification-standard", "ASVS"),
+    ("w3.org", "WCAG"),
+    ("etsi.org", "EN 301 549"),
+    ("wiki.sei.cmu.edu", "SEI CERT"),
+)
+
+
+def label_from_url(url: str) -> str:
+    """A display label recovered from a ref's url alone, or '' when unknown.
+
+    Reports written between 2026-09-29 and the label fix kept only
+    ``{label: '', url}``; the url still names the reference.
+    """
+    if m := _CWE_URL.search(url):
+        return f"CWE-{m.group(1)}"
+    if m := _SEI_URL.search(url):
+        return m.group(1)
+    return next((label for marker, label in _HOST_LABELS if marker in url), "")
 
 
 # ---------------------------------------------------------------------------
