@@ -2,20 +2,19 @@
  * Pure functions for filtering scores by visible standards.
  *
  * No side effects, no API calls. These operate on the pre-rescored data
- * returned by the unified /scores endpoint.
+ * returned by the unified /scores endpoint. Averages weigh and round like
+ * the server's (dimensionWeights.js), so with nothing hidden the Overview
+ * prints the number Compare and the API do.
  */
 
 import { bucketKey, isBucketEligible } from './dailyGrouping.js';
 import { scoreToGradeLabel } from './gradeThresholds.js';
 import { countBySeverity, emptySeverityCounts } from './severity.js';
-import { roundOneDecimal } from './rounding.js';
+import { weightedMeanScore } from './dimensionWeights.js';
 
-// Mean of the scores that are present, rounded to one decimal. null when
-// nothing is left after dropping the missing ones.
-function meanScore(scores) {
-  const present = scores.filter((s) => s != null);
-  if (present.length === 0) return null;
-  return roundOneDecimal(present.reduce((a, b) => a + b, 0) / present.length);
+// The [dimension id, score] pairs of an entry's details, for an average.
+function scorePairs(details) {
+  return details.map((d) => [(d.dimension || '').toLowerCase(), d.score]);
 }
 
 // The entry's dimensionDetails narrowed to the visible set.
@@ -45,7 +44,7 @@ function projectEntry(entry, visibleSet, accAvg) {
   return {
     ...entry,
     numericAverage: accAvg,
-    runNumericAverage: meanScore(details.map((d) => d.score)),
+    runNumericAverage: weightedMeanScore(scorePairs(details)),
     dimensionDetails: details,
     dimensions: dims,
     dimensionsCount: dims.length,
@@ -68,7 +67,7 @@ export function filterTrendByVisibleStandards(trend, visibleSet) {
   const rawReversed = [...trend].reverse(); // oldest first
   for (const entry of rawReversed) {
     foldVisibleScores(accByDim, entry, visibleSet);
-    accByRun.set(entry.runId, meanScore(Object.values(accByDim)));
+    accByRun.set(entry.runId, weightedMeanScore(Object.entries(accByDim)));
   }
   return trend
     .map((entry) => projectEntry(entry, visibleSet, accByRun.get(entry.runId) ?? null))
@@ -117,7 +116,7 @@ export function filterTrendByVisibleStandardsDaily(trend, periodTrend, visibleSe
     if (!isBucketEligible(entry)) continue;
     if (!foldVisibleScores(accByDim, entry, visibleSet)) continue;
     const key = bucketKey(entry.dateISO, granularity);
-    accByKey.set(key, meanScore(Object.values(accByDim)));
+    accByKey.set(key, weightedMeanScore(Object.entries(accByDim)));
     visibleKeys.add(key);
   }
   // Match period entries by bucket key, only include periods with visible evaluations

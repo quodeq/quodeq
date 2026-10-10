@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { saveGradeFormula, resetGradeFormula } from '../../api/index.js';
 import { defaultGradeThresholdsStore } from '../../utils/gradeThresholds.js';
+import { setDimensionWeights } from '../../utils/dimensionWeights.js';
 import { RESCORE_STATE } from '../../vocab/rescoreState.js';
 import { useGradeFormulaState } from './hooks/useGradeFormulaState.js';
 import { useGradePreview } from './hooks/useGradePreview.js';
@@ -68,6 +69,7 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
       const d = await run();
       adoptServerFormula(d.current, d.isCustom);
       thresholdsStore.set(d.current.gradeThresholds);
+      setDimensionWeights(d.current);
       track(d);
       return d;
     } catch (err) {
