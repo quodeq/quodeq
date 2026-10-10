@@ -25,6 +25,7 @@ from quodeq.api.app import create_app
 from quodeq.config.paths import default_paths
 from quodeq.data.sqlite import score_cache_db
 from quodeq.services import compare as compare_service
+from quodeq.services import grade_formula
 from quodeq.services.warmup import engine as warmup_engine, warm_project
 from tests.perf._budget_fixture import PROJECT, count_io, seed_project
 from tests.perf._scenario_fixture import (
@@ -174,6 +175,17 @@ def _eval_poll_tick(client):
     ))
 
 
+def _formula_pass(client):
+    """A grade-formula apply: every run with an event log of every project, newest first.
+
+    The one trigger that rewrites every run's grade tables; it had no
+    measurement at all before this budget.
+    """
+    result = grade_formula.apply_to_all_runs(client.reports)
+    assert result.failed == [] and not result.aborted
+    return 0
+
+
 def _agent_spawn(client):
     run_dir = client.reports / PROJECT / RUNNING_RUN
     findings_path = run_dir / "evidence" / "maintainability_evidence.jsonl"
@@ -222,6 +234,8 @@ def _scenarios(client, monkeypatch, budgets) -> dict[str, dict[str, int]]:
         peak_budget=peak_budget("dimension_eval_warm"))
     out["agent_spawn"] = _measure(
         monkeypatch, lambda: _agent_spawn(client), peak_budget=peak_budget("agent_spawn"))
+    out["formula_pass"] = _measure(
+        monkeypatch, lambda: _formula_pass(client), peak_budget=peak_budget("formula_pass"))
     return out
 
 
