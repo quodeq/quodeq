@@ -150,7 +150,7 @@
     "dateLabel": "2 Feb 2026",
     "exitReason": null,
     "gradeAlgoVersion": null,
-    "gradesAlgoVersion": 5,
+    "gradesAlgoVersion": 6,
     "runId": "20260202T000000"
   },
   "sinceBaseline": {
