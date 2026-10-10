@@ -6,14 +6,14 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { saveProviderKey } from '../../../api/providers.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorKey, apiErrorMessage } from '../../../strings/apiErrors.js';
-import { STORED_FALSE, STORED_TRUE } from '../../../adapters/storage.js';
+import { STORED_TRUE } from '../../../adapters/storage.js';
 
 export { PROVIDER_CONFIGURED_MARKER };
 
 const SETTINGS = [
   PROVIDER_SETTING_KEY.MODEL, PROVIDER_SETTING_KEY.MODEL_ANALYSIS, PROVIDER_SETTING_KEY.MODEL_FAST,
   PROVIDER_SETTING_KEY.MODEL_BALANCED, PROVIDER_SETTING_KEY.MODEL_THOROUGH, PROVIDER_SETTING_KEY.SUBAGENTS,
-  PROVIDER_SETTING_KEY.TIME_LIMIT, PROVIDER_SETTING_KEY.PER_DIMENSION, PROVIDER_SETTING_KEY.VERIFY,
+  PROVIDER_SETTING_KEY.TIME_LIMIT, PROVIDER_SETTING_KEY.VERIFY,
   PROVIDER_SETTING_KEY.API_KEY, PROVIDER_SETTING_KEY.API_BASE, PROVIDER_SETTING_KEY.CMD_PATH,
 ];
 const DEFAULTS = {
@@ -24,9 +24,6 @@ const DEFAULTS = {
   [PROVIDER_SETTING_KEY.MODEL_THOROUGH]: '',
   [PROVIDER_SETTING_KEY.SUBAGENTS]: '1',
   [PROVIDER_SETTING_KEY.TIME_LIMIT]: '0',
-  // Grouped is the engine's actual default; the pill must not claim
-  // per-dimension for an untouched toggle.
-  [PROVIDER_SETTING_KEY.PER_DIMENSION]: STORED_FALSE,
   [PROVIDER_SETTING_KEY.VERIFY]: STORED_TRUE,
   [PROVIDER_SETTING_KEY.API_KEY]: '',
   [PROVIDER_SETTING_KEY.API_BASE]: '',

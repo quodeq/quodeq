@@ -26,11 +26,3 @@ class WorkQueue(Protocol):
     def remaining(self) -> int:
         """Number of items still pending."""
         ...
-
-    def taken_log(self) -> list[dict]:
-        """Return the full take log for audit / crash recovery."""
-        ...
-
-    def all_taken_files(self) -> list[str]:
-        """Return flat list of every file that was taken, in order."""
-        ...

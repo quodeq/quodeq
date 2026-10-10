@@ -106,7 +106,6 @@ def build_analysis_options(
         max_subagents=limits.max_subagents,
         subagent_model=resolved.subagent_model,
         verify_findings=limits.verify_findings,
-        consolidated=resolved.consolidated,
         time_limit=limits.time_limit,
         incremental=limits.incremental,
         incremental_file_filter=resolved.diff_files,

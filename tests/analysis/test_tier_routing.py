@@ -27,7 +27,6 @@ class TestBuildRunConfigAiModel:
         args.max_duration = None
         args.n_subagents = 1
         args.no_verify = False
-        args.no_consolidated = False
         args.pool_budget = None
         args.incremental = False
         for k, v in overrides.items():

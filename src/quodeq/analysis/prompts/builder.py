@@ -12,10 +12,7 @@ from quodeq.analysis.prompts._renderers import (
     render_compact_standards,
     render_dimensions,
 )
-from quodeq.analysis.prompts._standards_io import (
-    render_all_standards,
-    write_standards_and_instruction,
-)
+from quodeq.analysis.prompts._standards_io import write_standards_and_instruction
 from quodeq.analysis.prompts.template import load_template, template_hash
 from quodeq.config.prompt_templates import render_template
 
@@ -88,7 +85,6 @@ __all__ = [
     "PromptContext",
     "prompt_context",
     "build_analysis_prompt",
-    "build_consolidated_prompt",
     "load_template",
     "render_compiled_standards",
     "render_dimensions",
@@ -154,8 +150,8 @@ def prompt_context(
 ) -> ctx.PromptContext:
     """The PromptContext an analysis prompt for *dimension* is built from.
 
-    One reading of the run config and context, shared by the per-dimension,
-    subagent and consolidated prompt builders. *previous_findings* is the
+    One reading of the run config and context, shared by the per-dimension
+    and subagent prompt builders. *previous_findings* is the
     inline findings block only the subagent prompt carries.
     """
     return ctx.PromptContext(
@@ -192,25 +188,3 @@ def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
         result += prev_section
     return result
 
-
-def build_consolidated_prompt(
-    dimensions: list[str],
-    context: ctx.PromptContext,
-    template: str | None = None,
-) -> str:
-    """Build a multi-dimension analysis prompt with all standards inline."""
-    if template is None:
-        template = load_template(template_name="cli_consolidated_prompt.md")
-
-    load_overrides = context.overrides_loader if context.overrides_loader is not None else load_project_overrides
-    standards_text = render_all_standards(
-        context.standards_dir, dimensions, evaluators_dir=context.evaluators_dir,
-        overrides=load_overrides(context.project_root),
-    ) if context.standards_dir else ctx.NO_STANDARDS
-
-    manifest_context = ctx.render_manifest_context(context)
-    prompt_hash = template_hash(template)
-    values = _shared_values(context, manifest_context, prompt_hash)
-    values[ctx.TPL_DIMENSION_LIST] = ", ".join(dimensions)
-    values[ctx.TPL_STANDARDS_CHECKLISTS] = standards_text
-    return _render(template, context, values)

@@ -2,7 +2,7 @@
 concurrency test that reaches IncrementalTally through a module-attribute
 patch. Split from test_scan_progress_live_tally.py to keep that file under
 the file-size cap; these tests call ``live_tally`` directly rather than
-through the ``_dim_evidence_tally``/``consolidated_dim_progress`` wrappers.
+through the ``_dim_evidence_tally`` wrapper.
 """
 from __future__ import annotations
 

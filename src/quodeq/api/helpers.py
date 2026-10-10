@@ -217,7 +217,7 @@ def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
     Returns an error message string if validation fails, or ``None`` if valid.
     Required fields: ``repo`` (non-empty string).
     Optional typed fields: ``discipline`` (str), ``dimensions`` (str),
-    ``numerical``, ``verifyFindings``, ``perDimension``, ``cleanScan``,
+    ``numerical``, ``verifyFindings``, ``cleanScan``,
     ``incremental`` (bool), ``aiCmd`` (str), ``aiModel`` (str),
     ``subagentModel`` (str).
     """
@@ -244,7 +244,7 @@ def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
         if value is not None and not isinstance(value, str):
             invalid.append(f"{field} (must be a string)")
 
-    bool_fields = ("numerical", "verifyFindings", "perDimension", "cleanScan", "incremental")
+    bool_fields = ("numerical", "verifyFindings", "cleanScan", "incremental")
     for field in bool_fields:
         value = payload.get(field)
         if value is not None and not isinstance(value, bool):

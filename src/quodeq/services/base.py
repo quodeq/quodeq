@@ -31,7 +31,6 @@ class EvaluationOptions:
     max_subagents: int = DEFAULT_MAX_SUBAGENTS
     time_limit: int = DEFAULT_TIME_LIMIT
     clean_scan: bool = False
-    per_dimension: bool = False
     branch: str | None = None
     scope_path: str | None = None
     context_size: int = 0

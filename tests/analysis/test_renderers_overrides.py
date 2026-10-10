@@ -7,7 +7,6 @@ from quodeq.analysis.prompts._renderers import (
     render_compact_standards,
     render_compiled_standards,
 )
-from quodeq.analysis.prompts._standards_io import render_all_standards
 
 DIMENSION = {
     "id": "maintainability",
@@ -68,13 +67,3 @@ def test_compact_raises_clear_error_for_requirement_missing_id(tmp_path):
     (tmp_path / "maintainability.json").write_text(json.dumps(data))
     with pytest.raises(ValueError, match="missing required 'id'"):
         render_compact_standards(tmp_path, "maintainability")
-
-
-def test_render_all_standards_applies_overrides(tmp_path):
-    standards_dir = tmp_path
-    compiled = standards_dir / "compiled"
-    compiled.mkdir()
-    (compiled / "maintainability.json").write_text(json.dumps(DIMENSION))
-    out = render_all_standards(standards_dir, ["maintainability"],
-                               overrides={"M-ANA-2": {"max_lines": 60}})
-    assert "Functions MUST NOT exceed 60 lines" in out

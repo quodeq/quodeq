@@ -79,10 +79,6 @@ class TestComputeDimensionBoost:
     def test_maintainability_small_file(self):
         assert compute_dimension_boost("src/tiny.py", "maintainability", file_size=500) == 0
 
-    def test_consolidated_max_across_dimensions(self):
-        score = compute_dimension_boost("src/auth_handler.py", ["security", "maintainability"])
-        assert score == 5
-
     def test_unknown_dimension(self):
         assert compute_dimension_boost("src/file.py", "unknown_dim") == 0
 
@@ -162,18 +158,6 @@ class TestComputePreviousViolations:
             counts = compute_previous_violations(None, tmp_path, "security")
         assert counts == {}
 
-    def test_consolidated_merges_dimensions(self, tmp_path):
-        def mock_load(config, dim, evidence_dir, **kwargs):
-            if dim == "security":
-                return [{"t": "violation", "file": "auth.py", "line": 1}]
-            elif dim == "maintainability":
-                return [{"t": "violation", "file": "big.py", "line": 1}]
-            return []
-        with patch("quodeq.analysis.subagents.priority_scoring.load_previous_findings_for_dimension", side_effect=mock_load):
-            counts = compute_previous_violations(None, tmp_path, ["security", "maintainability"])
-        assert counts.get("auth.py", 0) >= 1
-        assert counts.get("big.py", 0) >= 1
-
 
 class TestPrioritizeFiles:
     def test_returns_sorted_by_score_descending(self, tmp_path):
@@ -202,15 +186,6 @@ class TestPrioritizeFiles:
         files = ["src/utils.py", "src/auth.py"]
         result = prioritize_files(files, tmp_path, "security")
         assert result[0] == "src/auth.py"
-
-    def test_consolidated_uses_max_dimension_boost(self, tmp_path):
-        (tmp_path / "src").mkdir()
-        (tmp_path / "src" / "auth.py").write_text("x")
-        (tmp_path / "src" / "error_handler.py").write_text("x")
-
-        files = ["src/auth.py", "src/error_handler.py"]
-        result = prioritize_files(files, tmp_path, ["security", "reliability"])
-        assert len(result) == 2
 
 
 class TestPrioritizationIntegration:

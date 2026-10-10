@@ -155,7 +155,7 @@ def read_run_status_json(run_dir: Path) -> dict:
 
 
 def read_queue_state(queue_path: Path) -> dict | None:
-    """Parse a dim (or consolidated) ``*_queue.json`` file into a dict.
+    """Parse a dim ``*_queue.json`` file into a dict.
 
     None on any read/parse problem: missing and corrupt are equivalent "no
     signal" here, mirroring ``read_run_state``'s no-schema-check contract.

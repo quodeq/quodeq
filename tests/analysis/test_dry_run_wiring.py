@@ -43,7 +43,6 @@ class TestCliWiring:
             pool_budget=None,
             incremental=False,
             no_verify=False,
-            no_consolidated=False,
             dry_run=True,
         )
 
@@ -76,7 +75,6 @@ class TestCliWiring:
             pool_budget=None,
             incremental=False,
             no_verify=False,
-            no_consolidated=False,
             dry_run=False,
         )
 
@@ -110,7 +108,6 @@ class TestCliWiring:
             pool_budget=None,
             incremental=False,
             no_verify=False,
-            no_consolidated=False,
             # no dry_run attribute at all
         )
 

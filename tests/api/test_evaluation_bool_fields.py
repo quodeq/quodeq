@@ -13,7 +13,7 @@ from quodeq.api.app import create_app
 from quodeq.services.base import ActionProvider
 
 _ORIGIN = {"Origin": "http://localhost"}
-_BOOL_FIELDS = ("numerical", "verifyFindings", "perDimension", "cleanScan")
+_BOOL_FIELDS = ("numerical", "verifyFindings", "cleanScan")
 
 
 class _CountingProvider(ActionProvider):
@@ -112,5 +112,4 @@ def test_json_null_is_treated_as_absent(client, provider, field):
     assert provider.start_calls == 1
     # null takes each flag's default, the same options as omitting it.
     opts = provider.options
-    assert (opts.numerical, opts.verify_findings, opts.per_dimension, opts.clean_scan) == (
-        False, True, False, False)
+    assert (opts.numerical, opts.verify_findings, opts.clean_scan) == (False, True, False)
