@@ -132,3 +132,33 @@ def test_dismissed_item_is_what_the_listing_shows(tmp_path):
     assert item == load_dismissed(project_dir)[0]
     assert item["reason"] == "a"
     assert dismissed_item(project_dir, "Z", "z.py", 9) is None
+
+
+class TestRecordedRun:
+    """A dismissal remembers the run it was made from, when that run exists."""
+
+    def test_run_id_is_recorded_on_the_entry(self, tmp_path):
+        project_dir = tmp_path / "project"
+        _seed_run(project_dir, "r1", "2026-01-01T00:00:00", [("A", "a.py", 1, "a")])
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1}, run_id="r1")
+
+        (entry,) = dismissed_keys(project_dir).entries
+
+        assert entry.run_id == "r1"
+
+    def test_sentinel_and_unknown_runs_are_not_recorded(self, tmp_path):
+        project_dir = tmp_path / "project"
+        _seed_run(project_dir, "r1", "2026-01-01T00:00:00", [("A", "a.py", 1, "a")])
+        _seed_run(project_dir, "r1", "2026-01-01T00:00:00", [("B", "b.py", 2, "b")])
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1}, run_id="latest")
+        dismiss_finding(project_dir, {"req": "B", "file": "b.py", "line": 2}, run_id="../r1")
+
+        assert {e.run_id for e in dismissed_keys(project_dir).entries} == {None}
+
+    def test_run_id_is_not_identity(self, tmp_path):
+        project_dir = tmp_path / "project"
+        _seed_run(project_dir, "r1", "2026-01-01T00:00:00", [("A", "a.py", 1, "a")])
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1}, run_id="r1")
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1})
+
+        assert len(dismissed_keys(project_dir).entries) == 1

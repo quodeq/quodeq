@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from flask import Flask, Response, abort, jsonify, make_response, request
 
+from quodeq.api._body_fields import invalid_body_fields
 from quodeq.api._constants import (
     CODE_INVALID_PARAM,
     CODE_MISSING_PARAM,
@@ -43,32 +44,6 @@ from quodeq.shared.validation import resolve_child_dir
 
 _logger = logging.getLogger(__name__)
 _PROJECT_FIELDS = ("project",)  # the one body field restore-all and delete-all read
-
-
-def _invalid_body_fields(
-    body: dict[str, Any],
-    str_fields: tuple[str, ...],
-    int_fields: tuple[str, ...] = (),
-) -> str | None:
-    """Return a message naming mistyped body fields, or None when types are fine.
-
-    Missing fields stay the caller's MISSING_PARAM concern; this only rejects
-    present values of the wrong type (str fields must be str, int fields must
-    be a non-bool int) so list/dict/number payloads get a 400 at the API
-    boundary instead of crashing in the persistence layer.
-    """
-    bad: list[str] = []
-    for name in str_fields:
-        value = body.get(name)
-        if value is not None and not isinstance(value, str):
-            bad.append(f"{name} (must be a string)")
-    for name in int_fields:
-        value = body.get(name)
-        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
-            bad.append(f"{name} (must be an integer)")
-    if bad:
-        return f"invalid fields: {', '.join(bad)}"
-    return None
 
 
 def _project_dir_or_none(evaluations_dir: str, project: str) -> Path | None:
@@ -122,7 +97,7 @@ def _finding_request() -> tuple[dict[str, Any], dict[str, Any], None] | tuple[No
     line = body.get("line")
     if not project or not req or not file or line is None:
         return None, None, json_error("project, req, file, and line are required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
-    type_err = _invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
+    type_err = invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
     if type_err:
         return None, None, json_error(type_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
     return body, {"project": project, "req": req, "file": file, "line": line}, None
@@ -202,7 +177,7 @@ def _mutate_project(
     run_id = _run_id(body)
     if not project:
         return json_error("project is required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
-    type_err = _invalid_body_fields(body, _PROJECT_FIELDS)
+    type_err = invalid_body_fields(body, _PROJECT_FIELDS)
     if type_err:
         return json_error(type_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
     count = mutate(_project_dir(_eval_dir(app), project))
@@ -244,7 +219,7 @@ def _delete(app: Flask) -> tuple[Response, int]:
     run_id = _run_id(body)
     if not project or not dimension or not principle or not file:
         return json_error("project, dimension, principle, and file are required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
-    type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
+    type_err = invalid_body_fields(body, ("project", "dimension", "principle", "file"))
     if type_err:
         return json_error(type_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
     swept = delete_finding(_project_dir(_eval_dir(app), project), body)
