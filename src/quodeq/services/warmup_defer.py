@@ -15,6 +15,8 @@ from typing import Callable
 from quodeq.services import warmup as _warmup
 from quodeq.services.warmup import WarmupEngine
 
+_LAST_KNOWN_FIELDS = ("grade", "score", "files")
+
 
 def summary_is_pending(reports_dir: str, project_id: str) -> bool:
     """True when the project's card summary is a cache miss the engine has yet to fill."""
@@ -54,10 +56,26 @@ def defer_to_warmup(
     target = engine if engine is not None else _warmup.engine
     target.prioritise(project_id)
     if target.current() == project_id:
-        return {"pending": True, "warmup": target.snapshot()}
+        return _pending_body(target, project_id)
     if not target.owes(project_id):
         return None
     probe = summary_pending if summary_pending is not None else summary_is_pending
     if not probe(reports_dir, project_id):
         return None
-    return {"pending": True, "warmup": target.snapshot()}
+    return _pending_body(target, project_id)
+
+
+def _pending_body(engine: WarmupEngine, project_id: str) -> dict:
+    """The pending body, with the last known card summary when there is one.
+
+    ``lastKnown`` is the grade, score and file count computed under the
+    previous version, so the Overview can show that grade dimmed while the
+    rebuild runs. Absent when the project was never summarised.
+    """
+    from quodeq.services.score_cache import read_last_project_summary_cached  # noqa: PLC0415
+
+    body: dict = {"pending": True, "warmup": engine.snapshot()}
+    last = read_last_project_summary_cached(project_id)
+    if last is not None:
+        body["lastKnown"] = {field: last.get(field) for field in _LAST_KNOWN_FIELDS}
+    return body

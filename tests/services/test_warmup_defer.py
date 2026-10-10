@@ -128,3 +128,26 @@ def test_the_project_being_warmed_is_deferred_even_when_its_summary_is_cached(tm
         assert probes == []
     finally:
         release.set()
+
+
+def test_the_pending_body_carries_the_last_known_summary(tmp_path, engines, monkeypatch):
+    """The row written under the previous version is still in the cache
+    while the engine rebuilds the project; the Overview shows that grade
+    dimmed instead of an empty loading state."""
+    from quodeq.data.sqlite.score_cache_db import open_score_cache
+    from quodeq.data.sqlite.score_cache_store import write_cached_project_summary
+
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    with open_score_cache() as conn:
+        write_cached_project_summary(conn, "selected", "old-version", {"grade": "B", "score": 7.4, "files": 12})
+    eng, _order, first_started, release, all_done = _blocked_engine(engines, _LISTING)
+    eng.start(str(tmp_path))
+    assert first_started.wait(5)
+
+    body = defer_to_warmup(str(tmp_path), "selected", engine=eng, summary_pending=lambda *_: True)
+
+    assert body["pending"] is True
+    assert body["lastKnown"] == {"grade": "B", "score": 7.4, "files": 12}
+    release.set()
+    assert all_done.wait(5)
+

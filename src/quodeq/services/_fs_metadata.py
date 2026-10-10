@@ -159,13 +159,22 @@ def _read_settled_or_pending_summary(
     ``select_default_view_runs``), so its cache must still be consulted
     below rather than assumed empty forever.
     """
-    from quodeq.services.score_cache import read_project_summary_cached  # noqa: PLC0415
+    from quodeq.services.score_cache import (  # noqa: PLC0415
+        read_last_project_summary_cached, read_project_summary_cached,
+    )
 
     if not runs:
         return None, None, None, False
     hit = read_project_summary_cached(entry_name, version)
     if hit is not None:
         return hit["grade"], hit["score"], hit["files"], False
+    # A miss answers the last known summary, computed under an older version
+    # (a formula change, an upgrade), still marked pending: the card shows
+    # that grade dimmed while the warm-up rebuilds it instead of a blank
+    # placeholder, and keeps polling until the rebuilt row lands.
+    last = read_last_project_summary_cached(entry_name)
+    if last is not None:
+        return last.get("grade"), last.get("score"), last.get("files"), True
     return None, None, None, True
 
 

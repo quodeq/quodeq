@@ -207,6 +207,40 @@ def read_all_cached_rows(
     return {key: attach_principles(dims, principles.get(key, {})) for key, dims in by_run_version.items()}
 
 
+def read_last_project_summary(conn: sqlite3.Connection, project: str) -> dict | None:
+    """The project-card summary row whatever version it was computed under.
+
+    The table keeps one row per project, so after a version change (new
+    formula, upgrade) the previous summary is still here until the warm-up
+    rewrites it. That is the last known grade a pending card or Overview can
+    show while the rebuild runs. None on miss, error or bad JSON.
+    """
+    try:
+        row = conn.execute(
+            "SELECT payload FROM project_summary_cache WHERE project=?", (project,),
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None:
+        return None
+    try:
+        return json.loads(row[0])
+    except (ValueError, TypeError):
+        return None
+
+
+def read_last_project_summary_cached(project: str) -> dict | None:
+    """Open the cache, read the project's last summary row whatever its version, close.
+
+    None on a clean miss and on any sqlite3 error (corrupt/locked db).
+    """
+    try:
+        with open_score_cache() as conn:
+            return read_last_project_summary(conn, project)
+    except sqlite3.Error:
+        return None
+
+
 def read_project_summary_cached(project: str, version: str) -> dict | None:
     """Open the cache, read one project-summary row, close.
 

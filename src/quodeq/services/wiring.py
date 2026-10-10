@@ -249,6 +249,7 @@ from quodeq.data.sqlite.score_cache_store import (  # noqa: F401
     read_all_cached_rows,
     read_cached_project_summary,
     read_cached_rows,
+    read_last_project_summary_cached,
     read_project_summary_cached,
     store_run_keys,
     write_cached_project_summary,
