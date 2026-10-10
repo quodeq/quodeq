@@ -75,14 +75,16 @@ describe('shouldShowEvaluate', () => {
 });
 
 describe('ROUTE_RENDERERS onDismiss source gating', () => {
+  // The Dismissed tab's item the dismiss POST answers with.
+  const ENTRY = { req: 'R1', file: 'a.py', line: 1 };
   function baseProps(selectedSource) {
     return {
       navigation: { selectedProject: 'proj1', selectedRun: 'latest', selectedSource, projects: [] },
-      dismissFinding: vi.fn().mockResolvedValue({ scores: { dimensions: [] }, delta: {} }),
+      dismissFinding: vi.fn().mockResolvedValue({ scores: { dimensions: [] }, delta: {}, dismissedEntry: ENTRY }),
       applyDelta: vi.fn(),
       refreshDashboard: vi.fn(),
       scheduleDashboardReconcile: vi.fn(),
-      bumpDismissRefresh: vi.fn(),
+      recordDismissed: vi.fn(),
     };
   }
 
@@ -156,31 +158,31 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
   // marks the project queries stale synchronously AND actively refetches the
   // always-mounted Overview observer after the debounce (see useDashboard.js),
   // so a separate refreshDashboard call would be redundant.
-  it('file route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
+  it('file route onDismiss calls scheduleDashboardReconcile and records the entry on success', async () => {
     const props = baseProps('local');
     const el = ROUTE_RENDERERS.file({ file: { path: 'a.py' }, runId: 'r1' }, props);
     await el.props.onDismiss({ reason: 'test' });
     expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
     expect(props.refreshDashboard).not.toHaveBeenCalled();
-    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+    expect(props.recordDismissed).toHaveBeenCalledWith('proj1', ENTRY);
   });
 
-  it('finding route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
+  it('finding route onDismiss calls scheduleDashboardReconcile and records the entry on success', async () => {
     const props = baseProps('local');
     const el = ROUTE_RENDERERS.finding({ finding: {}, principle: 'P', dimension: 'Security' }, props);
     await el.props.onDismiss({ reason: 'test' });
     expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
     expect(props.refreshDashboard).not.toHaveBeenCalled();
-    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+    expect(props.recordDismissed).toHaveBeenCalledWith('proj1', ENTRY);
   });
 
-  it('evalprinciple route onDismiss calls scheduleDashboardReconcile and bumpDismissRefresh on success', async () => {
+  it('evalprinciple route onDismiss calls scheduleDashboardReconcile and records the entry on success', async () => {
     const props = baseProps('local');
     const el = ROUTE_RENDERERS.evalprinciple({ evalPrincipal: { principle: 'P', dimension: 'Security' } }, props);
     await el.props.onDismiss({ reason: 'test' });
     expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
     expect(props.refreshDashboard).not.toHaveBeenCalled();
-    expect(props.bumpDismissRefresh).toHaveBeenCalledTimes(1);
+    expect(props.recordDismissed).toHaveBeenCalledWith('proj1', ENTRY);
   });
 });
 
@@ -202,7 +204,6 @@ describe('ViolationsRoute onReconcile wiring (Dismissed tab reconcile)', () => {
     return {
       dashboardData: { latestAccumulated: null, accumulated: null, selectedDisplayName: 'p1', loading: false, isFetching: false },
       navigation: { selectedProject: 'proj1', selectedSource: 'local', projects: [], projectsLoaded: true, handleNavigate: vi.fn(), navStackLength: 1 },
-      dismissRefreshKey: 0,
       refreshDashboard: vi.fn(),
       scheduleDashboardReconcile: vi.fn(),
     };

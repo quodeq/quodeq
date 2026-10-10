@@ -276,3 +276,4 @@ class TestRecencyCache:
         cache = _RecencyCache()
         assert run_started_at(run_dir, cache=cache) == "2026-02-02T00:00:00Z"
         assert cache.get(run_dir) == "2026-02-02T00:00:00Z"
+

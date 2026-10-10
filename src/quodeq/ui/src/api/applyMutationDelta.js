@@ -5,7 +5,7 @@
  * The dismiss endpoint returns a ``delta`` describing the mutation; this writer
  * folds it into the cached dashboard/scores payloads so the Overview updates
  * instantly, without waiting for a refetch. It is ADDITIVE — the existing
- * refreshDashboard / bumpDismissRefresh mechanisms still run; they just no
+ * refreshDashboard / recordDismissed mechanisms still run; they just no
  * longer gate the perceived latency of a dismiss.
  *
  * Referential identity is a hard requirement: untouched dimensions must keep

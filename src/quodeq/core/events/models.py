@@ -148,6 +148,10 @@ class FindingDismissed:
     line: int
     reason: Optional[str] = None
     fingerprint: Optional[str] = None
+    #: The run the finding was dismissed from, when the client named one.
+    #: Display data: the dismissed listing looks the finding up there before
+    #: walking older runs. Never part of the identity.
+    run_id: Optional[str] = None
 
 
 @dataclass(frozen=True, kw_only=True)

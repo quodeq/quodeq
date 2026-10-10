@@ -95,6 +95,10 @@ export const projectKeys = {
   // merge. Both sit inside the project subtree on purpose, so every existing
   // mutation invalidation (dismiss/delete/formula reconcile) reaches them.
   runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runScores", run || LATEST_RUN_ID),
+  // The Dismissed tab's list. In the project subtree so the reconcile after
+  // a suppression mutation refreshes it; the dismiss flow prepends the entry
+  // the server answers with (see api/dismissedListCache.js).
+  dismissed: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dismissed"),
   // Compare tab's slim per-project payload. Lives inside the project subtree
   // on purpose: dismiss/delete/formula invalidations must reach it, or the
   // fleet table would keep showing pre-dismissal scores.

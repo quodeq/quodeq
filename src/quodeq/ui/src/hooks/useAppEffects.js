@@ -36,24 +36,24 @@ export function useDeadSharedSelectionEffect({ state, sharedSignal }) {
 
 /**
  * Bridges ASSISTANT_ACTION_APPLIED_EVENT window events into the
- * dashboard/scores cache patch + dismissed-list refresh, mirroring the
+ * dashboard/scores cache patch + dismissed-list entry, mirroring the
  * manual dismiss handlers (dismissWithReconcile callers in
  * routes/renderers.jsx).
  */
 export function useAssistantActionAppliedEffect({
-  applyDelta, bumpDismissRefresh, scheduleReconcileForApply, selectedProject,
+  applyDelta, recordDismissed, scheduleReconcileForApply, selectedProject,
 }) {
   // The two cache-patch callbacks get a new identity on most renders. Reading
   // them through a ref keeps the listener attached across those renders (a
   // detach/attach cycle could drop an event that lands in between) while the
   // handler still calls the current ones.
-  const patchRef = useRef({ applyDelta, bumpDismissRefresh });
-  patchRef.current = { applyDelta, bumpDismissRefresh };
+  const patchRef = useRef({ applyDelta, recordDismissed });
+  patchRef.current = { applyDelta, recordDismissed };
 
   useEffect(() => {
     const handler = buildAssistantActionAppliedHandler({
       applyDelta: (...args) => patchRef.current.applyDelta(...args),
-      bumpDismissRefresh: (...args) => patchRef.current.bumpDismissRefresh(...args),
+      recordDismissed: (...args) => patchRef.current.recordDismissed?.(...args),
       scheduleDashboardReconcile: scheduleReconcileForApply,
       selectedProject,
     });

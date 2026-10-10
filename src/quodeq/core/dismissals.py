@@ -28,7 +28,9 @@ class DismissedEntry:
 
     ``fingerprint`` is None for entries whose finding has no snippet and for
     legacy entries the backfill could not resolve; those match on ``line``.
-    ``reason`` and ``dismissed_at`` are display data, not identity.
+    ``reason``, ``dismissed_at`` and ``run_id`` are display data, not
+    identity; ``run_id`` is the run the dismissal was made from, when the
+    client named one, and tells the listing where to look first.
     """
 
     req: str
@@ -37,6 +39,7 @@ class DismissedEntry:
     fingerprint: str | None = None
     reason: str | None = field(default=None, compare=False)
     dismissed_at: datetime | None = field(default=None, compare=False)
+    run_id: str | None = field(default=None, compare=False)
 
     @property
     def key(self) -> DismissKey:
@@ -205,6 +208,7 @@ def fold_dismissals(events: Iterable[BaseEvent]) -> DismissedKeys:
                 req, file, line, fp,
                 reason=getattr(payload, "reason", None),
                 dismissed_at=getattr(event, "timestamp", None),
+                run_id=getattr(payload, "run_id", None) or None,
             )
             if fp:
                 active.pop(_line_identity(req, file, line), None)

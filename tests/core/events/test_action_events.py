@@ -65,3 +65,20 @@ def test_fingerprint_round_trips_and_legacy_lines_decode_without_it():
         "payload": {"req": "R1", "file": "a.py", "line": 10},
     }
     assert event_from_dict(FindingUndismissedEvent, legacy).payload.fingerprint is None
+
+
+def test_run_id_round_trips_and_legacy_dismissals_decode_without_it():
+    from quodeq.data.events.codec import event_from_dict
+
+    event = FindingDismissedEvent(payload=FindingDismissed(
+        req="R1", file="a.py", line=10, run_id="run-7"))
+    decoded = event_from_dict(FindingDismissedEvent, json.loads(event_to_json(event)))
+    assert decoded.payload.run_id == "run-7"
+
+    legacy = {
+        "event_id": str(event.event_id), "timestamp": "2026-07-24T10:00:00Z",
+        "event_type": "FINDING_DISMISSED",
+        "payload": {"req": "R1", "file": "a.py", "line": 10},
+    }
+    assert event_from_dict(FindingDismissedEvent, legacy).payload.run_id is None
+

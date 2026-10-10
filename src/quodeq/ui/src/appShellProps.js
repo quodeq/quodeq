@@ -86,7 +86,7 @@ export function buildProjectSwitcherProps({ state, navigation, navTab, navStack 
 // (buildDashboardDataBundle / buildNavigationBundle), no new derivation.
 export function buildContentProps({
   state, sharedSignal, navTab, navStackLength, isEvaluating, showToast, setWizardEntry,
-  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey,
+  dismissFinding, applyDelta, recordDismissed,
 }) {
   return {
     dashboardData: buildDashboardDataBundle({ state, sharedHasContent: sharedSignal.hasContent }),
@@ -110,12 +110,12 @@ export function buildContentProps({
     handleRunDeleted: state.handleRunDeleted,
     dismissFinding,
     // Patch the dashboard/scores caches from the dismiss response delta so the
-    // Overview updates instantly. Additive — the refreshDashboard /
-    // bumpDismissRefresh mechanisms below still run. The delta carries only the
-    // mutation shape; the caller folds in the rescored dims from result.scores.
+    // Overview updates instantly. Additive — the reconcile above still runs.
+    // The delta carries only the mutation shape; the caller folds in the
+    // rescored dims from result.scores.
     applyDelta,
-    bumpDismissRefresh,
-    dismissRefreshKey,
+    // Prepend the dismiss response's entry to the cached Dismissed list.
+    recordDismissed,
   };
 }
 
@@ -126,14 +126,14 @@ export function buildContentProps({
 // without touching hook order.
 export function buildAppShell({
   state, sharedSignal, navTab, navStack, activeTab, activePage, isEvaluating, showToast, setWizardEntry,
-  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo, showEvaluate,
+  dismissFinding, applyDelta, recordDismissed, selectedProjectInfo, showEvaluate,
   assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel,
   navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, wizardEntry, wizardHandlers,
   filteredAccumulated, filteredTrend,
 }) {
   const contentProps = buildContentProps({
     state, sharedSignal, navTab, navStackLength: navStack.length, isEvaluating, showToast, setWizardEntry,
-    dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey,
+    dismissFinding, applyDelta, recordDismissed,
   });
 
   // Resolve the project's friendly name (see resolveProjectDisplayName): local
