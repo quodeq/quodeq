@@ -4,26 +4,26 @@ from pathlib import Path
 
 from quodeq.analysis.prompts.builder import render_compact_standards, render_compiled_standards
 from quodeq.analysis.subprocess import render_standards_grouped
-from quodeq.analysis.prompts.severity_advice import advised_class
+from quodeq.analysis.prompts.severity_advice import advised_severity
 from quodeq.analysis.prompts.builder import load_evaluation_rules
 
 COMPILED = Path(__file__).resolve().parents[3] / "src" / "quodeq" / "data" / "standards" / "compiled"
 
 
-def test_advised_class_reads_the_requirement():
-    assert advised_class({"id": "X", "severity": "major"}) == "major"
+def test_advised_severity_reads_the_requirement():
+    assert advised_severity({"id": "X", "severity": "major"}) == "major"
 
 
-def test_advised_class_ignores_junk():
-    assert advised_class({"id": "X", "severity": "huge"}) is None
-    assert advised_class({"id": "X"}) is None
-    assert advised_class("not a mapping") is None
+def test_advised_severity_ignores_junk():
+    assert advised_severity({"id": "X", "severity": "huge"}) is None
+    assert advised_severity({"id": "X"}) is None
+    assert advised_severity("not a mapping") is None
 
 
 def test_override_replaces_the_suggestion():
-    assert advised_class({"id": "X", "severity": "major"}, {"severity": "minor"}) == "minor"
-    assert advised_class({"id": "X", "severity": "major"}, {"severity": "nope"}) == "major"
-    assert advised_class({"id": "X"}, {"severity": "critical"}) == "critical"
+    assert advised_severity({"id": "X", "severity": "major"}, {"severity": "minor"}) == "minor"
+    assert advised_severity({"id": "X", "severity": "major"}, {"severity": "nope"}) == "major"
+    assert advised_severity({"id": "X"}, {"severity": "critical"}) == "critical"
 
 
 def test_compact_renderer_carries_severity_and_override():

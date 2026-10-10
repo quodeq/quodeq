@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.core.standards.severity_classes import is_severity_class
+from quodeq.core.types.severity import is_severity
 
 ROOT = Path(__file__).resolve().parents[3] / "src" / "quodeq" / "data" / "standards"
 DIMENSIONS = sorted(p.stem for p in (ROOT / "compiled").glob("*.json"))
@@ -27,7 +27,7 @@ def test_compiled_severity_matches_source_and_is_on_the_ladder(dimension):
         source = {r["id"]: r.get("severity") for r in _reqs(source_path)}
         assert compiled == source
     for req_id, value in compiled.items():
-        assert is_severity_class(value), (dimension, req_id, value)
+        assert is_severity(value), (dimension, req_id, value)
 
 
 def test_security_suggests_a_severity_on_every_requirement():

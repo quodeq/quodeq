@@ -26,3 +26,8 @@ def parse_severity(raw: str | None, default: Severity = Severity.MINOR) -> Sever
         return Severity((raw or "").strip().lower())
     except ValueError:
         return default
+
+
+def is_severity(value: object) -> bool:
+    """True for exactly one of the three severity words; strict, unlike ``parse_severity``."""
+    return isinstance(value, str) and value in Severity.__members__.values()
