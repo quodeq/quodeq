@@ -36,8 +36,8 @@
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.9",
-    "@tanstack/react-query": "^5.104.2",
-    "@tanstack/react-virtual": "^3.14.17",
+    "@tanstack/react-query": "^5.104.5",
+    "@tanstack/react-virtual": "^3.14.21",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
     "d3-hierarchy": "^3.1.2",
@@ -48,7 +48,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@tanstack/react-query-devtools": "^5.104.2",
+    "@tanstack/react-query-devtools": "^5.104.5",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
