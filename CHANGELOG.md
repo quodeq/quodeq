@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.15.2] - 2026-10-28
+
+### Fixes
+- **Security, trusted certificates**: certifi 2026.10.19 drops the emSign root certificates whose intermediate CA keys were compromised ([GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2)). Quodeq's HTTPS calls, model providers included, trust this certificate list. The macOS and Windows apps carry their own copy, so update them as well; a pip install that is not upgraded keeps the old certificates until `pip install -U certifi`.
+
+### Improvements
+- **Smaller install**: the package no longer carries the dashboard's source code, only the built dashboard and the help pages the assistant reads. The wheel goes from 5.2 MB to 3.3 MB.
+- **Dependencies**: openai 3.35.1, pywinpty 3.1.0 (the Windows terminal), React 19.3.1, TanStack Query 5.104.5 and TanStack Virtual 3.14.21.
+
 ## [1.15.1] - 2026-10-20
 
 ### Improvements
