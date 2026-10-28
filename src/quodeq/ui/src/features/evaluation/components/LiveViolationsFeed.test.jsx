@@ -137,8 +137,8 @@ describe('LiveViolationsFeed', () => {
       const scroller = document.createElement('main');
       scroller.className = 'dashboard';
       // jsdom has no layout; the virtualizer reads the viewport off these.
-      Object.defineProperty(scroller, 'offsetHeight', { value: 400 });
-      Object.defineProperty(scroller, 'offsetWidth', { value: 800 });
+      Object.defineProperty(scroller, 'clientHeight', { value: 400 });
+      Object.defineProperty(scroller, 'clientWidth', { value: 800 });
       column.appendChild(scroller);
       document.body.appendChild(column);
       // The virtualizer measures each mounted row's offsetHeight.

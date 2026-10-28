@@ -93,6 +93,7 @@ jobs:
           require 'quodeq/data/.+[^/]$'          'runtime data under quodeq/data/'
           require 'quodeq/static/index\.html$'   'quodeq/static/index.html'
           require 'quodeq/static/assets/.+[^/]$' 'dashboard assets under quodeq/static/assets/'
+          require 'quodeq/ui/src/features/help/content/en/.+\.md$' 'help pages the assistant reads'
           if [ "$fail" -ne 0 ]; then
             echo "---- wheel contents (first 60) ----"
             unzip -l "$wheel" | head -60
