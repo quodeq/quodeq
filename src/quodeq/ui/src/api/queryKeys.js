@@ -61,30 +61,38 @@ export const projectKeys = {
   all: () => [PROJECT_SCOPE],
   project: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source),
   scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || LATEST_RUN_ID),
-  // Detail /scores deferred, per finding kind (violation | compliance). Keyed
-  // on content (as-of run, dimension, scope), not on the /scores response it
-  // was fetched for: the next response's items read the same rows, and an
-  // invalidation of the project subtree refetches them in place.
+  /**
+   * Detail /scores deferred, per finding kind (violation | compliance). Keyed
+   * on content (as-of run, dimension, scope), not on the /scores response it
+   * was fetched for: the next response's items read the same rows, and an
+   * invalidation of the project subtree refetches them in place.
+   */
   findingDetail: (projectId, asOf, kind, dimension, scope = {}) => projectScope(
     projectId, DEFAULT_PROJECT_SOURCE, "findingDetail", kind, asOf || LATEST_RUN_ID, dimension,
     scope.principle ?? null, scope.pathPrefix ?? null,
   ),
+  /** findingDetail for the compliance kind. */
   complianceDetail: (projectId, asOf, dimension, scope = {}) =>
     projectKeys.findingDetail(projectId, asOf, FINDING_TYPE.COMPLIANCE, dimension, scope),
-  // Detail /scores/<run> deferred: one run's lists, on either source. Takes
-  // the ref a run finding carries (api/complianceDetail.js) plus the kind
-  // and the request scope.
+  /**
+   * Detail /scores/<run> deferred: one run's lists, on either source. Takes
+   * the ref a run finding carries (api/complianceDetail.js) plus the kind
+   * and the request scope.
+   */
   runFindingDetail: ({ project, run, dimension, source = DEFAULT_PROJECT_SOURCE }, kind, scope = {}) =>
     projectScope(
       project, source, "runFindingDetail", kind, run, dimension,
       scope.principle ?? null, scope.pathPrefix ?? null,
     ),
+  /** One run's dashboard payload; the latest run when `run` is empty. */
   dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) =>
     projectScope(projectId, source, DASHBOARD_KIND, run || LATEST_RUN_ID),
   runs: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runs"),
   runLog: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runLog"),
-  // One entry per frames mode and finding selection (selectionKey, see
-  // features/map/model/riskSelection.js); every finding keeps the bare key.
+  /**
+   * One entry per frames mode and finding selection (selectionKey, see
+   * features/map/model/riskSelection.js); every finding keeps the bare key.
+   */
   mapHistory: (projectId, frames, source = DEFAULT_PROJECT_SOURCE, selectionKey = null) => (selectionKey
     ? projectScope(projectId, source, "mapHistory", frames, selectionKey)
     : projectScope(projectId, source, "mapHistory", frames)),
