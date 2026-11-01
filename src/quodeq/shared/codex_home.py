@@ -17,7 +17,20 @@ _OWNER_RW = 0o600
 _OWNER_RWX = 0o700
 _AUTH_FILE = "auth.json"
 _CONFIG_FILE = "config.toml"
-_CONFIG = "# Managed by Quodeq: no MCP servers, plugins or skills.\n"
+# The ChatGPT login also brings account-level tools (the codex_apps connector:
+# site deploys, credentials, plugin and parental-control changes), a browser,
+# image generation and sub-agents. The OS sandbox cannot stop network calls to
+# OpenAI, so they are switched off here; a scan only needs the shell and MCP.
+_DISABLED_FEATURES = (
+    "apps", "plugins", "browser_use", "browser_use_external",
+    "browser_use_full_cdp_access", "image_generation", "multi_agent", "goals",
+    "memories",
+)
+_CONFIG = (
+    "# Managed by Quodeq: no MCP servers, plugins, skills or account apps.\n"
+    'web_search = "disabled"\n\n[tools]\nweb_search = false\n\n[features]\n'
+    + "".join(f"{name} = false\n" for name in _DISABLED_FEATURES)
+)
 
 
 def user_codex_home(env: dict[str, str]) -> Path:

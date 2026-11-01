@@ -122,7 +122,11 @@ class TestBuildAnalysisEnv:
         home = tmp_path / ".quodeq" / "codex"
         assert result["CODEX_HOME"] == str(home)
         assert (home / "auth.json").read_text() == '{"token": "t"}'
-        assert "mcp_servers" not in (home / "config.toml").read_text()
+        config = (home / "config.toml").read_text()
+        assert "mcp_servers" not in config
+        # ChatGPT account apps (site deploys, credentials) and web stay off
+        assert "apps = false" in config and "plugins = false" in config
+        assert 'web_search = "disabled"' in config
 
     def test_handles_none_ai_cmd(self):
         env = {"PATH": "/usr/bin"}
