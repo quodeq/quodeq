@@ -225,8 +225,8 @@ def test_seatbelt_profile_limits_home_reads_to_the_given_dirs(tmp_path):
     home = str(Path.home())
     prof = os_sandbox._seatbelt_profile(
         writable_dirs=["/w"], writable_files=[], readable_home_dirs=[f"{home}/repo"])
-    deny = prof.index(f'(deny file-read-data (subpath "{home}"))')
-    allow = prof.index(f'(subpath "{home}/repo")')
+    deny = prof.index(f"(deny file-read-data (subpath {os_sandbox._sb_quote(home)}))")
+    allow = prof.index(f"(subpath {os_sandbox._sb_quote(f'{home}/repo')})")
     assert deny < allow  # later rules win, so the repo stays readable
 
 

@@ -1,4 +1,5 @@
 """Codex scans use Codex's own sandbox where a probe shows it works."""
+import json
 import subprocess
 from pathlib import Path
 
@@ -16,11 +17,12 @@ def test_native_args_swap_the_bypass_and_approve_the_findings_tools():
     assert out[-1].endswith('default_tools_approval_mode = "approve"}')
 
 
-def test_profile_blocks_home_and_reads_back_the_given_dirs():
-    profile = codex_sandbox.profile_args(Path("/home/u"), [Path("/home/u/repo")])
+def test_profile_blocks_home_and_reads_back_the_given_dirs(tmp_path):
+    home, repo = tmp_path, tmp_path / "repo"
+    profile = codex_sandbox.profile_args(home, [repo])
     filesystem = next(a for a in profile if a.startswith("permissions.quodeq_scan.filesystem="))
-    assert '"/home/u" = "none"' in filesystem
-    assert '"/home/u/repo" = "read"' in filesystem
+    assert f"{json.dumps(str(home))} = \"none\"" in filesystem  # TOML-escaped, Windows too
+    assert f"{json.dumps(str(repo))} = \"read\"" in filesystem
     assert 'approval_policy="never"' in profile
 
 
