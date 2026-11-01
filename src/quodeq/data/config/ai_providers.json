@@ -81,7 +81,7 @@
     "order": 3,
     "cmd": "gemini",
     "cmd_subcommand": "",
-    "base_args": "--output-format stream-json --approval-mode plan",
+    "base_args": "--output-format stream-json --yolo",
     "prompt_style": "flag",
     "prompt_flag": "-p",
     "mcp_style": "cli-register",

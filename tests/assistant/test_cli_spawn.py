@@ -80,6 +80,7 @@ def test_external_sandbox_prefix_linux_bwrap(monkeypatch):
     monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Linux")
     monkeypatch.setattr(os_sandbox.shutil, "which",
                         lambda name: "/usr/bin/bwrap" if name == "bwrap" else None)
+    monkeypatch.setattr(os_sandbox, "_bwrap_works", lambda: True)
     prefix, cleanup = external_sandbox_prefix(
         writable_dirs=["/home/u/.quodeq/scratch"], writable_files=["/home/u/.quodeq/a.db"])
     assert prefix[0] == "bwrap"
@@ -92,6 +93,25 @@ def test_external_sandbox_prefix_linux_no_sandbox_fails_safe(monkeypatch):
     monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Linux")
     monkeypatch.setattr(os_sandbox.shutil, "which", lambda name: None)
     with pytest.raises(RuntimeError, match="sandbox"):
+        external_sandbox_prefix(writable_dirs=["/x"], writable_files=[])
+
+
+def test_broken_bwrap_falls_back_to_firejail(monkeypatch):
+    # Ubuntu 24.04's AppArmor and containers refuse bwrap's user namespaces.
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(os_sandbox.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(os_sandbox, "_bwrap_works", lambda: False)
+    prefix, _ = external_sandbox_prefix(
+        writable_dirs=["/x"], writable_files=[], readable_home_dirs=["/home/u/repo"])
+    assert prefix[0] == "firejail"
+
+
+def test_broken_bwrap_without_firejail_is_unavailable(monkeypatch):
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(os_sandbox.shutil, "which",
+                        lambda name: "/usr/bin/bwrap" if name == "bwrap" else None)
+    monkeypatch.setattr(os_sandbox, "_bwrap_works", lambda: False)
+    with pytest.raises(os_sandbox.SandboxUnavailable):
         external_sandbox_prefix(writable_dirs=["/x"], writable_files=[])
 
 

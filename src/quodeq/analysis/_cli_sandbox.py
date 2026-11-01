@@ -12,20 +12,40 @@ this machine (Quodeq's own API), except a local proxy.
 
 Quodeq's other state stays out of reach on purpose: other projects' clones
 and evidence, the assistant database and the settings of other projects.
+
+Where no OS sandbox works (Windows, a container, Linux without a usable
+bubblewrap or firejail) the scan still runs, as it did before the sandbox
+existed, with the limits that need none: the env allowlist and, for Codex,
+the dedicated home without account apps, plugins or the user's MCP
+servers. *require_sandbox* makes it fail instead.
 """
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
 from quodeq.analysis._config import AnalysisConfig
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.project_standards import project_settings_file, settings_reports_root
 from quodeq.shared.os_sandbox import (
+    SandboxUnavailable,
     external_sandbox_prefix,
     loopback_proxy_ports,
     runtime_readable_dirs,
 )
+
+_warned_unsandboxed: set[str] = set()  # one warning per CLI per process, not per agent spawn
+
+
+@dataclass(frozen=True)
+class SandboxPolicy:
+    """What a scan does where no OS sandbox works: warn on *log* and run
+    without one, or, with *require*, fail."""
+
+    require: bool = False
+    log: LogSink = field(default=NULL_LOG)
 
 
 def _project_dir(cfg: AnalysisConfig) -> Path | None:
@@ -77,13 +97,14 @@ def _cli_home(spec: dict, env: Mapping[str, str]) -> Path:
 
 def analysis_sandbox_prefix(
     cfg: AnalysisConfig, provider_cfg: dict, work_dir: Path, binary: str,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str] | None = None, policy: SandboxPolicy = SandboxPolicy(),
 ) -> tuple[list[str], Callable[[], None]]:
     """The sandbox launcher prefix for this run's CLI, or ``([], no-op)`` when
-    the provider declares no ``analysis_sandbox``. *env* is the CLI's env.
+    the provider declares no ``analysis_sandbox`` or no sandbox works here.
+    *env* is the CLI's env.
 
-    Raises RuntimeError when the platform has no usable sandbox, so a CLI
-    with bypassed approvals never runs unconfined.
+    Raises SandboxUnavailable instead of running unsandboxed when
+    ``policy.require`` is set.
     """
     spec = provider_cfg.get("analysis_sandbox")
     if not spec:
@@ -92,6 +113,21 @@ def analysis_sandbox_prefix(
     cli_home = _cli_home(spec, env)
     cli_home.mkdir(parents=True, exist_ok=True)
     writable = [cli_home, *_run_writable_dirs(cfg)]
+    try:
+        return _sandbox_prefix(cfg, work_dir, binary, env, writable)
+    except SandboxUnavailable as exc:
+        if policy.require:
+            raise
+        if binary not in _warned_unsandboxed:
+            _warned_unsandboxed.add(binary)
+            policy.log.warning(f"Running {binary} without an OS sandbox: {exc} "
+                        "Set QUODEQ_REQUIRE_SANDBOX=1 to fail instead.")
+        return [], lambda: None
+
+
+def _sandbox_prefix(
+    cfg: AnalysisConfig, work_dir: Path, binary: str, env: Mapping[str, str], writable: list[Path],
+) -> tuple[list[str], Callable[[], None]]:
     return external_sandbox_prefix(
         writable_dirs=[str(d) for d in writable],
         writable_files=[],

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.subprocess import AnalysisConfig, analysis_sandbox_prefix
+from quodeq.analysis.subprocess import AnalysisConfig, SandboxPolicy, analysis_sandbox_prefix
 from quodeq.shared import os_sandbox
 
 
@@ -62,9 +62,20 @@ def test_loopback_is_blocked_except_a_local_proxy(tmp_path, captured):
     assert captured["loopback_allow_ports"] == [3128]
 
 
-def test_sandboxed_provider_fails_closed_without_a_sandbox(tmp_path, monkeypatch):
+def test_runs_without_a_sandbox_where_none_works(tmp_path, monkeypatch):
+    # Windows, a container, Linux without a usable bwrap: the scan still runs.
     monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Windows")
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    with pytest.raises(RuntimeError, match="sandbox"):
+    prefix, cleanup = analysis_sandbox_prefix(
+        AnalysisConfig(), {"analysis_sandbox": {"cli_home": ".x"}}, tmp_path, "codex")
+    assert prefix == []
+    cleanup()
+
+
+def test_require_sandbox_fails_where_none_works(tmp_path, monkeypatch):
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    with pytest.raises(os_sandbox.SandboxUnavailable):
         analysis_sandbox_prefix(
-            AnalysisConfig(), {"analysis_sandbox": {"cli_home": ".x"}}, tmp_path, "codex")
+            AnalysisConfig(), {"analysis_sandbox": {"cli_home": ".x"}}, tmp_path, "codex",
+            policy=SandboxPolicy(require=True))

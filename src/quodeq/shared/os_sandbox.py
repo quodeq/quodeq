@@ -10,8 +10,10 @@ machine, such as Quodeq's own API, except a local proxy's port.
 """
 from __future__ import annotations
 
+import functools
 import platform
 import shutil
+import subprocess
 import sys
 import tempfile
 from collections.abc import Iterable, Mapping
@@ -47,6 +49,12 @@ def runtime_readable_dirs(*binaries: str) -> list[Path]:
     return dirs
 
 
+class SandboxUnavailable(RuntimeError):
+    """No OS sandbox works on this machine."""
+
+
+_BWRAP_PROBE_TIMEOUT_S = 5
+_BWRAP = "bwrap"
 _BIND = "--bind"
 _RO_BIND = "--ro-bind"
 _PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy",
@@ -124,7 +132,7 @@ def _writable_paths(writable_dirs: list[str], writable_files: list[str]) -> list
 def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str],
                   readable_home_dirs: list[str] | None = None,
                   readonly_dirs: list[str] | None = None) -> list[str]:
-    argv = ["bwrap", _RO_BIND, "/", "/", "--dev", "/dev", "--proc", "/proc",
+    argv = [_BWRAP, _RO_BIND, "/", "/", "--dev", "/dev", "--proc", "/proc",
             "--tmpfs", "/tmp", "--share-net", "--die-with-parent", "--unshare-pid"]
     seen: set[str] = set()
     if readable_home_dirs is not None:
@@ -149,6 +157,20 @@ def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str],
     return argv
 
 
+@functools.cache
+def _bwrap_works() -> bool:
+    """Whether bwrap can create its namespaces here. Installed is not enough:
+    Ubuntu 24.04's AppArmor and most containers refuse unprivileged user
+    namespaces, and every sandboxed spawn would then fail."""
+    try:
+        probe = subprocess.run(
+            [_BWRAP, _RO_BIND, "/", "/", "--dev", "/dev", "--unshare-pid", "true"],
+            capture_output=True, timeout=_BWRAP_PROBE_TIMEOUT_S, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return probe.returncode == 0
+
+
 def external_sandbox_prefix(*, writable_dirs: list[str], writable_files: list[str],
                             readable_home_dirs: list[str] | None = None,
                             readonly_dirs: list[str] | None = None,
@@ -163,8 +185,8 @@ def external_sandbox_prefix(*, writable_dirs: list[str], writable_files: list[st
     *loopback_allow_ports*; bwrap cannot filter by address, so on Linux it
     has no effect.
 
-    Fails safe: raises if no sandbox mechanism is available on this platform, so
-    an agent whose own sandbox is bypassed never runs unsandboxed.
+    Raises SandboxUnavailable when no sandbox works on this machine; the
+    caller decides between failing and running without one.
     """
     system = platform.system()
     if system == SYSTEM_DARWIN:
@@ -181,17 +203,17 @@ def external_sandbox_prefix(*, writable_dirs: list[str], writable_files: list[st
             Path(tmp.name).unlink(missing_ok=True)
         return ["sandbox-exec", "-f", tmp.name], _cleanup
     if system == SYSTEM_LINUX:
-        if shutil.which("bwrap"):
+        if shutil.which(_BWRAP) and _bwrap_works():
             return (_bwrap_prefix(writable_dirs, writable_files, readable_home_dirs, readonly_dirs),
                     lambda: None)
-        if shutil.which("firejail") and readable_home_dirs is None:
-            # firejail read-only whole fs, then allow-list the writable dirs
+        if shutil.which("firejail"):
+            # firejail read-only whole fs, then allow-list the writable dirs.
+            # Writes only: home reads stay open, weaker than bwrap.
             argv = ["firejail", "--quiet", "--read-only=/"]
             for d in _writable_paths(writable_dirs, writable_files):
                 argv.append(f"--read-write={d}")
             return argv, lambda: None
-        raise RuntimeError(
-            "This provider must run in an OS sandbox, which needs bubblewrap "
-            "(or firejail for assistant turns); install it or pick another provider.")
-    raise RuntimeError(
-        f"OS sandboxing is unsupported on {system}; pick Claude or an API provider.")
+        raise SandboxUnavailable(
+            "No working OS sandbox: install bubblewrap (and allow it unprivileged "
+            "user namespaces) or firejail.")
+    raise SandboxUnavailable(f"No OS sandbox is available on {system}.")
