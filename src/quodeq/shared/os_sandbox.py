@@ -10,11 +10,37 @@ from __future__ import annotations
 
 import platform
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from typing import Callable
 
 from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
+
+
+def _under_home(path: Path) -> bool:
+    return path.resolve().is_relative_to(Path.home().resolve())
+
+
+def _binary_root(binary: str) -> Path | None:
+    """The install prefix of *binary* (``<prefix>/bin/<binary>``), when under home."""
+    found = shutil.which(binary)
+    if not found:
+        return None
+    root = Path(found).resolve().parent.parent
+    return root if _under_home(root) else None
+
+
+def runtime_readable_dirs(*binaries: str) -> list[Path]:
+    """What a sandboxed CLI and the Python MCP server it spawns must read to
+    start: this interpreter, the quodeq package, and each binary's install
+    prefix (plus node's, for node-based CLIs) when they live under home."""
+    dirs = [Path(sys.prefix), Path(sys.base_prefix), Path(__file__).resolve().parents[2]]
+    for binary in (*binaries, "node"):
+        root = _binary_root(binary)
+        if root is not None:
+            dirs.append(root)
+    return dirs
 
 
 def _sb_quote(path: str) -> str:

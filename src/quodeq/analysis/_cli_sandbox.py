@@ -10,28 +10,12 @@ Quodeq's state and what the CLI and the findings server need to run.
 """
 from __future__ import annotations
 
-import shutil
-import sys
 from pathlib import Path
 from typing import Callable
 
-import quodeq
 from quodeq.analysis._config import AnalysisConfig
-from quodeq.shared.env_paths import home_state_dir
-from quodeq.shared.os_sandbox import external_sandbox_prefix
-
-
-def _under_home(path: Path) -> bool:
-    return path.resolve().is_relative_to(Path.home().resolve())
-
-
-def _binary_root(binary: str) -> Path | None:
-    """The install prefix of *binary* (``<prefix>/bin/<binary>``), when under home."""
-    found = shutil.which(binary)
-    if not found:
-        return None
-    root = Path(found).resolve().parent.parent
-    return root if _under_home(root) else None
+from quodeq.shared.env_paths import get_quodeq_dir
+from quodeq.shared.os_sandbox import external_sandbox_prefix, runtime_readable_dirs
 
 
 def _run_writable_dirs(cfg: AnalysisConfig) -> list[Path]:
@@ -48,16 +32,9 @@ def _run_writable_dirs(cfg: AnalysisConfig) -> list[Path]:
 
 
 def _readable_dirs(cfg: AnalysisConfig, work_dir: Path, binary: str) -> list[Path]:
-    dirs = [work_dir.resolve(), Path(sys.prefix), Path(sys.base_prefix),
-            Path(quodeq.__file__).resolve().parent.parent]
+    dirs = [work_dir.resolve(), *runtime_readable_dirs(binary)]
     if cfg.compiled_dir is not None:
         dirs.append(Path(cfg.compiled_dir).resolve())
-    root = _binary_root(binary)
-    if root is not None:
-        dirs.append(root)
-    node_root = _binary_root("node")
-    if node_root is not None:
-        dirs.append(node_root)
     return dirs
 
 
@@ -75,7 +52,7 @@ def analysis_sandbox_prefix(
         return [], lambda: None
     cli_home = Path.home() / spec["cli_home"]
     cli_home.mkdir(parents=True, exist_ok=True)
-    writable = [home_state_dir(), cli_home, *_run_writable_dirs(cfg)]
+    writable = [get_quodeq_dir(), cli_home, *_run_writable_dirs(cfg)]
     return external_sandbox_prefix(
         writable_dirs=[str(d) for d in writable],
         writable_files=[],

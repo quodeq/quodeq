@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 from quodeq.config.provider import Provider
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.codex_home import dedicated_codex_home
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.os_sandbox import external_sandbox_prefix  # noqa: F401 -- re-export
 
@@ -55,7 +56,12 @@ def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> d
     source = resolve_env(env)
     if provider == Provider.COPILOT:
         return build_copilot_env(source)
-    return {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
+    env = {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
+    if provider == Provider.CODEX:
+        # Not the user's ~/.codex: its MCP servers, plugins and the ChatGPT
+        # account apps would load even with the shell tool disabled.
+        env["CODEX_HOME"] = str(dedicated_codex_home(source))
+    return env
 
 
 def scratch_cwd(base: Path) -> Path:

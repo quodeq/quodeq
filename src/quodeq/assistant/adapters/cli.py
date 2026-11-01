@@ -26,6 +26,9 @@ from quodeq.assistant.mcp import mcp_config
 from quodeq.assistant.message_role import MessageRole
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.data.ports.assistant import AssistantStore
+from quodeq.shared.codex_home import dedicated_codex_home_path
+from quodeq.shared.env_paths import get_quodeq_dir
+from quodeq.shared.os_sandbox import runtime_readable_dirs
 from quodeq.shared.process_kill import kill_proc_tree as _kill_proc_tree
 
 _logger = logging.getLogger(__name__)
@@ -98,16 +101,31 @@ def _external_sandbox(cfg: CliTurnConfig, cwd: Path) -> tuple[list[str], object 
 
     codex needs its internal sandbox bypassed for MCP to work, so we wrap it
     in an OS sandbox WE control that blocks writes outside the scratch cwd,
-    temp, ~/.codex, the assistant db (which draft_action writes) and the MCP
-    server's log file. Evaluation stores stay read-only: the server opens
-    them through ``open_evaluation_db``'s read-only fallback.
+    temp, Quodeq's dedicated codex home, the assistant db (which draft_action
+    writes) and the MCP server's log file. Evaluation stores stay read-only:
+    the server opens them through ``open_evaluation_db``'s read-only
+    fallback. File contents under home are unreadable except Quodeq's state,
+    the paths the MCP server was given and what the CLI needs to run.
     """
     db = str(cfg.db_path)
     log = str(assistant_mcp_log_path())
+    worktree = [str(cfg.worktree_dir)] if cfg.worktree_dir else []
     return external_sandbox_prefix(
-        writable_dirs=[str(cwd), str(Path.home() / ".codex"),
-                       *([str(cfg.worktree_dir)] if cfg.worktree_dir else [])],
-        writable_files=[db, db + "-wal", db + "-shm", db + "-journal", log, log + ".1"])
+        writable_dirs=[str(cwd), str(dedicated_codex_home_path()), *worktree],
+        writable_files=[db, db + "-wal", db + "-shm", db + "-journal", log, log + ".1"],
+        readable_home_dirs=[str(get_quodeq_dir()), *_mcp_arg_paths(cfg.mcp_server_args),
+                            *(str(d) for d in runtime_readable_dirs("codex"))])
+
+
+def _mcp_arg_paths(args: list[str]) -> list[str]:
+    """The absolute paths among the MCP server's args (repo root, run and
+    reports dirs, ...), as dirs: a file's parent, since the sandbox grants dirs."""
+    paths = []
+    for arg in args:
+        if arg.startswith("/"):
+            path = Path(arg)
+            paths.append(str(path if path.is_dir() else path.parent))
+    return paths
 
 
 def _arm_kill_guards(proc, session: CliTurnSession) -> threading.Timer:

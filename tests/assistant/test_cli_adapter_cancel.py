@@ -109,7 +109,7 @@ def _failing_codex_turn(tmp_path, monkeypatch):
     """Run a codex turn whose stream raises; return what the turn acquired."""
     seen = {"proc": _RunningProc([]), "sandbox_cleaned": False, "timers": []}
 
-    def sandbox_prefix(*, writable_dirs, writable_files):
+    def sandbox_prefix(*, writable_dirs, writable_files, readable_home_dirs=None):
         return [], lambda: seen.update(sandbox_cleaned=True)
 
     class RecordingTimer(threading.Timer):

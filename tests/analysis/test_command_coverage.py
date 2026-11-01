@@ -116,7 +116,8 @@ class TestBuildAnalysisEnv:
         user_home.mkdir()
         (user_home / "auth.json").write_text('{"token": "t"}')
         (user_home / "config.toml").write_text('[mcp_servers.repl]\ncommand = "node"\n')
-        env = {"PATH": "/usr/bin", "HOME": str(tmp_path), "CODEX_HOME": str(user_home)}
+        env = {"PATH": "/usr/bin", "HOME": str(tmp_path), "CODEX_HOME": str(user_home),
+               "QUODEQ_DIR": str(tmp_path / ".quodeq")}
         with patch("quodeq.analysis._command._get_provider_configs", return_value={}):
             result = build_analysis_env("codex", env)
         home = tmp_path / ".quodeq" / "codex"
