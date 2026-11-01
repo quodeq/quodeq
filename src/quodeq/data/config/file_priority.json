@@ -20,7 +20,8 @@
     "maintainability": [],
     "performance": ["cache", "query", "database", "pool", "batch", "stream", "index", "optimize", "buffer"],
     "flexibility": ["config", "plugin", "adapter", "factory", "interface", "abstract", "registry", "provider"],
-    "usability": ["accessibility", "a11y", "i18n", "locale", "input", "form", "validation", "aria"]
+    "usability": ["accessibility", "a11y", "i18n", "locale", "input", "form", "validation", "aria"],
+    "ai-integration-security": ["llm", "agent", "prompt", "mcp", "openai", "anthropic", "claude", "gemini", "codex", "ollama", "embedding", "sandbox", "spawn"]
   },
   "dimension_keyword_boost": 5,
   "maintainability_size_divisor": 2000,

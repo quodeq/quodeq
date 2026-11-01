@@ -1,0 +1,1034 @@
+{
+  "id": "ai-integration-security",
+  "name": "AI Integration Security",
+  "description": "How safely the code calls models and runs agents. Untrusted content stays data, model output is validated before use, agents get only the privileges their task needs, and high-impact actions wait for a human. Drafted from OWASP AISVS 1.0 and the OWASP Top 10 for LLM Applications 2025.",
+  "type": "quodeq",
+  "version": "2026.11",
+  "managed": true,
+  "source": "OWASP AISVS 1.0, OWASP Top 10 for LLM Applications 2025, MITRE CWE",
+  "weight": 1.0,
+  "principles": [
+    {
+      "name": "Untrusted Content Boundary",
+      "description": "Content the program did not write (repository files, web pages, documents, tool results, issue and PR text) is data for the model, never instructions",
+      "requirements": [
+        {
+          "id": "AIS-INP-01",
+          "text": "Untrusted content MUST NOT be concatenated into system or developer instructions",
+          "description": "Untrusted text goes in its own clearly delimited message or field, below the system and developer instructions. An f-string that splices a file's contents or a web page into the system prompt is a violation",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 2.1.6",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C02-Input-Validation.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.3.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.11.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM01:2025",
+              "name": "Prompt Injection",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "1427",
+              "name": "Improper Neutralization of Input Used for LLM Prompting",
+              "url": "https://cwe.mitre.org/data/definitions/1427.html"
+            }
+          ],
+          "severity": "critical"
+        },
+        {
+          "id": "AIS-INP-02",
+          "text": "Reserved role or special tokens in untrusted content MUST be neutralised before it reaches the model",
+          "description": "Strings such as chat template markers, role tags or tool-call delimiters inside untrusted text are escaped or rejected so they cannot open a new role or tool call",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 2.1.7",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C02-Input-Validation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM01:2025",
+              "name": "Prompt Injection",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "1427",
+              "name": "Improper Neutralization of Input Used for LLM Prompting",
+              "url": "https://cwe.mitre.org/data/definitions/1427.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-INP-03",
+          "text": "Oversized untrusted input MUST be rejected or chunked explicitly, never silently truncated",
+          "description": "Cutting input to fit the context window without telling anyone can push the instructions out of the window or hide part of the content. Check the size and reject, split, or report it",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 2.1.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C02-Input-Validation.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.3.5",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "cwe",
+              "id": "1284",
+              "name": "Improper Validation of Specified Quantity in Input",
+              "url": "https://cwe.mitre.org/data/definitions/1284.html"
+            }
+          ],
+          "severity": "minor"
+        },
+        {
+          "id": "AIS-INP-04",
+          "text": "Secrets, credentials and tokens MUST NOT be placed in prompts, system prompts or tool-call arguments",
+          "description": "API keys, passwords, session tokens or private keys in prompt text reach the provider and any log of the conversation. The program uses the credential itself, outside the model's context",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.5.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.3.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.3.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM02:2025",
+              "name": "Sensitive Information Disclosure",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "201",
+              "name": "Insertion of Sensitive Information Into Sent Data",
+              "url": "https://cwe.mitre.org/data/definitions/201.html"
+            }
+          ],
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "name": "Model Output Handling",
+      "description": "Whatever the model returns is untrusted input to the rest of the program",
+      "requirements": [
+        {
+          "id": "AIS-OUT-01",
+          "text": "Model output MUST be validated against a defined schema before the program acts on it",
+          "description": "Structured output is parsed and checked (types, allowed values, required fields); output that does not match is rejected, not patched up and used",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 7.1.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C07-Model-Behavior.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.3.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.11.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM05:2025",
+              "name": "Improper Output Handling",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-OUT-02",
+          "text": "Model output MUST NOT be executed as a shell command, code or query, or used unchecked as a file path",
+          "description": "Passing model text to a shell, eval/exec, a SQL string or open() is the classic injection sink with the model as the attacker's proxy. Map output to an allow-list of actions and confine paths to the workspace",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.11.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM05:2025",
+              "name": "Improper Output Handling",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "78",
+              "name": "Improper Neutralization of Special Elements used in an OS Command",
+              "url": "https://cwe.mitre.org/data/definitions/78.html"
+            },
+            {
+              "source": "cwe",
+              "id": "94",
+              "name": "Improper Control of Generation of Code",
+              "url": "https://cwe.mitre.org/data/definitions/94.html"
+            },
+            {
+              "source": "cwe",
+              "id": "22",
+              "name": "Improper Limitation of a Pathname to a Restricted Directory",
+              "url": "https://cwe.mitre.org/data/definitions/22.html"
+            }
+          ],
+          "severity": "critical"
+        },
+        {
+          "id": "AIS-OUT-03",
+          "text": "URLs, packages and servers named in model output MUST be checked against an allow-list before the program fetches, installs or connects to them",
+          "description": "Fetching a URL the model produced is SSRF and exfiltration waiting to happen; installing a package it named invites hallucinated or typo-squatted dependencies",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.3.7",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 7.3.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C07-Model-Behavior.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM05:2025",
+              "name": "Improper Output Handling",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "918",
+              "name": "Server-Side Request Forgery",
+              "url": "https://cwe.mitre.org/data/definitions/918.html"
+            },
+            {
+              "source": "cwe",
+              "id": "829",
+              "name": "Inclusion of Functionality from Untrusted Control Sphere",
+              "url": "https://cwe.mitre.org/data/definitions/829.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-OUT-04",
+          "text": "Model calls MUST bound output length and generation time",
+          "description": "Every completion request sets a max output token limit and a timeout, so a looping or manipulated model cannot run up cost or block a worker",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 7.1.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C07-Model-Behavior.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.1.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM10:2025",
+              "name": "Unbounded Consumption",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "770",
+              "name": "Allocation of Resources Without Limits or Throttling",
+              "url": "https://cwe.mitre.org/data/definitions/770.html"
+            }
+          ],
+          "severity": "minor"
+        }
+      ]
+    },
+    {
+      "name": "Agent Privilege and Sandboxing",
+      "description": "An agent that reads untrusted content gets only the privileges its task needs, enforced outside the model",
+      "requirements": [
+        {
+          "id": "AIS-PRV-01",
+          "text": "Agents or agent CLIs that process untrusted content MUST NOT run with approval or sandbox bypass flags",
+          "description": "Flags such as bypassPermissions, --yolo, --dangerously-bypass-approvals-and-sandbox, --dangerously-skip-permissions or an auto-approve-all setting hand every tool to whoever wrote the content the agent reads",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.3.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.11.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM06:2025",
+              "name": "Excessive Agency",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "250",
+              "name": "Execution with Unnecessary Privileges",
+              "url": "https://cwe.mitre.org/data/definitions/250.html"
+            }
+          ],
+          "severity": "critical"
+        },
+        {
+          "id": "AIS-PRV-02",
+          "text": "A spawned agent's tools and file access MUST be limited to what the task needs",
+          "description": "Tools are pre-approved by an explicit allow-list, file reads are scoped to the working directory, and write tools are absent when the task only reads. Accepting any absolute path is a violation",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.3.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.5.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM06:2025",
+              "name": "Excessive Agency",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "250",
+              "name": "Execution with Unnecessary Privileges",
+              "url": "https://cwe.mitre.org/data/definitions/250.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-PRV-03",
+          "text": "The environment of a spawned agent MUST be built from an allow-list",
+          "description": "Passing os.environ (or the parent environment minus a few keys) gives the agent every token and key the parent holds. Pass only the runtime keys and the provider's own credentials",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.5.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.11.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM02:2025",
+              "name": "Sensitive Information Disclosure",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "526",
+              "name": "Cleartext Storage of Sensitive Information in an Environment Variable",
+              "url": "https://cwe.mitre.org/data/definitions/526.html"
+            },
+            {
+              "source": "cwe",
+              "id": "214",
+              "name": "Invocation of Process Using Visible Sensitive Information",
+              "url": "https://cwe.mitre.org/data/definitions/214.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-PRV-04",
+          "text": "Network access of an agent that reads untrusted content MUST be restricted",
+          "description": "Shell commands run by the agent have no network, or an egress allow-list, and cannot reach loopback services such as the host application's own API",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 7.3.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C07-Model-Behavior.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.11.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM06:2025",
+              "name": "Excessive Agency",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "918",
+              "name": "Server-Side Request Forgery",
+              "url": "https://cwe.mitre.org/data/definitions/918.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-PRV-05",
+          "text": "Locally launched MCP servers and tool processes MUST run with least privilege",
+          "description": "A tool server started by the program gets a restricted file system, network and environment, not the full rights of the user session",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.1.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.3.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "cwe",
+              "id": "250",
+              "name": "Execution with Unnecessary Privileges",
+              "url": "https://cwe.mitre.org/data/definitions/250.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-PRV-06",
+          "text": "Code paths that process untrusted content MUST be separated from code paths that can invoke privileged tools",
+          "description": "A summariser or classifier reading untrusted text has no tool access; its result passes through validation before a privileged agent sees it",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.3.5",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.3.6",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM06:2025",
+              "name": "Excessive Agency",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "250",
+              "name": "Execution with Unnecessary Privileges",
+              "url": "https://cwe.mitre.org/data/definitions/250.html"
+            }
+          ],
+          "severity": "major"
+        }
+      ]
+    },
+    {
+      "name": "Configuration and Supply Chain Integrity",
+      "description": "What the agent loads (settings, hooks, tool servers, models) comes from trusted sources, never from the content it works on",
+      "requirements": [
+        {
+          "id": "AIS-CFG-01",
+          "text": "A tool that runs an AI agent over third-party content MUST NOT load prompts, settings, hooks or tool-server definitions from that content",
+          "description": "An analysed repository's .claude/settings.json, .cursor rules, MCP config or AGENTS.md can carry hooks and instructions that run before any permission check. Load configuration only from the user or the program itself",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.11.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM03:2025",
+              "name": "Supply Chain",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "829",
+              "name": "Inclusion of Functionality from Untrusted Control Sphere",
+              "url": "https://cwe.mitre.org/data/definitions/829.html"
+            }
+          ],
+          "severity": "critical"
+        },
+        {
+          "id": "AIS-CFG-02",
+          "text": "Automated agents MUST load only allow-listed MCP servers and plugins",
+          "description": "An automated run does not inherit every MCP server or plugin the user configured for interactive use; it declares the servers it needs",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.1.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.1.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM03:2025",
+              "name": "Supply Chain",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "829",
+              "name": "Inclusion of Functionality from Untrusted Control Sphere",
+              "url": "https://cwe.mitre.org/data/definitions/829.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-CFG-03",
+          "text": "Model artifacts MUST be loaded only through serialization formats that cannot execute code",
+          "description": "pickle.load, torch.load without weights_only=True, or trust_remote_code=True on a model from an unvetted source runs arbitrary code at load time. Prefer safetensors",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 4.1.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C04-Infrastructure.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 6.1.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C06-Supply-Chain.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 6.1.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C06-Supply-Chain.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM03:2025",
+              "name": "Supply Chain",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "502",
+              "name": "Deserialization of Untrusted Data",
+              "url": "https://cwe.mitre.org/data/definitions/502.html"
+            }
+          ],
+          "severity": "critical"
+        },
+        {
+          "id": "AIS-CFG-04",
+          "text": "Security controls described in code comments or docs MUST exist in the code",
+          "description": "A comment claiming a sandbox, an allow-list or a permission check that the code does not enforce misleads reviewers into skipping the check",
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1116",
+              "name": "Inaccurate Source Code Comments",
+              "url": "https://cwe.mitre.org/data/definitions/1116.html"
+            }
+          ],
+          "severity": "minor"
+        }
+      ]
+    },
+    {
+      "name": "Authorization and Human Control",
+      "description": "Authorization is decided by code, and high-impact actions wait for a human",
+      "requirements": [
+        {
+          "id": "AIS-AUZ-01",
+          "text": "Access-control decisions MUST be enforced by application code, never delegated to the model",
+          "description": "A system prompt saying \"only reveal this to admins\" is not access control. Check the user's rights in code before the data or tool is offered to the model",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.5.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 5.2.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C05-Access-Control-and-Identity.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM06:2025",
+              "name": "Excessive Agency",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "863",
+              "name": "Incorrect Authorization",
+              "url": "https://cwe.mitre.org/data/definitions/863.html"
+            }
+          ],
+          "severity": "critical"
+        },
+        {
+          "id": "AIS-AUZ-02",
+          "text": "Irreversible or high-impact agent actions MUST require explicit human approval enforced by the runtime",
+          "description": "Deleting data, sending messages, paying, merging, deploying or writing outside the workspace is blocked until a human approves it; the model cannot approve on the user's behalf",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.2.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.2.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM06:2025",
+              "name": "Excessive Agency",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "862",
+              "name": "Missing Authorization",
+              "url": "https://cwe.mitre.org/data/definitions/862.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-AUZ-03",
+          "text": "Approval requests MUST show the complete action parameters",
+          "description": "The approval shows the full command, diff, recipient or amount, untruncated and unrewritten, so a human approves what will actually run",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.2.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            }
+          ],
+          "severity": "minor"
+        },
+        {
+          "id": "AIS-AUZ-04",
+          "text": "A pending approval that times out MUST block the action",
+          "description": "No answer means no; the action fails closed",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.6.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "cwe",
+              "id": "862",
+              "name": "Missing Authorization",
+              "url": "https://cwe.mitre.org/data/definitions/862.html"
+            }
+          ],
+          "severity": "minor"
+        },
+        {
+          "id": "AIS-AUZ-05",
+          "text": "Agents MUST NOT be able to approve, merge or deploy their own output, or change branch protection",
+          "description": "The agent's credentials lack the rights to approve its own PR, bypass required reviews or edit protection rules",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.8.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS AC.8.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x92-Appendix-C_AI_for_Code_Generation.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM06:2025",
+              "name": "Excessive Agency",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "862",
+              "name": "Missing Authorization",
+              "url": "https://cwe.mitre.org/data/definitions/862.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-AUZ-06",
+          "text": "Retrieval for a user MUST enforce that user's authorization",
+          "description": "RAG and embedding lookups filter by the end user's rights at query time, not by the service account's broader access",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 5.2.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C05-Access-Control-and-Identity.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM02:2025",
+              "name": "Sensitive Information Disclosure",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "863",
+              "name": "Incorrect Authorization",
+              "url": "https://cwe.mitre.org/data/definitions/863.html"
+            }
+          ],
+          "severity": "major"
+        }
+      ]
+    },
+    {
+      "name": "Resource Bounds",
+      "description": "Agents and model calls stop on their own",
+      "requirements": [
+        {
+          "id": "AIS-RES-01",
+          "text": "Agent loops MUST enforce a maximum number of steps and a token or spend budget",
+          "description": "A while-loop that calls the model until it says it is done needs a hard step cap and a budget, checked by code",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.1.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM10:2025",
+              "name": "Unbounded Consumption",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "835",
+              "name": "Loop with Unreachable Exit Condition",
+              "url": "https://cwe.mitre.org/data/definitions/835.html"
+            },
+            {
+              "source": "cwe",
+              "id": "770",
+              "name": "Allocation of Resources Without Limits or Throttling",
+              "url": "https://cwe.mitre.org/data/definitions/770.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-RES-02",
+          "text": "Model and tool calls MUST have timeouts",
+          "description": "Each provider request, tool invocation and spawned agent process has a timeout and a resource limit",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.1.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM10:2025",
+              "name": "Unbounded Consumption",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "770",
+              "name": "Allocation of Resources Without Limits or Throttling",
+              "url": "https://cwe.mitre.org/data/definitions/770.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-RES-03",
+          "text": "Running agents MUST be stoppable",
+          "description": "There is a cancel path that ends the agent and its child processes, not only the UI",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 9.6.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C09-Orchestration-and-Agentic-Action.md"
+            }
+          ],
+          "severity": "minor"
+        }
+      ]
+    },
+    {
+      "name": "MCP Server Security",
+      "description": "Tool servers authenticate every call and treat their own results as untrusted",
+      "requirements": [
+        {
+          "id": "AIS-MCP-01",
+          "text": "Remote MCP servers MUST authenticate every request and validate the token's issuer, audience, expiry and scope",
+          "description": "Relying on TLS or a network boundary alone, or accepting a token without checking who it was issued to, lets any caller use the tools",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.2.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.2.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "cwe",
+              "id": "306",
+              "name": "Missing Authentication for Critical Functionality",
+              "url": "https://cwe.mitre.org/data/definitions/306.html"
+            }
+          ],
+          "severity": "critical"
+        },
+        {
+          "id": "AIS-MCP-02",
+          "text": "MCP servers MUST NOT pass client tokens through to downstream APIs",
+          "description": "Forwarding the token the client sent turns the server into a confused deputy; use a token issued to the server for the downstream call",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.2.7",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "cwe",
+              "id": "441",
+              "name": "Unintended Proxy or Intermediary",
+              "url": "https://cwe.mitre.org/data/definitions/441.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-MCP-03",
+          "text": "MCP tool calls MUST validate arguments against the declared schema and reject unknown or oversized parameters",
+          "description": "Tool handlers check types, ranges and sizes and refuse fields they do not declare",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.4.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.4.4",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "cwe",
+              "id": "1284",
+              "name": "Improper Validation of Specified Quantity in Input",
+              "url": "https://cwe.mitre.org/data/definitions/1284.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-MCP-04",
+          "text": "HTTP-based MCP servers MUST validate the Origin and Host headers",
+          "description": "A local HTTP tool server that skips these checks can be driven from a web page through DNS rebinding",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.3.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "cwe",
+              "id": "346",
+              "name": "Origin Validation Error",
+              "url": "https://cwe.mitre.org/data/definitions/346.html"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-MCP-05",
+          "text": "Tool results MUST be validated and passed to the model as data, not instructions",
+          "description": "A tool result is checked against its schema and kept in the tool-result channel; text inside it that addresses the model is not obeyed",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.4.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 10.4.2",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C10-MCP-Security.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM01:2025",
+              "name": "Prompt Injection",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            },
+            {
+              "source": "cwe",
+              "id": "1427",
+              "name": "Improper Neutralization of Input Used for LLM Prompting",
+              "url": "https://cwe.mitre.org/data/definitions/1427.html"
+            }
+          ],
+          "severity": "major"
+        }
+      ]
+    },
+    {
+      "name": "Memory and Audit",
+      "description": "What an agent remembers and what it did can be trusted later",
+      "requirements": [
+        {
+          "id": "AIS-MEM-01",
+          "text": "Agent and tool output MUST NOT be written to persistent agent memory without source validation",
+          "description": "Saving whatever the model or a tool returned into long-term memory lets one injected page poison every later session",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 8.2.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C08-Memory-Embeddings-and-Vector-Database.md"
+            },
+            {
+              "source": "owasp",
+              "id": "LLM01:2025",
+              "name": "Prompt Injection",
+              "url": "https://genai.owasp.org/llm-top-10/"
+            }
+          ],
+          "severity": "major"
+        },
+        {
+          "id": "AIS-LOG-01",
+          "text": "AI calls MUST be logged with model, provider and token usage, without secrets or raw credentials",
+          "description": "Each inference leaves a structured record that supports cost tracking and forensics; keys and tokens are redacted",
+          "refs": [
+            {
+              "source": "aisvs",
+              "id": "AISVS 12.1.1",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C12-Monitoring-and-Logging.md"
+            },
+            {
+              "source": "aisvs",
+              "id": "AISVS 12.1.3",
+              "name": "OWASP AISVS 1.0",
+              "url": "https://github.com/OWASP/AISVS/blob/main/1.0/en/0x10-C12-Monitoring-and-Logging.md"
+            },
+            {
+              "source": "cwe",
+              "id": "778",
+              "name": "Insufficient Logging",
+              "url": "https://cwe.mitre.org/data/definitions/778.html"
+            },
+            {
+              "source": "cwe",
+              "id": "532",
+              "name": "Insertion of Sensitive Information into Log File",
+              "url": "https://cwe.mitre.org/data/definitions/532.html"
+            }
+          ],
+          "severity": "minor"
+        }
+      ]
+    }
+  ]
+}

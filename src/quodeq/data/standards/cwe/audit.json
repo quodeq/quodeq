@@ -563,6 +563,19 @@
     "llm_mapping_usage": "Allowed"
   },
   {
+    "id": 214,
+    "name": "Invocation of Process Using Visible Sensitive Information",
+    "abstraction": "Base",
+    "status": "Incomplete",
+    "mapping_usage": "Allowed",
+    "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
+    "dimensions": [
+      "ai-integration-security"
+    ],
+    "fetched_date": "2026-11-01",
+    "llm_mapping_usage": "Allowed"
+  },
+  {
     "id": 215,
     "name": "Insertion of Sensitive Information Into Debugging Code",
     "abstraction": "Base",
@@ -638,6 +651,19 @@
       "reliability"
     ],
     "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
+  },
+  {
+    "id": 250,
+    "name": "Execution with Unnecessary Privileges",
+    "abstraction": "Base",
+    "status": "Draft",
+    "mapping_usage": "Allowed",
+    "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
+    "dimensions": [
+      "ai-integration-security"
+    ],
+    "fetched_date": "2026-11-01",
     "llm_mapping_usage": "Allowed"
   },
   {
@@ -4770,6 +4796,19 @@
     "llm_mapping_usage": "Allowed"
   },
   {
+    "id": 1284,
+    "name": "Improper Validation of Specified Quantity in Input",
+    "abstraction": "Base",
+    "status": "Incomplete",
+    "mapping_usage": "Allowed",
+    "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
+    "dimensions": [
+      "ai-integration-security"
+    ],
+    "fetched_date": "2026-11-01",
+    "llm_mapping_usage": "Allowed"
+  },
+  {
     "id": 1329,
     "name": "Reliance on Component That is Not Updateable",
     "abstraction": "Base",
@@ -4871,6 +4910,19 @@
       "security"
     ],
     "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
+  },
+  {
+    "id": 1427,
+    "name": "Improper Neutralization of Input Used for LLM Prompting",
+    "abstraction": "Base",
+    "status": "Incomplete",
+    "mapping_usage": "Allowed",
+    "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
+    "dimensions": [
+      "ai-integration-security"
+    ],
+    "fetched_date": "2026-11-01",
     "llm_mapping_usage": "Allowed"
   }
 ]
