@@ -88,7 +88,14 @@ def test_codex_sandbox_confines_when_the_probe_accepts_it(layout, tmp_path):
     (tmp_path / "codex-home").mkdir()
     profile = codex_sandbox.profile_args(Path.home().resolve(), [repo.resolve()])
     if not codex_sandbox.native_sandbox_works(binary, profile, repo, repo / "app.py", env):
-        pytest.skip("Codex's sandbox is refused here, scans use the OS sandbox path")
+        # Rerun the probe's read to say why: a platform refusal or a probe bug.
+        why = subprocess.run([binary, "sandbox", *profile, "--", *_shell(_cat(repo / "app.py"))],
+                             cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=60, check=False)
+        version = subprocess.run([binary, "--version"], capture_output=True, text=True,
+                                 encoding="utf-8", errors="replace", check=False).stdout.strip()
+        pytest.skip(f"Codex's sandbox is refused here ({version}, rc={why.returncode}): "
+                    f"{(why.stderr or why.stdout).strip()[-400:]}")
 
     def inside(script: str) -> bool:
         argv = [binary, "sandbox", *profile, "--", *_shell(script)]
