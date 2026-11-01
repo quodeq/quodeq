@@ -41,6 +41,13 @@ def _toml_str(value: str) -> str:
     return json.dumps(value)  # a JSON string is a valid TOML basic string
 
 
+def plain_read_only_args() -> list[str]:
+    """``-c`` overrides for read-only without read limits: no writes and no
+    network, home readable. Windows refuses restricted reads unless its
+    elevated sandbox backend is installed, but runs this."""
+    return [_CONFIG_FLAG, 'approval_policy="never"']
+
+
 def profile_args(home: Path, readable: list[Path]) -> list[str]:
     """``-c`` overrides selecting a read-only profile with *home* unreadable
     except *readable*, and no approval prompts."""

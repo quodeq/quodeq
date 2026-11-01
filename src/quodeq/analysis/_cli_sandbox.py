@@ -26,7 +26,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from quodeq.analysis.codex_sandbox import native_args, native_sandbox_works, profile_args
+from quodeq.analysis.codex_sandbox import (
+    native_args, native_sandbox_works, plain_read_only_args, profile_args,
+)
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.project_standards import project_settings_file, settings_reports_root
@@ -164,8 +166,10 @@ def _native_args(
     if project is None or sample is None:
         return None
     readable = [work_dir.resolve(), project, *runtime_readable_dirs("rg")]
-    profile = profile_args(Path.home().resolve(), readable)
     evidence = cfg.jsonl_file.resolve().parent if cfg.jsonl_file else project
-    if not native_sandbox_works(args[0], profile, evidence, sample.resolve(), env):
-        return None
-    return native_args(args, profile)
+    # Home unreadable where Codex can enforce it, else plain read-only (no
+    # writes, no network), which still beats the OS fallbacks on Windows.
+    for profile in (profile_args(Path.home().resolve(), readable), plain_read_only_args()):
+        if native_sandbox_works(args[0], profile, evidence, sample.resolve(), env):
+            return native_args(args, profile)
+    return None

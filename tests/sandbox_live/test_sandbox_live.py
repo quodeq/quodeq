@@ -79,33 +79,55 @@ def test_os_sandbox_confines_what_it_runs(layout):
         cleanup()
 
 
-def test_codex_sandbox_confines_when_the_probe_accepts_it(layout, tmp_path):
-    repo, _, secret = layout
+@pytest.fixture
+def codex(tmp_path):
     binary = shutil.which("codex")
     if binary is None:
         pytest.skip("codex is not installed")
-    env = {**os.environ, "CODEX_HOME": str(tmp_path / "codex-home")}
-    (tmp_path / "codex-home").mkdir()
+    # Under home like Quodeq's real one: Codex refuses its helper binaries in /tmp.
+    home = Path.home() / f".{_SECRET}-codex"
+    (home / tmp_path.name).mkdir(parents=True, exist_ok=True)
+    yield binary, {**os.environ, "CODEX_HOME": str(home / tmp_path.name)}
+    shutil.rmtree(home, ignore_errors=True)
+
+
+def _refused(binary, profile, repo, env) -> str:
+    """Why Codex refuses *profile* here: a platform refusal or a probe bug."""
+    why = subprocess.run([binary, "sandbox", *profile, "--", *_shell(_cat(repo / "app.py"))],
+                         cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=60, check=False)
+    version = subprocess.run([binary, "--version"], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", check=False).stdout.strip()
+    return f"({version}, rc={why.returncode}): {(why.stderr or why.stdout).strip()[-400:]}"
+
+
+def _inside(binary, profile, repo, env, script: str) -> bool:
+    argv = [binary, "sandbox", *profile, "--", *_shell(script)]
+    return subprocess.run(argv, cwd=repo, env=env, capture_output=True,
+                          timeout=60, check=False).returncode == 0
+
+
+def test_codex_profile_confines_when_the_probe_accepts_it(layout, codex):
+    repo, _, secret = layout
+    binary, env = codex
     profile = codex_sandbox.profile_args(Path.home().resolve(), [repo.resolve()])
     if not codex_sandbox.native_sandbox_works(binary, profile, repo, repo / "app.py", env):
-        # Rerun the probe's read to say why: a platform refusal or a probe bug.
-        why = subprocess.run([binary, "sandbox", *profile, "--", *_shell(_cat(repo / "app.py"))],
-                             cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8",
-                             errors="replace", timeout=60, check=False)
-        version = subprocess.run([binary, "--version"], capture_output=True, text=True,
-                                 encoding="utf-8", errors="replace", check=False).stdout.strip()
-        pytest.skip(f"Codex's sandbox is refused here ({version}, rc={why.returncode}): "
-                    f"{(why.stderr or why.stdout).strip()[-400:]}")
+        pytest.skip(f"Codex's home-limited profile is refused here {_refused(binary, profile, repo, env)}")
+    assert _inside(binary, profile, repo, env, _cat(repo / "app.py")), "repo must stay readable"
+    assert not _inside(binary, profile, repo, env, _cat(secret)), "home read leaked"
+    assert not _inside(binary, profile, repo, env, _touch(repo / "pwned.txt")), "repo write leaked"
+    assert not _inside(binary, profile, repo, env, _fetch()), "network leaked"
 
-    def inside(script: str) -> bool:
-        argv = [binary, "sandbox", *profile, "--", *_shell(script)]
-        return subprocess.run(argv, cwd=repo, env=env, capture_output=True,
-                              timeout=60, check=False).returncode == 0
 
-    assert inside(_cat(repo / "app.py")), "repo must stay readable"
-    assert not inside(_cat(secret)), "home read leaked"
-    assert not inside(_touch(repo / "pwned.txt")), "repo write leaked"
-    assert not inside(_fetch()), "network leaked"
+def test_codex_plain_read_only_confines_when_the_probe_accepts_it(layout, codex):
+    repo, _, _ = layout
+    binary, env = codex
+    profile = codex_sandbox.plain_read_only_args()
+    if not codex_sandbox.native_sandbox_works(binary, profile, repo, repo / "app.py", env):
+        pytest.skip(f"Codex's read-only sandbox is refused here {_refused(binary, profile, repo, env)}")
+    assert _inside(binary, profile, repo, env, _cat(repo / "app.py")), "repo must stay readable"
+    assert not _inside(binary, profile, repo, env, _touch(repo / "pwned.txt")), "repo write leaked"
+    assert not _inside(binary, profile, repo, env, _fetch()), "network leaked"
 
 
 def test_this_interpreter_is_what_the_os_sandbox_reads_back():

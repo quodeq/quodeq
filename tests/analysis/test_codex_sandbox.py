@@ -67,3 +67,16 @@ def test_confine_cli_uses_codex_sandbox_when_the_probe_passes(tmp_path, monkeypa
 def test_confine_cli_falls_back_to_the_os_sandbox(tmp_path, monkeypatch):
     args = _scan(tmp_path, monkeypatch, works=False)
     assert args[0] == "sandbox-exec" and _BYPASS in args
+
+
+def test_confine_cli_falls_back_to_plain_read_only_when_home_limits_are_refused(tmp_path, monkeypatch):
+    # Windows without the elevated sandbox backend refuses restricted reads.
+    plain = codex_sandbox.plain_read_only_args()
+    args = _scan(tmp_path, monkeypatch, works=True)  # sets up the layout
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.native_sandbox_works",
+                        lambda binary, profile, *a: profile == plain)
+    cfg = AnalysisConfig(jsonl_file=tmp_path / "evals" / "p" / "r" / "evidence" / "s_evidence.jsonl")
+    spec = {"native_sandbox": True, "analysis_sandbox": {"cli_home": ".codex-test"}}
+    args, _ = confine_cli(cfg, spec, tmp_path / "repo", ["codex", "exec", _BYPASS], {})
+    assert args[args.index("-s") + 1] == "read-only"
+    assert not any(a.startswith("default_permissions") for a in args)
