@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from quodeq.config.provider import Provider
 from quodeq.shared.env_resolve import resolve_env
-from quodeq.shared.codex_home import dedicated_codex_home
+from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.os_sandbox import external_sandbox_prefix  # noqa: F401 -- re-export
 
@@ -61,6 +61,7 @@ def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> d
         # Not the user's ~/.codex: its MCP servers, plugins and the ChatGPT
         # account apps would load even with the shell tool disabled.
         env["CODEX_HOME"] = str(dedicated_codex_home(source))
+        env.update({k: source[k] for k in provider_env_keys(source) if k in source})
     return env
 
 

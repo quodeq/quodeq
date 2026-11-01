@@ -40,7 +40,7 @@ def test_dispatch_failure_is_isolated_per_message_and_still_serves_the_next(
 
     calls: list[object] = []
 
-    def fake_dispatch(msg, _router, _queue, _agent_id):
+    def fake_dispatch(msg, _router, _queue, _agent_id, _standards_file=None):
         calls.append(msg["id"])
         if msg["id"] == 1:
             raise AttributeError("handler bug")

@@ -22,12 +22,12 @@ def test_shipped_claude_config_ignores_the_repo_settings(tmp_path):
     assert args[args.index("--permission-mode") + 1] == "dontAsk"
 
 
-def test_claude_may_read_the_standards_checklist_outside_the_repo(tmp_path):
-    # The prompt's first action reads <evidence>/.quodeq_standards_<dim>.md;
-    # dontAsk denies it unless a rule names it, and the run finds nothing.
+def test_claude_gets_the_checklist_from_the_findings_server_not_a_path(tmp_path):
+    # The checklist sits outside the repo; no Read rule may reach past the cwd.
     args = _claude_args(tmp_path)
     rules = args[args.index("--allowedTools") + 1].split(",")
-    assert f"Read(/{(tmp_path / 'evidence').resolve().as_posix()}/.quodeq_standards_*)" in rules
+    assert "mcp__findings__get_standards" in rules
+    assert [r for r in rules if r.startswith("Read(")] == ["Read(./**)"]
 
 
 def test_bedrock_credentials_pass_only_when_claude_uses_bedrock():

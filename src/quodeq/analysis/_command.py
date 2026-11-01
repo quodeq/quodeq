@@ -31,7 +31,7 @@ from quodeq.analysis.provider_cache import get_provider_configs as _get_provider
 from quodeq.config.process_env import process_environment_copy
 from quodeq.config.provider import Provider, ProviderType
 from quodeq.shared.child_env import allowlisted_env
-from quodeq.shared.codex_home import dedicated_codex_home
+from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.log_sink import LoggerSink
 
@@ -255,8 +255,10 @@ def build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = N
     # (Claude on Bedrock: AWS_*; on Vertex: GOOGLE_*, CLOUD_ML_*).
     switched = [prefix for switch, prefixes in provider_cfg.get("env_passthrough_when", {}).items()
                 if source.get(switch) for prefix in prefixes]
+    # Codex custom model providers (Azure, ...) name their own key variable.
+    codex_keys = provider_env_keys(source) if ai_cmd == Provider.CODEX else []
     env = allowlisted_env(
-        source, keys=(*_ANALYSIS_ENV_KEYS, *([api_key_env] if api_key_env else [])),
+        source, keys=(*_ANALYSIS_ENV_KEYS, *([api_key_env] if api_key_env else []), *codex_keys),
         prefixes=(*_ANALYSIS_ENV_PREFIXES, *provider_cfg.get("env_passthrough_prefixes", ()), *switched),
     )
     for key in _SENSITIVE_ENV_KEYS:

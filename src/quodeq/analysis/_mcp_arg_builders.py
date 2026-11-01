@@ -17,6 +17,7 @@ from quodeq.analysis._config import (
     AnalysisConfig,
     AgentParams,
     MCP_TOOL_GET_NEXT_FILES,
+    MCP_TOOL_GET_STANDARDS,
     MCP_TOOL_MARK_FILE_DONE,
     MCP_TOOL_REPORT_FINDING,
 )
@@ -31,18 +32,6 @@ from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.models import normalize_model_id
 
 _READ_REPO_RULE = "Read(./**)"  # permission rule: reads under the CLI's cwd only
-# The prompt's standards checklist, written next to the run's evidence
-# (prompts._standards_io), outside the repo.
-_STANDARDS_GLOB = ".quodeq_standards_*"
-
-
-def _absolute_read_rule(path: Path) -> str:
-    """A Read permission rule for absolute *path*: ``//`` marks an absolute
-    path, and a Windows drive is written ``/c/...``."""
-    posix = path.as_posix()
-    if len(posix) > 1 and posix[1] == ":":
-        posix = f"/{posix[0].lower()}{posix[2:]}"
-    return f"Read(/{posix})"
 
 
 def get_ai_tools(env: Mapping[str, str] | None = None) -> str:
@@ -132,14 +121,12 @@ def _build_config_file_mcp_args(
         # handlers.handle_tools_list) and drives cache writes, so allow it
         # unconditionally: dontAsk denies anything left off this list.
         allowed += f",{MCP_TOOL_MARK_FILE_DONE}"
-        # Reads are pre-approved only under the cwd, the analysed repo, and
-        # for the standards checklist (Read rules also govern Glob and Grep).
+        # The checklist sits next to the evidence, outside the repo: served
+        # by the findings server, so no read outside the cwd is approved.
+        allowed += f",{MCP_TOOL_GET_STANDARDS}"
+        # Reads are pre-approved only under the cwd, the analysed repo (Read
+        # rules also govern Glob and Grep).
         allowed += f",{_READ_REPO_RULE}"
-        # The prompt names the unresolved path; the resolved one covers a
-        # symlinked parent (macOS /var -> /private/var).
-        evidence = config.jsonl_file.parent.absolute()
-        for d in dict.fromkeys((evidence, evidence.resolve())):
-            allowed += f",{_absolute_read_rule(d / _STANDARDS_GLOB)}"
         args.extend(["--allowedTools", allowed])
     # dontAsk denies every call not pre-approved above instead of prompting,
     # so the non-interactive run cannot read outside the repo, run commands
