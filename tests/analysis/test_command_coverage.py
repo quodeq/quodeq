@@ -94,8 +94,11 @@ class TestBuildAnalysisEnv:
             result = build_analysis_env("claude", env)
         assert result["ANTHROPIC_API_KEY"] == "real-key"
 
-    def test_removes_provider_specific_keys(self):
-        env = {"PATH": "/usr/bin", "OPENAI_API_KEY": "sk-xxx"}
+    def test_removes_provider_specific_keys(self, tmp_path):
+        # HOME and QUODEQ_DIR point at tmp: codex prepares its dedicated home,
+        # which must never be the developer's real ~/.quodeq/codex.
+        env = {"PATH": "/usr/bin", "OPENAI_API_KEY": "sk-xxx",
+               "HOME": str(tmp_path), "QUODEQ_DIR": str(tmp_path / ".quodeq")}
         provider = {"codex": {"env_remove": ["OPENAI_API_KEY"]}}
         with patch("quodeq.analysis._command._get_provider_configs", return_value=provider):
             result = build_analysis_env("codex", env)

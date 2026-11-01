@@ -12,6 +12,7 @@ PLATFORM_DARWIN = "darwin"
 # ("Darwin"/"Linux" vs "darwin"/"win32").
 SYSTEM_DARWIN = "Darwin"
 SYSTEM_LINUX = "Linux"
+SYSTEM_WINDOWS = "Windows"
 MACHINE_ARM64 = "arm64"  # platform.machine() on Apple silicon (Homebrew prefix, native tooling picks)
 
 # URL schemes the app's fetchers and SSRF guards allow.

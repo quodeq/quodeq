@@ -121,12 +121,12 @@ def _seatbelt_profile(*, writable_dirs: list[str], writable_files: list[str],
 
 
 def _writable_paths(writable_dirs: list[str], writable_files: list[str]) -> list[str]:
-    """Every path the sandbox must allow writes under.
-
-    The writable dirs themselves, plus the parent of each writable file -- a
-    sandbox grants a directory, not a single file.
-    """
-    return [*writable_dirs, *(str(Path(f).parent) for f in writable_files)]
+    """Every path bwrap or firejail must allow writes under: the writable
+    dirs, each existing writable file by itself (the user's Codex login stays
+    writable without the rest of ~/.codex), and the parent of a file yet to
+    be created (a SQLite -wal), since it cannot be bound before it exists."""
+    return [*writable_dirs, *(f if Path(f).is_file() else str(Path(f).parent)
+                              for f in writable_files)]
 
 
 def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str],

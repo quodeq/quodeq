@@ -5,6 +5,11 @@
 node REPL server alone gives the agent full filesystem access. Evaluations
 and assistant turns therefore run with ``CODEX_HOME`` set to a Quodeq-owned dir holding only the
 user's login and an empty config.
+
+The login is a link to the user's ``auth.json``, not a copy: ChatGPT refresh
+tokens are single-use, so two copies refreshing on their own log one of them
+out. Codex writes through the link. Where links are unavailable (Windows
+without the privilege) it falls back to a copy that only moves forward.
 """
 from __future__ import annotations
 
@@ -50,22 +55,36 @@ def dedicated_codex_home_path(env: Mapping[str, str] | None = None) -> Path:
     return get_quodeq_dir(dict(resolve_env(env))) / "codex"
 
 
-def dedicated_codex_home(env: Mapping[str, str] | None = None) -> Path:
-    """The dedicated home, prepared: login copied in when newer, config reset.
+def user_codex_auth_file(env: Mapping[str, str] | None = None) -> Path | None:
+    """The user's ``auth.json`` (resolved), which the dedicated home links to
+    and Codex rewrites on refresh, or None when there is no login file."""
+    auth = user_codex_home(env) / _AUTH_FILE
+    return auth.resolve() if auth.is_file() else None
 
-    Codex refreshes tokens in place, so the copy only moves forward: a newer
-    auth.json from the user's home replaces ours, an older one never does.
-    """
+
+def _link_login(source_auth: Path, auth: Path) -> None:
+    """Point *auth* at *source_auth*; copy when links are unavailable."""
+    if auth.is_symlink() and auth.resolve() == source_auth.resolve():
+        return
+    try:
+        if auth.is_symlink() or auth.exists():
+            auth.unlink()
+        auth.symlink_to(source_auth.resolve())
+    except OSError:
+        if not auth.exists() or source_auth.stat().st_mtime > auth.stat().st_mtime:
+            shutil.copy2(source_auth, auth)
+            auth.chmod(_OWNER_RW)
+
+
+def dedicated_codex_home(env: Mapping[str, str] | None = None) -> Path:
+    """The dedicated home, prepared: login linked, config reset."""
     target = dedicated_codex_home_path(env)
     source_auth = user_codex_home(env) / _AUTH_FILE
     with _HOME_LOCK:
         target.mkdir(parents=True, exist_ok=True, mode=_OWNER_RWX)
         target.chmod(_OWNER_RWX)
-        auth = target / _AUTH_FILE
-        if source_auth.is_file() and (
-                not auth.exists() or source_auth.stat().st_mtime > auth.stat().st_mtime):
-            shutil.copy2(source_auth, auth)
-            auth.chmod(_OWNER_RW)
+        if source_auth.is_file():
+            _link_login(source_auth, target / _AUTH_FILE)
         config = target / _CONFIG_FILE
         if not config.exists() or config.read_text(encoding="utf-8") != _CONFIG:
             config.write_text(_CONFIG, encoding="utf-8")

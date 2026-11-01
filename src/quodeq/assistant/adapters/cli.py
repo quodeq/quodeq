@@ -26,7 +26,7 @@ from quodeq.assistant.mcp import mcp_config
 from quodeq.assistant.message_role import MessageRole
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.data.ports.assistant import AssistantStore
-from quodeq.shared.codex_home import dedicated_codex_home_path
+from quodeq.shared.codex_home import dedicated_codex_home_path, user_codex_auth_file
 from quodeq.shared.env_paths import get_quodeq_dir
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.os_sandbox import loopback_proxy_ports, runtime_readable_dirs
@@ -115,7 +115,8 @@ def _external_sandbox(cfg: CliTurnConfig, cwd: Path) -> tuple[list[str], object 
     worktree = [str(cfg.worktree_dir)] if cfg.worktree_dir else []
     return external_sandbox_prefix(
         writable_dirs=[str(cwd), str(dedicated_codex_home_path()), *worktree],
-        writable_files=[db, db + "-wal", db + "-shm", db + "-journal", log, log + ".1"],
+        writable_files=[db, db + "-wal", db + "-shm", db + "-journal", log, log + ".1",
+                        *([str(auth)] if (auth := user_codex_auth_file()) else [])],
         readable_home_dirs=[str(get_quodeq_dir()), *mcp_arg_dirs(cfg.mcp_server_args),
                             *(str(d) for d in runtime_readable_dirs("codex"))],
         block_loopback=True, loopback_allow_ports=loopback_proxy_ports(resolve_env()))

@@ -28,3 +28,12 @@ def test_claude_may_read_the_standards_checklist_outside_the_repo(tmp_path):
     args = _claude_args(tmp_path)
     rules = args[args.index("--allowedTools") + 1].split(",")
     assert f"Read(/{(tmp_path / 'evidence').resolve().as_posix()}/.quodeq_standards_*)" in rules
+
+
+def test_bedrock_credentials_pass_only_when_claude_uses_bedrock():
+    from quodeq.analysis.subprocess import build_analysis_env
+
+    env = {"AWS_ACCESS_KEY_ID": "a", "PATH": "/usr/bin"}
+    assert "AWS_ACCESS_KEY_ID" not in build_analysis_env("claude", env=env)
+    on = build_analysis_env("claude", env={**env, "CLAUDE_CODE_USE_BEDROCK": "1"})
+    assert on.get("AWS_ACCESS_KEY_ID") == "a"

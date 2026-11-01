@@ -26,9 +26,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from quodeq.analysis.codex_sandbox import native_args, native_sandbox_works, profile_args
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.project_standards import project_settings_file, settings_reports_root
+from quodeq.shared.codex_home import user_codex_auth_file
 from quodeq.shared.os_sandbox import (
     SandboxUnavailable,
     external_sandbox_prefix,
@@ -128,11 +130,42 @@ def analysis_sandbox_prefix(
 def _sandbox_prefix(
     cfg: AnalysisConfig, work_dir: Path, binary: str, env: Mapping[str, str], writable: list[Path],
 ) -> tuple[list[str], Callable[[], None]]:
+    # The dedicated Codex home links to the user's login, which Codex rewrites
+    # on refresh: that one file, not the user's ~/.codex.
+    auth = user_codex_auth_file(env)
     return external_sandbox_prefix(
         writable_dirs=[str(d) for d in writable],
-        writable_files=[],
+        writable_files=[str(auth)] if auth else [],
         readable_home_dirs=[str(d) for d in _readable_dirs(cfg, work_dir, binary)],
         readonly_dirs=[str(work_dir.resolve())],
         block_loopback=True,
         loopback_allow_ports=loopback_proxy_ports(env),
     )
+
+
+def confine_cli(
+    cfg: AnalysisConfig, provider_cfg: dict, work_dir: Path, args: list[str],
+    env: Mapping[str, str], policy: SandboxPolicy = SandboxPolicy(),
+) -> tuple[list[str], Callable[[], None]]:
+    """*args* confined as well as this machine allows: the CLI's own sandbox
+    where the provider has one that works here (Codex), else the OS sandbox,
+    else, unless *policy* requires one, unconfined."""
+    if provider_cfg.get("native_sandbox") and (native := _native_args(cfg, work_dir, args, env)):
+        return native, lambda: None
+    prefix, cleanup = analysis_sandbox_prefix(cfg, provider_cfg, work_dir, args[0], env, policy)
+    return [*prefix, *args], cleanup
+
+
+def _native_args(
+    cfg: AnalysisConfig, work_dir: Path, args: list[str], env: Mapping[str, str],
+) -> list[str] | None:
+    project = _project_dir(cfg)
+    sample = next((p for p in sorted(work_dir.iterdir()) if p.is_file()), None)
+    if project is None or sample is None:
+        return None
+    readable = [work_dir.resolve(), project, *runtime_readable_dirs("rg")]
+    profile = profile_args(Path.home().resolve(), readable)
+    evidence = cfg.jsonl_file.resolve().parent if cfg.jsonl_file else project
+    if not native_sandbox_works(args[0], profile, evidence, sample.resolve(), env):
+        return None
+    return native_args(args, profile)

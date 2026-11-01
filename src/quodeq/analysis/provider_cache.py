@@ -29,6 +29,10 @@ _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
         "mcp_permission_args": ["--permission-mode", "dontAsk"],
         "mcp_strict_args": ["--strict-mcp-config", "--setting-sources", "user"],
         "env_passthrough_prefixes": ["ANTHROPIC_", "CLAUDE_"],
+        "env_passthrough_when": {
+            "CLAUDE_CODE_USE_BEDROCK": ["AWS_"],
+            "CLAUDE_CODE_USE_VERTEX": ["GOOGLE_", "CLOUD_ML_", "VERTEX_", "GCLOUD_"],
+        },
         "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
         "env_remove": ["CLAUDECODE"],
     },

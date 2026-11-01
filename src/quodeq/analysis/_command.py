@@ -251,9 +251,13 @@ def build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = N
     source = process_environment_copy(env)
     provider_cfg = _get_provider_configs().get(ai_cmd or "", {})
     api_key_env = provider_cfg.get("api_key_env")
+    # A provider backend switched on in the env brings its own credentials
+    # (Claude on Bedrock: AWS_*; on Vertex: GOOGLE_*, CLOUD_ML_*).
+    switched = [prefix for switch, prefixes in provider_cfg.get("env_passthrough_when", {}).items()
+                if source.get(switch) for prefix in prefixes]
     env = allowlisted_env(
         source, keys=(*_ANALYSIS_ENV_KEYS, *([api_key_env] if api_key_env else [])),
-        prefixes=(*_ANALYSIS_ENV_PREFIXES, *provider_cfg.get("env_passthrough_prefixes", ())),
+        prefixes=(*_ANALYSIS_ENV_PREFIXES, *provider_cfg.get("env_passthrough_prefixes", ()), *switched),
     )
     for key in _SENSITIVE_ENV_KEYS:
         env.pop(key, None)

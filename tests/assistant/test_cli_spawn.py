@@ -278,3 +278,14 @@ def test_bwrap_binds_readonly_repo_after_a_writable_parent(tmp_path):
 ])
 def test_loopback_proxy_ports(env, ports):
     assert os_sandbox.loopback_proxy_ports(env) == ports
+
+
+def test_bwrap_binds_an_existing_writable_file_by_itself(tmp_path):
+    # The user's Codex login must stay writable without the rest of ~/.codex.
+    codex = tmp_path / ".codex"
+    codex.mkdir()
+    (codex / "auth.json").write_text("{}")
+    argv = os_sandbox._bwrap_prefix([], [str(codex / "auth.json"), str(tmp_path / "db" / "a.db-wal")])
+    assert str(codex / "auth.json") in argv
+    assert str(codex) not in argv
+    assert str(tmp_path / "db") in argv  # a file yet to exist still needs its dir
