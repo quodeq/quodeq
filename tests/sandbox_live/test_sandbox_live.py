@@ -96,7 +96,18 @@ def _refused(binary, profile, repo, env) -> str:
                          errors="replace", timeout=60, check=False)
     version = subprocess.run([binary, "--version"], capture_output=True, text=True,
                              encoding="utf-8", errors="replace", check=False).stdout.strip()
-    return f"({version}, rc={why.returncode}): {(why.stderr or why.stdout).strip()[-400:]}"
+    detail = f"({version}, rc={why.returncode}): {(why.stderr or why.stdout).strip()[-300:]}"
+    if _WINDOWS:  # which reads Codex's Windows sandbox allows, to tell its limits from a probe bug
+        system = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "win.ini"
+        tries = {"echo": ["cmd.exe", "/c", "echo", "hi"], "dir cwd": ["cmd.exe", "/c", "dir"],
+                 "type cwd file": ["cmd.exe", "/c", "type", "app.py"], "type system file": _cat(system)}
+        for name, command in tries.items():
+            run = subprocess.run([binary, "sandbox", *profile, "--", *command], cwd=repo, env=env,
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                 timeout=60, check=False)
+            detail += f" | {name}: rc={run.returncode} {(run.stderr or run.stdout).strip()[-80:]!r}"
+        detail += f" | repo={repo}"
+    return detail
 
 
 def _inside(binary, profile, repo, env, command: list[str]) -> bool:
