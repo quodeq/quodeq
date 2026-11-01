@@ -85,6 +85,17 @@ def assert_no_dangerous_args(argv: list[str]) -> None:
             raise AssertionError(f"assistant spawn must never use {token!r}")
 
 
+def mcp_arg_dirs(args: list[str]) -> list[str]:
+    """The absolute paths among the MCP server's args (repo root, run and
+    reports dirs, ...), as dirs: a file's parent, since the sandbox grants dirs."""
+    paths = []
+    for arg in args:
+        if arg.startswith("/"):
+            path = Path(arg)
+            paths.append(str(path if path.is_dir() else path.parent))
+    return paths
+
+
 def spawn_turn(argv: list[str], *, cwd: Path, env: dict) -> subprocess.Popen:
     assert_no_dangerous_args(argv)
     return subprocess.Popen(

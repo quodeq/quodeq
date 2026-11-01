@@ -40,7 +40,7 @@ _log = logging.getLogger(__name__)
 
 # Dropped even when an allowlisted prefix (QUODEQ_) would let them through.
 _SENSITIVE_ENV_KEYS = frozenset({
-    "QUODEQ_API_KEY", "DATABASE_URL", "SECRET_KEY",
+    "QUODEQ_API_KEY", "QUODEQ_WEBVIEW_TOKEN", "DATABASE_URL", "SECRET_KEY",
 })
 # The findings server the CLI spawns reads QUODEQ_* settings and, from a
 # source checkout, needs PYTHONPATH to import quodeq.

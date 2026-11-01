@@ -134,7 +134,7 @@ def _run_cli_analysis(
     try:
         env = build_analysis_env(ai_cmd)
         with ExitStack() as stack:
-            prefix, sandbox_cleanup = analysis_sandbox_prefix(cfg, provider_cfg, work_dir, args[0])
+            prefix, sandbox_cleanup = analysis_sandbox_prefix(cfg, provider_cfg, work_dir, args[0], env)
             stack.callback(sandbox_cleanup)
             args = [*prefix, *args]
             cwd = work_dir

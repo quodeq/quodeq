@@ -43,7 +43,7 @@ def test_codex_turn_is_wrapped_in_external_os_sandbox(tmp_path, monkeypatch):
 def _codex_sandbox_dirs(tmp_path, monkeypatch, cfg):
     seen = {}
 
-    def spy(*, writable_dirs, writable_files, readable_home_dirs=None):
+    def spy(*, writable_dirs, writable_files, readable_home_dirs=None, **_):
         seen["dirs"] = writable_dirs
         seen["readable"] = readable_home_dirs
         return [], None
@@ -94,6 +94,7 @@ def test_codex_sandbox_limits_home_reads(tmp_path, monkeypatch):
     readable = seen["readable_home_dirs"]
     assert readable is not None
     assert str(Path.home()) not in readable  # home as a whole stays unreadable
+    assert seen["block_loopback"] is True  # Quodeq's own API stays out of reach
 
 
 def test_codex_turn_env_uses_the_dedicated_codex_home(tmp_path, monkeypatch):

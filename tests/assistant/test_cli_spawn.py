@@ -223,3 +223,38 @@ def test_seatbelt_profile_keeps_readonly_dirs_unwritable_under_temp():
     deny = prof.index('(deny file-write* (subpath "/private/tmp/repo"))')
     nested = prof.index('(allow file-write* (subpath "/private/tmp/repo/out"))')
     assert temp_allow < deny < nested  # later rules win
+
+
+def test_seatbelt_profile_blocks_loopback_except_allowed_ports():
+    prof = os_sandbox._seatbelt_profile(
+        writable_dirs=["/w"], writable_files=[], block_loopback=True, loopback_allow_ports=[3128])
+    deny = prof.index('(deny network-outbound (remote ip "localhost:*"))')
+    allow = prof.index('(allow network-outbound (remote ip "localhost:3128"))')
+    assert deny < allow  # later rules win, so the proxy stays reachable
+
+
+def test_seatbelt_profile_leaves_loopback_open_by_default():
+    assert "network-outbound" not in os_sandbox._seatbelt_profile(writable_dirs=["/w"], writable_files=[])
+
+
+def test_bwrap_binds_readonly_repo_after_a_writable_parent(tmp_path):
+    state, repo = tmp_path / "state", tmp_path / "state" / "clones" / "repo"
+    out = repo / "out"
+    out.mkdir(parents=True)
+    argv = os_sandbox._bwrap_prefix([str(state), str(out)], [], readonly_dirs=[str(repo)])
+    parent_rw = argv.index(str(state)) - 1
+    repo_ro = len(argv) - 1 - argv[::-1].index(str(repo)) - 2
+    nested_rw = len(argv) - 1 - argv[::-1].index(str(out)) - 2
+    assert argv[parent_rw] == "--bind" and argv[repo_ro] == "--ro-bind"
+    assert parent_rw < repo_ro < nested_rw  # later mounts cover earlier ones
+
+
+@pytest.mark.parametrize(("env", "ports"), [
+    ({"HTTPS_PROXY": "http://127.0.0.1:3128", "http_proxy": "localhost:8080"}, [3128, 8080]),
+    ({"HTTPS_PROXY": "http://proxy.corp:3128"}, []),
+    ({"ALL_PROXY": "socks5://[::1]:1080"}, [1080]),
+    ({"HTTPS_PROXY": "http://127.0.0.1:notaport"}, []),
+    ({}, []),
+])
+def test_loopback_proxy_ports(env, ports):
+    assert os_sandbox.loopback_proxy_ports(env) == ports

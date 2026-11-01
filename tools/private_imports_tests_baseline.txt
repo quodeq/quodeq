@@ -106,7 +106,6 @@ tests/analysis/test_cluster39_tail_logging.py:9:private-module:quodeq.analysis.c
 tests/analysis/test_command.py:5:private-module:quodeq.analysis._command.register_cli_mcp
 tests/analysis/test_command.py:5:private-name:quodeq.analysis._command._unregister_cli_mcp
 tests/analysis/test_command.py:6:private-module:quodeq.analysis._config.AnalysisConfig
-tests/analysis/test_command_builder.py:268:private-module:quodeq.analysis._command.build_analysis_env
 tests/analysis/test_command_builder.py:7:private-module:quodeq.analysis._command.build_ai_cmd
 tests/analysis/test_command_builder.py:8:private-module:quodeq.analysis._config.AnalysisConfig
 tests/analysis/test_command_coverage.py:14:private-module:quodeq.analysis._config.AnalysisConfig
