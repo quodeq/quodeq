@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.assistant.adapters import _cli_spawn
+from quodeq.shared import os_sandbox
 from quodeq.assistant.adapters._cli_spawn import (
     assert_no_dangerous_args, build_chat_env, external_sandbox_prefix,
     scratch_cwd, spawn_turn,
@@ -44,7 +44,7 @@ def test_other_skip_flags_forbidden_even_when_wrapped():
 
 
 def test_seatbelt_profile_denies_writes_except_allowed():
-    prof = _cli_spawn._seatbelt_profile(
+    prof = os_sandbox._seatbelt_profile(
         writable_dirs=["/scratch/x", "/home/u/.codex"],
         writable_files=["/data/a.db", "/data/a.db-wal"])
     assert "(deny file-write*)" in prof
@@ -63,7 +63,7 @@ def test_seatbelt_profile_denies_writes_except_allowed():
            "occurs in production.",
 )
 def test_external_sandbox_prefix_macos(monkeypatch, tmp_path):
-    monkeypatch.setattr(_cli_spawn.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Darwin")
     prefix, cleanup = external_sandbox_prefix(
         writable_dirs=[str(tmp_path / "scratch")], writable_files=[str(tmp_path / "a.db")])
     assert prefix[0] == "sandbox-exec" and prefix[1] == "-f"
@@ -77,8 +77,8 @@ def test_external_sandbox_prefix_macos(monkeypatch, tmp_path):
 
 
 def test_external_sandbox_prefix_linux_bwrap(monkeypatch):
-    monkeypatch.setattr(_cli_spawn.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(_cli_spawn.shutil, "which",
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(os_sandbox.shutil, "which",
                         lambda name: "/usr/bin/bwrap" if name == "bwrap" else None)
     prefix, cleanup = external_sandbox_prefix(
         writable_dirs=["/home/u/.quodeq/scratch"], writable_files=["/home/u/.quodeq/a.db"])
@@ -89,14 +89,14 @@ def test_external_sandbox_prefix_linux_bwrap(monkeypatch):
 
 
 def test_external_sandbox_prefix_linux_no_sandbox_fails_safe(monkeypatch):
-    monkeypatch.setattr(_cli_spawn.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(_cli_spawn.shutil, "which", lambda name: None)
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(os_sandbox.shutil, "which", lambda name: None)
     with pytest.raises(RuntimeError, match="sandbox"):
         external_sandbox_prefix(writable_dirs=["/x"], writable_files=[])
 
 
 def test_external_sandbox_prefix_unsupported_platform_fails_safe(monkeypatch):
-    monkeypatch.setattr(_cli_spawn.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Windows")
     with pytest.raises(RuntimeError):
         external_sandbox_prefix(writable_dirs=["/x"], writable_files=[])
 
@@ -199,3 +199,27 @@ def test_spawn_turn_streams_stdout(tmp_path):
     proc.wait(timeout=budget(10))
     assert "a" in out and "b" in out
     assert proc.returncode == 0
+
+
+def test_seatbelt_profile_limits_home_reads_to_the_given_dirs(tmp_path):
+    home = str(Path.home())
+    prof = os_sandbox._seatbelt_profile(
+        writable_dirs=["/w"], writable_files=[], readable_home_dirs=[f"{home}/repo"])
+    deny = prof.index(f'(deny file-read-data (subpath "{home}"))')
+    allow = prof.index(f'(subpath "{home}/repo")')
+    assert deny < allow  # later rules win, so the repo stays readable
+
+
+def test_seatbelt_profile_without_read_limits_keeps_reads_open():
+    prof = os_sandbox._seatbelt_profile(writable_dirs=["/w"], writable_files=[])
+    assert "file-read" not in prof
+
+
+def test_seatbelt_profile_keeps_readonly_dirs_unwritable_under_temp():
+    prof = os_sandbox._seatbelt_profile(
+        writable_dirs=["/private/tmp/repo/out"], writable_files=[],
+        readonly_dirs=["/private/tmp/repo"])
+    temp_allow = prof.index('(subpath "/private/tmp")')
+    deny = prof.index('(deny file-write* (subpath "/private/tmp/repo"))')
+    nested = prof.index('(allow file-write* (subpath "/private/tmp/repo/out"))')
+    assert temp_allow < deny < nested  # later rules win

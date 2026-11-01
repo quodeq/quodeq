@@ -218,19 +218,21 @@ class TestBuildAiCmd:
         for tool in ("Read", "Glob", "Grep"):
             assert tool in tools_value.split(","), f"{tool} missing from --tools"
 
-    def test_bypass_permissions_with_mcp(self, tmp_path):
-        """MCP mode must use bypassPermissions — without it, tools are blocked
-        in --print mode and the evaluation silently produces 0 findings."""
+    def test_dont_ask_with_preapproved_tools_with_mcp(self, tmp_path):
+        """MCP mode runs in dontAsk with the findings tools and repo reads
+        pre-approved. Without the pre-approvals, tools are blocked in --print
+        mode and the evaluation silently produces 0 findings; with
+        bypassPermissions, Read accepts any path on the machine."""
         jsonl = tmp_path / "findings.jsonl"
         args, mcp_path = build_ai_cmd(
             "test prompt", AnalysisConfig(ai_cmd="claude", jsonl_file=jsonl),
         )
-        assert "--permission-mode" in args, (
-            "--permission-mode flag is missing; without bypassPermissions "
-            "the AI cannot use tools in --print mode"
-        )
         perm_idx = args.index("--permission-mode")
-        assert args[perm_idx + 1] == "bypassPermissions"
+        assert args[perm_idx + 1] == "dontAsk"
+        allowed = args[args.index("--allowedTools") + 1].split(",")
+        assert "mcp__findings__report_finding" in allowed
+        assert "mcp__findings__mark_file_done" in allowed
+        assert "Read(./**)" in allowed
 
     def test_mcp_config_created_with_jsonl(self, tmp_path):
         """When jsonl_file is set, MCP config must be generated."""

@@ -30,6 +30,8 @@ from quodeq.core.constants import (
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.models import normalize_model_id
 
+_READ_REPO_RULE = "Read(./**)"  # permission rule: reads under the CLI's cwd only
+
 
 def get_ai_tools(env: Mapping[str, str] | None = None) -> str:
     """Return AI tools from QUODEQ_AI_TOOLS env var (default: "Glob,Grep,Read")."""
@@ -104,8 +106,7 @@ def _build_config_file_mcp_args(
     mcp_prefix = provider_cfg.get("mcp_config_prefix", "")
     args: list[str] = [mcp_flag, f"{mcp_prefix}{mcp_config_path}"]
     # Restrict the subprocess to the findings server only. Without this the
-    # CLI also loads the user's own MCP servers (user/project scope), and
-    # bypassPermissions would let the model call them.
+    # CLI also loads the user's own MCP servers (user/project scope).
     args.extend(provider_cfg.get("mcp_strict_args", ["--strict-mcp-config"]))
 
     if provider_cfg.get("supports_tools", True):
@@ -114,16 +115,17 @@ def _build_config_file_mcp_args(
             allowed += f",{MCP_TOOL_GET_NEXT_FILES}"
         # mark_file_done is always exposed by the findings server (see
         # handlers.handle_tools_list) and drives cache writes, so allow it
-        # unconditionally rather than leaving it to bypassPermissions.
+        # unconditionally: dontAsk denies anything left off this list.
         allowed += f",{MCP_TOOL_MARK_FILE_DONE}"
+        # Reads are pre-approved only under the cwd, the analysed repo (Read
+        # rules also govern Glob and Grep).
+        allowed += f",{_READ_REPO_RULE}"
         args.extend(["--allowedTools", allowed])
-    # bypassPermissions is intentional: the CLI analysis tool runs in a
-    # sandboxed, non-interactive subprocess where MCP tool calls (e.g.
-    # report_finding) must succeed without user confirmation prompts.
-    # The subprocess has no access to credentials or network beyond
-    # what the parent process explicitly provides via env filtering.
+    # dontAsk denies every call not pre-approved above instead of prompting,
+    # so the non-interactive run cannot read outside the repo, run commands
+    # or reach other tools. Never bypassPermissions: that approves any path.
     args.extend(
-        provider_cfg.get("mcp_permission_args", ["--permission-mode", "bypassPermissions"])
+        provider_cfg.get("mcp_permission_args", ["--permission-mode", "dontAsk"])
     )
     return args, mcp_config_path
 

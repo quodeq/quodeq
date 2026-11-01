@@ -268,7 +268,7 @@ class TestBuildAnalysisEnv:
         from quodeq.analysis._command import build_analysis_env
 
         env = {"OPENROUTER_API_KEY": "sk-or-x", "QUODEQ_API_KEY": "internal", "PATH": "/usr/bin"}
-        with _patch_providers({"openrouter": {"type": "api"}}):
+        with _patch_providers({"openrouter": {"type": "api", "api_key_env": "OPENROUTER_API_KEY"}}):
             out = build_analysis_env("openrouter", env=env)
         assert out.get("OPENROUTER_API_KEY") == "sk-or-x"
         assert "QUODEQ_API_KEY" not in out

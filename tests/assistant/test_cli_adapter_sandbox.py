@@ -11,7 +11,7 @@ from ._cli_adapter_helpers import FakeProc, _config, _repo, _session
 
 
 def test_codex_turn_is_wrapped_in_external_os_sandbox(tmp_path, monkeypatch):
-    import quodeq.assistant.adapters._cli_spawn as sb
+    import quodeq.shared.os_sandbox as sb
     monkeypatch.setattr(sb.platform, "system", lambda: "Darwin")  # force sandbox-exec path
     repo = _repo(tmp_path)
     cfg = dataclasses.replace(_config(tmp_path), provider="codex", model="5",

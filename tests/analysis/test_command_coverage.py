@@ -88,7 +88,8 @@ class TestBuildAnalysisEnv:
 
     def test_does_not_overwrite_existing_env_vars(self):
         env = {"PATH": "/usr/bin", "ANTHROPIC_API_KEY": "real-key"}
-        provider = {"claude": {"env_set_if_missing": {"ANTHROPIC_API_KEY": "fallback"}}}
+        provider = {"claude": {"env_set_if_missing": {"ANTHROPIC_API_KEY": "fallback"},
+                               "env_passthrough_prefixes": ["ANTHROPIC_"]}}
         with patch("quodeq.analysis._command._get_provider_configs", return_value=provider):
             result = build_analysis_env("claude", env)
         assert result["ANTHROPIC_API_KEY"] == "real-key"
@@ -99,6 +100,29 @@ class TestBuildAnalysisEnv:
         with patch("quodeq.analysis._command._get_provider_configs", return_value=provider):
             result = build_analysis_env("codex", env)
         assert "OPENAI_API_KEY" not in result
+
+    def test_drops_unrelated_secrets_and_keeps_provider_auth(self):
+        env = {"PATH": "/usr/bin", "GH_TOKEN": "gh", "AWS_SECRET_ACCESS_KEY": "aws",
+               "JIRA_API_TOKEN": "jira", "ANTHROPIC_API_KEY": "sk-ant",
+               "QUODEQ_EVALUATIONS_DIR": "/evals", "OPENAI_API_KEY": "sk-oa"}
+        provider = {"claude": {"env_passthrough_prefixes": ["ANTHROPIC_", "CLAUDE_"]}}
+        with patch("quodeq.analysis._command._get_provider_configs", return_value=provider):
+            result = build_analysis_env("claude", env)
+        assert result == {"PATH": "/usr/bin", "ANTHROPIC_API_KEY": "sk-ant",
+                          "QUODEQ_EVALUATIONS_DIR": "/evals"}
+
+    def test_codex_gets_a_dedicated_home_with_only_the_login(self, tmp_path):
+        user_home = tmp_path / "user-codex"
+        user_home.mkdir()
+        (user_home / "auth.json").write_text('{"token": "t"}')
+        (user_home / "config.toml").write_text('[mcp_servers.repl]\ncommand = "node"\n')
+        env = {"PATH": "/usr/bin", "HOME": str(tmp_path), "CODEX_HOME": str(user_home)}
+        with patch("quodeq.analysis._command._get_provider_configs", return_value={}):
+            result = build_analysis_env("codex", env)
+        home = tmp_path / ".quodeq" / "codex"
+        assert result["CODEX_HOME"] == str(home)
+        assert (home / "auth.json").read_text() == '{"token": "t"}'
+        assert "mcp_servers" not in (home / "config.toml").read_text()
 
     def test_handles_none_ai_cmd(self):
         env = {"PATH": "/usr/bin"}

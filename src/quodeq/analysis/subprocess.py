@@ -40,6 +40,7 @@ from quodeq.analysis._api_standards_text import (
     render_standards_grouped,  # noqa: F401 -- re-export
     skip_dirs,
 )
+from quodeq.analysis._cli_sandbox import analysis_sandbox_prefix
 from quodeq.analysis._command import (
     build_ai_cmd,
     build_analysis_env,
@@ -133,6 +134,9 @@ def _run_cli_analysis(
     try:
         env = build_analysis_env(ai_cmd)
         with ExitStack() as stack:
+            prefix, sandbox_cleanup = analysis_sandbox_prefix(cfg, provider_cfg, work_dir, args[0])
+            stack.callback(sandbox_cleanup)
+            args = [*prefix, *args]
             cwd = work_dir
             if ai_cmd == Provider.COPILOT:
                 cwd = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="quodeq-copilot-")))

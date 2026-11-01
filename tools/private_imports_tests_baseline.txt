@@ -451,13 +451,11 @@ tests/api/test_terminal_ws_helpers.py:17:private-module:quodeq.api._terminal_ws_
 tests/api/test_terminal_ws_helpers.py:18:private-module:quodeq.api._terminal_ws_helpers.setup_terminal_session
 tests/assistant/test_api_adapter.py:109:private-name:quodeq.assistant.adapters.api._extra_body
 tests/assistant/test_api_adapter.py:121:private-name:quodeq.assistant.adapters.api._extra_body
-tests/assistant/test_cli_adapter_sandbox.py:14:private-module:quodeq.assistant.adapters._cli_spawn.sb
 tests/assistant/test_cli_command.py:1:private-module:quodeq.assistant.adapters._cli_command.TurnArgvRequest
 tests/assistant/test_cli_command.py:1:private-module:quodeq.assistant.adapters._cli_command.build_turn_argv
 tests/assistant/test_cli_command.py:1:private-name:quodeq.assistant.adapters._cli_command._with_web_access
 tests/assistant/test_cli_events.py:6:private-name:quodeq.assistant.adapters._cli_events._BENIGN_RAW_LINES
 tests/assistant/test_cli_events.py:6:private-name:quodeq.assistant.adapters._cli_events._raw_error_line
-tests/assistant/test_cli_spawn.py:7:private-module:quodeq.assistant.adapters._cli_spawn
 tests/assistant/test_cli_spawn.py:8:private-module:quodeq.assistant.adapters._cli_spawn.assert_no_dangerous_args
 tests/assistant/test_cli_spawn.py:8:private-module:quodeq.assistant.adapters._cli_spawn.build_chat_env
 tests/assistant/test_cli_spawn.py:8:private-module:quodeq.assistant.adapters._cli_spawn.external_sandbox_prefix
