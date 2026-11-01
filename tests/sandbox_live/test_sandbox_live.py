@@ -44,20 +44,18 @@ def _ok(argv: list[str], cwd: Path) -> bool:
     return subprocess.run(argv, cwd=cwd, capture_output=True, timeout=60, check=False).returncode == 0
 
 
-def _shell(script: str) -> list[str]:
-    return ["cmd.exe", "/c", script] if _WINDOWS else ["/bin/sh", "-c", script]
+# Each part its own argument: embedded quotes reach cmd.exe escaped (\\"), which it rejects.
+def _cat(path: Path) -> list[str]:
+    return ["cmd.exe", "/c", "type", str(path)] if _WINDOWS else ["/bin/cat", str(path)]
 
 
-def _cat(path: Path) -> str:
-    return f'type "{path}"' if _WINDOWS else f'cat "{path}"'
+def _touch(path: Path) -> list[str]:
+    return ["cmd.exe", "/c", "echo", "x", ">", str(path)] if _WINDOWS else ["/usr/bin/touch", str(path)]
 
 
-def _touch(path: Path) -> str:
-    return f'echo x > "{path}"' if _WINDOWS else f'touch "{path}"'
-
-
-def _fetch() -> str:
-    return f"curl.exe -sf -m 10 -o NUL {_URL}" if _WINDOWS else f"curl -sf -m 10 -o /dev/null {_URL}"
+def _fetch() -> list[str]:
+    return ["curl.exe" if _WINDOWS else "curl", "-sf", "-m", "10", "-o",
+            "NUL" if _WINDOWS else "/dev/null", _URL]
 
 
 def test_os_sandbox_confines_what_it_runs(layout):
@@ -70,11 +68,11 @@ def test_os_sandbox_confines_what_it_runs(layout):
     except os_sandbox.SandboxUnavailable as exc:
         pytest.skip(f"no OS sandbox here, scans fall back: {exc}")
     try:
-        assert _ok([*prefix, *_shell(_cat(repo / "app.py"))], repo), "repo must stay readable"
-        assert _ok([*prefix, *_shell(_touch(out / "ok.txt"))], repo), "out dir must stay writable"
-        assert not _ok([*prefix, *_shell(_touch(repo / "pwned.txt"))], repo), "repo write leaked"
+        assert _ok([*prefix, *(_cat(repo / "app.py"))], repo), "repo must stay readable"
+        assert _ok([*prefix, *(_touch(out / "ok.txt"))], repo), "out dir must stay writable"
+        assert not _ok([*prefix, *(_touch(repo / "pwned.txt"))], repo), "repo write leaked"
         if prefix[0] != "firejail":  # firejail confines writes only
-            assert not _ok([*prefix, *_shell(_cat(secret))], repo), "home read leaked"
+            assert not _ok([*prefix, *(_cat(secret))], repo), "home read leaked"
     finally:
         cleanup()
 
@@ -93,7 +91,7 @@ def codex(tmp_path):
 
 def _refused(binary, profile, repo, env) -> str:
     """Why Codex refuses *profile* here: a platform refusal or a probe bug."""
-    why = subprocess.run([binary, "sandbox", *profile, "--", *_shell(_cat(repo / "app.py"))],
+    why = subprocess.run([binary, "sandbox", *profile, "--", *(_cat(repo / "app.py"))],
                          cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8",
                          errors="replace", timeout=60, check=False)
     version = subprocess.run([binary, "--version"], capture_output=True, text=True,
@@ -101,8 +99,8 @@ def _refused(binary, profile, repo, env) -> str:
     return f"({version}, rc={why.returncode}): {(why.stderr or why.stdout).strip()[-400:]}"
 
 
-def _inside(binary, profile, repo, env, script: str) -> bool:
-    argv = [binary, "sandbox", *profile, "--", *_shell(script)]
+def _inside(binary, profile, repo, env, command: list[str]) -> bool:
+    argv = [binary, "sandbox", *profile, "--", *command]
     return subprocess.run(argv, cwd=repo, env=env, capture_output=True,
                           timeout=60, check=False).returncode == 0
 

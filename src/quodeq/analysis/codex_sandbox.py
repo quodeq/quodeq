@@ -88,9 +88,11 @@ def _version(binary: str, env: Mapping[str, str]) -> Version | None:
 
 
 def _probe_command(listed: Path, sample: Path) -> list[str]:
-    """List *listed* and read *sample*, as the agent's shell would."""
+    """List *listed* and read *sample*, as the agent's shell would. On
+    Windows each part is its own argument: embedded quotes reach cmd.exe
+    escaped (\\"), which it rejects."""
     if platform.system() == SYSTEM_WINDOWS:
-        return ["cmd.exe", "/c", f'dir "{listed}" && type "{sample}"']
+        return ["cmd.exe", "/c", "dir", str(listed), "&&", "type", str(sample)]
     return ["/bin/sh", "-c", 'ls "$1" >/dev/null && cat "$2"', "sh", str(listed), str(sample)]
 
 
