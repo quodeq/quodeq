@@ -169,9 +169,16 @@ def iter_source_files(
                 continue
             if ignore_patterns and is_ignored(rel, ignore_patterns):
                 continue
+            full = os.path.join(dirpath, fname)
+            # os.walk lists symlinked files even though it never descends
+            # symlinked dirs, and git tracks a committed link like any file.
+            # Reading one follows it, so `leak.py -> ~/.ssh/id_rsa` would
+            # inline the key into an API prompt.
+            if os.path.islink(full):
+                continue
             if tracked is not None and src_abs / rel not in tracked:
                 counts.skipped_untracked += 1
                 continue
-            if _looks_binary(os.path.join(dirpath, fname)):
+            if _looks_binary(full):
                 continue
             yield rel, suffix, ext_map.get(suffix, _UNKNOWN_LANG)
