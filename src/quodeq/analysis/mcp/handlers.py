@@ -4,6 +4,7 @@ Each function handles one JSON-RPC method and returns the response dict.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq import __version__
@@ -14,6 +15,9 @@ from quodeq.analysis.mcp.schemas import (
     GET_NEXT_FILES_DESC,
     GET_NEXT_FILES_NAME,
     GET_NEXT_FILES_SCHEMA,
+    GET_STANDARDS_DESC,
+    GET_STANDARDS_NAME,
+    GET_STANDARDS_SCHEMA,
     MARK_FILE_DONE_DESC,
     MARK_FILE_DONE_NAME,
     MARK_FILE_DONE_SCHEMA,
@@ -52,13 +56,20 @@ def handle_initialize(request_id: object, msg: dict) -> dict:
     })
 
 
-def handle_tools_list(request_id: object, *, has_queue: bool = False) -> dict:
+def handle_tools_list(request_id: object, *, has_queue: bool = False,
+                      has_standards: bool = False) -> dict:
     """Handle the 'tools/list' JSON-RPC method."""
     tools = [{
         "name": REPORT_FINDING_NAME,
         "description": REPORT_FINDING_DESC,
         "inputSchema": REPORT_FINDING_SCHEMA,
     }]
+    if has_standards:
+        tools.append({
+            "name": GET_STANDARDS_NAME,
+            "description": GET_STANDARDS_DESC,
+            "inputSchema": GET_STANDARDS_SCHEMA,
+        })
     if has_queue:
         tools.append({
             "name": GET_NEXT_FILES_NAME,
@@ -118,10 +129,20 @@ def _handle_mark_file_done(request_id: object, args: dict, router: FindingsRoute
     return _text_reply(request_id, "marked")
 
 
+def _handle_get_standards(request_id: object, standards_file: Path | None) -> dict:
+    """Handle a `get_standards` tool call: the checklist the prompt builder wrote."""
+    try:
+        if standards_file is None:
+            raise OSError("no checklist for this run")
+        return _text_reply(request_id, standards_file.read_text(encoding="utf-8"))
+    except OSError as exc:
+        return _text_reply(request_id, f"Standards checklist unavailable: {exc}", is_error=True)
+
+
 def handle_tools_call(
     request_id: object, params: dict,
     router: FindingsRouter, queue: FileQueue | None = None,
-    agent_id: str = "",
+    agent_id: str = "", standards_file: Path | None = None,
 ) -> dict:
     """Handle the 'tools/call' JSON-RPC method."""
     name = params.get("name")
@@ -139,6 +160,9 @@ def handle_tools_call(
 
     if name == MARK_FILE_DONE_NAME:
         return _handle_mark_file_done(request_id, args, router)
+
+    if name == GET_STANDARDS_NAME:
+        return _handle_get_standards(request_id, standards_file)
 
     return _text_reply(request_id, f"Unknown tool: {name}", is_error=True)
 

@@ -40,6 +40,9 @@ from quodeq.analysis._api_standards_text import (
     render_standards_grouped,  # noqa: F401 -- re-export
     skip_dirs,
 )
+from quodeq.analysis._cli_sandbox import (  # noqa: F401 -- analysis_sandbox_prefix re-exported
+    SandboxPolicy, analysis_sandbox_prefix, confine_cli,
+)
 from quodeq.analysis._command import (
     build_ai_cmd,
     build_analysis_env,
@@ -51,8 +54,10 @@ from quodeq.analysis.cache.local import default_cache_root
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
+from quodeq.config.analysis_env import require_os_sandbox
 from quodeq.config.process_env import process_environment
 from quodeq.config.provider import Provider, ProviderType
+from quodeq.shared.log_sink import LoggerSink
 from quodeq.core.constants import MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_FILE
 from quodeq.core.stream.events import copilot_error, parse_stream_event
 from quodeq.shared.utils import sanitize_sensitive
@@ -133,6 +138,10 @@ def _run_cli_analysis(
     try:
         env = build_analysis_env(ai_cmd)
         with ExitStack() as stack:
+            args, sandbox_cleanup = confine_cli(
+                cfg, provider_cfg, work_dir, args, env,
+                SandboxPolicy(require=require_os_sandbox(), log=LoggerSink(_log)))
+            stack.callback(sandbox_cleanup)
             cwd = work_dir
             if ai_cmd == Provider.COPILOT:
                 cwd = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="quodeq-copilot-")))

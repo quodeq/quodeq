@@ -110,8 +110,8 @@ def test_omlx_credential_loader_honours_the_injected_env(monkeypatch, tmp_path: 
 
 def test_build_analysis_env_uses_the_injected_mapping(monkeypatch):
     monkeypatch.setenv("FROM_PROCESS", "1")
-    built = build_analysis_env(None, {"KEEP": "yes"})
-    assert built["KEEP"] == "yes"
+    built = build_analysis_env(None, {"PATH": "yes"})
+    assert built["PATH"] == "yes"
     assert "FROM_PROCESS" not in built
     assert build_analysis_env(None, {}) == {}
 

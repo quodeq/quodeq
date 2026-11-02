@@ -1,16 +1,14 @@
 """Hardened subprocess spawn for assistant CLI turns (read-only, scrubbed, scratch cwd)."""
 from __future__ import annotations
 
-import platform
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Callable
 from quodeq.config.provider import Provider
-from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
+from quodeq.shared.os_sandbox import external_sandbox_prefix  # noqa: F401 -- re-export
 
 # The spawned agent CLI is network-capable and tool-executing; it must NOT
 # inherit arbitrary secrets from the server process (JIRA_API_TOKEN, GH_TOKEN,
@@ -58,7 +56,13 @@ def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> d
     source = resolve_env(env)
     if provider == Provider.COPILOT:
         return build_copilot_env(source)
-    return {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
+    env = {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
+    if provider == Provider.CODEX:
+        # Not the user's ~/.codex: its MCP servers, plugins and the ChatGPT
+        # account apps would load even with the shell tool disabled.
+        env["CODEX_HOME"] = str(dedicated_codex_home(source))
+        env.update({k: source[k] for k in provider_env_keys(source) if k in source})
+    return env
 
 
 def scratch_cwd(base: Path) -> Path:
@@ -82,75 +86,15 @@ def assert_no_dangerous_args(argv: list[str]) -> None:
             raise AssertionError(f"assistant spawn must never use {token!r}")
 
 
-def _sb_quote(path: str) -> str:
-    return '"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
-def _seatbelt_profile(*, writable_dirs: list[str], writable_files: list[str]) -> str:
-    """macOS Seatbelt (SBPL): allow reads/exec, deny all file writes except the
-    scratch dir, system temp, ~/.codex state, and the assistant db files."""
-    lines = ["(version 1)", "(allow default)", "(deny file-write*)", "(allow file-write*"]
-    for d in ["/private/tmp", "/private/var/folders", *writable_dirs]:
-        lines.append(f"  (subpath {_sb_quote(d)})")
-    for f in writable_files:
-        lines.append(f"  (literal {_sb_quote(f)})")
-    lines.append('  (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")'
-                 ' (literal "/dev/dtracehelper") (subpath "/dev/fd"))')
-    return "\n".join(lines) + "\n"
-
-
-def _writable_paths(writable_dirs: list[str], writable_files: list[str]) -> list[str]:
-    """Every path the sandbox must allow writes under.
-
-    The writable dirs themselves, plus the parent of each writable file -- a
-    sandbox grants a directory, not a single file.
-    """
-    return [*writable_dirs, *(str(Path(f).parent) for f in writable_files)]
-
-
-def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str]) -> list[str]:
-    argv = ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
-            "--tmpfs", "/tmp", "--share-net", "--die-with-parent", "--unshare-pid"]
-    seen: set[str] = set()
-    for d in _writable_paths(writable_dirs, writable_files):
-        if d and d not in seen:
-            seen.add(d)
-            argv += ["--bind", d, d]
-    return argv
-
-
-def external_sandbox_prefix(*, writable_dirs: list[str],
-                            writable_files: list[str]) -> tuple[list[str], Callable[[], None]]:
-    """Return (argv_prefix, cleanup) that wraps a command in an OS sandbox which
-    allows reads + network but blocks file writes outside the given paths.
-
-    Fails safe: raises if no sandbox mechanism is available on this platform, so
-    codex never runs unsandboxed with its internal sandbox bypassed.
-    """
-    system = platform.system()
-    if system == SYSTEM_DARWIN:
-        profile = _seatbelt_profile(writable_dirs=writable_dirs, writable_files=writable_files)
-        tmp = tempfile.NamedTemporaryFile("w", suffix=".sb", delete=False)
-        tmp.write(profile)
-        tmp.close()
-
-        def _cleanup() -> None:
-            Path(tmp.name).unlink(missing_ok=True)
-        return ["sandbox-exec", "-f", tmp.name], _cleanup
-    if system == SYSTEM_LINUX:
-        if shutil.which("bwrap"):
-            return _bwrap_prefix(writable_dirs, writable_files), lambda: None
-        if shutil.which("firejail"):
-            # firejail read-only whole fs, then allow-list the writable dirs
-            argv = ["firejail", "--quiet", "--read-only=/"]
-            for d in _writable_paths(writable_dirs, writable_files):
-                argv.append(f"--read-write={d}")
-            return argv, lambda: None
-        raise RuntimeError(
-            "Codex assistant turns require an OS sandbox (bubblewrap or firejail) "
-            "which is not installed; install one, or use Claude/Gemini for the assistant.")
-    raise RuntimeError(
-        f"Codex assistant sandboxing is unsupported on {system}; use Claude/Gemini.")
+def mcp_arg_dirs(args: list[str]) -> list[str]:
+    """The absolute paths among the MCP server's args (repo root, run and
+    reports dirs, ...), as dirs: a file's parent, since the sandbox grants dirs."""
+    paths = []
+    for arg in args:
+        if arg.startswith("/"):
+            path = Path(arg)
+            paths.append(str(path if path.is_dir() else path.parent))
+    return paths
 
 
 def spawn_turn(argv: list[str], *, cwd: Path, env: dict) -> subprocess.Popen:

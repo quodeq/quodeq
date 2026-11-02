@@ -30,15 +30,22 @@ from quodeq.analysis._mcp_arg_builders import (
 from quodeq.analysis.provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.config.process_env import process_environment_copy
 from quodeq.config.provider import Provider, ProviderType
+from quodeq.shared.child_env import allowlisted_env
+from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.log_sink import LoggerSink
 
 _log = logging.getLogger(__name__)
 
 
+# Dropped even when an allowlisted prefix (QUODEQ_) would let them through.
 _SENSITIVE_ENV_KEYS = frozenset({
-    "QUODEQ_API_KEY", "DATABASE_URL", "SECRET_KEY",
+    "QUODEQ_API_KEY", "QUODEQ_WEBVIEW_TOKEN", "DATABASE_URL", "SECRET_KEY",
 })
+# The findings server the CLI spawns reads QUODEQ_* settings and, from a
+# source checkout, needs PYTHONPATH to import quodeq.
+_ANALYSIS_ENV_PREFIXES = ("QUODEQ_",)
+_ANALYSIS_ENV_KEYS = ("PYTHONPATH",)
 
 _MCP_SUBPACKAGE = "mcp"  # this module's mcp/ subpackage, holding findings_server.py
 _MCP_SUBCOMMAND = "mcp"  # the provider CLI's `<cmd> mcp add/remove` namespace
@@ -233,15 +240,31 @@ def _unregister_cli_mcp(cmd: str, name: str, ai_cmd_path: str | None = None) -> 
 
 
 def build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
-    """Build the subprocess environment, removing sensitive variables.
+    """Build the subprocess environment from an allowlist.
 
-    The ``None`` default resolves to the process environment in the config
-    layer; an injected ``{}`` means "no variables set".
+    The agent CLI runs tool calls a prompt-injected repo can steer, so it gets
+    only runtime keys, QUODEQ_* settings and its provider's own auth prefixes
+    (``env_passthrough_prefixes``), never the server's other secrets. The
+    ``None`` default resolves to the process environment in the config layer;
+    an injected ``{}`` means "no variables set".
     """
-    env = process_environment_copy(env)
+    source = process_environment_copy(env)
+    provider_cfg = _get_provider_configs().get(ai_cmd or "", {})
+    api_key_env = provider_cfg.get("api_key_env")
+    # A provider backend switched on in the env brings its own credentials
+    # (Claude on Bedrock: AWS_*; on Vertex: GOOGLE_*, CLOUD_ML_*).
+    switched = [prefix for switch, prefixes in provider_cfg.get("env_passthrough_when", {}).items()
+                if source.get(switch) for prefix in prefixes]
+    # Codex custom model providers (Azure, ...) name their own key variable.
+    codex_keys = provider_env_keys(source) if ai_cmd == Provider.CODEX else []
+    env = allowlisted_env(
+        source, keys=(*_ANALYSIS_ENV_KEYS, *([api_key_env] if api_key_env else []), *codex_keys),
+        prefixes=(*_ANALYSIS_ENV_PREFIXES, *provider_cfg.get("env_passthrough_prefixes", ()), *switched),
+    )
     for key in _SENSITIVE_ENV_KEYS:
         env.pop(key, None)
-    provider_cfg = _get_provider_configs().get(ai_cmd or "", {})
+    if ai_cmd == Provider.CODEX:
+        env["CODEX_HOME"] = str(dedicated_codex_home(source))
     for key, val in provider_cfg.get("env_set_if_missing", {}).items():
         if key not in env:
             env[key] = val

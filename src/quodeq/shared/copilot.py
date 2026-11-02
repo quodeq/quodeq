@@ -6,16 +6,10 @@ import tempfile
 import threading
 from pathlib import Path
 
+from quodeq.shared.child_env import allowlisted_env
 from quodeq.shared.json_state import dump_json_and_replace
 
 _PROFILE_LOCK = threading.Lock()
-_ALLOWED_ENV_KEYS = frozenset({
-    "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR", "TZ",
-    "USERPROFILE", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "SystemRoot",
-    "WINDIR", "PATHEXT", "TEMP", "TMP",
-    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
-    "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR",
-})
 _OWNER_RW = 0o600  # Only the profile owner may modify its execution settings.
 _OWNER_RWX = 0o700  # Login state and sessions must not be visible to other users.
 
@@ -58,9 +52,6 @@ def build_copilot_env(env: dict[str, str]) -> dict[str, str]:
     profile = (Path(home) if home else Path.home()) / ".quodeq" / "copilot"
     with _PROFILE_LOCK:
         _prepare_profile(profile)
-    result = {
-        key: value for key, value in env.items()
-        if key in _ALLOWED_ENV_KEYS or key.startswith("LC_")
-    }
+    result = allowlisted_env(env)
     result["COPILOT_HOME"] = str(profile)
     return result

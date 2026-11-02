@@ -109,15 +109,12 @@ def test_get_evaluation_returns_before_scoring_completes(client):
         side_effect=_slow_score,
     ):
         resp = client.get("/api/evaluations/j1")
-
-    # Response must have arrived before (or independently of) scoring finishing.
-    assert resp.status_code == 200
-
-    # Unblock the background thread so the test process can exit cleanly.
-    scoring_may_finish.set()
-
-    # Wait briefly for the thread to actually start, confirming it was launched.
-    assert scoring_started.wait(timeout=budget(2)), (
+        # Response must have arrived before (or independently of) scoring finishing.
+        assert resp.status_code == 200
+        # Inside the patch: a thread starting after it exits calls the real one.
+        started = scoring_started.wait(timeout=budget(2))
+        scoring_may_finish.set()  # unblock the thread so the process exits cleanly
+    assert started, (
         "Background scoring thread never started — check that the thread is "
         "actually launched in the handler."
     )
@@ -126,10 +123,12 @@ def test_get_evaluation_returns_before_scoring_completes(client):
 def test_get_evaluation_scores_only_once_for_same_job(client):
     """_score_completed_evidence is called at most once per job_id."""
     call_count = 0
+    scored = threading.Event()
 
     def _count_score(reports_dir, args):
         nonlocal call_count
         call_count += 1
+        scored.set()
 
     with patch(
         "quodeq.services.score_run.score_completed_evidence",
@@ -137,7 +136,7 @@ def test_get_evaluation_scores_only_once_for_same_job(client):
     ):
         client.get("/api/evaluations/j1")
         client.get("/api/evaluations/j1")
-        # Give background threads time to finish.
+        assert scored.wait(timeout=budget(2)), "scoring never ran"
         time.sleep(0.1)
 
     assert call_count == 1, (
@@ -196,11 +195,12 @@ def test_deadline_cancelled_job_still_triggers_salvage_scoring(reports_root):
         side_effect=_score,
     ):
         resp = client.get("/api/evaluations/j1")
+        started = scoring_started.wait(timeout=budget(2))  # inside the patch, as above
 
     assert resp.status_code == 200
     # The UI reads exitReason off this payload to render "time limit reached".
     assert resp.get_json().get("exitReason") == "deadline"
-    assert scoring_started.wait(timeout=budget(2)), (
+    assert started, (
         "Deadline-cancelled job never spawned salvage scoring — did "
         "'cancelled' fall out of the trigger list in _evaluation_routes?"
     )

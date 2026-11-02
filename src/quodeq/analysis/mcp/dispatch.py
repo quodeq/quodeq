@@ -5,6 +5,7 @@ Re-exports public API for backward compatibility.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq.core.mcp_method import McpMethod
@@ -45,8 +46,10 @@ _IGNORED_NOTIFICATIONS = (
 def dispatch(
     msg: dict, router: FindingsRouter,
     queue: FileQueue | None = None, agent_id: str = "",
+    standards_file: Path | None = None,
 ) -> None:
-    """Route a single JSON-RPC message."""
+    """Route a single JSON-RPC message. *standards_file* is the run's
+    checklist, served by ``get_standards`` when given."""
     method = msg.get("method", "")
     req_id = msg.get("id")
     params = msg.get("params")
@@ -58,9 +61,10 @@ def dispatch(
     if method == McpMethod.INITIALIZE:
         _send(handle_initialize(req_id, {**msg, "params": params}))
     elif method == McpMethod.TOOLS_LIST:
-        _send(handle_tools_list(req_id, has_queue=queue is not None))
+        _send(handle_tools_list(req_id, has_queue=queue is not None,
+                                has_standards=standards_file is not None))
     elif method == McpMethod.TOOLS_CALL:
-        _send(handle_tools_call(req_id, params, router, queue, agent_id))
+        _send(handle_tools_call(req_id, params, router, queue, agent_id, standards_file))
     elif method == McpMethod.PING:
         _send(_ok(req_id, {}))
     else:

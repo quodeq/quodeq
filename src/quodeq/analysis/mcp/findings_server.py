@@ -18,6 +18,7 @@ from pathlib import Path
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
+from quodeq.analysis.prompts.standards_file import standards_file_path
 from quodeq.analysis.mcp.jsonrpc_io import JSONRPC_VERSION, send as _send
 from quodeq.analysis.mcp.finding_admission import run_catalog
 from quodeq.analysis.mcp.precedent_signals import precedent_signals
@@ -133,6 +134,10 @@ def main() -> None:
         sys.exit(1)
 
     ctx = _build_compiled_context(sa)
+    # One dimension per spawn: its checklist sits next to the evidence file.
+    dims = sa.dimensions
+    standards_file = (standards_file_path(Path(sa.findings_file).parent, dims[0])
+                      if len(dims) == 1 else None)
 
     queue: FileQueue | None = None
     if sa.queue_path:
@@ -146,7 +151,7 @@ def main() -> None:
                 if msg is None:
                     break
                 run_isolated(
-                    lambda msg=msg: _dispatch(msg, router, queue, sa.agent_id),
+                    lambda msg=msg: _dispatch(msg, router, queue, sa.agent_id, standards_file),
                     label=f"MCP message dispatch ({msg.get('method', '?')!r})",
                     log=_STDERR_WARN,
                     on_error=lambda exc, msg=msg: _send_dispatch_error_response(msg, exc),

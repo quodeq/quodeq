@@ -265,10 +265,19 @@ class TestBuildAnalysisEnv:
         # API providers read their key from the environment at analysis time
         # (see _resolve_provider_config); the sensitive-key filter must never
         # grow to swallow provider api_key_env variables.
-        from quodeq.analysis._command import build_analysis_env
+        from quodeq.analysis.subprocess import build_analysis_env
 
         env = {"OPENROUTER_API_KEY": "sk-or-x", "QUODEQ_API_KEY": "internal", "PATH": "/usr/bin"}
-        with _patch_providers({"openrouter": {"type": "api"}}):
+        with _patch_providers({"openrouter": {"type": "api", "api_key_env": "OPENROUTER_API_KEY"}}):
             out = build_analysis_env("openrouter", env=env)
         assert out.get("OPENROUTER_API_KEY") == "sk-or-x"
         assert "QUODEQ_API_KEY" not in out
+
+    def test_webview_token_never_reaches_the_cli(self):
+        from quodeq.analysis.subprocess import build_analysis_env
+
+        env = {"QUODEQ_WEBVIEW_TOKEN": "t", "QUODEQ_MODEL": "m", "PATH": "/usr/bin"}
+        with _patch_providers({"claude": {"type": "cli"}}):
+            out = build_analysis_env("claude", env=env)
+        assert "QUODEQ_WEBVIEW_TOKEN" not in out
+        assert out.get("QUODEQ_MODEL") == "m"

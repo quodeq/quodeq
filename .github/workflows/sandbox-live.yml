@@ -1,0 +1,55 @@
+name: Sandbox Live
+
+# Scans confine the agent CLIs with whatever sandbox the machine has: Codex's
+# own, then Seatbelt or bubblewrap/firejail, then none. Unit tests cannot see
+# whether a sandbox that reports itself working really confines on each OS,
+# so this runs tests/sandbox_live on real runners. A sandbox the runner
+# lacks is a skip with its reason; one that is chosen but leaks fails.
+# No login or model call: `codex sandbox` runs commands locally.
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'src/quodeq/shared/os_sandbox.py'
+      - 'src/quodeq/analysis/codex_sandbox.py'
+      - 'src/quodeq/analysis/_cli_sandbox.py'
+      - 'tests/sandbox_live/**'
+      - '.github/workflows/sandbox-live.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.0
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Install bubblewrap and firejail (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -yq bubblewrap firejail
+
+      - name: Install Codex
+        # The version the scan probe was first tested with (codex_sandbox._MIN_VERSION).
+        run: npm install -g @openai/codex@0.162.1
+
+      - name: Run live sandbox checks
+        env:
+          QUODEQ_SANDBOX_LIVE: "1"
+        run: uv run pytest tests/sandbox_live -v -rs --tb=short
