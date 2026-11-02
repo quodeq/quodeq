@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import filecmp
 import gzip
+import io
 import os
 import tarfile
 import tempfile
@@ -30,6 +31,7 @@ from quodeq.data.fs.run_archive_limits import RunArchiveError, check_restore_dir
 from quodeq.data.fs.run_archive_wal import DB_NAME
 
 _FILE_MODE = 0o644
+_READ_GZ = "r:gz"  # tarfile mode: read a gzipped archive
 
 
 @contextmanager
@@ -107,7 +109,7 @@ def repack_without_db(archive: Path, dest_archive: Path) -> Path:
     _check_destination(dest_archive.parent)
     with _run_read_lock(archive.parent):
         try:
-            with tarfile.open(archive, "r:gz") as src:
+            with tarfile.open(archive, _READ_GZ) as src:
                 members = _log_members(src, dest_archive.parent)
 
                 def add(tar: tarfile.TarFile) -> None:
@@ -134,6 +136,28 @@ def pack_run_logs(run_dir: Path, dest_archive: Path) -> Path:
         return _write_tar(dest_archive, add)
 
 
+def rewrite_archive_logs(archive: Path, transform: Callable[[str, bytes], bytes]) -> Path:
+    """Rewrite a published *archive* with each log member's bytes passed through *transform*; its path.
+
+    *transform* gets the member name and its bytes. The result is as
+    deterministic as any archive written here (same order, same mtimes), so an
+    unchanged run republished rewrites nothing. Raises ``RunArchiveError`` when
+    *archive* is unsafe, over the limits or unreadable.
+    """
+    try:
+        with tarfile.open(archive, _READ_GZ) as src:
+            members = _log_members(src, archive.parent)
+            rewritten = [(m, transform(m.name, src.extractfile(m).read())) for m in members]
+    except READ_ERRORS as exc:
+        raise RunArchiveError(f"cannot read run archive {archive}: {exc}") from exc
+
+    def add(tar: tarfile.TarFile) -> None:
+        for member, data in rewritten:
+            tar.addfile(_tar_info(member.name, len(data), member.mtime), io.BytesIO(data))
+
+    return _write_tar(archive, add)
+
+
 def extract_members_to(archive: Path, dest_dir: Path, names: list[str] | None = None) -> list[Path]:
     """Extract *archive*'s log members (or only *names*) into *dest_dir*; the paths written.
 
@@ -144,7 +168,7 @@ def extract_members_to(archive: Path, dest_dir: Path, names: list[str] | None = 
     written: list[Path] = []
     with _run_read_lock(archive.parent):
         try:
-            with tarfile.open(archive, "r:gz") as src:
+            with tarfile.open(archive, _READ_GZ) as src:
                 members = [m for m in _log_members(src, dest_dir) if names is None or m.name in names]
                 for member in members:
                     stream = src.extractfile(member)

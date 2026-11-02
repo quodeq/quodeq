@@ -22,6 +22,12 @@ import re
 from typing import NamedTuple
 
 _WS_RE = re.compile(r"\s+")
+# A snippet the publisher did not share travels as this token, which carries
+# the finding's fingerprint so dismissals and run diffs still match it on a
+# shared clone. A finding without a req is fingerprinted under its own (empty)
+# req only, so a dismissal recorded under its principle does not match there.
+WITHHELD_SNIPPET_PREFIX = "quodeq:snippet-withheld:"
+_WITHHELD_RE = re.compile(re.escape(WITHHELD_SNIPPET_PREFIX) + r"([0-9a-f]{64})")
 
 DismissKey = tuple[str, str, object]
 """``(req, file, line)`` or ``(req, file, fingerprint)``; see the module doc."""
@@ -43,6 +49,9 @@ def fingerprint(req: str | None, snippet: str | None) -> str | None:
     alerts across uploads by it. Returning None for blank inputs lets callers
     skip lookup entirely instead of poisoning a set with an all-empty key.
     """
+    withheld = _WITHHELD_RE.fullmatch(snippet.strip()) if snippet else None
+    if withheld:
+        return withheld.group(1)
     norm = normalize_snippet(snippet)
     req_part = (req or "").strip()
     if not req_part and not norm:
@@ -62,6 +71,12 @@ def snippet_fingerprint(req: str | None, snippet: str | None) -> str | None:
     if not normalize_snippet(snippet):
         return None
     return fingerprint(req, snippet)
+
+
+def withheld_snippet(req: str | None, snippet: str | None) -> str:
+    """The token that stands in for *snippet* when its code is not shared; "" for a blank one."""
+    fp = snippet_fingerprint(req, snippet)
+    return f"{WITHHELD_SNIPPET_PREFIX}{fp}" if fp else ""
 
 
 def coerce_line(line: object) -> int:

@@ -190,3 +190,13 @@ class TestRunScoping:
 def test_dismissed_at_is_not_part_of_the_identity():
     now = datetime.now(timezone.utc)
     assert DismissedEntry("R1", "a.py", 10, FP, dismissed_at=now) == DismissedEntry("R1", "a.py", 10, FP)
+
+
+def test_withheld_token_keeps_the_fingerprint():
+    from quodeq.core.finding_identity import fingerprint, snippet_fingerprint, withheld_snippet
+
+    token = withheld_snippet("R1", "x = secret()")
+    assert "secret" not in token
+    assert snippet_fingerprint("R1", token) == fingerprint("R1", "x = secret()")
+    assert withheld_snippet("R1", token) == token  # republishing a pulled finding changes nothing
+    assert withheld_snippet("R1", "   ") == ""

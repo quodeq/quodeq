@@ -96,14 +96,14 @@ def test_leftovers_in_the_clone_never_reach_the_commit(setup, monkeypatch):
     _run(root, "run-c", days=10)
     real = shared_publish.stage_project
 
-    def plant_then_stage(project_dir, dest):
+    def plant_then_stage(project_dir, dest, **opts):
         archived, full = dest / "run-a", dest / "run-b"
         (archived / "events.jsonl").write_text("restored in the clone\n")
         (archived / "evaluation.db-wal").write_text("wal")
         (archived / RESTORED_STAMP).write_text("stamp")
         (full / "evaluation.db").write_text("rebuilt")
         (dest / "stray.txt").write_text("untracked")
-        return real(project_dir, dest)
+        return real(project_dir, dest, **opts)
 
     monkeypatch.setattr(shared_publish, "stage_project", plant_then_stage)
     _publish(url, root)
@@ -141,10 +141,10 @@ def test_a_linked_project_folder_in_the_clone_is_refused_before_any_write(setup,
     outside.mkdir()
     real = shared_publish.stage_project
 
-    def link_then_stage(project_dir, dest):
+    def link_then_stage(project_dir, dest, **opts):
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.symlink_to(outside, target_is_directory=True)
-        return real(project_dir, dest)
+        return real(project_dir, dest, **opts)
 
     monkeypatch.setattr(shared_publish, "stage_project", link_then_stage)
     with pytest.raises(PublishError, match="link"):
@@ -159,10 +159,10 @@ def test_a_linked_run_folder_in_the_clone_is_refused_before_any_write(setup, tmp
     outside.mkdir()
     real = shared_publish.stage_project
 
-    def link_then_stage(project_dir, dest):
+    def link_then_stage(project_dir, dest, **opts):
         dest.mkdir(parents=True, exist_ok=True)
         (dest / "run-a").symlink_to(outside, target_is_directory=True)
-        return real(project_dir, dest)
+        return real(project_dir, dest, **opts)
 
     monkeypatch.setattr(shared_publish, "stage_project", link_then_stage)
     with pytest.raises(PublishError, match="link"):
