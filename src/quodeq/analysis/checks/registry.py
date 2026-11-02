@@ -20,6 +20,7 @@ from quodeq.core.checks.config_reads import CONFIG_SYMBOLS, check_config_reads
 from quodeq.core.checks.entity_imports import check_entity_imports
 from quodeq.core.checks.framework_deps import check_framework_dependencies
 from quodeq.core.checks.frameworks import FRAMEWORK_PACKAGES
+from quodeq.core.checks.hardcoded_secrets import check_hardcoded_secrets
 from quodeq.core.checks.model import ImportGraph, SymbolUse
 from quodeq.core.events.models import Judgment
 
@@ -45,6 +46,7 @@ class CheckContext:
     symbol_uses_builder: (
         Callable[[Path, Iterable[Path], frozenset[str]], tuple[SymbolUse, ...]] | None
     ) = None
+    text_reader: Callable[[Path, Iterable[Path]], list[tuple[str, str]]] | None = None
     _cache: dict = field(default_factory=dict, repr=False, compare=False)
 
     def _paths(self) -> list[Path]:
@@ -78,6 +80,19 @@ class CheckContext:
             )
         return self._cache["uses"]
 
+    def source_texts(self) -> list[tuple[str, str]]:
+        """``(file, text)`` for every readable source, read once per context.
+
+        Raises RuntimeError when no ``text_reader`` was injected.
+        """
+        if "texts" not in self._cache:
+            if self.text_reader is None:
+                raise RuntimeError(
+                    "CheckContext has no text_reader; the composition point "
+                    "must inject one (see runner.deterministic_judgments)")
+            self._cache["texts"] = self.text_reader(self.root, self._paths())
+        return self._cache["texts"]
+
 
 def _framework_imports(context: CheckContext) -> list[Judgment]:
     return check_framework_dependencies(
@@ -97,8 +112,13 @@ def _config_reads(context: CheckContext) -> list[Judgment]:
     )
 
 
+def _hardcoded_secrets(context: CheckContext) -> list[Judgment]:
+    return check_hardcoded_secrets(context.source_texts(), dimension=context.dimension)
+
+
 CHECKERS: dict[str, Callable[[CheckContext], list[Judgment]]] = {
     "framework-imports": _framework_imports,
     "entity-imports": _entity_imports,
     "config-reads": _config_reads,
+    "hardcoded-secrets": _hardcoded_secrets,
 }
