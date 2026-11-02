@@ -1,12 +1,13 @@
 """The user-agent the native window sends, and the version it carries.
 
-Kept apart from the macOS app identity it used to sit beside: the CSP
-relaxation in ``quodeq.api.security`` is keyed off these two strings, so they
-are a cross-process contract rather than a window detail. ``security.py``
-carries its own copies, and tests/dashboard/test_native_chrome.py pins that
-the two agree.
+Kept apart from the macOS app identity it used to sit beside: the session
+check in ``quodeq.api.session_auth`` is keyed off the token prefix, so the
+UA is a cross-process contract rather than a window detail. The prefix lives
+in ``quodeq.shared.api_session`` for both sides.
 """
 from __future__ import annotations
+
+from quodeq.shared.api_session import WEBVIEW_TOKEN_UA_PREFIX
 
 
 def quodeq_version() -> str:
@@ -18,18 +19,15 @@ def quodeq_version() -> str:
         return "dev"
 
 
-# Human-readable marker (must match quodeq.api.security._WEBVIEW_UA_MARKER).
-# Not itself a security check — any HTTP client can send this substring; the
+# Human-readable marker. Not itself a security check — any HTTP client can send this substring; the
 # CSP relaxation is gated on the per-launch token below.
 WEBVIEW_UA_MARKER = "QuodeqDesktop"
-
-# UA prefix ahead of the token (must match security._WEBVIEW_TOKEN_UA_PREFIX).
-WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
 
 
 def webview_user_agent(token: str | None = None) -> str:
     """UA carrying the marker (human-readable) and the token that actually
-    grants the relaxed CSP (see quodeq.api.security._is_trusted_webview)."""
+    authenticates the window to the API and grants it the relaxed CSP
+    (see quodeq.api.session_auth.is_trusted_webview)."""
     token_part = f" {WEBVIEW_TOKEN_UA_PREFIX}{token}" if token else ""
     return (
         "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "

@@ -205,7 +205,7 @@ def test_send_token_logs_on_write_failure() -> None:
     window_proc = MagicMock()
     window_proc.stdin.write.side_effect = ValueError("bad token")
     with patch.object(webview_token._logger, "debug") as debug:
-        webview_token._send_token(window_proc)  # signature: (window_proc: subprocess.Popen | None) -> None
+        webview_token._send_token(window_proc, "tok")
     assert debug.called
     assert "webview token handoff failed" in debug.call_args.args[0]
 
@@ -218,7 +218,7 @@ def test_send_token_logs_close_failure_instead_of_swallowing_it(exc) -> None:
     window_proc = MagicMock()
     window_proc.stdin.close.side_effect = exc
     with patch.object(webview_token._logger, "debug") as debug:
-        webview_token._send_token(window_proc)  # must not raise
+        webview_token._send_token(window_proc, "tok")  # must not raise
     assert debug.called
     assert "stdin close failed" in debug.call_args.args[0]
 

@@ -167,8 +167,8 @@ class TestDownloadViaDialogUrlValidation:
 
         assert result is True
         mock_urlopen.assert_called_once()
-        called_url = mock_urlopen.call_args[0][0]
-        assert called_url == "http://127.0.0.1:7863/api/export/results"
+        called = mock_urlopen.call_args[0][0]
+        assert called.full_url == "http://127.0.0.1:7863/api/export/results"
 
     def test_download_path_with_network_scheme_rejected(self, tmp_path):
         """A path starting with // (network scheme) should be rejected."""

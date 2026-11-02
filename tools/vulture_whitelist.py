@@ -96,6 +96,8 @@ _.rebuild_index_endpoint  # api/_index_routes.py: Flask view function; the route
 _.reject_assistant_action  # api/assistant_action_routes.py: Flask view function; the route decorator is its only caller.
 _.restore_all  # api/routes_findings.py: Flask view function; the route decorator is its only caller.
 _.run_violations  # api/routes_project_data.py: Flask view function; the route decorator is its only caller.
+_.session_code  # api/session_auth.py: Flask view function; the route decorator is its only caller.
+_.session_open  # api/session_auth.py: Flask view function; the route decorator is its only caller.
 _.serve_root  # api/helpers.py: Flask view function; the route decorator is its only caller.
 _.serve_static_or_spa  # api/helpers.py: Flask view function; the route decorator is its only caller.
 _.shared_projects  # api/routes_shared_mirrors.py: Flask view function; the route decorator is its only caller.

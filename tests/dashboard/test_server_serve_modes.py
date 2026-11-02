@@ -116,7 +116,7 @@ class TestServeNative:
         that wins the CSP 'unsafe-eval' relaxation. It is written to the
         child's stdin instead, which only the two processes can see.
         """
-        from quodeq.dashboard import _webview_token
+        from quodeq.dashboard import _server
         from quodeq.dashboard._server import _serve_native
 
         mock_instance = MagicMock()
@@ -129,7 +129,7 @@ class TestServeNative:
         mock_popen = MagicMock(return_value=window_proc)
 
         shell = self._shell(make_instance=lambda: mock_instance, spawn_window=mock_popen)
-        with patch.object(_webview_token, "get_webview_token", return_value="s3cret-token"):
+        with patch.object(_server, "window_token", return_value="s3cret-token"):
             _serve_native("http://localhost:8000", mock_proc, MagicMock(), shell=shell)
 
         argv = mock_popen.call_args[0][0]
@@ -144,7 +144,7 @@ class TestServeNative:
     def test_stdin_is_closed_even_when_the_write_fails(self):
         """The child blocks in readline() until this end closes, so a failed
         write must not leave it hanging at startup."""
-        from quodeq.dashboard import _webview_token
+        from quodeq.dashboard import _server
         from quodeq.dashboard._server import _serve_native
 
         mock_instance = MagicMock()
@@ -156,7 +156,7 @@ class TestServeNative:
         mock_popen = MagicMock(return_value=window_proc)
 
         shell = self._shell(make_instance=lambda: mock_instance, spawn_window=mock_popen)
-        with patch.object(_webview_token, "get_webview_token", return_value="s3cret-token"):
+        with patch.object(_server, "window_token", return_value="s3cret-token"):
             _serve_native("http://localhost:8000", MagicMock(), MagicMock(), shell=shell)
 
         window_proc.stdin.close.assert_called_once()

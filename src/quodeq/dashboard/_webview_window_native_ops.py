@@ -26,6 +26,7 @@ from pathlib import Path
 import webview
 
 from quodeq.config.services_env import cancel_escalation_window_s
+from quodeq.shared.api_session import session_headers
 from quodeq.shared.constants import LOCALHOST, PLATFORM_WIN32, SCHEME_HTTP, SCHEME_HTTPS
 
 _logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ def fetch_running_evaluation(base_url: str) -> dict | None:
     if not base_url:
         return None
     try:
-        req = urllib.request.Request(f"{base_url}/api/evaluations/active")
+        req = urllib.request.Request(f"{base_url}/api/evaluations/active", headers=session_headers(base_url))
         with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
             job = json.loads(resp.read())
     except (OSError, ValueError):
@@ -80,7 +81,7 @@ def send_cancel_evaluation(base_url: str, job_id: str | None) -> None:
         req = urllib.request.Request(
             f"{base_url}/api/evaluations/{urllib.parse.quote(job_id)}?intent=cancel&wait=true",
             method="DELETE",
-            headers={"Origin": base_url},
+            headers={"Origin": base_url, **session_headers(base_url)},
         )
         # The API answers once the run is gone: up to the SIGTERM grace, the
         # SIGKILL settle, then the scoring.
@@ -135,7 +136,7 @@ def download_via_dialog(window: object, base_url: str, path: str, filename: str)
         url = urllib.parse.urljoin(base_url, path)
         if not is_safe_reload_url(url):
             return False
-        _stream_to(url, Path(save_path))
+        _stream_to(urllib.request.Request(url, headers=session_headers(base_url)), Path(save_path))
         return True
     except (OSError, ValueError, http.client.HTTPException):
         # OSError: connection/URLError/write failures. ValueError: a URL
@@ -146,7 +147,7 @@ def download_via_dialog(window: object, base_url: str, path: str, filename: str)
         return False
 
 
-def _stream_to(url: str, target: Path) -> None:
+def _stream_to(url: str | urllib.request.Request, target: Path) -> None:
     """Stream *url* into *target* in fixed-size chunks.
 
     The body lands in a uniquely named temp file in *target*'s directory

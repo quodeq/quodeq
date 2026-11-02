@@ -57,17 +57,13 @@ class TestWindowCreation:
 
 
 class TestUaMarkerNoDrift:
-    def test_marker_matches_security_module(self):
-        from quodeq.api import security
-        assert ww.WEBVIEW_UA_MARKER == security._WEBVIEW_UA_MARKER
-
     def test_user_agent_carries_marker(self):
         assert ww.WEBVIEW_UA_MARKER in ww.webview_user_agent()
 
-    def test_token_prefix_matches_security_module(self):
-        from quodeq.api import security
+    def test_token_prefix_is_the_one_the_api_reads(self):
         from quodeq.dashboard import _webview_window_about
-        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX == security._WEBVIEW_TOKEN_UA_PREFIX
+        from quodeq.shared.api_session import WEBVIEW_TOKEN_UA_PREFIX
+        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX == WEBVIEW_TOKEN_UA_PREFIX
 
     def test_user_agent_without_token_has_no_token_prefix(self):
         """The marker alone is not the security check — no token, no token prefix."""

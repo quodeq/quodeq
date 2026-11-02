@@ -134,44 +134,23 @@ def test_allow_plaintext_http_honours_the_injected_env(monkeypatch):
 # Launch-token hand-off
 # --------------------------------------------------------------------------
 
-def test_ensure_action_api_writes_the_launch_token_into_the_injected_env(monkeypatch):
+def test_ensure_action_api_puts_no_secret_in_the_environment(monkeypatch):
+    """The API mints its session secret itself; the launcher no longer hands
+    one down through the environment, where any same-user process can read it."""
     import os
 
-    from quodeq.dashboard._server import ensure_action_api
-    from quodeq.dashboard._webview_token import ENV_WEBVIEW_TOKEN
+    from quodeq.dashboard._server import ensure_action_api, ensure_action_api_forced
     from quodeq.dashboard._probes import ApiProbes
 
-    monkeypatch.delenv(ENV_WEBVIEW_TOKEN, raising=False)
+    before = dict(os.environ)
     probes = ApiProbes(
         local_hosts=lambda *a, **k: {"127.0.0.1"},
         is_port_open=lambda *_a: False,
         spawn=lambda port, url, cfg: (url, None),
     )
-    target: dict[str, str] = {}
-    ensure_action_api("127.0.0.1", 8000, probes=probes, env=target)
-
-    assert target[ENV_WEBVIEW_TOKEN]
-    assert ENV_WEBVIEW_TOKEN not in os.environ
-
-
-def test_ensure_action_api_forced_writes_the_launch_token_into_the_injected_env(monkeypatch):
-    import os
-
-    from quodeq.dashboard._server import ensure_action_api_forced
-    from quodeq.dashboard._webview_token import ENV_WEBVIEW_TOKEN
-    from quodeq.dashboard._probes import ApiProbes
-
-    monkeypatch.delenv(ENV_WEBVIEW_TOKEN, raising=False)
-    probes = ApiProbes(
-        local_hosts=lambda *a, **k: {"127.0.0.1"},
-        is_port_open=lambda *_a: False,
-        spawn=lambda port, url, cfg: (url, None),
-    )
-    target: dict[str, str] = {}
-    ensure_action_api_forced("127.0.0.1", 5000, probes=probes, env=target)
-
-    assert target[ENV_WEBVIEW_TOKEN]
-    assert ENV_WEBVIEW_TOKEN not in os.environ
+    ensure_action_api("127.0.0.1", 8000, probes=probes)
+    ensure_action_api_forced("127.0.0.1", 5000, probes=probes)
+    assert dict(os.environ) == before
 
 
 def _record_npm_commands(monkeypatch) -> list[list[str]]:

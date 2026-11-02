@@ -4,13 +4,14 @@ Split out of test_csp_header.py when that file crossed the 300-line cap.
 
 Held security fix: the relaxation used to be gated on the QuodeqDesktop UA
 marker alone, a fixed public string any HTTP client could send. It is now
-gated on a per-launch shared secret (QUODEQ_WEBVIEW_TOKEN) embedded in the
-webview's own UA — see quodeq.api.security._is_trusted_webview.
+gated on the API's per-launch session secret embedded in the webview's own
+UA, see quodeq.api.session_auth.is_trusted_webview.
 """
 from __future__ import annotations
 
-from quodeq.api import security
+from quodeq.api import session_auth, security
 from quodeq.api.app import create_app
+from quodeq.shared.api_session import WEBVIEW_TOKEN_UA_PREFIX
 from tests.api._csp_helpers import _csp_for_ua, _directive
 
 _TOKEN = "shared-secret-abc123"
@@ -19,7 +20,7 @@ _WEBVIEW_UA_MARKER_ONLY = (
 )
 _WEBVIEW_UA_WITH_TOKEN = (
     "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
-    f"QuodeqDesktop/1.4.0 {security._WEBVIEW_TOKEN_UA_PREFIX}{_TOKEN} Safari/605.1.15"
+    f"QuodeqDesktop/1.4.0 {WEBVIEW_TOKEN_UA_PREFIX}{_TOKEN} Safari/605.1.15"
 )
 
 
@@ -27,8 +28,7 @@ def test_webview_ua_with_correct_token_gets_unsafe_eval(monkeypatch):
     """The native webview UA, carrying the correct per-launch token, must be
     served script-src with 'unsafe-eval' so pywebview's new Function()
     bridge works under the otherwise-strict CSP."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    script_src = _directive(_csp_for_ua(_WEBVIEW_UA_WITH_TOKEN), "script-src")
+    script_src = _directive(_csp_for_ua(_WEBVIEW_UA_WITH_TOKEN, _TOKEN), "script-src")
     assert script_src is not None
     assert "'unsafe-eval'" in script_src
 
@@ -37,8 +37,7 @@ def test_forged_marker_without_token_stays_strict(monkeypatch):
     """The OLD static marker string alone, without the token, must NOT get
     the relaxed CSP — this is the forgery the token gate closes: any HTTP
     client can set a UA substring, so the marker alone must never be enough."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    script_src = _directive(_csp_for_ua(_WEBVIEW_UA_MARKER_ONLY), "script-src")
+    script_src = _directive(_csp_for_ua(_WEBVIEW_UA_MARKER_ONLY, _TOKEN), "script-src")
     assert script_src is not None
     assert "'unsafe-eval'" not in script_src
 
@@ -46,22 +45,18 @@ def test_forged_marker_without_token_stays_strict(monkeypatch):
 def test_wrong_token_stays_strict(monkeypatch):
     """A UA carrying a token that doesn't match the launch's secret must not
     get the relaxation either (not just any token-shaped string)."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
     wrong_ua = (
         "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
-        f"QuodeqDesktop/1.4.0 {security._WEBVIEW_TOKEN_UA_PREFIX}not-the-real-token Safari/605.1.15"
+        f"QuodeqDesktop/1.4.0 {WEBVIEW_TOKEN_UA_PREFIX}not-the-real-token Safari/605.1.15"
     )
-    script_src = _directive(_csp_for_ua(wrong_ua), "script-src")
+    script_src = _directive(_csp_for_ua(wrong_ua, _TOKEN), "script-src")
     assert script_src is not None
     assert "'unsafe-eval'" not in script_src
 
 
-def test_no_token_env_var_set_never_relaxes(monkeypatch):
-    """With QUODEQ_WEBVIEW_TOKEN unset entirely (e.g. dashboard run
-    standalone via CLI, not through the desktop launcher), CSP relaxation
-    must never fire, regardless of UA content — preserves today's behavior
-    for non-desktop usage, where unsafe-eval should never be granted."""
-    monkeypatch.delenv(security._ENV_WEBVIEW_TOKEN, raising=False)
+def test_a_fresh_launch_secret_never_matches_a_guessed_token():
+    """Without a pinned secret the app mints its own, so no UA a client can
+    guess ever wins the relaxation."""
     for ua in (_WEBVIEW_UA_WITH_TOKEN, _WEBVIEW_UA_MARKER_ONLY, "Mozilla/5.0 (a regular browser)"):
         script_src = _directive(_csp_for_ua(ua), "script-src")
         assert script_src is not None
@@ -70,8 +65,7 @@ def test_no_token_env_var_set_never_relaxes(monkeypatch):
 
 def test_non_webview_ua_stays_strict(monkeypatch):
     """Any non-webview UA keeps the strict script-src (no unsafe-eval)."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    script_src = _directive(_csp_for_ua("Mozilla/5.0 (a regular browser)"), "script-src")
+    script_src = _directive(_csp_for_ua("Mozilla/5.0 (a regular browser)", _TOKEN), "script-src")
     assert script_src is not None
     assert "'unsafe-eval'" not in script_src
 
@@ -87,12 +81,11 @@ def test_non_ascii_ua_token_does_not_crash_and_stays_strict(monkeypatch):
     launcher path). The candidate must be dropped instead, exactly like any
     other non-matching token.
     """
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
     hostile_ua = (
         "Mozilla/5.0 (quodeq) QuodeqDesktop/1.4.0 "
-        f"{security._WEBVIEW_TOKEN_UA_PREFIX}tøken Safari/605.1.15"
+        f"{WEBVIEW_TOKEN_UA_PREFIX}tøken Safari/605.1.15"
     )
-    app = create_app()
+    app = create_app(test_config={session_auth.CONFIG_SECRET: _TOKEN})
     with app.test_client() as client:
         resp = client.get("/api/health", headers={"User-Agent": hostile_ua})
 
@@ -105,13 +98,10 @@ def test_non_ascii_ua_token_does_not_crash_and_stays_strict(monkeypatch):
     assert "'unsafe-eval'" not in script_src, "a non-ASCII token must fail closed"
 
 
-def test_non_ascii_env_token_does_not_crash_and_stays_strict(monkeypatch):
+def test_non_ascii_expected_secret_does_not_crash_and_stays_strict():
     """The OTHER side of compare_digest. It raises TypeError if EITHER str is
-    non-ASCII, and QUODEQ_WEBVIEW_TOKEN can be set by hand, so guarding only
-    the UA candidate leaves the same 500-on-every-request hole open behind a
-    misconfigured environment."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, "sécret-token")
-    app = create_app()
+    non-ASCII, so a misconfigured pinned secret must fail closed, not 500."""
+    app = create_app(test_config={session_auth.CONFIG_SECRET: "sécret-token"})
     with app.test_client() as client:
         resp = client.get("/api/health", headers={"User-Agent": _WEBVIEW_UA_WITH_TOKEN})
 
@@ -125,10 +115,10 @@ def test_non_ascii_env_token_does_not_crash_and_stays_strict(monkeypatch):
 def test_non_ascii_ua_token_extractor_returns_none():
     """The guard lives in the extractor, so _is_trusted_webview's
     compare_digest never sees a non-ASCII str."""
-    ua = f"QuodeqDesktop/1.0 {security._WEBVIEW_TOKEN_UA_PREFIX}café Safari"
-    assert security._webview_token_from_ua(ua) is None
-    ascii_ua = f"QuodeqDesktop/1.0 {security._WEBVIEW_TOKEN_UA_PREFIX}abc123 Safari"
-    assert security._webview_token_from_ua(ascii_ua) == "abc123"
+    ua = f"QuodeqDesktop/1.0 {WEBVIEW_TOKEN_UA_PREFIX}café Safari"
+    assert session_auth._webview_token_from_ua(ua) is None
+    ascii_ua = f"QuodeqDesktop/1.0 {WEBVIEW_TOKEN_UA_PREFIX}abc123 Safari"
+    assert session_auth._webview_token_from_ua(ascii_ua) == "abc123"
 
 
 def test_audit_log_records_final_status_for_non_ascii_ua(monkeypatch):
@@ -136,8 +126,7 @@ def test_audit_log_records_final_status_for_non_ascii_ua(monkeypatch):
     TypeError is gone it logs the request's real final status code."""
     from unittest.mock import patch
 
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    hostile_ua = f"QuodeqDesktop/1.0 {security._WEBVIEW_TOKEN_UA_PREFIX}tøken"
+    hostile_ua = f"QuodeqDesktop/1.0 {WEBVIEW_TOKEN_UA_PREFIX}tøken"
     app = create_app()
     with patch.object(security._logger, "info") as info, app.test_client() as client:
         resp = client.get("/api/health", headers={"User-Agent": hostile_ua})
@@ -149,15 +138,7 @@ def test_audit_log_records_final_status_for_non_ascii_ua(monkeypatch):
     assert audit_calls[-1][4] == 200, "the audit line must carry the real final status code"
 
 
-def test_is_trusted_webview_reads_the_injected_env(monkeypatch):
-    """The env mapping is a parameter so the check is testable without
-    touching os.environ; the process environment stays the default."""
-    monkeypatch.delenv(security._ENV_WEBVIEW_TOKEN, raising=False)
-    env = {security._ENV_WEBVIEW_TOKEN: _TOKEN}
-    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, env) is True
-    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, {}) is False
-    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN) is False
-
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN) is True
-    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, {}) is False
+def test_is_trusted_webview_compares_against_the_given_secret():
+    assert session_auth.is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, _TOKEN) is True
+    assert session_auth.is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, "other") is False
+    assert session_auth.is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, None) is False
