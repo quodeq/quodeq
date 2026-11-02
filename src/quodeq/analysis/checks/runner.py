@@ -23,6 +23,7 @@ from quodeq.analysis.checks.admission import admit_all, drop_already_reported
 from quodeq.core.admission import StandardCatalog
 from quodeq.data.fs.import_graph import build_import_graph
 from quodeq.data.fs.standard_index_loader import load_standard_index
+from quodeq.data.fs.secret_files import read_tracked_secret_files
 from quodeq.data.fs.source_texts import read_source_texts
 from quodeq.data.fs.stream_files import append_jsonl_rows
 from quodeq.data.fs.symbol_uses import build_symbol_uses
@@ -67,8 +68,8 @@ def deterministic_judgments(
     # CheckContext itself never imports the data.fs adapters.
     context = CheckContext(root=Path(root), source_files=tuple(source_files),
                            dimension=dimension, graph_builder=build_import_graph,
-                           symbol_uses_builder=build_symbol_uses,
-                           text_reader=read_source_texts)
+                           symbol_uses_builder=build_symbol_uses, text_reader=read_source_texts,
+                           secret_file_reader=read_tracked_secret_files)
     out: list[Judgment] = []
     for name in sorted(declared):
         checker = CHECKERS.get(name)
@@ -180,8 +181,7 @@ def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> N
 
     try:
         writer = EventLogWriter(jsonl_path.parent.parent / "events.jsonl")
-        writer.emit_many(
-            JudgmentCreatedEvent(payload=j) for j in judgments)
+        writer.emit_many(JudgmentCreatedEvent(payload=j) for j in judgments)
     except (OSError, TypeError, ValueError):  # the findings are already in the evidence
         _logger.warning("checks: could not mirror findings to the event log", exc_info=True)
 

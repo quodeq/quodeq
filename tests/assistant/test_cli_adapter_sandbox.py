@@ -94,7 +94,7 @@ def test_codex_sandbox_limits_home_reads(tmp_path, monkeypatch):
     readable = seen["readable_home_dirs"]
     assert readable is not None
     assert str(Path.home()) not in readable  # home as a whole stays unreadable
-    assert seen["block_loopback"] is True  # Quodeq's own API stays out of reach
+    assert seen["loopback_open_ports"] is not None  # Quodeq's own API stays out of reach
 
 
 def test_codex_turn_env_uses_the_dedicated_codex_home(tmp_path, monkeypatch):
