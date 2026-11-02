@@ -9,12 +9,11 @@ Shared by the clone (services/_fs_clone.py) and the reachability probe
 """
 from __future__ import annotations
 
-import ipaddress
 from collections.abc import Callable
 from urllib.parse import urlparse
 
 from quodeq.shared.constants import SCHEME_HTTP, SCHEME_HTTPS
-from quodeq.shared.ssrf import resolve_addresses
+from quodeq.shared.ssrf import public_addresses, resolve_addresses
 
 _DEFAULT_PORTS = {SCHEME_HTTP: 80, SCHEME_HTTPS: 443}
 
@@ -33,15 +32,7 @@ def pinned_git_config(
     hostname = parsed.hostname
     if parsed.scheme not in _DEFAULT_PORTS or not hostname:
         return []
-    addresses = resolve(hostname)
-    if not addresses:
-        raise ValueError(f"could not resolve {hostname}")
-    if any(_is_internal(a) for a in addresses):
-        raise ValueError(f"{hostname} resolves to a private/internal address")
+    addresses = public_addresses(hostname, resolve=resolve)
     port = parsed.port or _DEFAULT_PORTS[parsed.scheme]
     return [f"http.curloptResolve={hostname}:{port}:{','.join(addresses)}"]
 
-
-def _is_internal(address: str) -> bool:
-    addr = ipaddress.ip_address(address)
-    return addr.is_private or addr.is_loopback or addr.is_link_local

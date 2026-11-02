@@ -1,6 +1,7 @@
 """Tests for shared SSRF protection utility."""
 from unittest.mock import patch
 
+import pytest
 
 from quodeq.shared import ssrf
 from quodeq.shared.ssrf import is_private_address
@@ -127,3 +128,24 @@ class TestIsLoopbackAddress:
     def test_unresolvable_name_is_not_loopback(self, monkeypatch):
         monkeypatch.setattr(ssrf.socket, "getaddrinfo", _no_dns)
         assert ssrf.is_loopback_address("nowhere.example") is False
+
+
+@pytest.mark.parametrize("literal", [
+    "0.0.0.0",           # unspecified: connects to this host on most stacks
+    "::ffff:127.0.0.1",  # IPv4-mapped loopback
+    "::ffff:10.0.0.1",   # IPv4-mapped private
+    "224.0.0.1",         # multicast
+    "240.0.0.1",         # reserved
+])
+def test_non_routable_literals_count_as_private(literal):
+    assert ssrf.is_private_address(literal)
+
+
+def test_public_addresses_returns_the_answer_it_judged():
+    assert ssrf.public_addresses("example.com", resolve=lambda host: ("93.184.215.14",)) == ("93.184.215.14",)
+
+
+@pytest.mark.parametrize("answer", [(), ("10.0.0.1",), ("93.184.215.14", "127.0.0.1")])
+def test_public_addresses_refuses_unresolvable_or_internal(answer):
+    with pytest.raises(ValueError):
+        ssrf.public_addresses("rebind.example.com", resolve=lambda host: answer)
