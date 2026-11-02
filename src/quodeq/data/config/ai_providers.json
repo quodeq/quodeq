@@ -120,9 +120,8 @@
     "session_settings": {
       "flag": "--settings",
       "settings": {
-        "toolPermission": "strict",
         "permissions": {
-          "allow": ["mcp(quodeq-findings/*)", "read_file({repo})"],
+          "allow": ["mcp(quodeq-findings/*)", "read_file({repo})", "read_file({agy_brain})"],
           "deny": ["write_file(/)", "command(*)", "read_url(*)", "execute_url(*)", "browser(*)"]
         }
       }
@@ -133,7 +132,8 @@
     "effort_levels": ["low", "medium", "high", "xhigh", "max"],
     "effort_args": ["--effort", "{effort}"],
     "env_passthrough_prefixes": ["AGY_", "GEMINI_", "GOOGLE_"],
-    "analysis_sandbox": {"cli_home": ".gemini", "readable_home_dirs": ["Library/Keychains"]},
+    "analysis_sandbox": {"cli_home_env": "HOME", "cli_home": ".quodeq/agy",
+                         "readable_home_dirs": ["Library/Keychains"]},
     "supports_tools": false,
     "supports_budget": false,
     "supports_turns": false,
@@ -144,10 +144,9 @@
       "session_settings": {
         "flag": "--settings",
         "settings": {
-          "toolPermission": "strict",
-          "permissions": {
-            "allow": ["mcp(quodeq-assistant/*)"],
-            "deny": ["read_file(/)", "write_file(/)", "command(*)", "read_url(*)", "execute_url(*)", "browser(*)"]
+            "permissions": {
+            "allow": ["mcp(quodeq-assistant/*)", "read_file({agy_brain})"],
+            "deny": ["write_file(/)", "command(*)", "read_url(*)", "execute_url(*)", "browser(*)"]
           }
         }
       },

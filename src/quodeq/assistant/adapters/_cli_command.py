@@ -11,6 +11,7 @@ from quodeq.assistant.adapters.cli_config import (
 from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE, PROMPT_STYLE_POSITIONAL,
 )
+from quodeq.shared.agy_home import agy_brain_dir
 from quodeq.shared.cli_session_settings import session_settings_args
 from quodeq.shared.models import normalize_model_id
 
@@ -141,7 +142,7 @@ def build_turn_argv(cfg: CliChatConfig, request: TurnArgvRequest) -> CliTurnSpec
 
     argv.extend(_with_web_access(cfg.assistant_args) if request.web_enabled
                else cfg.assistant_args)
-    argv.extend(session_settings_args(cfg.session_settings))
+    argv.extend(session_settings_args(cfg.session_settings, {"agy_brain": agy_brain_dir()}))
     if resume_frag:
         argv.extend(resume_frag)
     if request.mcp_config_path and cfg.mcp_style == MCP_STYLE_CONFIG_FILE:

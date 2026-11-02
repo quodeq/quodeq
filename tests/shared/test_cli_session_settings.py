@@ -8,13 +8,14 @@ _SPEC = {"flag": "--settings", "settings": {"permissions": {
 
 
 def test_repo_placeholder_is_filled_with_the_resolved_repo(tmp_path):
-    flag, payload = session_settings_args(_SPEC, tmp_path)
+    flag, payload = session_settings_args(_SPEC, {"repo": tmp_path})
     assert flag == "--settings"
     assert json.loads(payload)["permissions"]["allow"] == ["mcp(srv/*)", f"read_file({tmp_path.resolve()})"]
 
 
 def test_a_repo_rule_without_a_repo_emits_nothing():
     assert session_settings_args(_SPEC) == []
+    assert session_settings_args(_SPEC, {"repo": None}) == []
 
 
 def test_settings_without_placeholders_need_no_repo():
@@ -23,5 +24,5 @@ def test_settings_without_placeholders_need_no_repo():
 
 
 def test_no_spec_emits_nothing():
-    assert session_settings_args(None, Path("/repo")) == []
-    assert session_settings_args({"flag": "--settings"}, Path("/repo")) == []
+    assert session_settings_args(None, {"repo": Path("/repo")}) == []
+    assert session_settings_args({"flag": "--settings"}, {"repo": Path("/repo")}) == []

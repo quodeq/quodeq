@@ -34,8 +34,9 @@ def test_agy_turnN_resumes_with_conversation_flag():
 def test_agy_assistant_may_only_call_the_assistant_server():
     argv = _spec().argv
     settings = json.loads(argv[argv.index("--settings") + 1])
-    assert settings["permissions"]["allow"] == ["mcp(quodeq-assistant/*)"]
-    assert {"read_file(/)", "write_file(/)", "command(*)", "read_url(*)"} <= set(settings["permissions"]["deny"])
+    assert settings["permissions"]["allow"][0] == "mcp(quodeq-assistant/*)"
+    assert settings["permissions"]["allow"][1].endswith("/agy/.gemini/antigravity-cli/brain)")
+    assert {"write_file(/)", "command(*)", "read_url(*)"} <= set(settings["permissions"]["deny"])
 
 
 def _agy_turn(tmp_path, lines):

@@ -12,8 +12,11 @@ from quodeq.services.tooling_mixin import FsToolingMixin, get_allowed_client_ids
 
 
 @pytest.fixture(autouse=True)
-def isolated_home(tmp_path, monkeypatch):
+def tmp_home(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("QUODEQ_DIR", raising=False)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    return tmp_path
 
 
 @pytest.fixture()
@@ -62,13 +65,15 @@ def test_agy_headless_stream_json_with_model_and_effort(agy_args):
 def test_agy_never_runs_with_auto_approval(agy_args):
     args, _repo = agy_args
     assert not {"--dangerously-skip-permissions", "--yolo", "--add-dir", "--sandbox"} & set(args)
-    assert _settings(args)["toolPermission"] == "strict"
+    # agy's default mode refuses every call no rule allows when it cannot prompt.
+    assert "toolPermission" not in _settings(args)
 
 
-def test_agy_pre_approves_only_findings_tools_and_repo_reads(agy_args):
+def test_agy_pre_approves_only_findings_tools_and_repo_reads(agy_args, tmp_home):
     args, repo = agy_args
     allow = _settings(args)["permissions"]["allow"]
-    assert allow == ["mcp(quodeq-findings/*)", f"read_file({repo.resolve()})"]
+    brain = tmp_home / ".quodeq" / "agy" / ".gemini" / "antigravity-cli" / "brain"
+    assert allow == ["mcp(quodeq-findings/*)", f"read_file({repo.resolve()})", f"read_file({brain.resolve()})"]
 
 
 def test_agy_denies_commands_writes_urls_and_browser(agy_args):
