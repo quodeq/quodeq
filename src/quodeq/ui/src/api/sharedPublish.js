@@ -16,3 +16,13 @@ export function publishProject(projectId) {
     method: 'POST',
   });
 }
+
+/**
+ * Opt the connected shared repository in to (or out of) receiving code
+ * snippets with published findings. Off by default.
+ * @param {boolean} withSnippets
+ * @returns {Promise<{withSnippets: boolean}>}
+ */
+export function setSharedSnippets(withSnippets) {
+  return request('/shared/snippets', { method: 'PUT', body: JSON.stringify({ withSnippets }) });
+}

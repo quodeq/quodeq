@@ -98,11 +98,13 @@ def test_empty_repo_lists_zero_projects_not_503(client, empty_shared_clone_fixtu
 # --- read-only sweep ----------------------------------------------------------
 
 def test_no_mutating_routes_under_shared(app):
-    """Read-only invariant: /api/shared/* accepts only GET plus the four control POST/PUT/DELETE."""
+    """Read-only invariant: /api/shared/* accepts only GET plus the five control POST/PUT/DELETE."""
     allowed_mutations = {
         ("/api/shared/config", "PUT"),
         ("/api/shared/config", "DELETE"),
         ("/api/shared/refresh", "POST"),
+        # A local settings write (shared.json's snippets opt-in): the clone is not touched.
+        ("/api/shared/snippets", "PUT"),
         # Deliberate, spec-approved exception: this mutates LOCAL state (the
         # local reports directory, via import_zip_stream) to materialize a
         # copy of a shared project -- it does not mutate the shared

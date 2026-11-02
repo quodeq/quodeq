@@ -122,7 +122,7 @@ def test_a_standard_file_that_is_not_an_object_is_skipped_with_a_warning(
 
 
 def test_publish_job_reports_skipped_standards(tmp_path, monkeypatch):
-    def fake(project_id, url, *, evaluations_root, env=None, on_skipped=None):
+    def fake(project_id, url, *, evaluations_root, env=None, on_skipped=None, with_snippets=False):
         on_skipped(["android"])
         return 2
 

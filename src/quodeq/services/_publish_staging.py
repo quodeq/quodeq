@@ -7,6 +7,8 @@ Invariants (spec):
 - explicit allowlist of source-of-truth files, never derived artifacts
 - no machine path of the publisher's: a local project's ``path`` is blanked
   and each report's ``project`` names only the folder (publish_scrub.py)
+- no code unless the shared repository opts in: snippets become fingerprint
+  tokens and context is dropped (publish_scrub.py)
 - actions.jsonl is union-merged with the remote copy, never overwritten
 - a run keeps the form the shared repo has it in (full or archive); a new
   one takes its local form; the local archive is read, never restored
@@ -25,7 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.core.run.state import RunState
-from quodeq.services.publish_scrub import published_repository_info, scrub_report_paths
+from quodeq.services.publish_scrub import published_repository_info, scrub_report_paths, withhold_snippets
 from quodeq.services.wiring import (
     ACTIONS_LOG_FILENAME,
     DIMENSIONS_FILENAME,
@@ -131,8 +133,11 @@ def _copy_logs(run_dir: Path, dest_run_dir: Path, written: list[Path]) -> None:
             raise RunArchiveError(f"run {run_dir.name} changed while publishing, retry")
 
 
-def copy_run(run_dir: Path, dest_run_dir: Path) -> list[Path]:
+def copy_run(run_dir: Path, dest_run_dir: Path, *, with_snippets: bool = False) -> list[Path]:
     """Copy the run's published files into *dest_run_dir*; the paths written.
+
+    Without *with_snippets* the copies carry no code: each finding's snippet
+    becomes its fingerprint token and its context is dropped (publish_scrub).
 
     Never restores, stamps or changes the local run. Raises ``RunArchiveError``
     (before any other file is written) when its archive is unsafe or unreadable.
@@ -158,6 +163,8 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> list[Path]:
     reports = copy_reports_plain(run_dir / _EVALUATION_DIR, dest_run_dir / _EVALUATION_DIR)
     scrub_report_paths(reports)
     written.extend(reports)
+    if not with_snippets:
+        withhold_snippets(written)
     return written
 
 
@@ -202,7 +209,7 @@ def _check_clone_dirs(dest_project_dir: Path, runs: list[Path]) -> None:
             raise RunArchiveError(f"run {run_dir.name} is a link in the shared clone, refusing to publish into it")
 
 
-def stage_project(project_dir: Path, dest_project_dir: Path) -> StagedProject:
+def stage_project(project_dir: Path, dest_project_dir: Path, *, with_snippets: bool = False) -> StagedProject:
     runs = list_completed_runs(project_dir)
     _check_clone_dirs(dest_project_dir, runs)
     ensure_dir(dest_project_dir)
@@ -222,7 +229,7 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> StagedProject:
     if actions.is_file():
         written.append(actions)
     for run_dir in runs:
-        written.extend(copy_run(run_dir, dest_project_dir / run_dir.name))
+        written.extend(copy_run(run_dir, dest_project_dir / run_dir.name, with_snippets=with_snippets))
 
     # Record who published and when at publish time,
     # rather than relying solely on git-log against the shared clone, which
