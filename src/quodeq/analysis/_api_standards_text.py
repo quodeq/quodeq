@@ -65,7 +65,7 @@ def _walk_source_files(work_dir: Path, exts: frozenset[str]) -> Iterator[Path]:
             if name.startswith(".") or os.path.splitext(name)[1] not in exts:
                 continue
             path = Path(root, name)
-            if path.is_symlink():
+            if os.path.islink(path):
                 continue
             if ignore_patterns and is_ignored(path.relative_to(work_dir).as_posix(), ignore_patterns):
                 continue
