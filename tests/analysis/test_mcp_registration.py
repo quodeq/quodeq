@@ -140,3 +140,34 @@ class TestRunScopedCliMcpRegistry:
 
         assert first == second == "quodeq-findings"
         assert mock_run.call_count == 2  # 1 unregister + 1 register, not 4
+
+
+class TestReleaseAll:
+    """A run removes its CLI-register MCP server when it ends.
+
+    ``gemini mcp add`` writes a persistent registration; without this it
+    stayed in the CLI's settings after every scan, pointing at a findings
+    server for a run that no longer exists.
+    """
+
+    def _register(self, registry, tmp_path, mock_run):
+        config = AnalysisConfig(jsonl_file=tmp_path / "findings.jsonl", ai_cmd_path="/opt/gemini")
+        mock_run.return_value = MagicMock(returncode=0)
+        registry.ensure_registered("gemini", config)
+
+    def test_release_all_removes_what_this_run_registered(self, tmp_path):
+        registry = RunConfig(src=tmp_path, language="python").mcp_registry
+        with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"gemini": {"type": "cli"}}):
+            self._register(registry, tmp_path, mock_run)
+            mock_run.reset_mock()
+            registry.release_all()
+        assert mock_run.call_args.args[0] == ["/opt/gemini", "mcp", "remove", "quodeq-findings"]
+        assert "gemini:quodeq-findings" not in registry
+
+    def test_release_all_is_idempotent_and_noop_when_nothing_registered(self, tmp_path):
+        registry = RunConfig(src=tmp_path, language="python").mcp_registry
+        with patch("quodeq.analysis._command.subprocess.run") as mock_run:
+            registry.release_all()
+            registry.release_all()
+        mock_run.assert_not_called()
