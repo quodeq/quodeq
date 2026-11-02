@@ -15,6 +15,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from quodeq.analysis import dispatch_policy
+from quodeq.analysis._ignore import is_ignored, load_ignore_patterns
 from quodeq.config.analysis_env import max_api_prompt_chars, max_standards_chars
 
 _log = logging.getLogger(__name__)
@@ -51,12 +52,24 @@ _MARKUP_EXTS = frozenset({".html", ".css", ".scss", ".vue", ".svelte"})
 
 
 def _walk_source_files(work_dir: Path, exts: frozenset[str]) -> Iterator[Path]:
-    """Source files under *work_dir*, never descending into skip dirs or dot dirs."""
+    """Source files under *work_dir*, never descending into skip dirs or dot dirs.
+
+    Applies ``.quodeqignore`` like the manifest walk does, and skips
+    symlinked files: their text is inlined into the prompt, and reading a
+    link follows it out of the repo.
+    """
+    ignore_patterns = load_ignore_patterns(work_dir)
     for root, dirs, files in os.walk(work_dir):
         dirs[:] = [d for d in dirs if d not in skip_dirs() and not d.startswith(".")]
         for name in files:
-            if not name.startswith(".") and os.path.splitext(name)[1] in exts:
-                yield Path(root, name)
+            if name.startswith(".") or os.path.splitext(name)[1] not in exts:
+                continue
+            path = Path(root, name)
+            if os.path.islink(path):
+                continue
+            if ignore_patterns and is_ignored(path.relative_to(work_dir).as_posix(), ignore_patterns):
+                continue
+            yield path
 
 
 def gather_source_files(work_dir: Path) -> list[Path]:
