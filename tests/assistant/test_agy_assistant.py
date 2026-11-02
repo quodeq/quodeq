@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from quodeq.assistant.adapters.cli import TurnArgvRequest, build_turn_argv, run_cli_turn
 from quodeq.assistant.adapters.cli_config import load_cli_chat_config
+from quodeq.shared.agy_home import agy_brain_dir
 
 from ._cli_adapter_helpers import FakeProc, _config, _repo, _session
 
@@ -35,7 +36,7 @@ def test_agy_assistant_may_only_call_the_assistant_server():
     argv = _spec().argv
     settings = json.loads(argv[argv.index("--settings") + 1])
     assert settings["permissions"]["allow"][0] == "mcp(quodeq-assistant/*)"
-    assert settings["permissions"]["allow"][1].endswith("/agy/.gemini/antigravity-cli/brain)")
+    assert settings["permissions"]["allow"][1] == f"read_file({agy_brain_dir().resolve()})"
     assert {"write_file(/)", "command(*)", "read_url(*)"} <= set(settings["permissions"]["deny"])
 
 
