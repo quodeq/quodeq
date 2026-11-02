@@ -1,53 +1,37 @@
-"""Per-launch shared secret gating the webview's CSP unsafe-eval relaxation."""
+"""Hand the desktop window the local API's session secret, over stdin.
+
+The API mints the secret and publishes it in its 0600 session file
+(quodeq.shared.api_session); the launcher reads it there and passes it on.
+The window puts it in its User-Agent, which is how every request it makes,
+navigations included, proves it is the Quodeq UI (quodeq.api.session_auth)
+and wins the CSP 'unsafe-eval' its JS bridge needs.
+"""
 from __future__ import annotations
 
 import logging
-import secrets
 import subprocess
 import sys
 import typing
 from pathlib import Path
 
+from quodeq.shared.api_session import secret_for_url
+
 _logger = logging.getLogger(__name__)
-# Env var read by quodeq.api.security to gate the webview-only CSP
-# relaxation. Must match quodeq.api.security._ENV_WEBVIEW_TOKEN.
-ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
-
-_TOKEN_BYTES = 24  # secrets.token_urlsafe's input size for the per-launch webview token
-
-_webview_token: str | None = None
 
 
-def get_webview_token() -> str:
-    """Return this process's launch token, generating it on first use.
+def window_token(base_url: str) -> str:
+    """The secret for the API at *base_url*, or "" (with a warning) when it published none.
 
-    Memoized so the API subprocess (started via ensure_action_api[_forced],
-    which sets it into this process's environment before spawning) and the
-    webview subprocess (started later by _serve_native, which appends it to
-    argv) get the same value, however far apart their call sites are.
+    An API from a Quodeq version before session auth writes no file; its
+    window then runs token-less and that API serves it the strict CSP.
     """
-    global _webview_token
-    if _webview_token is None:
-        _webview_token = secrets.token_urlsafe(_TOKEN_BYTES)
-    return _webview_token
-
-
-def warn_reused_api_token_mismatch(base_url: str) -> None:
-    """Explain why the desktop shell's CSP relaxation will not be granted.
-
-    The token is only handed to an API process we spawn ourselves. A reused
-    API (a second `quodeq dashboard`, or an API started separately) keeps
-    whatever token it launched with while the webview we are about to open
-    gets this launch's fresh one, so _is_trusted_webview fails closed. That
-    is correct, but it silently breaks pywebview's new Function() JS bridge,
-    which is baffling without this line.
-    """
-    logging.getLogger(__name__).warning(
-        "Reusing the Action API already running at %s; it was started with a "
-        "different (or no) webview launch token, so the native window's CSP "
-        "'unsafe-eval' relaxation will not be granted and its JS bridge may "
-        "not work. Stop that API and relaunch to pair them.", base_url,
-    )
+    token = secret_for_url(base_url)
+    if not token:
+        _logger.warning(
+            "The Action API at %s published no session secret, so the window cannot "
+            "authenticate to it. Stop that API and relaunch to pair them.", base_url,
+        )
+    return token or ""
 
 
 def read_token_from_stdin() -> str | None:
@@ -66,7 +50,7 @@ def read_token_from_stdin() -> str | None:
         return None
 
 
-def _send_token(window_proc: subprocess.Popen | None) -> None:
+def _send_token(window_proc: subprocess.Popen | None, token: str) -> None:
     """Write the launch token to the window's stdin, then close it.
 
     Best-effort by design: on any failure the child reads an empty line, gets
@@ -78,7 +62,7 @@ def _send_token(window_proc: subprocess.Popen | None) -> None:
     if stdin is None:
         return
     try:
-        stdin.write(f"{get_webview_token()}\n".encode())
+        stdin.write(f"{token}\n".encode())
         stdin.flush()
     except (OSError, ValueError) as exc:
         _logger.debug("webview token handoff failed: %s", exc)
@@ -92,14 +76,14 @@ def _send_token(window_proc: subprocess.Popen | None) -> None:
 
 
 def spawn_window_with_token(
-    spawn: typing.Callable[..., subprocess.Popen], cmd: list[str], *, stderr: typing.Any,
+    spawn: typing.Callable[..., subprocess.Popen], cmd: list[str], *, stderr: typing.Any, token: str,
 ) -> subprocess.Popen:
     """Spawn the webview window and hand it the token over stdin, never argv.
 
     argv is world-readable: /proc/<pid>/cmdline is mode 0444 and `ps` shows it
     to every user on the machine, so a token passed there let any local user
     forge the UA that wins the CSP 'unsafe-eval' relaxation (see
-    quodeq.api.security._is_trusted_webview for what that grants). A pipe is
+    quodeq.api.session_auth for what that grants). A pipe is
     visible only to the two processes holding it.
     """
     window_proc = spawn(
@@ -109,7 +93,7 @@ def spawn_window_with_token(
         stdout=subprocess.DEVNULL,
         stderr=stderr,
     )
-    _send_token(window_proc)
+    _send_token(window_proc, token)
     return window_proc
 
 

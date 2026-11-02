@@ -36,8 +36,9 @@ def _directive(csp: str, name: str) -> str | None:
     return None
 
 
-def _csp_for_ua(ua: str | None) -> str:
-    app = create_app()
+def _csp_for_ua(ua: str | None, secret: str | None = None) -> str:
+    """The CSP served to *ua*; *secret* pins the app's session secret."""
+    app = create_app(test_config={"QUODEQ_SESSION_SECRET": secret} if secret else None)
     with app.test_client() as client:
         headers = {"User-Agent": ua} if ua is not None else {}
         return client.get("/api/health", headers=headers).headers["Content-Security-Policy"]

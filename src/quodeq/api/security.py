@@ -14,10 +14,12 @@ from werkzeug.exceptions import SecurityError
 
 from quodeq.api._constants import CODE_FORBIDDEN
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.api.session_auth import (  # noqa: F401  publish_session: app.main's entry
+    check_session, install_session_auth, is_trusted_webview, publish_session,
+)
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_common import is_local_request
 from quodeq.shared import request_metrics
-from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.dashboard_ports import alt_port_origins
 from quodeq.shared.log_throttle import LogThrottle
@@ -40,67 +42,10 @@ _SAFE_HTTP_METHODS = ("GET", "HEAD", "OPTIONS")  # never state-changing: skip CS
 _BEARER_PREFIX = "Bearer "
 _MIN_BEARER_HEADER_LEN = len(_BEARER_PREFIX) + SECRET_SUFFIX_CHARS
 
-# Marker substring in the native webview's User-Agent (set by
-# quodeq.dashboard._webview_window_about). Kept for human-readable UA
-# strings only — it's a fixed, publicly-known string, so it is NOT what
-# grants 'unsafe-eval' (see _is_trusted_webview below). The literal MUST
-# match _webview_window_about._WEBVIEW_UA_MARKER (drift-guarded by
-# tests/dashboard/test_native_chrome.py).
-_WEBVIEW_UA_MARKER = "QuodeqDesktop"
-
-# Env var carrying the per-launch shared secret _server.py generates and
-# hands to the API subprocess (env) and the webview subprocess (argv), which
-# embeds it in its own UA. Requests whose UA carries the matching token are
-# the trusted local desktop shell and are served 'unsafe-eval' so pywebview's
-# new Function() JS bridge works; everyone else keeps the strict script-src.
-# Unset (e.g. the dashboard run standalone via `quodeq api`, not through the
-# desktop launcher) means the relaxation never fires.
-_ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
-
-# UA prefix the webview puts ahead of the token (see
-# _webview_window_about.webview_user_agent). Must match there.
-_WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
-
-
-def _webview_token_from_ua(user_agent: str) -> str | None:
-    idx = user_agent.find(_WEBVIEW_TOKEN_UA_PREFIX)
-    if idx == -1:
-        return None
-    rest = user_agent[idx + len(_WEBVIEW_TOKEN_UA_PREFIX):]
-    candidate = rest.split(" ", 1)[0]
-    if not candidate:
-        return None
-    # hmac.compare_digest raises TypeError on a non-ASCII str, and Werkzeug
-    # decodes request headers as latin-1, so any UA byte >= 0x80 inside the
-    # token would otherwise blow up _is_trusted_webview from inside the
-    # after_request hook -- turning every request into a 500 with none of
-    # the security headers set. The real token is secrets.token_urlsafe(),
-    # always ASCII, so a non-ASCII candidate can never be a match anyway:
-    # drop it here and fail closed like any other wrong token.
-    return candidate if candidate.isascii() else None
-
-
-def _is_trusted_webview(user_agent: str, env: Mapping[str, str] | None = None) -> bool:
-    """True only for a request carrying this launch's webview token.
-
-    Reads QUODEQ_WEBVIEW_TOKEN from *env* (os.environ by default) lazily, not
-    at module load, so it reflects whatever _server.py set in this process's
-    environment before spawning the API subprocess, and so standalone
-    (non-desktop) runs that never set it always fail closed here regardless
-    of UA content.
-    """
-    expected = resolve_env(env).get(_ENV_WEBVIEW_TOKEN)
-    # isascii() for the same reason _webview_token_from_ua guards the
-    # candidate: compare_digest raises TypeError if EITHER str is non-ASCII,
-    # and this one comes from the environment, which an operator can set by
-    # hand. get_webview_token() only ever produces token_urlsafe() output,
-    # so a non-ASCII value here is a misconfiguration, not a match.
-    if not expected or not expected.isascii():
-        return False
-    candidate = _webview_token_from_ua(user_agent)
-    if not candidate:
-        return False
-    return hmac.compare_digest(candidate, expected)
+# The desktop window's UA carries this launch's session secret, which also
+# grants it 'unsafe-eval' for pywebview's new Function() JS bridge; see
+# quodeq.api.session_auth.is_trusted_webview. The bare "QuodeqDesktop" UA
+# marker is a public string and grants nothing.
 
 
 # Host header must look like a bare hostname/IPv4 or a bracketed IPv6
@@ -254,19 +199,22 @@ def configure_security(
 ) -> None:
     """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers.
 
-    *env* is captured once here, at app-creation time, rather than read per
-    request; ``None`` keeps the per-request lookup against ``os.environ``.
+    Without *api_key* every request must also carry this launch's session
+    secret (``session_auth``); *env* names the port its cookie is keyed by.
     """
     csp_ws_failure_throttle = LogThrottle(_CSP_WS_FAILURE_LOG_INTERVAL_S)
+    session = install_session_auth(app, env)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
-        denied = _check_auth(api_key)
+        denied = _check_auth(api_key) or (None if api_key else check_session(session))
         if denied is not None:
             # A failed auth always counts, whatever the method or path, so
             # key guessing hits the limit. Passing requests are unaffected.
             return _count_attempt(rate_limit_store) or denied
-        return _check_csrf() or _check_rate_limit(rate_limit_store)
+        # The session header cannot come from a cross-site page, so it needs no Origin.
+        csrf = None if session.header_ok() else _check_csrf()
+        return csrf or _check_rate_limit(rate_limit_store)
 
     @app.after_request
     def _add_security_headers(response: Response) -> Response:
@@ -282,7 +230,7 @@ def configure_security(
         except SecurityError as exc:
             self_ws = ""
             _log_csp_ws_failure(exc, csp_ws_failure_throttle)
-        is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""), env)
+        is_webview = is_trusted_webview(request.headers.get("User-Agent", ""), session.secret)
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "

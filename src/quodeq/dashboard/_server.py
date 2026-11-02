@@ -9,7 +9,6 @@ import sys
 import threading
 import typing
 import webbrowser
-from collections.abc import MutableMapping
 from pathlib import Path
 
 from quodeq.dashboard._api_health import ApiConfig
@@ -19,15 +18,9 @@ from quodeq.dashboard._networking import MAX_PORT_SCAN_TRIES, allow_plaintext_ht
 from quodeq.dashboard._frozen import subprocess_cmd
 from quodeq.dashboard._probes import ApiProbes, NativeShell
 from quodeq.dashboard._process import PROCESS_WAIT_TIMEOUT_S, wait_for_process
-from quodeq.dashboard._webview_token import (
-    ENV_WEBVIEW_TOKEN,
-    get_webview_token,
-    warn_reused_api_token_mismatch,
-    open_webview_log,
-    spawn_window_with_token,
-)
+from quodeq.dashboard._session_link import log_launch_link, open_in_browser
+from quodeq.dashboard._webview_token import open_webview_log, spawn_window_with_token, window_token
 from quodeq.shared.constants import SCHEME_HTTP
-from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
@@ -57,39 +50,30 @@ _Launched = tuple[str, subprocess.Popen | None]  # API base URL, plus the proces
 
 
 def _reuse_or_launch(
-    probes: ApiProbes, host: str, port: int, cfg: ApiConfig, env: MutableMapping[str, str] | None,
+    probes: ApiProbes, host: str, port: int, cfg: ApiConfig,
 ) -> _Launched | None:
     """Reuse the healthy Action API on *port*, or start one there when the port is free.
 
-    None when something else holds the port. Before a start, this launch's
-    webview token is published in *env* for the API subprocess to inherit.
+    None when something else holds the port. The API mints its own session
+    secret, so a reused one pairs with this launch's window like a new one.
     """
     base_url = f"{SCHEME_HTTP}://{host}:{port}"
     if probes.is_port_open(host, port):
-        if probes.api_healthy(base_url):
-            warn_reused_api_token_mismatch(base_url)
-            return base_url, None
-        return None
-    resolve_env_mut(env)[ENV_WEBVIEW_TOKEN] = get_webview_token()
+        return (base_url, None) if probes.api_healthy(base_url) else None
     return probes.spawn(port, base_url, cfg)
 
 
 def ensure_action_api(
     host: str, start_port: int, max_tries: int = MAX_PORT_SCAN_TRIES,
     api_config: ApiConfig | None = None,
-    *, probes: ApiProbes | None = None, env: MutableMapping[str, str] | None = None,
+    *, probes: ApiProbes | None = None,
 ) -> _Launched:
-    """Find a free port and start (or reuse) the action API on it.
-
-    *env* is where this launch's webview token is published for the API
-    subprocess to inherit; it defaults to ``os.environ``, which is the only
-    mapping ``probes.spawn`` passes on by default.
-    """
+    """Find a free port and start (or reuse) the action API on it."""
     probes = probes or ApiProbes()
     cfg = api_config or ApiConfig()
     _guard_plaintext_http(host, cfg.allow_plaintext, probes=probes)
     for port in range(start_port, start_port + max_tries):
-        launched = _reuse_or_launch(probes, host, port, cfg, env)
+        launched = _reuse_or_launch(probes, host, port, cfg)
         if launched is not None:
             return launched
     raise RuntimeError("Unable to find a free port for Action API.")
@@ -97,16 +81,13 @@ def ensure_action_api(
 
 def ensure_action_api_forced(
     host: str, port: int, static_dist: Path | None = None, evaluations_dir: str | None = None,
-    *, probes: ApiProbes | None = None, env: MutableMapping[str, str] | None = None,
+    *, probes: ApiProbes | None = None,
 ) -> _Launched:
-    """Start (or reuse) the action API on exactly *port*; refuse a port held by anything else.
-
-    *env* receives the webview token as in :func:`ensure_action_api`.
-    """
+    """Start (or reuse) the action API on exactly *port*; refuse a port held by anything else."""
     probes = probes or ApiProbes()
     _guard_plaintext_http(host, probes=probes)
     cfg = ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir)
-    launched = _reuse_or_launch(probes, host, port, cfg, env)
+    launched = _reuse_or_launch(probes, host, port, cfg)
     if launched is None:
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
     return launched
@@ -173,9 +154,10 @@ def _serve_and_wait(
     if config.build.use_native and config.build.open_browser:
         _serve_native(action_api_url, action_api_process, stop_children, shell=shell, detach=detach)
     elif config.build.open_browser:
-        webbrowser.open(action_api_url)
+        open_in_browser(action_api_url, webbrowser.open)
         _serve_blocking(action_api_process, stop_children)
     else:
+        log_launch_link(action_api_url)
         _serve_blocking(action_api_process, stop_children)
 
 
@@ -189,7 +171,7 @@ def _linux_webview_fallback(
         "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
         "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window.",
     )
-    shell.open_browser(action_api_url)
+    open_in_browser(action_api_url, shell.open_browser)
     serve_blocking(action_api_process, stop_children)
 
 
@@ -262,7 +244,7 @@ def _serve_native(
     window_proc = spawn_window_with_token(
         shell.spawn_window,
         subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid]),
-        stderr=webview_stderr,
+        stderr=webview_stderr, token=window_token(action_api_url),
     )
     if detach and handed_to_window(window_proc, instance.sock_path):
         return  # the window stops the API when it closes
