@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import tempfile
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
@@ -85,6 +86,22 @@ def settings_file_for_owner(owner_id: str, *, env: Mapping[str, str] | None = No
     if not is_safe_owner_id(owner_id):
         raise ValueError(f"Invalid project id for standards settings: {owner_id!r}")
     return get_quodeq_dir(env) / _PROJECTS_DIRNAME / owner_id / _SETTINGS_FILENAME
+
+
+def remove_project_settings(project_id: str, *, env: Mapping[str, str] | None = None) -> bool:
+    """Delete a deleted project's own settings folder; True when one was there.
+
+    A scoped child has no folder of its own (it uses its parent's), so this
+    never touches another project's settings.
+    """
+    folder = settings_file_for_owner(project_id, env=env).parent
+    if folder.is_symlink():
+        folder.unlink()
+        return True
+    if not folder.is_dir():
+        return False
+    shutil.rmtree(folder)
+    return True
 
 
 @contextmanager

@@ -150,7 +150,7 @@ from quodeq.data.fs.standards_loader import (  # noqa: F401
 )
 
 # Per-project standards-visibility preferences.
-from quodeq.data.fs.standards_prefs import load_project_standards, settings_reports_root  # noqa: F401
+from quodeq.data.fs.standards_prefs import load_project_standards, remove_project_settings, settings_reports_root  # noqa: F401
 
 # Filesystem report parser: JSON/markdown eval-report parsing.
 from quodeq.data.fs.report_parser import OVERALL_PRINCIPLE, parse_eval_from_json, parse_eval_markdown  # noqa: F401
@@ -254,8 +254,9 @@ from quodeq.data.sqlite.score_cache_store import (  # noqa: F401
 )
 # Connection-owning score-cache operations: services never open the cache or catch driver errors.
 from quodeq.data.sqlite.score_cache_access import (  # noqa: F401
-    RunKeyStore, ScoreCacheError, persisted_run_key_sets, read_project_rows, read_project_summary, run_key_store,
-    save_run_change, save_run_keys, take_run_changes, write_project_summary, write_run_rows,
+    RunKeyStore, ScoreCacheError, forget_project_scores, persisted_run_key_sets, read_project_rows,
+    read_project_summary, run_key_store, save_run_change, save_run_keys, take_run_changes, write_project_summary,
+    write_run_rows,
 )
 
 # Live evidence tally (heartbeat + scan-progress counters).
