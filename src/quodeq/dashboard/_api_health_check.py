@@ -6,6 +6,7 @@ import random
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from http import HTTPStatus
 
 from quodeq.shared.logging import log_info
@@ -13,7 +14,10 @@ from quodeq.shared.quiet_run import Spinner
 
 _HEALTH_CHECK_TIMEOUT_S = 0.5
 _HEALTH_POLL_INTERVAL_S = 0.2
-_DEFAULT_WAIT_TIMEOUT_S = 10
+# Generous: the first start after an install or upgrade compiles every module,
+# and on Windows real-time AV scans each new file first, which can take well
+# over 10s. A child that dies stops the wait early (see *alive*).
+_DEFAULT_WAIT_TIMEOUT_S = 60
 _MAX_HEALTH_POLL_ATTEMPTS = 200
 _MAX_JITTER_DELAY_S = 2.0
 _LOG_CADENCE = 10
@@ -34,8 +38,14 @@ def action_api_healthy(base_url: str) -> bool:
         return False
 
 
-def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_S) -> None:
+def wait_for_action_api(
+    base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_S,
+    alive: Callable[[], bool] | None = None,
+) -> None:
     """Block until the action API becomes healthy, or raise TimeoutError.
+
+    *alive*, when given, reports whether the API process is still running;
+    once it says no, waiting longer is pointless and this raises at once.
 
     On a terminal a spinner shows the wait; elsewhere (logs, pipes) it is
     plain log lines.
@@ -50,6 +60,8 @@ def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_
         while time.monotonic() - start < timeout_s and attempts < _MAX_HEALTH_POLL_ATTEMPTS:
             if action_api_healthy(base_url):
                 return None
+            if alive is not None and not alive():
+                raise TimeoutError("Action API exited before it became ready.")
             attempts += 1
             if attempts % _LOG_CADENCE == 0 and not spinner.animating:
                 elapsed = round(time.monotonic() - start, 1)
