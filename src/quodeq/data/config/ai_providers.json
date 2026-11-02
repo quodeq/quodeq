@@ -107,6 +107,54 @@
       "system_prompt_style": "message-prefix"
     }
   },
+  "agy": {
+    "type": "cli",
+    "order": 3,
+    "cmd": "agy",
+    "cmd_subcommand": "",
+    "base_args": "--output-format stream-json --disable-slash-commands",
+    "prompt_style": "flag",
+    "prompt_flag": "-p",
+    "mcp_style": "cli-register",
+    "mcp_permission_args": [],
+    "session_settings": {
+      "flag": "--settings",
+      "settings": {
+        "permissions": {
+          "allow": ["mcp(quodeq-findings/*)", "read_file({repo})", "read_file({agy_brain})"],
+          "deny": ["write_file(/)", "command(*)", "read_url(*)", "execute_url(*)", "browser(*)"]
+        }
+      }
+    },
+    "isolated_cwd": true,
+    "repo_preamble": "Repository root: {root}\nResolve relative source paths against this root and read each file by its absolute path. Listing directories and shell commands are unavailable: take the files to review from get_next_files and skip any step that lists or globs the repo.\n\n",
+    "models_args": ["models"],
+    "effort_levels": ["low", "medium", "high", "xhigh", "max"],
+    "effort_args": ["--effort", "{effort}"],
+    "env_passthrough_prefixes": ["AGY_", "GEMINI_", "GOOGLE_"],
+    "analysis_sandbox": {"cli_home_env": "HOME", "cli_home": ".quodeq/agy",
+                         "readable_home_dirs": ["Library/Keychains"]},
+    "supports_tools": false,
+    "supports_budget": false,
+    "supports_turns": false,
+    "env_set_if_missing": {},
+    "env_remove": [],
+    "assistant": {
+      "assistant_args": ["--output-format", "stream-json", "--disable-slash-commands"],
+      "session_settings": {
+        "flag": "--settings",
+        "settings": {
+            "permissions": {
+            "allow": ["mcp(quodeq-assistant/*)", "read_file({agy_brain})"],
+            "deny": ["write_file(/)", "command(*)", "read_url(*)", "execute_url(*)", "browser(*)"]
+          }
+        }
+      },
+      "resume_style": "conversation-flag",
+      "session_id_source": "parse-jsonl",
+      "system_prompt_style": "message-prefix"
+    }
+  },
   "copilot": {
     "type": "cli",
     "order": 4,
@@ -123,6 +171,9 @@
     "mcp_server_tools": ["*"],
     "mcp_strict_args": [],
     "mcp_permission_args": ["--allow-tool", "findings"],
+    "isolated_cwd": true,
+    "repo_add_dir_flag": "--add-dir",
+    "repo_preamble": "Repository root: {root}\nResolve relative source paths against this root.\nUse view, glob and grep where instructions refer to Read, Glob and Grep. Shell tools are unavailable.\n\n",
     "assistant": {
       "assistant_args": ["--output-format", "json", "--stream", "on",
                          "--no-auto-update", "--no-custom-instructions", "--no-ask-user",

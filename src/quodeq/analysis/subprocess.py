@@ -53,6 +53,7 @@ from quodeq.analysis._process import AnalysisError, check_process_result, spawn_
 from quodeq.analysis.cache.local import default_cache_root
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.stream.counters import count_files_in_stream
+from quodeq.analysis.stream.validation import denied_actions
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.config.analysis_env import require_os_sandbox
 from quodeq.config.process_env import process_environment
@@ -143,8 +144,11 @@ def _run_cli_analysis(
                 SandboxPolicy(require=require_os_sandbox(), log=LoggerSink(_log)))
             stack.callback(sandbox_cleanup)
             cwd = work_dir
-            if ai_cmd == Provider.COPILOT:
-                cwd = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="quodeq-copilot-")))
+            if provider_cfg.get("isolated_cwd"):
+                # Outside the repo: a CLI that loads customizations from its
+                # cwd (agy's .agents/ hooks and plugin MCP servers run shell
+                # commands no permission rule stops) must not find the repo's.
+                cwd = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix=f"quodeq-{ai_cmd}-")))
             process, timed_out = spawn_and_monitor(
                 args, cwd, env, SpawnPaths(stream_file, stream_err), cfg,
             )
@@ -155,9 +159,16 @@ def _run_cli_analysis(
         # Cleanup happens via ensure_registered's idempotent remove-then-add on next run.
 
     if not timed_out:
-        if ai_cmd == Provider.COPILOT:
-            _check_copilot_stream(stream_file)
+        _check_cli_stream(ai_cmd, stream_file)
         check_process_result(process, stream_err)
+
+
+def _check_cli_stream(ai_cmd: str, stream_file: Path) -> None:
+    """Provider-reported problems a zero exit code does not show."""
+    if denied := denied_actions(stream_file):
+        _log.warning("%s refused tool actions Quodeq does not allow: %s", ai_cmd, ", ".join(denied))
+    if ai_cmd == Provider.COPILOT:
+        _check_copilot_stream(stream_file)
 
 
 def _check_copilot_stream(stream_file: Path) -> None:

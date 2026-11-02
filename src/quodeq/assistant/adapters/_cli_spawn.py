@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from quodeq.config.provider import Provider
+from quodeq.shared.agy_home import dedicated_agy_home
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
@@ -62,6 +63,9 @@ def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> d
         # account apps would load even with the shell tool disabled.
         env["CODEX_HOME"] = str(dedicated_codex_home(source))
         env.update({k: source[k] for k in provider_env_keys(source) if k in source})
+    if provider == Provider.AGY:
+        # Not the user's ~/.gemini: their rules, plugins, hooks and saved outputs.
+        env["HOME"] = str(dedicated_agy_home(source))
     return env
 
 

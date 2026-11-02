@@ -21,8 +21,11 @@ import threading
 import time
 
 
-def run_cli_models_command(client_id: str, *, timeout_s: float) -> str:
-    """Run ``<client_id> /models`` and return its stdout, or "" on any failure.
+def run_cli_models_command(
+    client_id: str, *, timeout_s: float, args: tuple[str, ...] = ("/models",),
+) -> str:
+    """Run ``<client_id> <args>`` (``/models`` by default; agy's is ``models``)
+    and return its stdout, or "" on any failure.
 
     "" covers: the binary is not installed, it times out, it exits non-zero,
     or the process cannot be started at all.
@@ -31,7 +34,7 @@ def run_cli_models_command(client_id: str, *, timeout_s: float) -> str:
         return ""
     try:
         result = subprocess.run(
-            [client_id, "/models"],
+            [client_id, *args],
             capture_output=True,
             text=True, encoding="utf-8",
             timeout=timeout_s,

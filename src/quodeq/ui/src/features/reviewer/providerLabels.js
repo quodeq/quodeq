@@ -6,6 +6,7 @@ export const PROVIDER_LABELS = Object.freeze({
   claude: 'Claude Code',
   codex: 'Codex CLI',
   gemini: 'Gemini CLI',
+  agy: 'Antigravity CLI',
   copilot: 'GitHub Copilot',
   ollama: 'Ollama',
   openrouter: 'OpenRouter',

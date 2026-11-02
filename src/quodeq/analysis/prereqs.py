@@ -39,6 +39,10 @@ _CLI_INSTALL_HINTS: dict[str, str] = {
         "  npm install -g @google/gemini-cli\n"
         "  https://geminicli.com/docs/get-started/installation/"
     ),
+    "agy": (
+        "Install the Antigravity CLI (agy) and sign in by running `agy` once:\n"
+        "  https://antigravity.google/docs/cli/reference"
+    ),
     "copilot": (
         "Install GitHub Copilot CLI:\n"
         "  npm install -g @github/copilot\n"
@@ -178,7 +182,7 @@ def check_evaluate_prereqs(env: dict[str, str] | None = None) -> None:
             "No AI provider configured.\n\n"
             "Quodeq needs an AI provider to evaluate your code. You can use:\n\n"
             "  Local (free, private):  Ollama with Gemma 4\n"
-            "  Cloud (faster):         Claude Code, Codex CLI, Gemini CLI, or GitHub Copilot CLI\n\n"
+            "  Cloud (faster):         Claude Code, Codex CLI, Gemini CLI, Antigravity CLI, or GitHub Copilot CLI\n\n"
             f"{_SETTINGS_HINT}"
         )
 

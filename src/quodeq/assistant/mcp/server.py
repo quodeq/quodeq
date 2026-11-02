@@ -18,7 +18,7 @@ from quodeq.assistant import AssistantRepository
 from quodeq.config.assistant_env import assistant_mcp_log_path
 from quodeq.data.fs.standards_prefs import load_project_standards, settings_reports_root
 from quodeq.core.jsonrpc import JsonRpcErrorCode
-from quodeq.core.mcp_method import McpMethod
+from quodeq.core.mcp_method import TOOL_META, McpMethod
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.shared.fault_isolation import run_isolated
 
@@ -29,7 +29,7 @@ _SERVER_NAME = "quodeq-assistant"
 def _tools_list(registry: ToolRegistry) -> dict:
     tools = [
         {"name": t["function"]["name"], "description": t["function"]["description"],
-         "inputSchema": t["function"]["parameters"]}
+         "inputSchema": t["function"]["parameters"], "_meta": TOOL_META}
         for t in registry.openai_tools()
     ]
     return {"tools": tools}

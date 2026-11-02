@@ -15,6 +15,7 @@ PROVIDERS: dict[Provider, str] = {
     Provider.CLAUDE: "ANTHROPIC_API_KEY",
     Provider.CODEX: "CODEX_API_KEY",
     Provider.GEMINI: "GEMINI_API_KEY",
+    Provider.AGY: "",
     Provider.COPILOT: "",
     Provider.OLLAMA: "",
     Provider.LLAMACPP: "",
