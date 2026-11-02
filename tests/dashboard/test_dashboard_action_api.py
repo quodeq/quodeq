@@ -127,7 +127,7 @@ class _StubbornProcess:
 
 
 def _spawn_failing_health(monkeypatch, tmp_path, proc):
-    def unhealthy(_base_url):
+    def unhealthy(_base_url, **_kwargs):
         raise TimeoutError("not healthy")
 
     monkeypatch.setattr(_api_spawn, "spawn_action_api", lambda *_a, **_k: proc)
@@ -137,12 +137,14 @@ def _spawn_failing_health(monkeypatch, tmp_path, proc):
 
 
 def test_spawn_and_wait_bounds_the_wait_after_sigterm(monkeypatch, tmp_path):
+    monkeypatch.setattr(_api_spawn, "_IS_WIN32", False)
     proc = _StubbornProcess(ignores_sigterm=False)
     _spawn_failing_health(monkeypatch, tmp_path, proc)
     assert proc.calls == [("terminate", None), ("wait", _api_spawn.TERMINATE_GRACE_SECONDS)]
 
 
 def test_spawn_and_wait_kills_a_child_that_ignores_sigterm(monkeypatch, tmp_path):
+    monkeypatch.setattr(_api_spawn, "_IS_WIN32", False)
     proc = _StubbornProcess(ignores_sigterm=True)
     _spawn_failing_health(monkeypatch, tmp_path, proc)
     assert proc.calls == [
@@ -151,3 +153,36 @@ def test_spawn_and_wait_kills_a_child_that_ignores_sigterm(monkeypatch, tmp_path
         ("kill", None),
         ("wait", None),
     ]
+
+
+def test_spawn_and_wait_kills_the_whole_tree_on_windows(monkeypatch, tmp_path):
+    # The venv launcher's child is the real API; killing only the launcher orphans it.
+    monkeypatch.setattr(_api_spawn, "_IS_WIN32", True)
+    killed = []
+    monkeypatch.setattr(_api_spawn, "kill_proc_tree", killed.append)
+    proc = _StubbornProcess(ignores_sigterm=False)
+    _spawn_failing_health(monkeypatch, tmp_path, proc)
+    assert killed == [proc]
+    assert proc.calls == [("wait", _api_spawn.TERMINATE_GRACE_SECONDS)]
+
+
+def test_spawn_and_wait_tells_the_wait_whether_the_child_lives(monkeypatch, tmp_path):
+    seen = {}
+
+    def healthy(_base_url, alive=None):
+        seen["alive"] = alive()
+
+    monkeypatch.setattr(_api_spawn, "spawn_action_api", lambda *_a, **_k: _StubbornProcess(ignores_sigterm=False))
+    monkeypatch.setattr(_api_spawn, "wait_for_action_api", healthy)
+    _api_spawn.spawn_and_wait(_TEST_PORT, "http://x", tmp_path / "p.pid", _TEST_HOST)
+    assert seen == {"alive": True}
+
+
+def test_wait_stops_once_the_child_exits(monkeypatch):
+    probes = []
+    monkeypatch.setattr(
+        "quodeq.dashboard._api_health_check.action_api_healthy", lambda url: probes.append(url) or False,
+    )
+    with pytest.raises(TimeoutError, match="exited"):
+        _api_spawn.wait_for_action_api("http://x", timeout_s=60, alive=lambda: False)
+    assert probes == ["http://x"]
