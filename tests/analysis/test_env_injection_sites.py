@@ -56,7 +56,7 @@ def test_ai_tools_and_base_args_honour_injected_env(monkeypatch):
 def test_non_scout_providers_honours_injected_env(monkeypatch):
     monkeypatch.setenv("QUODEQ_NON_SCOUT_PROVIDERS", "claude")
     assert _non_scout_providers(env={"QUODEQ_NON_SCOUT_PROVIDERS": "codex"}) == ("codex",)
-    assert _non_scout_providers(env={}) == ("codex", "gemini")
+    assert _non_scout_providers(env={}) == ("codex", "gemini", "agy")
 
 
 def test_default_subagent_model_honours_injected_env(monkeypatch):

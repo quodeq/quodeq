@@ -67,7 +67,7 @@ VOCABULARIES: dict[str, frozenset[str]] = {
     "Grade": frozenset({"Exemplary", "Good", "Adequate", "Poor", "Insufficient"}),
     "FileDoneStatus": frozenset({"ok", "error", "skipped"}),
     "DimState": frozenset({"pending", "running", "done", "incomplete"}),
-    "Provider": frozenset({"claude", "codex", "gemini", "copilot", "ollama", "llamacpp", "openrouter", "custom"}),
+    "Provider": frozenset({"claude", "codex", "gemini", "agy", "copilot", "ollama", "llamacpp", "openrouter", "custom"}),
     "FindingType": frozenset({"violation", "compliance"}),
     "SyncPhase": frozenset({"connecting", "downloading", "resolving", "checkout", "reading", "done", "error"}),
 }

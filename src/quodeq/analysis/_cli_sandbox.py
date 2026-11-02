@@ -117,8 +117,12 @@ def analysis_sandbox_prefix(
     cli_home = _cli_home(spec, env)
     cli_home.mkdir(parents=True, exist_ok=True)
     writable = [cli_home, *_run_writable_dirs(cfg)]
+    # Where the CLI keeps what it needs to sign in outside its own home (agy:
+    # its Google token sits in the macOS keychain, under ~/Library/Keychains).
+    readable = [*_readable_dirs(cfg, work_dir, binary),
+                *(Path.home() / d for d in spec.get("readable_home_dirs", ()))]
     try:
-        return _sandbox_prefix(cfg, work_dir, binary, env, writable)
+        return _sandbox_prefix(work_dir, env, writable, readable)
     except SandboxUnavailable as exc:
         if policy.require:
             raise
@@ -130,7 +134,7 @@ def analysis_sandbox_prefix(
 
 
 def _sandbox_prefix(
-    cfg: AnalysisConfig, work_dir: Path, binary: str, env: Mapping[str, str], writable: list[Path],
+    work_dir: Path, env: Mapping[str, str], writable: list[Path], readable: list[Path],
 ) -> tuple[list[str], Callable[[], None]]:
     # The dedicated Codex home links to the user's login, which Codex rewrites
     # on refresh: that one file, not the user's ~/.codex.
@@ -138,7 +142,7 @@ def _sandbox_prefix(
     return external_sandbox_prefix(
         writable_dirs=[str(d) for d in writable],
         writable_files=[str(auth)] if auth else [],
-        readable_home_dirs=[str(d) for d in _readable_dirs(cfg, work_dir, binary)],
+        readable_home_dirs=[str(d) for d in readable],
         readonly_dirs=[str(work_dir.resolve())],
         block_loopback=True,
         loopback_allow_ports=loopback_proxy_ports(env),

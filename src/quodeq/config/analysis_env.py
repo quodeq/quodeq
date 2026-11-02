@@ -112,7 +112,7 @@ MAX_STANDARDS_CHARS_DEFAULT = 50000  # full standards for models with large cont
 MCP_MAX_BATCH_DEFAULT = 1000
 AI_TOOLS_DEFAULT = "Glob,Grep,Read"
 BASE_AI_ARGS_DEFAULT = "--print --output-format stream-json --verbose"
-NON_SCOUT_PROVIDERS_DEFAULT = "codex,gemini"
+NON_SCOUT_PROVIDERS_DEFAULT = "codex,gemini,agy"
 AGENT_FAILURE_STREAK_DEFAULT = 5
 FAILURE_STREAK_THRESHOLD_DEFAULT = 5  # consecutive file_done errors that trip the dim breaker
 

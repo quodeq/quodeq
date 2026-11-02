@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.analysis.stream.counters import extract_files_from_blocks
+from quodeq.analysis.stream.counters import extract_files_from_blocks, parse_stream_event
 from quodeq.analysis.stream.event_text import TEXT_EXTRACTORS
 from quodeq.core.types.finding_type import FINDING_TYPES
 from quodeq.shared.logging import log_debug
@@ -73,9 +73,8 @@ def extract_evidence_from_stream(stream_file: Path, jsonl_file: Path) -> int:
             line = raw_line.strip()
             if not line:
                 continue
-            try:
-                data = json.loads(line)
-            except json.JSONDecodeError:
+            data = parse_stream_event(line)
+            if not isinstance(data, dict):
                 continue
 
             etype = data.get("type", "unknown")

@@ -10,6 +10,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import socket
+from collections.abc import Callable
 
 from quodeq.shared.constants import LOCALHOST, LOCALHOST_LOCALDOMAIN
 
@@ -18,8 +19,18 @@ _logger = logging.getLogger(__name__)
 _IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
 
-def _is_internal(addr: _IPAddress) -> bool:
-    return addr.is_private or addr.is_loopback or addr.is_link_local
+def is_internal_ip(address: str) -> bool:
+    """True when *address* (an IP string) is not a public unicast address.
+
+    An IPv4-mapped IPv6 address (``::ffff:127.0.0.1``) is judged as the IPv4
+    address it carries. Unspecified (``0.0.0.0`` reaches this host on most
+    stacks), multicast and reserved ranges count as internal too.
+    """
+    addr: _IPAddress = ipaddress.ip_address(address)
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        addr = addr.ipv4_mapped
+    return (addr.is_private or addr.is_loopback or addr.is_link_local
+            or addr.is_unspecified or addr.is_multicast or addr.is_reserved)
 
 
 def _ip_literal(hostname: str) -> _IPAddress | None:
@@ -64,7 +75,24 @@ def is_private_address(hostname: str) -> bool:
     addresses = resolve_addresses(hostname)
     if not addresses:
         return True
-    return any(_is_internal(ipaddress.ip_address(a)) for a in addresses)
+    return any(is_internal_ip(a) for a in addresses)
+
+
+def public_addresses(
+    hostname: str, *, resolve: Callable[[str], tuple[str, ...]] = resolve_addresses,
+) -> tuple[str, ...]:
+    """Resolve *hostname* once and return that answer, for the caller to pin.
+
+    Raises ``ValueError`` when it does not resolve or any address is
+    internal. Connecting to these addresses (not to the name again) is what
+    closes the DNS-rebinding window between the check and the connect.
+    """
+    addresses = resolve(hostname)
+    if not addresses:
+        raise ValueError(f"could not resolve {hostname}")
+    if any(is_internal_ip(a) for a in addresses):
+        raise ValueError(f"{hostname} resolves to a private/internal address")
+    return addresses
 
 
 def is_loopback_address(hostname: str) -> bool:
