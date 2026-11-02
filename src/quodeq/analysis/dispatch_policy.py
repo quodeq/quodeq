@@ -28,6 +28,7 @@ from typing import Callable
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.analysis_env import max_api_file_size
 from quodeq.config.provider import ProviderType
+from quodeq.core.utils.io import is_within_not_link
 from quodeq.shared.utils import get_ai_cmd
 
 StatFn = Callable[[Path], int]
@@ -68,13 +69,17 @@ class DispatchPolicy:
     ) -> tuple[list[str], list[str]]:
         """Split *rel_files* into (dispatchable, excluded), preserving order.
 
-        A file is excluded when it is missing/unreadable or its size
-        reaches ``file_size_cap`` — exactly the set an API worker cannot
-        send.
+        A file is excluded when it is missing/unreadable, its size reaches
+        ``file_size_cap``, or it is a symlink or resolves outside *root*
+        (its text would be inlined into the prompt) — exactly the set an
+        API worker cannot send.
         """
         dispatchable: list[str] = []
         excluded: list[str] = []
         for f in rel_files:
+            if not is_within_not_link(root / f, root):
+                excluded.append(f)
+                continue
             try:
                 size = self.stat_size(root / f)
             except OSError:

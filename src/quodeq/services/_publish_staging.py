@@ -5,6 +5,10 @@ plus stage_project's one exception, a `git config user.name` read.
 Invariants (spec):
 - only completed runs (state == "done") are published
 - explicit allowlist of source-of-truth files, never derived artifacts
+- no machine path of the publisher's: a local project's ``path`` is blanked
+  and each report's ``project`` names only the folder (publish_scrub.py)
+- no code unless the shared repository opts in: snippets become fingerprint
+  tokens and context is dropped (publish_scrub.py)
 - actions.jsonl is union-merged with the remote copy, never overwritten
 - a run keeps the form the shared repo has it in (full or archive); a new
   one takes its local form; the local archive is read, never restored
@@ -23,6 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.core.run.state import RunState
+from quodeq.services.publish_scrub import published_repository_info, scrub_report_paths, withhold_snippets
 from quodeq.services.wiring import (
     ACTIONS_LOG_FILENAME,
     DIMENSIONS_FILENAME,
@@ -33,6 +38,7 @@ from quodeq.services.wiring import (
     copy_matching_files, copy_reports_plain,
     ensure_dir,
     merge_action_log_files,
+    read_repository_info,
     read_status,
     replace_json_file,
     run_git,
@@ -57,6 +63,7 @@ EVENTS_FILENAME = "events.jsonl"
 _EVIDENCE_PATTERN = "*_evidence.jsonl"
 _EVALUATION_DIR = "evaluation"
 _SCAN_FILENAME = "scan.json"
+_REPO_INFO_FILENAME = "repository_info.json"
 
 
 def list_completed_runs(project_dir: Path) -> list[Path]:
@@ -126,8 +133,11 @@ def _copy_logs(run_dir: Path, dest_run_dir: Path, written: list[Path]) -> None:
             raise RunArchiveError(f"run {run_dir.name} changed while publishing, retry")
 
 
-def copy_run(run_dir: Path, dest_run_dir: Path) -> list[Path]:
+def copy_run(run_dir: Path, dest_run_dir: Path, *, with_snippets: bool = False) -> list[Path]:
     """Copy the run's published files into *dest_run_dir*; the paths written.
+
+    Without *with_snippets* the copies carry no code: each finding's snippet
+    becomes its fingerprint token and its context is dropped (publish_scrub).
 
     Never restores, stamps or changes the local run. Raises ``RunArchiveError``
     (before any other file is written) when its archive is unsafe or unreadable.
@@ -150,7 +160,11 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> list[Path]:
     # source of truth read_run_data() needs to render a dashboard at all;
     # without them a published clone renders an EMPTY dashboard. Only the
     # reports, written plain whatever form the local run keeps them in.
-    written.extend(copy_reports_plain(run_dir / _EVALUATION_DIR, dest_run_dir / _EVALUATION_DIR))
+    reports = copy_reports_plain(run_dir / _EVALUATION_DIR, dest_run_dir / _EVALUATION_DIR)
+    scrub_report_paths(reports)
+    written.extend(reports)
+    if not with_snippets:
+        withhold_snippets(written)
     return written
 
 
@@ -195,12 +209,15 @@ def _check_clone_dirs(dest_project_dir: Path, runs: list[Path]) -> None:
             raise RunArchiveError(f"run {run_dir.name} is a link in the shared clone, refusing to publish into it")
 
 
-def stage_project(project_dir: Path, dest_project_dir: Path) -> StagedProject:
+def stage_project(project_dir: Path, dest_project_dir: Path, *, with_snippets: bool = False) -> StagedProject:
     runs = list_completed_runs(project_dir)
     _check_clone_dirs(dest_project_dir, runs)
     ensure_dir(dest_project_dir)
     written: list[Path] = []
-    _copy(project_dir / "repository_info.json", dest_project_dir / "repository_info.json", written)
+    info = read_repository_info(project_dir)
+    if info is not None:  # the publisher's folder path never leaves this machine
+        replace_json_file(dest_project_dir / _REPO_INFO_FILENAME, published_repository_info(info), indent=2)
+        written.append(dest_project_dir / _REPO_INFO_FILENAME)
     # Project-level scan.json (quick-scan coverage metadata: total_files etc.)
     # is consumed by fs_reports._enrich_with_coverage and the project-card
     # coverage reader -- without it, a published clone's dashboard/card never
@@ -212,7 +229,7 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> StagedProject:
     if actions.is_file():
         written.append(actions)
     for run_dir in runs:
-        written.extend(copy_run(run_dir, dest_project_dir / run_dir.name))
+        written.extend(copy_run(run_dir, dest_project_dir / run_dir.name, with_snippets=with_snippets))
 
     # Record who published and when at publish time,
     # rather than relying solely on git-log against the shared clone, which

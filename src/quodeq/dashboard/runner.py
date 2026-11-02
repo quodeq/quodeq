@@ -30,6 +30,7 @@ from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.paths import resolve_path
+from quodeq.shared.state_permissions import secure_state_dir
 
 __all__ = [
     "BuildConfig",
@@ -261,6 +262,7 @@ def run_dashboard(
     if launch_args is not None:
         record_launch_args(launch_args)
     _log_startup_banner(config)
+    secure_state_dir()  # before the API writes evaluated code there (os.environ, never a test's partial env)
     action_api_url, action_api_process = _start_action_api_for(config, probes, hooks)
     _start_background_tasks()
     _server_mod.serve_and_wait(action_api_url, action_api_process, config)

@@ -25,9 +25,11 @@ describe('useSyncStatus', () => {
     const reading = { ...base, connect: { state: 'running', phase: 'reading', projectsFound: 2 } };
     const done = { ...base, connect: { state: 'done', phase: 'done', projectsFound: 5 } };
     const { spy, api } = setup([reading, reading, reading, done, done]);
-    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(5), { timeout: 500 });
-    expect(keyCalls(spy, sharedKeys.list())).toBe(1);
-    expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+    await waitFor(() => {
+      expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(5);
+      expect(keyCalls(spy, sharedKeys.list())).toBe(1);
+      expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+    }, { timeout: 500 });
   });
 
   it('polls fast while active and slow when idle', async () => {
@@ -48,9 +50,11 @@ describe('useSyncStatus', () => {
     const running = { ...base, refresh: { state: 'running', phase: 'downloading' } };
     const done = { ...base, refresh: { state: 'done', phase: 'done' } };
     const { spy, api } = setup([running, done, done]);
-    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(3), { timeout: 500 });
-    expect(keyCalls(spy, sharedKeys.list())).toBe(1);
-    expect(keyCalls(spy, projectsKeys.list())).toBe(0);
+    await waitFor(() => {
+      expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(3);
+      expect(keyCalls(spy, sharedKeys.list())).toBe(1);
+      expect(keyCalls(spy, projectsKeys.list())).toBe(0);
+    }, { timeout: 500 });
   });
 
   it('a slot already done at mount seeds the baseline and invalidates nothing', async () => {
@@ -64,8 +68,10 @@ describe('useSyncStatus', () => {
     const running = { ...base, connect: { state: 'running', phase: 'downloading' } };
     const done = { ...base, connect: { state: 'done', phase: 'done' } };
     const { spy, api } = setup([running, done, done, done]);
-    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(4), { timeout: 500 });
-    expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+    await waitFor(() => {
+      expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(4);
+      expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+    }, { timeout: 500 });
   });
 
   it('exposes configured, url, lastSynced and the three slots', async () => {
@@ -79,8 +85,10 @@ describe('useSyncStatus', () => {
       const running = { ...base, [kind]: { state: 'running', phase: 'downloading' } };
       const done = { ...base, [kind]: { state: 'done', phase: 'done' } };
       const { spy, api } = setup([running, done, done, done]);
-      await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(4), { timeout: 500 });
-      expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+      await waitFor(() => {
+        expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(4);
+        expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+      }, { timeout: 500 });
     }
   });
 
@@ -88,33 +96,42 @@ describe('useSyncStatus', () => {
     const first = { ...base, pull: { state: 'done', phase: 'done', project: 'a', finishedAt: 10 } };
     const second = { ...base, pull: { state: 'done', phase: 'done', project: 'b', finishedAt: 20 } };
     const { spy, api } = setup([base, first, second, second, second]);
-    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(5), { timeout: 500 });
-    expect(keyCalls(spy, projectsKeys.list())).toBe(2);
-    expect(keyCalls(spy, sharedKeys.list())).toBe(2);
+    await waitFor(() => {
+      expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(5);
+      expect(keyCalls(spy, projectsKeys.list())).toBe(2);
+      expect(keyCalls(spy, sharedKeys.list())).toBe(2);
+    }, { timeout: 500 });
   });
 
   it('identical DONE snapshots (same finishedAt) invalidate once', async () => {
     const done = { ...base, pull: { state: 'done', phase: 'done', project: 'a', finishedAt: 10 } };
     const { spy, api } = setup([base, done, { ...done, pull: { ...done.pull } }, done, done]);
-    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(5), { timeout: 500 });
-    expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+    await waitFor(() => {
+      expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(5);
+      expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+    }, { timeout: 500 });
   });
 
   it('error, done, error, done fires once per DONE edge', async () => {
     const mk = (phase) => ({ ...base, pull: { state: phase, phase } });
     const { spy, api } = setup([mk('error'), mk('done'), mk('error'), mk('done'), mk('done'), mk('done')]);
-    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(6), { timeout: 500 });
-    expect(keyCalls(spy, projectsKeys.list())).toBe(2);
-    expect(keyCalls(spy, sharedKeys.list())).toBe(2);
+    await waitFor(() => {
+      expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(6);
+      expect(keyCalls(spy, projectsKeys.list())).toBe(2);
+      expect(keyCalls(spy, sharedKeys.list())).toBe(2);
+    }, { timeout: 500 });
   });
 
   it('a refresh or connect done re-lists the standards (their sync state reads the clone); a pull done does not', async () => {
     for (const [kind, expected] of [['refresh', 1], ['connect', 1], ['pull', 0]]) {
       const running = { ...base, [kind]: { state: 'running', phase: 'downloading' } };
       const done = { ...base, [kind]: { state: 'done', phase: 'done' } };
-      const { spy, api } = setup([running, done, done]);
-      await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(3), { timeout: 500 });
-      expect(keyCalls(spy, standardsKeys.list())).toBe(expected);
+      const { spy } = setup([running, done, done]);
+      // Every kind re-lists the shared list on DONE: proof the edge was handled before reading the standards count.
+      await waitFor(() => {
+        expect(keyCalls(spy, sharedKeys.list())).toBe(1);
+        expect(keyCalls(spy, standardsKeys.list())).toBe(expected);
+      }, { timeout: 500 });
     }
   });
 

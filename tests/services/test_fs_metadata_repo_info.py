@@ -35,6 +35,10 @@ class TestCheckPathExists:
     def test_none_path_returns_none(self):
         assert check_path_exists(None, "local") is None
 
+    def test_empty_local_path_is_missing(self):
+        # A pulled project's publisher path is blanked on publish: there is no folder here.
+        assert check_path_exists("", "local") is False
+
     def test_none_location_returns_none(self):
         assert check_path_exists("/some/path", None) is None
 

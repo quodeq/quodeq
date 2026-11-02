@@ -29,6 +29,11 @@ schemas_dir = src_dir / "quodeq" / "analysis" / "plugins" / "schemas"
 if schemas_dir.exists():
     datas.append((str(schemas_dir), "quodeq/analysis/plugins/schemas"))
 
+# Standalone /logs viewer page, read by create_app at startup
+api_pages_dir = src_dir / "quodeq" / "api" / "pages"
+if api_pages_dir.exists():
+    datas.append((str(api_pages_dir), "quodeq/api/pages"))
+
 # AI config defaults
 ai_defaults = src_dir / "quodeq" / "config" / "ai_defaults.json"
 if ai_defaults.exists():

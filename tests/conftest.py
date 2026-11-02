@@ -13,6 +13,7 @@ from quodeq.data.fs._index_cache import clear_index_cache
 from quodeq.services.dashboard import clear_shared_dimension_cache
 from tests._sharding import ENV_VAR, parse_shard, select_shard
 from tests._cwd_guard import _cwd_leak_guard  # noqa: F401 — autouse fixture, registered by import
+from tests._session_client import _session_test_client  # noqa: F401 — autouse fixture, registered by import
 
 # Deep enough to exhaust the C JSON decoder's call stack on a default 8MB
 # main-thread stack. ~160KB of text -- trivially producible by hand or by a

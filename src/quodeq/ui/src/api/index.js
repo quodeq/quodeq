@@ -25,7 +25,7 @@ export {
   sharedGetDashboard, sharedGetAccumulated, sharedGetProjectScores,
   sharedGetRunScores, sharedGetFindingDetail, sharedGetDimensionEval, sharedGetViolations,
   sharedListDismissedFindings, sharedListVerifiedFindings,
-  publishProject, sharedGetCompareSummary, sharedGetFleetCompare,
+  publishProject, setSharedSnippets, sharedGetCompareSummary, sharedGetFleetCompare,
 } from './shared.js';
 export { getSyncStatus, startRefresh, startPull, getInvite } from './syncStatus.js';
 export { getCloneStatus, isCloneActive, cloneNameFromUrl } from './projectClone.js';

@@ -68,7 +68,7 @@ def gather_api_source_files(
             write_skip_markers(
                 jsonl_file, dropped,
                 reason=(
-                    f"skipped: missing or over the API file-size cap "
+                    f"skipped: missing, a symlink, outside the repo, or over the API file-size cap "
                     f"({policy.file_size_cap} bytes)"
                 ),
             )
