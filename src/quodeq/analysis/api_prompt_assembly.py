@@ -6,6 +6,7 @@ and evaluation rules.
 from __future__ import annotations
 
 import logging
+import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,8 +16,14 @@ from quodeq.config.prompt_templates import render_template
 from quodeq.context.path_role import Role, path_role
 from quodeq.context.project_shape import Deployment, ProjectShape, detect_shape
 from quodeq.context.trust_model import TrustModel
+from quodeq.core.secret_scan import redact
 
 _log = logging.getLogger(__name__)
+
+# secrets.token_hex byte count for the per-prompt file fence boundary. A file
+# cannot close its own fence without guessing it, so text inside a file can
+# never pose as prompt text that follows the file.
+_FENCE_BOUNDARY_BYTES = 8
 
 _FINDING_SCHEMA = """\
 Each finding must be a JSON object with these fields:
@@ -56,8 +63,14 @@ def _role_label(display_path: str) -> str:
     return f" (role: {role.value})"
 
 
-def _build_files_block(source_files: list[Path], repo_root: Path | None = None) -> str:
-    """Build the source files block for the prompt."""
+def _build_files_block(
+    source_files: list[Path], repo_root: Path | None = None, *, boundary: str,
+) -> str:
+    """Build the source files block for the prompt.
+
+    Each file is secret-redacted (typed placeholders, line count kept) and
+    fenced between ``<<file:PATH:BOUNDARY>>`` and ``<<end:BOUNDARY>>``.
+    """
     parts: list[str] = []
     for path in source_files:
         content = _read_file_safe(path)
@@ -68,8 +81,12 @@ def _build_files_block(source_files: list[Path], repo_root: Path | None = None) 
         # on Windows, which are unusual in code prompts and inconsistent
         # with the path-role classifier's normalisation.
         display_path = path.relative_to(repo_root).as_posix() if repo_root else path.name
-        numbered = "\n".join(f"{i+1:4d} | {line}" for i, line in enumerate(content.splitlines()))
-        parts.append(f"### {display_path}{_role_label(display_path)}\n```\n{numbered}\n```")
+        lines = redact(content).splitlines()
+        numbered = "\n".join(f"{i+1:4d} | {line}" for i, line in enumerate(lines))
+        parts.append(
+            f"### {display_path}{_role_label(display_path)}\n"
+            f"<<file:{display_path}:{boundary}>>\n{numbered}\n<<end:{boundary}>>"
+        )
     return "\n\n".join(parts)
 
 
@@ -207,7 +224,8 @@ def assemble_api_prompt(
     """
     template = load_template(template_name="api_prompt.md")
     rules = load_evaluation_rules()
-    files_block = _build_files_block(source_files, repo_root=project.root)
+    boundary = secrets.token_hex(_FENCE_BOUNDARY_BYTES)
+    files_block = _build_files_block(source_files, repo_root=project.root, boundary=boundary)
     project_shape = project.shape
     if project_shape is None and project.root is not None:
         project_shape = detect_shape(project.root)
@@ -223,4 +241,5 @@ def assemble_api_prompt(
         "EVALUATION_RULES": rules,
         "FINDING_SCHEMA": _FINDING_SCHEMA,
         "FILES_BLOCK": files_block,
+        "FILE_BOUNDARY": boundary,
     })
