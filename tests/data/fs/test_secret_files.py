@@ -41,7 +41,7 @@ def test_the_walk_stops_at_the_limit(tmp_path):
 def test_reads_only_tracked_secret_files(tmp_path):
     _git(tmp_path, "init", "-q")
     (tmp_path / ".gitignore").write_text(".env.local\n")
-    (tmp_path / ".env").write_text("TOKEN=abc\n")
+    (tmp_path / ".env").write_bytes(b"TOKEN=abc\n")  # text mode writes \r\n on Windows
     (tmp_path / ".env.local").write_text("TOKEN=local\n")
     (tmp_path / "app.py").write_text("print(1)\n")
     _git(tmp_path, "add", ".")

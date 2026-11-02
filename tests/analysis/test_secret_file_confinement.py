@@ -1,6 +1,7 @@
 """Scan agents cannot read the repo's credential files, and committed ones are still reported."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,10 @@ from quodeq.analysis.subprocess import AnalysisConfig, build_ai_cmd, confine_cli
 from tests.core._fake_secrets import GENERIC_VALUE
 
 _BYPASS = "--dangerously-bypass-approvals-and-sandbox"
+
+
+def _entry(path, access):
+    return f"{json.dumps(str(path))} = \"{access}\""  # TOML escapes Windows backslashes
 
 
 def test_claude_scan_denies_reading_credential_files(tmp_path):
@@ -26,8 +31,8 @@ def test_claude_scan_denies_reading_credential_files(tmp_path):
 def test_codex_profile_denies_files_inside_a_readable_repo(tmp_path):
     profile = codex_sandbox.profile_args(tmp_path, [tmp_path / "repo"], [tmp_path / "repo" / ".env"])
     filesystem = next(a for a in profile if ".filesystem=" in a)
-    assert f'"{tmp_path / "repo"}" = "read"' in filesystem
-    assert f'"{tmp_path / "repo" / ".env"}" = "none"' in filesystem
+    assert _entry(tmp_path / "repo", "read") in filesystem
+    assert _entry(tmp_path / "repo" / ".env", "none") in filesystem
 
 
 @pytest.fixture
@@ -53,7 +58,7 @@ def test_codex_native_sandbox_denies_the_repo_secret_files(tmp_path, repo, monke
                         lambda binary, profile, listed, sample, env: probes.append(sample) or True)
     args = _confine(tmp_path, repo)
     assert probes == [(repo / "app.py").resolve()]
-    assert f'"{(repo / ".env").resolve()}" = "none"' in next(a for a in args if ".filesystem=" in a)
+    assert _entry((repo / ".env").resolve(), "none") in next(a for a in args if ".filesystem=" in a)
 
 
 def test_codex_keeps_plain_read_only_where_it_cannot_deny_files(tmp_path, repo, monkeypatch):
