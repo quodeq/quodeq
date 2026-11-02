@@ -58,6 +58,13 @@ dev = [
     "ruff==0.17.2",
     "vulture==2.16",
 ]
+# Desktop bundle toolchain (packaging/macos, packaging/windows). Kept out of
+# `dev` so a plain `uv sync` stays lean, but locked in uv.lock so the DMG and
+# Windows zip are built by a reviewed PyInstaller, not whatever PyPI serves
+# on release day.
+desktop = [
+    "pyinstaller==6.22.3",
+]
 
 [project.scripts]
 quodeq = "quodeq:main"

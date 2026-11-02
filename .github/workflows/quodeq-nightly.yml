@@ -26,6 +26,11 @@ on:
         description: "Run time limit in seconds (0 = unlimited). Default 11h truncates gracefully before the 12h job timeout."
         default: "39600"
 
+# Runs on the self-hosted runner, so the token gets the smallest scope that
+# still lets it check out develop.
+permissions:
+  contents: read
+
 jobs:
   nightly:
     runs-on: [self-hosted, quodeq]
@@ -38,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout develop
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: develop
           fetch-depth: 0
@@ -67,13 +72,13 @@ jobs:
           echo "EVAL_DIR=$DIR" >> "$GITHUB_ENV"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Set up Python
         run: uv python install 3.13
 
       - name: Install quodeq
-        run: uv sync
+        run: uv sync --locked
 
       - name: Check for changes since last nightly
         id: changes
@@ -151,7 +156,7 @@ jobs:
 
       - name: Upload evaluation artifact
         if: steps.changes.outputs.skip != 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: quodeq-nightly-${{ github.sha }}
           path: ${{ steps.latest_run.outputs.path }}

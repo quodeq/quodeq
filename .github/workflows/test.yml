@@ -13,6 +13,10 @@ on:
   # the dispatched ref's head commit, which is where branch protection looks.
   workflow_dispatch:
 
+# Read-only token: the jobs only check out and test; nothing here writes back.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}
@@ -45,16 +49,16 @@ jobs:
           - { os: windows-latest, python-version: "3.13", shard: "3/3" }
 
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       - name: Run tests (Linux/macOS)
         if: runner.os != 'Windows'
@@ -124,10 +128,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7.1.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # 22, not 20: the `test` script runs `node --test` with a glob
           # pattern, and node only expands glob args to --test on 21+.

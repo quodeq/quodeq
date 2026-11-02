@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
 
+# Default for every job is read-only; the publish job widens only what
+# trusted publishing and attestations need.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -11,16 +16,16 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       - name: Run tests
         # Skip integration tests — same rationale as test.yml.
@@ -31,18 +36,23 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
+      contents: read
+      # Trusted publishing to PyPI and Sigstore signing for the attestations.
       id-token: write
+      # Stores the build provenance and SBOM attestations on GitHub.
+      attestations: write
+      artifact-metadata: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Set up Python
         run: uv python install 3.12
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7.1.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
 
@@ -65,5 +75,67 @@ jobs:
       - name: Build package
         run: uv build
 
+      # CycloneDX SBOMs for both halves of what the wheel ships: the locked
+      # Python runtime dependencies and the npm packages bundled into the
+      # pre-built UI. Written outside dist/ so the PyPI upload below only
+      # sees the wheel and sdist.
+      - name: Generate SBOMs
+        id: sbom
+        run: |
+          VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          mkdir -p sbom
+          uv export --locked --no-dev --preview-features sbom-export \
+            --format cyclonedx1.5 -o "sbom/quodeq-${VERSION}-python.cdx.json"
+          (cd src/quodeq/ui && npm sbom --omit dev --package-lock-only \
+            --sbom-format cyclonedx) > "sbom/quodeq-${VERSION}-ui.cdx.json"
+          echo "python=sbom/quodeq-${VERSION}-python.cdx.json" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+            sbom/*.cdx.json
+
+      - name: Attest Python SBOM against the distributions
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+          sbom-path: ${{ steps.sbom.outputs.python }}
+
+      - name: Keep SBOMs for the release job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom
+          path: sbom/*.cdx.json
+          if-no-files-found: error
+
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          # PEP 740 attestations, signed with this job's OIDC identity. On by
+          # default for trusted publishing; stated so it cannot silently drop.
+          attestations: true
+
+  # Separate from publish so the job holding id-token never also holds a
+  # token that can write to the repository.
+  release-sbom:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download SBOMs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sbom
+          path: sbom
+
+      - name: Attach SBOMs to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" sbom/*.cdx.json --clobber --repo "$GITHUB_REPOSITORY"

@@ -35,7 +35,7 @@ jobs:
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Notice when SNYK_TOKEN is missing
         if: env.SNYK_TOKEN == ''
@@ -43,11 +43,11 @@ jobs:
 
       - name: Install uv
         if: env.SNYK_TOKEN != ''
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Export pinned Python requirements
         if: env.SNYK_TOKEN != ''
-        run: uv export --no-dev --no-hashes --no-emit-project -o requirements.txt
+        run: uv export --locked --no-dev --no-hashes --no-emit-project -o requirements.txt
 
       # Snyk's pip scanner resolves the dependency graph from installed
       # packages, not from the requirements file alone (SNYK-OS-PYTHON-0013),
@@ -61,7 +61,7 @@ jobs:
 
       - name: Install Snyk CLI
         if: env.SNYK_TOKEN != ''
-        run: npm install -g snyk
+        run: npm install -g snyk@1.1308.3
 
       # continue-on-error so a high-severity finding in one scan does not skip
       # the remaining scans (each must still produce its SARIF); the final gate
@@ -106,21 +106,21 @@ jobs:
       # before it writes SARIF.
       - name: Upload Snyk Python (deps) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-python.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.39.1
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: snyk-python.sarif
           category: snyk-python-deps
 
       - name: Upload Snyk UI (deps) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-ui.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.39.1
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: snyk-ui.sarif
           category: snyk-ui-deps
 
       - name: Upload Snyk Code (SAST) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-code.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.39.1
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: snyk-code.sarif
           category: snyk-code
