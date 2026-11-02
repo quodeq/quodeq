@@ -27,6 +27,7 @@ from quodeq.data.fs.project_standards import (  # noqa: F401 - re-exported API
     load_project_standards,
     project_settings_file,
     read_project_standards,
+    remove_project_settings,
     save_enabled_ids,
     save_overrides,
     settings_file_for_owner,

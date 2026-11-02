@@ -37,7 +37,6 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
         "project_name": info.get("name"),
         "scope_path": info.get("scopePath"),
         "location": info.get("location"),
-        "repo_path": info.get("path"),
         "remote_url": info.get("remote_url"),
         "discipline": info.get("discipline"),
         "exported_at": utc_now_iso(),
@@ -85,13 +84,19 @@ class _ZipLimits:
 
 
 _DB_FILES = frozenset({"evaluation.db", "evaluation.db-wal", "evaluation.db-shm"})
+# The run console's log and the agents' raw transcripts (which carry the
+# evaluating machine's paths and whole tool outputs), plus lock files. Import
+# rebuilds a run from its event log, evidence and reports, never from these.
+_LOCAL_ONLY_FILES = frozenset({"run.log"})
+_LOCAL_ONLY_SUFFIXES = (".tmp", ".stream", ".stream.err", ".lock")
 
 
 def _is_local_state(relative: Path) -> bool:
     """True for a file that only means something on the machine that made it."""
     return (
         relative.name in _DB_FILES
-        or relative.name.endswith(".tmp")
+        or relative.name in _LOCAL_ONLY_FILES
+        or relative.name.endswith(_LOCAL_ONLY_SUFFIXES)
         or any(part.startswith(".") for part in relative.parts)
     )
 
@@ -102,7 +107,8 @@ def _iter_export_files(project_path: Path):
     Symlinks and non-files are skipped, as is any prior manifest so the
     export-time one is authoritative. Databases (rebuilt from the event log on
     the other side), dot-files and dot-folders (markers, locks, restore
-    staging) and ``*.tmp`` leftovers never travel.
+    staging), ``*.tmp`` leftovers, ``run.log``, agent ``*.stream`` transcripts
+    and ``*.lock`` files never travel.
     """
     for file_entry in project_path.rglob("*"):
         if file_entry.is_symlink() or not file_entry.is_file():

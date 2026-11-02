@@ -15,9 +15,14 @@ from quodeq.services.wiring_sync import is_shared_clone_root
 
 
 def check_path_exists(path: str | None, location: str | None) -> bool | None:
-    """Return whether a local path exists, or None if not applicable."""
-    if location == ProjectLocation.LOCAL and path:
-        return Path(path).exists()
+    """Return whether a local path exists, or None if not applicable.
+
+    A local project whose recorded path is empty (a pull from a shared repo,
+    whose publisher's path is never published) has no folder here: False, so
+    the UI asks for one. An absent path stays unknown.
+    """
+    if location == ProjectLocation.LOCAL and path is not None:
+        return bool(path) and Path(path).exists()
     return None
 
 
