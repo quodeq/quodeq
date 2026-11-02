@@ -29,9 +29,14 @@ from quodeq.core.constants import (
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.secret_files import SECRET_FILE_GLOBS
 from quodeq.shared.models import normalize_model_id
 
 _READ_REPO_RULE = "Read(./**)"  # permission rule: reads under the CLI's cwd only
+# Deny rules win over the allow above: the repo's credential files stay
+# unread at any depth. Templates (.env.example) are denied with them, since
+# a rule cannot make exceptions.
+_DENY_SECRET_FILE_RULES = ",".join(f"Read(./**/{glob})" for glob in SECRET_FILE_GLOBS)
 
 
 def get_ai_tools(env: Mapping[str, str] | None = None) -> str:
@@ -127,7 +132,7 @@ def _build_config_file_mcp_args(
         # Reads are pre-approved only under the cwd, the analysed repo (Read
         # rules also govern Glob and Grep).
         allowed += f",{_READ_REPO_RULE}"
-        args.extend(["--allowedTools", allowed])
+        args.extend(["--allowedTools", allowed, "--disallowedTools", _DENY_SECRET_FILE_RULES])
     # dontAsk denies every call not pre-approved above instead of prompting,
     # so the non-interactive run cannot read outside the repo, run commands
     # or reach other tools. Never bypassPermissions: that approves any path.

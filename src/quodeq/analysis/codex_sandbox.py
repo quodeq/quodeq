@@ -20,7 +20,7 @@ import json
 import platform
 import re
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
@@ -41,18 +41,30 @@ def _toml_str(value: str) -> str:
     return json.dumps(value)  # a JSON string is a valid TOML basic string
 
 
-def plain_read_only_args() -> list[str]:
-    """``-c`` overrides for read-only without read limits: no writes and no
-    network, home readable. Windows refuses restricted reads unless its
-    elevated sandbox backend is installed, but runs this."""
-    return [_CONFIG_FLAG, 'approval_policy="never"']
+def plain_read_only_args(unreadable: Sequence[Path] = ()) -> list[str]:
+    """``-c`` overrides for read-only with no read limits but *unreadable*:
+    no writes and no network, home readable. Windows refuses restricted
+    reads unless its elevated sandbox backend is installed, but runs this
+    when there is nothing to deny; a probe decides."""
+    if not unreadable:
+        return [_CONFIG_FLAG, 'approval_policy="never"']
+    return _profile(_unreadable_entries(unreadable))
 
 
-def profile_args(home: Path, readable: list[Path]) -> list[str]:
+def _unreadable_entries(paths: Sequence[Path]) -> list[str]:
+    return [f"{_toml_str(str(p))} = \"none\"" for p in dict.fromkeys(paths)]
+
+
+def profile_args(home: Path, readable: list[Path], unreadable: Sequence[Path] = ()) -> list[str]:
     """``-c`` overrides selecting a read-only profile with *home* unreadable
-    except *readable*, and no approval prompts."""
+    except *readable*, *unreadable* files unreadable even inside those, and
+    no approval prompts."""
     entries = [f"{_toml_str(str(home))} = \"none\""]
     entries += [f"{_toml_str(str(p))} = \"read\"" for p in dict.fromkeys(readable)]
+    return _profile([*entries, *_unreadable_entries(unreadable)])
+
+
+def _profile(entries: list[str]) -> list[str]:
     overrides = [
         'approval_policy="never"',
         f'default_permissions="{_PROFILE}"',

@@ -7,7 +7,8 @@ prompt-injected repo could steer, so it runs inside an OS sandbox Quodeq
 controls: writes only to this project's evaluations, the run's queue, the
 result cache, the CLI's own home and temp; no reads of file contents under
 the user's home except those, the analysed repo, the standards and what the
-CLI and the findings server need to run; and no connections to services on
+CLI and the findings server need to run; no reads of the repo's own
+credential files (``core.secret_files``); and no connections to services on
 this machine (Quodeq's own API), except a local proxy.
 
 Quodeq's other state stays out of reach on purpose: other projects' clones
@@ -31,7 +32,9 @@ from quodeq.analysis.codex_sandbox import (
 )
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.secret_files import secret_file_kind
 from quodeq.data.fs.project_standards import project_settings_file, settings_reports_root
+from quodeq.data.fs.secret_files import find_secret_files
 from quodeq.shared.codex_home import user_codex_auth_file
 from quodeq.shared.os_sandbox import (
     SandboxUnavailable,
@@ -144,8 +147,8 @@ def _sandbox_prefix(
         writable_files=[str(auth)] if auth else [],
         readable_home_dirs=[str(d) for d in readable],
         readonly_dirs=[str(work_dir.resolve())],
-        block_loopback=True,
-        loopback_allow_ports=loopback_proxy_ports(env),
+        loopback_open_ports=loopback_proxy_ports(env),
+        unreadable_files=[str(f) for f in find_secret_files(work_dir)],
     )
 
 
@@ -166,14 +169,19 @@ def _native_args(
     cfg: AnalysisConfig, work_dir: Path, args: list[str], env: Mapping[str, str],
 ) -> list[str] | None:
     project = _project_dir(cfg)
-    sample = next((p for p in sorted(work_dir.iterdir()) if p.is_file()), None)
+    sample = next((p for p in sorted(work_dir.iterdir())
+                   if p.is_file() and secret_file_kind(p.name) is None), None)
     if project is None or sample is None:
         return None
     readable = [work_dir.resolve(), project, *runtime_readable_dirs("rg")]
     evidence = cfg.jsonl_file.resolve().parent if cfg.jsonl_file else project
     # Home unreadable where Codex can enforce it, else plain read-only (no
-    # writes, no network), which still beats the OS fallbacks on Windows.
-    for profile in (profile_args(Path.home().resolve(), readable), plain_read_only_args()):
+    # writes, no network), which still beats the OS fallbacks on Windows:
+    # with the repo's credential files denied if it can, else without.
+    unreadable = [p.resolve() for p in find_secret_files(work_dir)]
+    profiles = [profile_args(Path.home().resolve(), readable, unreadable),
+                plain_read_only_args(unreadable), plain_read_only_args()]
+    for profile in map(list, dict.fromkeys(map(tuple, profiles))):
         if native_sandbox_works(args[0], profile, evidence, sample.resolve(), env):
             return native_args(args, profile)
     return None

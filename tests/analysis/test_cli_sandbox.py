@@ -58,8 +58,7 @@ def test_cli_home_follows_the_env_var_quodeq_set(tmp_path, captured):
 
 def test_loopback_is_blocked_except_a_local_proxy(tmp_path, captured):
     _run(tmp_path, {"cli_home": ".x"}, {"HTTPS_PROXY": "http://127.0.0.1:3128"})
-    assert captured["block_loopback"] is True
-    assert captured["loopback_allow_ports"] == [3128]
+    assert captured["loopback_open_ports"] == [3128]
 
 
 def test_runs_without_a_sandbox_where_none_works(tmp_path, monkeypatch):

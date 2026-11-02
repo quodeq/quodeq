@@ -20,7 +20,9 @@ from quodeq.core.checks.config_reads import CONFIG_SYMBOLS, check_config_reads
 from quodeq.core.checks.entity_imports import check_entity_imports
 from quodeq.core.checks.framework_deps import check_framework_dependencies
 from quodeq.core.checks.frameworks import FRAMEWORK_PACKAGES
-from quodeq.core.checks.hardcoded_secrets import check_hardcoded_secrets
+from quodeq.core.checks.hardcoded_secrets import (
+    check_committed_secret_files, check_hardcoded_secrets,
+)
 from quodeq.core.checks.model import ImportGraph, SymbolUse
 from quodeq.core.events.models import Judgment
 
@@ -47,6 +49,7 @@ class CheckContext:
         Callable[[Path, Iterable[Path], frozenset[str]], tuple[SymbolUse, ...]] | None
     ) = None
     text_reader: Callable[[Path, Iterable[Path]], list[tuple[str, str]]] | None = None
+    secret_file_reader: Callable[[Path], list[tuple[str, str, str]]] | None = None
     _cache: dict = field(default_factory=dict, repr=False, compare=False)
 
     def _paths(self) -> list[Path]:
@@ -93,6 +96,13 @@ class CheckContext:
             self._cache["texts"] = self.text_reader(self.root, self._paths())
         return self._cache["texts"]
 
+    def committed_secret_files(self) -> list[tuple[str, str, str]]:
+        """``(file, kind, text)`` for each credential file git tracks; empty
+        when no ``secret_file_reader`` was injected."""
+        if self.secret_file_reader is None:
+            return []
+        return self.secret_file_reader(self.root)
+
 
 def _framework_imports(context: CheckContext) -> list[Judgment]:
     return check_framework_dependencies(
@@ -113,7 +123,10 @@ def _config_reads(context: CheckContext) -> list[Judgment]:
 
 
 def _hardcoded_secrets(context: CheckContext) -> list[Judgment]:
-    return check_hardcoded_secrets(context.source_texts(), dimension=context.dimension)
+    return [
+        *check_hardcoded_secrets(context.source_texts(), dimension=context.dimension),
+        *check_committed_secret_files(context.committed_secret_files(), dimension=context.dimension),
+    ]
 
 
 CHECKERS: dict[str, Callable[[CheckContext], list[Judgment]]] = {

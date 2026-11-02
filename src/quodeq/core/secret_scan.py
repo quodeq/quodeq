@@ -19,11 +19,12 @@ from collections import Counter
 from dataclasses import dataclass
 
 PLACEHOLDER_PREFIX = "<REDACTED:"
+PRIVATE_KEY = "private_key"  # the kind of a PEM private-key block
 
 # The first rule to claim a span wins, so the specific token formats come
 # before the generic keyword rule (and sk-ant- before the plain sk- one).
 _TOKEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("private_key", re.compile(
+    (PRIVATE_KEY, re.compile(
         r"-----BEGIN[A-Z ]*PRIVATE KEY(?: BLOCK)?-----"
         r"(?:.*?-----END[A-Z ]*PRIVATE KEY(?: BLOCK)?-----|.*\Z)",
         re.DOTALL)),
@@ -77,7 +78,8 @@ def placeholder(kind: str) -> str:
     return f"{PLACEHOLDER_PREFIX}{kind}>"
 
 
-def _entropy(value: str) -> float:
+def entropy(value: str) -> float:
+    """Shannon entropy of *value* in bits per character."""
     n = len(value)
     return -sum(c / n * math.log2(c / n) for c in Counter(value).values())
 
@@ -85,7 +87,7 @@ def _entropy(value: str) -> float:
 def _is_generic_secret(value: str) -> bool:
     if any(marker in value for marker in _INDIRECTION_MARKERS):
         return False
-    return _entropy(value) >= _MIN_GENERIC_ENTROPY
+    return entropy(value) >= _MIN_GENERIC_ENTROPY
 
 
 def find_secrets(text: str) -> list[SecretHit]:

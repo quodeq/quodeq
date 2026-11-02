@@ -20,6 +20,12 @@ You choose the provider and model when you add a project (*Who reviews it*), fro
 >
 > On the OWASP Benchmark, quodeq with Claude Sonnet scored 0.77 (found minus false alarms); with local models such as Qwen 3.8 and Gemma 4 it scored 0.20: they find most of the real bugs but flag most safe code too, and small models report almost no compliance, which makes grades harsher. The full results are on the benchmarks page at quodeq.ai.
 
+### What the model sees
+
+The model reads the source files it evaluates, so with a CLI or a cloud API your code goes to that provider. Credential files stay out: Claude Code, Codex, Gemini CLI and Antigravity cannot open the project's `.env` files, private keys (`.pem`, `.key`), SSH keys, key stores, `.npmrc`, `.pypirc`, `.netrc` or `.git-credentials`, and quodeq itself reports any of them committed to git, without a model. With a cloud API, quodeq sends only source files and swaps the credentials it recognises in them for a placeholder.
+
+A credential written directly into a source file still reaches an AI CLI, since evaluating the code means reading it. GitHub Copilot is not covered yet and can open credential files. When no code may leave the machine, use a local model.
+
 ### CLI (Claude Code, Codex, Gemini CLI, GitHub Copilot)
 
 Delegates to an AI CLI you already have authenticated on your machine.

@@ -119,7 +119,7 @@ def _external_sandbox(cfg: CliTurnConfig, cwd: Path) -> tuple[list[str], object 
                         *([str(auth)] if (auth := user_codex_auth_file()) else [])],
         readable_home_dirs=[str(get_quodeq_dir()), *mcp_arg_dirs(cfg.mcp_server_args),
                             *(str(d) for d in runtime_readable_dirs("codex"))],
-        block_loopback=True, loopback_allow_ports=loopback_proxy_ports(resolve_env()))
+        loopback_open_ports=loopback_proxy_ports(resolve_env()))
 
 
 def _arm_kill_guards(proc, session: CliTurnSession) -> threading.Timer:

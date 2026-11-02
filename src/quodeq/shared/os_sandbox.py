@@ -5,8 +5,10 @@ except the given paths and system temp. When *readable_home_dirs* is given,
 file contents under the user's home are unreadable too, except under those
 dirs, so a prompt-injected agent cannot read ~/.ssh, ~/.aws or another
 repo's .env. Metadata stays readable so path resolution keeps working.
-With *block_loopback* (macOS only), the agent cannot reach services on this
-machine, such as Quodeq's own API, except a local proxy's port.
+*unreadable_files* stay unreadable wherever they are, the analysed repo's own
+credential files included.
+With *loopback_open_ports* (macOS only), the agent cannot reach services on
+this machine, such as Quodeq's own API, except those ports (a local proxy).
 """
 from __future__ import annotations
 
@@ -85,9 +87,9 @@ def _sb_quote(path: str) -> str:
 
 def _seatbelt_profile(*, writable_dirs: list[str], writable_files: list[str],
                       readable_home_dirs: list[str] | None = None,
+                      unreadable_files: Iterable[str] = (),
                       readonly_dirs: list[str] | None = None,
-                      block_loopback: bool = False,
-                      loopback_allow_ports: Iterable[int] = ()) -> str:
+                      loopback_open_ports: Iterable[int] | None = None) -> str:
     """macOS Seatbelt (SBPL): allow reads/exec, deny all file writes except the
     given paths and system temp. Later rules win, so each allow overrides the
     deny before it."""
@@ -106,6 +108,8 @@ def _seatbelt_profile(*, writable_dirs: list[str], writable_files: list[str],
         lines.append(f"  (literal {_sb_quote(f)})")
     lines.append('  (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")'
                  ' (literal "/dev/dtracehelper") (subpath "/dev/fd"))')
+    # After every read allow, so a readable repo does not undo them.
+    lines += [f"(deny file-read-data (literal {_sb_quote(f)}))" for f in unreadable_files]
     if readonly_dirs:
         # After the temp allow, so a repo under /tmp stays read-only too; then
         # any writable dir nested inside it is allowed again.
@@ -113,10 +117,10 @@ def _seatbelt_profile(*, writable_dirs: list[str], writable_files: list[str],
         nested = [d for d in writable_dirs
                   if any(Path(d).is_relative_to(r) for r in readonly_dirs)]
         lines += [f"(allow file-write* (subpath {_sb_quote(d)}))" for d in nested]
-    if block_loopback:
+    if loopback_open_ports is not None:
         lines.append('(deny network-outbound (remote ip "localhost:*"))')
         lines += [f'(allow network-outbound (remote ip "localhost:{port}"))'
-                  for port in loopback_allow_ports]
+                  for port in loopback_open_ports]
     return "\n".join(lines) + "\n"
 
 
@@ -131,7 +135,8 @@ def _writable_paths(writable_dirs: list[str], writable_files: list[str]) -> list
 
 def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str],
                   readable_home_dirs: list[str] | None = None,
-                  readonly_dirs: list[str] | None = None) -> list[str]:
+                  readonly_dirs: list[str] | None = None,
+                  unreadable_files: Iterable[str] = ()) -> list[str]:
     argv = [_BWRAP, _RO_BIND, "/", "/", "--dev", "/dev", "--proc", "/proc",
             "--tmpfs", "/tmp", "--share-net", "--die-with-parent", "--unshare-pid"]
     seen: set[str] = set()
@@ -154,6 +159,10 @@ def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str],
             argv += [_RO_BIND, r, r]
             argv += [arg for d in writable_dirs if d != r and Path(d).is_relative_to(r)
                      for arg in (_BIND, d, d)]
+    # An empty file over each, mounted after the repo it sits in.
+    for f in unreadable_files:
+        if Path(f).is_file():
+            argv += [_RO_BIND, "/dev/null", f]
     return argv
 
 
@@ -174,16 +183,16 @@ def _bwrap_works() -> bool:
 def external_sandbox_prefix(*, writable_dirs: list[str], writable_files: list[str],
                             readable_home_dirs: list[str] | None = None,
                             readonly_dirs: list[str] | None = None,
-                            block_loopback: bool = False,
-                            loopback_allow_ports: Iterable[int] = (),
+                            loopback_open_ports: Iterable[int] | None = None,
+                            unreadable_files: Iterable[str] = (),
                             ) -> tuple[list[str], Callable[[], None]]:
     """Return (argv_prefix, cleanup) that wraps a command in an OS sandbox which
     allows network but blocks file writes outside the given paths, and, with
     *readable_home_dirs*, file reads under home outside them. *readonly_dirs*
     stay unwritable even under system temp and under a writable parent.
-    *block_loopback* denies connections to this machine except
-    *loopback_allow_ports*; bwrap cannot filter by address, so on Linux it
-    has no effect.
+    *loopback_open_ports*, when given, denies connections to this machine
+    except those ports; None leaves them open. bwrap cannot filter by
+    address, so on Linux it has no effect. *unreadable_files* cannot be read at all.
 
     Raises SandboxUnavailable when no sandbox works on this machine; the
     caller decides between failing and running without one.
@@ -193,8 +202,8 @@ def external_sandbox_prefix(*, writable_dirs: list[str], writable_files: list[st
         profile = _seatbelt_profile(writable_dirs=writable_dirs, writable_files=writable_files,
                                     readable_home_dirs=readable_home_dirs,
                                     readonly_dirs=readonly_dirs,
-                                    block_loopback=block_loopback,
-                                    loopback_allow_ports=loopback_allow_ports)
+                                    loopback_open_ports=loopback_open_ports,
+                                    unreadable_files=unreadable_files)
         tmp = tempfile.NamedTemporaryFile("w", suffix=".sb", delete=False)
         tmp.write(profile)
         tmp.close()
@@ -204,14 +213,15 @@ def external_sandbox_prefix(*, writable_dirs: list[str], writable_files: list[st
         return ["sandbox-exec", "-f", tmp.name], _cleanup
     if system == SYSTEM_LINUX:
         if shutil.which(_BWRAP) and _bwrap_works():
-            return (_bwrap_prefix(writable_dirs, writable_files, readable_home_dirs, readonly_dirs),
-                    lambda: None)
+            return (_bwrap_prefix(writable_dirs, writable_files, readable_home_dirs,
+                                  readonly_dirs, unreadable_files), lambda: None)
         if shutil.which("firejail"):
             # firejail read-only whole fs, then allow-list the writable dirs.
             # Writes only: home reads stay open, weaker than bwrap.
             argv = ["firejail", "--quiet", "--read-only=/"]
             for d in _writable_paths(writable_dirs, writable_files):
                 argv.append(f"--read-write={d}")
+            argv += [f"--blacklist={f}" for f in unreadable_files]
             return argv, lambda: None
         raise SandboxUnavailable(
             "No working OS sandbox: install bubblewrap (and allow it unprivileged "

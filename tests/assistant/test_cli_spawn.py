@@ -247,7 +247,7 @@ def test_seatbelt_profile_keeps_readonly_dirs_unwritable_under_temp():
 
 def test_seatbelt_profile_blocks_loopback_except_allowed_ports():
     prof = os_sandbox._seatbelt_profile(
-        writable_dirs=["/w"], writable_files=[], block_loopback=True, loopback_allow_ports=[3128])
+        writable_dirs=["/w"], writable_files=[], loopback_open_ports=[3128])
     deny = prof.index('(deny network-outbound (remote ip "localhost:*"))')
     allow = prof.index('(allow network-outbound (remote ip "localhost:3128"))')
     assert deny < allow  # later rules win, so the proxy stays reachable
