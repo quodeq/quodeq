@@ -44,7 +44,7 @@ if (-not (Test-Path "$StaticDir\index.html")) {
 Write-Host "==> Building exe..."
 $env:QUODEQ_REPO_ROOT = $RepoRoot
 $env:QUODEQ_VERSION = $Version
-uv run --with pyinstaller --with pywebview --with flask --with jsonschema pyinstaller `
+uv run --locked --group desktop pyinstaller `
     "$ScriptDir\quodeq_dashboard.spec" `
     --distpath "$BuildDir\dist" `
     --workpath "$BuildDir\work"

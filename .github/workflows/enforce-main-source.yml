@@ -12,6 +12,10 @@ on:
   # which is the PR head.
   workflow_dispatch:
 
+# The check only reads github.head_ref from the event payload; it needs no
+# token scope at all, not even to check out.
+permissions: {}
+
 jobs:
   check-source:
     runs-on: ubuntu-latest
