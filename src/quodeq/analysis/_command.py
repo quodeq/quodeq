@@ -164,7 +164,8 @@ class CliMcpRegistry:
 
     def __init__(self) -> None:
         self._cli_mcp_lock = threading.Lock()
-        self._cli_mcp_registered: set[str] = set()  # tracks (cmd, name) pairs
+        # "cmd:name" -> (cmd, name, ai_cmd_path), what release_all needs to undo it
+        self._cli_mcp_registered: dict[str, tuple[str, str, str | None]] = {}
 
     def ensure_registered(
         self, cmd: str, config: AnalysisConfig, work_dir: Path | None = None,
@@ -199,11 +200,25 @@ class CliMcpRegistry:
             try:
                 subprocess.run(register_cmd, check=True, capture_output=True,
                                timeout=_MCP_REGISTER_TIMEOUT_S, env=register_env)
-                self._cli_mcp_registered.add(key)
+                self._cli_mcp_registered[key] = (cmd, name, config.ai_cmd_path)
                 return name
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
                 _log.warning("Failed to register MCP server '%s' via '%s mcp add': %s", name, cmd, exc)
                 return None
+
+    def release_all(self) -> None:
+        """Remove every server this registry registered (``<cmd> mcp remove``).
+
+        ``mcp add`` writes a persistent entry in the CLI's own settings, so a
+        run calls this when it ends; otherwise the entry outlives the scan.
+        Runs with the same cwd and default scope as the add, so it removes
+        exactly what the add wrote. Idempotent.
+        """
+        with self._cli_mcp_lock:
+            registered = list(self._cli_mcp_registered.values())
+            self._cli_mcp_registered.clear()
+            for cmd, name, ai_cmd_path in registered:
+                _unregister_cli_mcp(cmd, name, ai_cmd_path)
 
     def clear(self) -> None:
         """Drop every cached registration (test isolation)."""
