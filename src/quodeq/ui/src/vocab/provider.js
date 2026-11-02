@@ -1,7 +1,7 @@
 // Mirror of src/quodeq/core/types/provider.py:Provider, plus OMLX: omlx is a
 // provider-config id with no Provider member (llm_bridge/_providers.py).
 export const PROVIDER = Object.freeze({
-  CLAUDE: 'claude', CODEX: 'codex', GEMINI: 'gemini', COPILOT: 'copilot', OLLAMA: 'ollama',
+  CLAUDE: 'claude', CODEX: 'codex', GEMINI: 'gemini', AGY: 'agy', COPILOT: 'copilot', OLLAMA: 'ollama',
   LLAMACPP: 'llamacpp', OPENROUTER: 'openrouter', CUSTOM: 'custom', OMLX: 'omlx',
 });
 

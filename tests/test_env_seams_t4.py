@@ -62,7 +62,7 @@ class TestNonScoutProviders:
         from quodeq.analysis.subagents._pool_launcher import _non_scout_providers
 
         monkeypatch.delenv("QUODEQ_NON_SCOUT_PROVIDERS", raising=False)
-        assert _non_scout_providers() == ("codex", "gemini")
+        assert _non_scout_providers() == ("codex", "gemini", "agy")
 
 
 class TestPluginCacheTtl:

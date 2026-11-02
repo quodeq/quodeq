@@ -5,7 +5,10 @@ import json
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.core.stream.events import EVENT_TYPE_RESULT, copilot_error, copilot_event_data
+from quodeq.core.stream.agy_events import normalize_event
+from quodeq.core.stream.events import (
+    EVENT_TYPE_RESULT, copilot_error, copilot_event_data, parse_stream_event,
+)
 from quodeq.shared.utils import open_text
 
 _MCP_SERVER_NAME = "findings"
@@ -54,7 +57,7 @@ def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
         with open_text(stream_file) as f:
             for line in f:
                 try:
-                    d = json.loads(line)
+                    d = normalize_event(json.loads(line))
                 except json.JSONDecodeError:
                     log.debug(f"Skipping malformed stream line in {stream_file}")
                     continue
@@ -77,7 +80,7 @@ def _is_error_event(
 ) -> bool | None:
     """Check if a stream line is an error event. Returns True/False or None to skip."""
     try:
-        d = json.loads(line.strip())
+        d = normalize_event(json.loads(line.strip()))
     except json.JSONDecodeError as exc:
         log.debug(f"Skipping malformed stream line in {stream_file}: {exc}")
         return None
@@ -101,3 +104,23 @@ def is_stream_valid(stream_file: Path, *, log: LogSink = NULL_LOG) -> bool:
         log.debug(f"Cannot read stream file {stream_file}: {exc}")
         return False
     return True
+
+
+def denied_actions(stream_file: Path) -> list[str]:
+    """The tool actions the CLI refused without asking (agy's ``result``
+    lists them). Each one an agy turn hit outside its allow and deny rules
+    ended that turn early, so the run's remaining files go back to the queue."""
+    names: list[str] = []
+    try:
+        with open_text(stream_file) as f:
+            for line in f:
+                event = parse_stream_event(line)
+                if isinstance(event, dict) and event.get("type") == EVENT_TYPE_RESULT:
+                    names += [str(_dict_get(a, "action")) for a in event.get("denied_actions") or []]
+    except OSError:
+        return []
+    return names
+
+
+def _dict_get(value: object, key: str) -> object:
+    return value.get(key) if isinstance(value, dict) else value

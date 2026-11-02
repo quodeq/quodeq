@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from quodeq import __version__
 from quodeq.core.jsonrpc import JsonRpcErrorCode
+from quodeq.core.mcp_method import TOOL_META
 from quodeq.analysis.mcp.jsonrpc_io import JSONRPC_VERSION, send as _send, ok as _ok
 from quodeq.analysis.mcp.schemas import (
     DEFAULT_FILE_BATCH_SIZE,
@@ -81,7 +82,7 @@ def handle_tools_list(request_id: object, *, has_queue: bool = False,
         "description": MARK_FILE_DONE_DESC,
         "inputSchema": MARK_FILE_DONE_SCHEMA,
     })
-    return _ok(request_id, {"tools": tools})
+    return _ok(request_id, {"tools": [{**tool, "_meta": TOOL_META} for tool in tools]})
 
 
 def _text_reply(request_id: object, text: str, *, is_error: bool = False) -> dict:

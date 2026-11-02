@@ -31,6 +31,7 @@ from quodeq.analysis.provider_cache import get_provider_configs as _get_provider
 from quodeq.config.process_env import process_environment_copy
 from quodeq.config.provider import Provider, ProviderType
 from quodeq.shared.child_env import allowlisted_env
+from quodeq.shared.cli_session_settings import session_settings_args
 from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.log_sink import LoggerSink
@@ -69,14 +70,14 @@ def build_ai_cmd(
         config, provider_cfg, work_dir, log=LoggerSink(_log),
     )
     args.extend(mcp_args)
-    if cmd == Provider.COPILOT and work_dir is not None:
+    args.extend(session_settings_args(provider_cfg.get("session_settings"), work_dir))
+    if provider_cfg.get("isolated_cwd") and work_dir is not None:
+        # The CLI runs outside the repo (subprocess._run_cli_analysis), so
+        # the prompt names the root its relative paths resolve against.
         root = str(work_dir.resolve())
-        args.extend(["--add-dir", root])
-        prompt = (
-            f"Repository root: {root}\nResolve relative source paths against this root.\n"
-            "Use view, glob and grep where instructions refer to Read, Glob and Grep. "
-            "Shell tools are unavailable.\n\n" + prompt
-        )
+        if add_dir := provider_cfg.get("repo_add_dir_flag"):
+            args.extend([add_dir, root])
+        prompt = provider_cfg.get("repo_preamble", "").replace("{root}", root) + prompt
     args.extend(build_model_budget_prompt_args(prompt, config, provider_cfg, model, log=LoggerSink(_log)))
 
     return args, mcp_config_path
