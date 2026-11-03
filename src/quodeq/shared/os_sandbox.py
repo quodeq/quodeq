@@ -166,6 +166,22 @@ def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str],
     return argv
 
 
+def _firejail_prefix(writable: list[str], readonly_dirs: list[str],
+                     unreadable_files: Iterable[str]) -> list[str]:
+    """Writes only: home reads stay open, weaker than bwrap. firejail applies
+    its options in order, so the layering follows bwrap's. ``--read-only=/``
+    alone leaves home writable (firejail mounts it separately), hence home
+    read-only by name, the writable dirs back on top, then the repo
+    read-only again over a writable parent, with writable dirs nested in it
+    restored last."""
+    argv = ["firejail", "--quiet", "--read-only=/", f"--read-only={Path.home()}"]
+    argv += [f"--read-write={d}" for d in writable]
+    for r in readonly_dirs:
+        argv.append(f"--read-only={r}")
+        argv += [f"--read-write={d}" for d in writable if d != r and Path(d).is_relative_to(r)]
+    return argv + [f"--blacklist={f}" for f in unreadable_files]
+
+
 @functools.cache
 def _bwrap_works() -> bool:
     """Whether bwrap can create its namespaces here. Installed is not enough:
@@ -216,13 +232,8 @@ def external_sandbox_prefix(*, writable_dirs: list[str], writable_files: list[st
             return (_bwrap_prefix(writable_dirs, writable_files, readable_home_dirs,
                                   readonly_dirs, unreadable_files), lambda: None)
         if shutil.which("firejail"):
-            # firejail read-only whole fs, then allow-list the writable dirs.
-            # Writes only: home reads stay open, weaker than bwrap.
-            argv = ["firejail", "--quiet", "--read-only=/"]
-            for d in _writable_paths(writable_dirs, writable_files):
-                argv.append(f"--read-write={d}")
-            argv += [f"--blacklist={f}" for f in unreadable_files]
-            return argv, lambda: None
+            return _firejail_prefix(_writable_paths(writable_dirs, writable_files),
+                                    readonly_dirs or [], unreadable_files), lambda: None
         raise SandboxUnavailable(
             "No working OS sandbox: install bubblewrap (and allow it unprivileged "
             "user namespaces) or firejail.")

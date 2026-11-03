@@ -44,6 +44,8 @@ from quodeq.shared.os_sandbox import (
 )
 
 _warned_unsandboxed: set[str] = set()  # one warning per CLI per process, not per agent spawn
+_warned_secrets_readable: set[tuple[str, Path]] = set()  # per CLI and repo
+_NAMED_SECRET_FILES = 3  # how many a warning names before "and N more"
 
 
 @dataclass(frozen=True)
@@ -132,8 +134,21 @@ def analysis_sandbox_prefix(
         if binary not in _warned_unsandboxed:
             _warned_unsandboxed.add(binary)
             policy.log.warning(f"Running {binary} without an OS sandbox: {exc} "
-                        "Set QUODEQ_REQUIRE_SANDBOX=1 to fail instead.")
+                               f"{_readable_secrets_note(work_dir)}"
+                               "Set QUODEQ_REQUIRE_SANDBOX=1 to fail instead.")
         return [], lambda: None
+
+
+def _readable_secrets_note(work_dir: Path) -> str:
+    """A sentence naming the repo's credential files an unconfined CLI can
+    read, or nothing when it has none."""
+    found = sorted({f.relative_to(work_dir).as_posix() for f in find_secret_files(work_dir)
+                    if f.is_relative_to(work_dir)})
+    if not found:
+        return ""
+    named = ", ".join(found[:_NAMED_SECRET_FILES])
+    more = f" and {len(found) - _NAMED_SECRET_FILES} more" if len(found) > _NAMED_SECRET_FILES else ""
+    return f"It can read the repo's credential files: {named}{more}. "
 
 
 def _sandbox_prefix(
@@ -159,14 +174,15 @@ def confine_cli(
     """*args* confined as well as this machine allows: the CLI's own sandbox
     where the provider has one that works here (Codex), else the OS sandbox,
     else, unless *policy* requires one, unconfined."""
-    if provider_cfg.get("native_sandbox") and (native := _native_args(cfg, work_dir, args, env)):
+    if provider_cfg.get("native_sandbox") and (
+            native := _native_args(cfg, work_dir, args, env, policy.log)):
         return native, lambda: None
     prefix, cleanup = analysis_sandbox_prefix(cfg, provider_cfg, work_dir, args[0], env, policy)
     return [*prefix, *args], cleanup
 
 
 def _native_args(
-    cfg: AnalysisConfig, work_dir: Path, args: list[str], env: Mapping[str, str],
+    cfg: AnalysisConfig, work_dir: Path, args: list[str], env: Mapping[str, str], log: LogSink,
 ) -> list[str] | None:
     project = _project_dir(cfg)
     sample = next((p for p in sorted(work_dir.iterdir())
@@ -183,5 +199,16 @@ def _native_args(
                 plain_read_only_args(unreadable), plain_read_only_args()]
     for profile in map(list, dict.fromkeys(map(tuple, profiles))):
         if native_sandbox_works(args[0], profile, evidence, sample.resolve(), env):
+            if unreadable and profile == profiles[-1]:
+                _warn_secrets_readable(args[0], work_dir, log)
             return native_args(args, profile)
     return None
+
+
+def _warn_secrets_readable(binary: str, work_dir: Path, log: LogSink) -> None:
+    if (binary, work_dir) in _warned_secrets_readable:
+        return
+    _warned_secrets_readable.add((binary, work_dir))
+    log.warning("Codex's sandbox blocks writes and network here but cannot hide single "
+                "files (on Windows that needs its elevated sandbox backend). "
+                f"{_readable_secrets_note(work_dir)}")
