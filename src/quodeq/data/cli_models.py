@@ -20,6 +20,8 @@ import tempfile
 import threading
 import time
 
+from quodeq.shared.win_launch import launch_argv
+
 
 def run_cli_models_command(
     client_id: str, *, timeout_s: float, args: tuple[str, ...] = ("/models",),
@@ -34,7 +36,7 @@ def run_cli_models_command(
         return ""
     try:
         result = subprocess.run(
-            [client_id, *args],
+            launch_argv([client_id, *args]),
             capture_output=True,
             text=True, encoding="utf-8",
             timeout=timeout_s,
@@ -89,7 +91,7 @@ class _JsonLinesSession:
         self._deadline = deadline
         self._lines: queue.Queue[str | None] = queue.Queue()
         self._process = subprocess.Popen(
-            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            launch_argv(argv, env), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding="utf-8", env=env, cwd=tempfile.gettempdir(),
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == _OS_NAME_NT else 0,
         )

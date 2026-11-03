@@ -26,6 +26,7 @@ from pathlib import Path
 from packaging.version import InvalidVersion, Version
 
 from quodeq.shared.constants import SYSTEM_WINDOWS
+from quodeq.shared.win_launch import launch_argv
 
 _BYPASS_FLAG = "--dangerously-bypass-approvals-and-sandbox"
 _CONFIG_FLAG = "-c"
@@ -90,7 +91,7 @@ def native_args(args: list[str], profile: list[str]) -> list[str]:
 
 def _version(binary: str, env: Mapping[str, str]) -> Version | None:
     try:
-        out = subprocess.run([binary, "--version"], capture_output=True, text=True,
+        out = subprocess.run(launch_argv([binary, "--version"], env), capture_output=True, text=True,
                              encoding="utf-8", errors="replace",
                              timeout=_PROBE_TIMEOUT_S, env=dict(env), check=False).stdout
         match = _VERSION_RE.search(out)
@@ -125,7 +126,7 @@ def _probe(binary: str, profile: tuple[str, ...], listed: Path, sample: Path,
         return False
     try:
         probe = subprocess.run(
-            [binary, "sandbox", *profile, "--", *_probe_command(listed, sample)],
+            launch_argv([binary, "sandbox", *profile, "--", *_probe_command(listed, sample)], env_map),
             capture_output=True, timeout=_PROBE_TIMEOUT_S, env=env_map, cwd=sample.parent, check=False)
     except (OSError, subprocess.SubprocessError):
         return False
