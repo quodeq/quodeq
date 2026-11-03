@@ -161,29 +161,24 @@ def _serve_and_wait(
         _serve_blocking(action_api_process, stop_children)
 
 
-def _linux_webview_fallback(
-    action_api_url: str, action_api_process: subprocess.Popen | None,
-    shell: NativeShell, stop_children: typing.Callable, serve_blocking: typing.Callable,
-) -> None:
-    logging.getLogger(__name__).warning(
-        "pywebview's Linux GTK+/WebKit backend is missing — "
-        "falling back to opening the dashboard in your browser. "
-        "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
-        "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window.",
-    )
-    open_in_browser(action_api_url, shell.open_browser)
-    serve_blocking(action_api_process, stop_children)
+_LINUX_BACKEND_MISSING = (
+    "pywebview's Linux GTK+/WebKit backend is missing — "
+    "falling back to opening the dashboard in your browser. "
+    "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
+    "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window."
+)
+_WINDOWS_BACKEND_MISSING = (
+    "pywebview cannot load .NET on this Python (its loader supports x86/x64 only); "
+    "falling back to opening the dashboard in your browser. "
+    "On Windows on ARM, use an x64 Python to get the native window."
+)
 
 
-def _windows_webview_fallback(
-    action_api_url: str, action_api_process: subprocess.Popen | None,
+def _webview_fallback(
+    reason: str, action_api_url: str, action_api_process: subprocess.Popen | None,
     shell: NativeShell, stop_children: typing.Callable, serve_blocking: typing.Callable,
 ) -> None:
-    logging.getLogger(__name__).warning(
-        "pywebview cannot load .NET on this Python (its loader supports x86/x64 only); "
-        "falling back to opening the dashboard in your browser. "
-        "On Windows on ARM, use an x64 Python to get the native window.",
-    )
+    logging.getLogger(__name__).warning(reason)
     open_in_browser(action_api_url, shell.open_browser)
     serve_blocking(action_api_process, stop_children)
 
@@ -243,10 +238,10 @@ def _serve_native(
         )
 
     if sys.platform.startswith("linux") and not shell.linux_backend_available():
-        _linux_webview_fallback(action_api_url, action_api_process, shell, stop_children, serve_blocking)
+        _webview_fallback(_LINUX_BACKEND_MISSING, action_api_url, action_api_process, shell, stop_children, serve_blocking)
         return
     if sys.platform == PLATFORM_WIN32 and not shell.windows_backend_available():
-        _windows_webview_fallback(action_api_url, action_api_process, shell, stop_children, serve_blocking)
+        _webview_fallback(_WINDOWS_BACKEND_MISSING, action_api_url, action_api_process, shell, stop_children, serve_blocking)
         return
 
     instance = shell.make_instance()
