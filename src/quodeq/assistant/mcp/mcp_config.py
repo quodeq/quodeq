@@ -11,6 +11,7 @@ from pathlib import Path
 
 from quodeq.shared.agy_home import mcp_register_overrides
 from quodeq.shared.mcp import codex_mcp_override
+from quodeq.shared.win_launch import launch_argv
 
 _logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True
             register_cmd.append("--")
         register_cmd.extend(_server_argv(server_args))
         try:
-            subprocess.run(register_cmd, check=True, capture_output=True,
+            subprocess.run(launch_argv(register_cmd, register_env), check=True, capture_output=True,
                            timeout=_REGISTER_TIMEOUT_S, env=register_env)
         except (OSError, subprocess.SubprocessError) as exc:
             raise RuntimeError(f"Could not register the quodeq assistant MCP server with {cmd}: {exc}") from exc
@@ -77,9 +78,9 @@ def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True
 def _unregister_locked(cmd: str) -> None:
     """Remove the server from a CLI's registry. Caller must hold `_lock`."""
     try:
-        subprocess.run([cmd, "mcp", "remove", _SERVER_NAME],
-                       check=False, capture_output=True, timeout=_REGISTER_TIMEOUT_S,
-                       env=mcp_register_overrides(cmd)[0])
+        env = mcp_register_overrides(cmd)[0]
+        subprocess.run(launch_argv([cmd, "mcp", "remove", _SERVER_NAME], env),
+                       check=False, capture_output=True, timeout=_REGISTER_TIMEOUT_S, env=env)
     except (OSError, subprocess.SubprocessError) as exc:
         _logger.debug("MCP server unregister via %s failed: %s", cmd, exc)
 

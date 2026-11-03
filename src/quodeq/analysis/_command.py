@@ -36,6 +36,7 @@ from quodeq.shared.cli_session_settings import session_settings_args
 from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.log_sink import LoggerSink
+from quodeq.shared.win_launch import launch_argv
 
 _log = logging.getLogger(__name__)
 
@@ -198,11 +199,11 @@ class CliMcpRegistry:
             register_cmd.extend(mcp_args)
             _log.debug("Registering MCP server '%s': %s", name, " ".join(register_cmd))
             try:
-                subprocess.run(register_cmd, check=True, capture_output=True,
+                subprocess.run(launch_argv(register_cmd, register_env), check=True, capture_output=True,
                                timeout=_MCP_REGISTER_TIMEOUT_S, env=register_env)
                 self._cli_mcp_registered[key] = (cmd, name, config.ai_cmd_path)
                 return name
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
                 _log.warning("Failed to register MCP server '%s' via '%s mcp add': %s", name, cmd, exc)
                 return None
 
@@ -250,13 +251,13 @@ def _unregister_cli_mcp(cmd: str, name: str, ai_cmd_path: str | None = None) -> 
     """Remove the findings MCP server via `<cmd> mcp remove`."""
     if not _is_known_cli_provider(cmd):
         return
+    env = mcp_register_overrides(cmd)[0]
     try:
         subprocess.run(
-            [cmd_binary(cmd, ai_cmd_path), _MCP_SUBCOMMAND, "remove", name],
-            check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S,
-            env=mcp_register_overrides(cmd)[0],
+            launch_argv([cmd_binary(cmd, ai_cmd_path), _MCP_SUBCOMMAND, "remove", name], env),
+            check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S, env=env,
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+    except (subprocess.TimeoutExpired, OSError) as exc:
         _log.warning("Failed to unregister MCP server '%s' via '%s mcp remove': %s", name, cmd, exc)
 
 
