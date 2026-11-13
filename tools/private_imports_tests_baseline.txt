@@ -658,10 +658,10 @@ tests/dashboard/test_instance_coverage.py:189:private-name:quodeq.dashboard._ins
 tests/dashboard/test_linux_webview_fallback.py:10:private-module:quodeq.dashboard._probes.NativeShell
 tests/dashboard/test_linux_webview_fallback.py:9:private-module:quodeq.dashboard._server
 tests/dashboard/test_native_chrome.py:10:private-module:quodeq.dashboard._webview_window_chrome
-tests/dashboard/test_native_chrome.py:111:private-module:quodeq.dashboard._webview_window_about
-tests/dashboard/test_native_chrome.py:119:private-module:quodeq.dashboard._webview_window_about
-tests/dashboard/test_native_chrome.py:130:private-module:quodeq.dashboard._webview_window_about
-tests/dashboard/test_native_chrome.py:138:private-module:quodeq.dashboard._webview_window_about
+tests/dashboard/test_native_chrome.py:110:private-module:quodeq.dashboard._webview_window_about
+tests/dashboard/test_native_chrome.py:118:private-module:quodeq.dashboard._webview_window_about
+tests/dashboard/test_native_chrome.py:129:private-module:quodeq.dashboard._webview_window_about
+tests/dashboard/test_native_chrome.py:137:private-module:quodeq.dashboard._webview_window_about
 tests/dashboard/test_native_chrome.py:64:private-module:quodeq.dashboard._webview_window_about
 tests/dashboard/test_native_chrome.py:70:private-module:quodeq.dashboard._webview_window_about
 tests/dashboard/test_native_chrome.py:75:private-module:quodeq.dashboard._webview_window_about
@@ -714,8 +714,8 @@ tests/dashboard/test_server_serve_modes.py:68:private-name:quodeq.dashboard._ser
 tests/dashboard/test_server_serve_modes.py:77:private-name:quodeq.dashboard._server._serve_blocking
 tests/dashboard/test_server_serve_modes.py:90:private-module:quodeq.dashboard._probes.NativeShell
 tests/dashboard/test_server_serve_modes.py:96:private-name:quodeq.dashboard._server._serve_native
-tests/dashboard/test_webview_menu.py:7:private-module:quodeq.dashboard._webview_window.NAVIGATE_HELP_JS
-tests/dashboard/test_webview_menu.py:7:private-module:quodeq.dashboard._webview_window.non_macos_menu
+tests/dashboard/test_webview_menu.py:4:private-module:quodeq.dashboard._webview_window
+tests/dashboard/test_webview_menu.py:5:private-module:quodeq.dashboard._webview_window.NAVIGATE_HELP_JS
 tests/dashboard/test_webview_visibility.py:4:private-module:quodeq.dashboard._webview_window.dispatch_visibility
 tests/dashboard/test_webview_visibility.py:4:private-module:quodeq.dashboard._webview_window.install_visibility_events
 tests/dashboard/test_webview_visibility.py:5:private-module:quodeq.dashboard._webview_window_visibility.VISIBILITY_EVENT
