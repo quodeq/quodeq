@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import TypesTab from './TypesTab.jsx';
+import { pickSelectOption } from '../../test-utils/selectOption.js';
 
 function typeRow(over = {}) {
   return {
@@ -46,7 +47,7 @@ describe('TypesTab', () => {
   it('the dimension select filters and says so', () => {
     const setDimensionFilter = vi.fn();
     render(<TypesTab rows={ROWS} loading={false} dimensionFilter={null} setDimensionFilter={setDimensionFilter} dimensions={['maintainability', 'security']} />);
-    fireEvent.change(screen.getByLabelText('Dimension'), { target: { value: 'security' } });
+    pickSelectOption(screen.getByLabelText('Dimension'), 'security');
     expect(setDimensionFilter).toHaveBeenCalledWith('security');
   });
 

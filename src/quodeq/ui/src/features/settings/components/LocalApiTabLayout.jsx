@@ -13,6 +13,7 @@ import { LocalApiSubagentsRow } from './LocalApiSubagentsRow.jsx';
 
 import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
 import { PROVIDER_SETTING_KEY } from '../../../constants.js';
+import Select from '../../../components/select/Select.jsx';
 
 /**
  * The row state for a polled server status: null until the first poll answers,
@@ -112,16 +113,18 @@ export function LocalApiModelSelectRow({ hint, Control, state, update, models })
  * The picker over the models a local-API server reports, with the empty
  * "pick a model" entry the tabs rely on to express "nothing chosen yet".
  */
-export function ModelPickerSelect({ value, models, onChange, labelId, className }) {
+export function ModelPickerSelect({ value, models, onChange, labelId, ariaLabel, className }) {
   return (
-    <select
+    <Select
       className={className}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={onChange}
       aria-labelledby={labelId}
-    >
-      <option value="">{t('settings.pickAModel')}</option>
-      {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
-    </select>
+      aria-label={ariaLabel}
+      options={[
+        { value: '', label: t('settings.pickAModel') },
+        ...models.map((m) => ({ value: m.name, label: m.name })),
+      ]}
+    />
   );
 }

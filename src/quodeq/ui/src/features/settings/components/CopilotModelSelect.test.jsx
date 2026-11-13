@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
 import CopilotModelSelect, { CopilotModelStatus } from './CopilotModelSelect.jsx';
+import { findSelectOption, pickSelectOption, waitForSelectOption } from '../../../test-utils/selectOption.js';
 
 function renderModels(api, props = {}) {
   return render(
@@ -19,27 +20,27 @@ function makeSuccessApi() {
 
 it('shows account models on success', async () => {
   renderModels(makeSuccessApi());
-  expect(await screen.findByRole('option', { name: 'gpt-test' })).toBeTruthy();
+  expect(await findSelectOption('gpt-test')).toBeTruthy();
 });
 
 it('hides login instructions on success', async () => {
   renderModels(makeSuccessApi());
-  await screen.findByRole('option', { name: 'gpt-test' });
+  await waitForSelectOption('gpt-test');
   expect(screen.queryByText(/separate Quodeq profile/)).toBeNull();
 });
 
 it('calls onChange when a model is selected', async () => {
   const onChange = vi.fn();
   renderModels(makeSuccessApi(), { onChange });
-  await screen.findByRole('option', { name: 'gpt-test' });
-  fireEvent.change(screen.getByRole('combobox'), { target: { value: 'gpt-test' } });
+  await waitForSelectOption('gpt-test');
+  pickSelectOption(screen.getByRole('combobox'), 'gpt-test');
   expect(onChange).toHaveBeenCalledWith('gpt-test');
 });
 
 it('shares the discovery query between CopilotModelStatus and CopilotModelSelect', async () => {
   const api = makeSuccessApi();
   renderModels(api);
-  await screen.findByRole('option', { name: 'gpt-test' });
+  await waitForSelectOption('gpt-test');
   expect(api.getClientModels).toHaveBeenCalledTimes(1);
   expect(api.getClientModels).toHaveBeenCalledWith('copilot');
 });
@@ -59,7 +60,7 @@ it('shows errors and setup instructions, then hides them after a successful retr
   expect(await screen.findByRole('alert')).toHaveTextContent('Authentication required');
   expect(screen.getByText(/separate Quodeq profile/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Retry connection' }));
-  expect(await screen.findByRole('option', { name: 'gpt-test' })).toBeTruthy();
+  expect(await findSelectOption('gpt-test')).toBeTruthy();
   await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   expect(screen.queryByText(/separate Quodeq profile/)).toBeNull();
 });
@@ -68,8 +69,8 @@ it('preserves a saved model that is no longer in the account list', async () => 
   const onChange = vi.fn();
   renderModels({ getClientModels: () => Promise.resolve({ models: ['auto', 'gpt-test'] }) },
     { value: 'saved-model', onChange });
-  await screen.findByRole('option', { name: 'gpt-test' });
-  expect(screen.getByRole('combobox')).toHaveValue('saved-model');
+  await waitForSelectOption('gpt-test');
+  expect(screen.getByRole('combobox')).toHaveTextContent('Saved: saved-model');
   expect(onChange).not.toHaveBeenCalled();
 });
 

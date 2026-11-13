@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { groupRows, TYPE_GROUP } from '../violations/byTypeModel.js';
 import TypeGroupRow from '../violations/components/TypeGroupRow.jsx';
 import { t } from '../../strings/index.js';
+import Select from '../../components/select/Select.jsx';
 
 const COLUMN_KEYS = ['gradeFormula.colType', 'gradeFormula.colSeverity', 'gradeFormula.colWeight',
   'gradeFormula.colFindings', 'gradeFormula.colBaseline', 'gradeFormula.colStatus'];
@@ -31,10 +32,14 @@ function TypeRow({ row }) {
 
 function DimensionFilter({ dimensions, value, onChange }) {
   return (
-    <select className="gf-picker" aria-label={t('gradeFormula.pickDimension')} value={value || ''} onChange={(e) => onChange(e.target.value || null)}>
-      <option value="">{t('gradeFormula.typesFilterAll')}</option>
-      {dimensions.map((dim) => <option key={dim} value={dim}>{dim}</option>)}
-    </select>
+    <Select
+      className="gf-picker" aria-label={t('gradeFormula.pickDimension')} value={value || ''}
+      onChange={(next) => onChange(next || null)}
+      options={[
+        { value: '', label: t('gradeFormula.typesFilterAll') },
+        ...dimensions.map((dim) => ({ value: dim, label: dim })),
+      ]}
+    />
   );
 }
 
