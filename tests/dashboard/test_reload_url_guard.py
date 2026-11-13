@@ -223,3 +223,32 @@ class TestDownloadViaDialogUrlValidation:
 
         assert result is True
         mock_urlopen.assert_called_once()
+
+
+class TestFocusSurfacesTheWindow:
+    """A relaunch has to surface a minimised window on Linux."""
+
+    def test_linux_restores_without_calling_show(self, monkeypatch):
+        # pywebview's GTK show() hides a window created hidden, so calling it
+        # here made the window flash and vanish.
+        monkeypatch.setattr("sys.platform", "linux")
+        window = MagicMock()
+        make_on_reload(window)("")
+        window.show.assert_not_called()
+        window.restore.assert_called_once_with()
+
+    @pytest.mark.parametrize("platform", ["win32", "darwin"])
+    def test_other_platforms_keep_their_window_state(self, monkeypatch, platform):
+        # pywebview's Windows restore sets WindowState.Normal, which would
+        # un-maximize a maximized window on every relaunch.
+        monkeypatch.setattr("sys.platform", platform)
+        window = MagicMock()
+        make_on_reload(window)("")
+        window.show.assert_not_called()
+        window.restore.assert_not_called()
+
+    def test_unsafe_url_does_not_surface_the_window(self, monkeypatch):
+        monkeypatch.setattr("sys.platform", "linux")
+        window = MagicMock()
+        make_on_reload(window)("http://evil.example.com/")
+        window.restore.assert_not_called()

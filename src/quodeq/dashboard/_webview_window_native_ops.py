@@ -27,7 +27,7 @@ import webview
 
 from quodeq.config.services_env import cancel_escalation_window_s
 from quodeq.shared.api_session import session_headers
-from quodeq.shared.constants import LOCALHOST, PLATFORM_WIN32, SCHEME_HTTP, SCHEME_HTTPS
+from quodeq.shared.constants import LOCALHOST, PLATFORM_LINUX, PLATFORM_WIN32, SCHEME_HTTP, SCHEME_HTTPS
 
 _logger = logging.getLogger(__name__)
 
@@ -216,6 +216,11 @@ def make_on_reload(window: object) -> "Callable[[str], None]":
     InstanceController.send_focus): stay on the page this window already has,
     reloading it in place so a ``--dev`` relaunch picks up the rebuilt UI, and
     raise the window either way.
+
+    On Linux the on_top toggle alone cannot surface a minimised window, so
+    restore is asked for too. GNOME on Wayland still leaves a minimised window
+    where it is, so this is best effort. Only on Linux: pywebview's Windows
+    restore would un-maximize a maximized window on every relaunch.
     """
     def _on_reload(new_url: str) -> None:
         if new_url and not is_safe_reload_url(new_url):
@@ -224,6 +229,8 @@ def make_on_reload(window: object) -> "Callable[[str], None]":
         target = new_url or _current_url(window)
         if target:
             window.load_url(target)  # type: ignore[union-attr]
+        if sys.platform == PLATFORM_LINUX:
+            window.restore()  # type: ignore[union-attr]
         window.on_top = True  # type: ignore[union-attr]
         window.on_top = False  # type: ignore[union-attr]
 
