@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import RunHistoryPanel, { RunHistoryTooltip } from './RunHistoryPanel.jsx';
+import { pickSelectOption } from '../../../test-utils/selectOption.js';
 
 const TREND = [
   { runId: 'r1', dateISO: '2026-03-25T14:00:00', dateLabel: '25 Mar 2026', numericAverage: 9.5, overallGrade: 'Exemplary' },
@@ -12,7 +13,7 @@ const TREND = [
 describe('RunHistoryPanel', () => {
   it('renders the granularity selector reflecting the current value', () => {
     render(<RunHistoryPanel trend={TREND} selectedRunId="r1" granularity="week" onGranularityChange={() => {}} />);
-    expect(screen.getByLabelText('Group score history by')).toHaveValue('week');
+    expect(screen.getByLabelText('Group score history by')).toHaveTextContent('Week');
   });
 
   it('names the bucket unit after the count (weeks for week)', () => {
@@ -23,7 +24,7 @@ describe('RunHistoryPanel', () => {
   it('calls onGranularityChange when the selector changes', () => {
     const onGranularityChange = vi.fn();
     render(<RunHistoryPanel trend={TREND} selectedRunId="r1" granularity="day" onGranularityChange={onGranularityChange} />);
-    fireEvent.change(screen.getByLabelText('Group score history by'), { target: { value: 'month' } });
+    pickSelectOption(screen.getByLabelText('Group score history by'), 'Month');
     expect(onGranularityChange).toHaveBeenCalledWith('month');
   });
 

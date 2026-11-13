@@ -1,9 +1,9 @@
 import { t } from '../../strings/index.js';
 import { GRANULARITY } from '../../utils/granularity.js';
+import Select from '../select/Select.jsx';
 /**
  * PeriodSelect — terminal-styled granularity selector for the score-history
- * chart. A native <select> (keyboard + a11y for free) re-skinned to the mono
- * terminal idiom, with a static caret. Options: Day / Week / Month.
+ * chart, the app's Select in the mono terminal idiom. Options: Day / Week / Month.
  *
  * @param {object} props
  * @param {'day'|'week'|'month'} props.value
@@ -12,17 +12,17 @@ import { GRANULARITY } from '../../utils/granularity.js';
 export default function PeriodSelect({ value, onChange }) {
   return (
     <span className="term-period-select-wrap">
-      <select
+      <Select
         className="term-period-select"
         value={value}
-        onChange={(e) => onChange?.(e.target.value)}
+        onChange={(next) => onChange?.(next)}
         aria-label={t('common.groupHistoryBy')}
-      >
-        <option value={GRANULARITY.DAY}>{t('common.periodDay')}</option>
-        <option value={GRANULARITY.WEEK}>{t('common.periodWeek')}</option>
-        <option value={GRANULARITY.MONTH}>{t('common.periodMonth')}</option>
-      </select>
-      <span className="term-period-select__caret" aria-hidden="true">▾</span>
+        options={[
+          { value: GRANULARITY.DAY, label: t('common.periodDay') },
+          { value: GRANULARITY.WEEK, label: t('common.periodWeek') },
+          { value: GRANULARITY.MONTH, label: t('common.periodMonth') },
+        ]}
+      />
     </span>
   );
 }

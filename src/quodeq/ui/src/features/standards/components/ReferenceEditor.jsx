@@ -4,6 +4,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
 import { KEY } from '../../../vocab/keyboard.js';
+import Select from '../../../components/select/Select.jsx';
 
 // The one reference type with its own lookup UI (searchable CWE picker);
 // the rest are plain name/url fields.
@@ -61,16 +62,16 @@ function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilter
         onChange={(e) => setQuery(e.target.value)}
         aria-label={t('standards.cweSearchAria')}
       />
-      <select
+      <Select
         className="cwe-browser-filter"
         value={filterAbstraction}
-        onChange={(e) => setFilterAbstraction(e.target.value)}
-      >
-        <option value="">{t('standards.allTypes')}</option>
-        {ABSTRACTION_ORDER.map((a) => (
-          <option key={a} value={a}>{a}</option>
-        ))}
-      </select>
+        onChange={setFilterAbstraction}
+        aria-label={t('standards.cweTypeFilterAria')}
+        options={[
+          { value: '', label: t('standards.allTypes') },
+          ...ABSTRACTION_ORDER.map((a) => ({ value: a, label: a })),
+        ]}
+      />
     </div>
   );
 }
@@ -166,15 +167,14 @@ function GenericRefInputs({ refData, onFieldChange, disabled }) {
 
 function RefTypeSelect({ refData, typeOptions, onTypeChange, disabled }) {
   return (
-    <select
+    <Select
       className="ref-type-select"
       value={typeOptions.includes(refData.type) ? refData.type : 'other'}
-      onChange={(e) => onTypeChange(e.target.value)}
+      onChange={onTypeChange}
       disabled={disabled}
       aria-label={t('standards.refTypeAria')}
-    >
-      {typeOptions.map((opt) => <option key={opt} value={opt}>{opt.toUpperCase()}</option>)}
-    </select>
+      options={typeOptions.map((opt) => ({ value: opt, label: opt.toUpperCase() }))}
+    />
   );
 }
 

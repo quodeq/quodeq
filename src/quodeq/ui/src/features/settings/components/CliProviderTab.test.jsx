@@ -4,6 +4,7 @@ import React from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
+import { pickSelectOption, waitForSelectOption } from '../../../test-utils/selectOption.js';
 
 const fakeApi = {
   getClientModels: vi.fn().mockResolvedValue({ models: ['auto', 'claude-test'] }),
@@ -37,14 +38,14 @@ describe('CliProviderTab', () => {
 
   it('offers Copilot account models and hides setup after successful discovery', async () => {
     renderCopilot();
-    await screen.findAllByRole('option', { name: 'claude-test' });
+    await waitForSelectOption('claude-test');
     expect(screen.queryByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeNull();
   });
 
   it('changing the main model calls update("model", ...)', async () => {
     const update = renderCopilot();
-    await screen.findAllByRole('option', { name: 'claude-test' });
-    fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'claude-test' } });
+    await waitForSelectOption('claude-test');
+    pickSelectOption(screen.getAllByRole('combobox')[0], 'claude-test');
     expect(update).toHaveBeenCalledWith('model', 'claude-test');
   });
 

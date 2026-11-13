@@ -6,6 +6,7 @@ import { useOllamaModels } from '../../settings/hooks/useOllamaModels.js';
 import { defaultEffortLabel, effortLabel } from '../../settings/effortLabels.js';
 import { PROVIDER } from '../../../vocab/provider.js';
 import { t } from '../../../strings/index.js';
+import Select from '../../../components/select/Select.jsx';
 
 function OllamaModelField({ value, onChange }) {
   const labelId = useId();
@@ -27,13 +28,14 @@ function EffortSelect({ providerId, model, effort, onEffort }) {
   const { levels, defaultEffort } = modelEffort(catalog, model);
   if (!levels.length) return null;
   return (
-    <select
+    <Select
       className="settings-model-input reviewer-fields__effort" aria-label={t('settings.effort')}
-      value={levels.includes(effort) ? effort : ''} onChange={(e) => onEffort(e.target.value)}
-    >
-      <option value="">{defaultEffortLabel(defaultEffort)}</option>
-      {levels.map((level) => <option key={level} value={level}>{effortLabel(level)}</option>)}
-    </select>
+      value={levels.includes(effort) ? effort : ''} onChange={onEffort}
+      options={[
+        { value: '', label: defaultEffortLabel(defaultEffort) },
+        ...levels.map((level) => ({ value: level, label: effortLabel(level) })),
+      ]}
+    />
   );
 }
 
