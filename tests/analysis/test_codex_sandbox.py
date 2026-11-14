@@ -44,6 +44,18 @@ def test_probe_rejects_a_sandbox_that_fails_here(monkeypatch, tmp_path):
     assert not codex_sandbox.native_sandbox_works("codex", [], tmp_path, tmp_path / "f", {})
 
 
+def test_windows_probe_runs_each_command_inside_the_sandbox(monkeypatch, tmp_path):
+    # npm's codex.cmd goes through cmd.exe: a "&&" would run its right side unconfined.
+    monkeypatch.setattr(codex_sandbox.platform, "system", lambda: "Windows")
+    calls: list = []
+    run = _fake_run("0.162.1", 0)
+    monkeypatch.setattr(codex_sandbox.subprocess, "run", lambda argv, **kw: calls.append(argv) or run(argv))
+    assert codex_sandbox.native_sandbox_works("codex", ["-c", "w=1"], tmp_path, tmp_path / "f", {})
+    probes = [argv[argv.index("--") + 1:] for argv in calls if "--" in argv]
+    assert [p[2] for p in probes] == ["dir", "type"]
+    assert not any("&&" in p for p in probes)
+
+
 def _scan(tmp_path, monkeypatch, works: bool):
     monkeypatch.setattr("quodeq.analysis._cli_sandbox.native_sandbox_works", lambda *a: works)
     monkeypatch.setattr("quodeq.analysis._cli_sandbox.external_sandbox_prefix",
