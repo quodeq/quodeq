@@ -7,7 +7,7 @@ patched name. ``patch.object(ww, "X")`` only rebinds the name ``X`` inside
 defined here (its ``__globals__`` must be this module's dict), or the mock
 never intercepts the call. The remaining seams of that kind are ``webview``,
 ``InstanceController``, the ``make_on_*`` factories, ``_create_window``,
-``quodeq_dir``, ``set_app_icon``, and ``non_macos_menu`` — all bare-called
+``quodeq_dir``, and ``set_app_icon`` — all bare-called
 from main() (or, for ``webview``, also from _create_window), defined here or
 merely re-exported from a sibling module. ``sys`` and ``webbrowser`` are
 patched as shared module objects instead (e.g.
@@ -55,7 +55,6 @@ from quodeq.dashboard._webview_window_fullscreen import (  # noqa: F401 — re-e
 )
 from quodeq.dashboard._webview_window_help_menu import (  # noqa: F401 — re-export
     NAVIGATE_HELP_JS,
-    non_macos_menu,
 )
 from quodeq.dashboard._webview_window_lifecycle import make_on_loaded
 from quodeq.dashboard._webview_window_visibility import (  # noqa: F401 — re-export
@@ -237,15 +236,13 @@ def _own_reload_socket(instance: InstanceController, window: webview.Window) -> 
         instance.start_listening(on_reload=make_on_reload(window))
 
 
-def _run_webview(window: webview.Window, webview_token: str, instance: InstanceController,
-                 api_pid: int) -> None:
+def _run_webview(webview_token: str, instance: InstanceController, api_pid: int) -> None:
     """Block in the webview loop; release the socket and the API process on exit."""
     storage_dir = str(quodeq_dir() / "webview")
     pid_file = record_window_pid()
     try:
         webview.start(private_mode=False, storage_path=storage_dir,
-                      user_agent=webview_user_agent(webview_token),
-                      menu=non_macos_menu(window) or [])
+                      user_agent=webview_user_agent(webview_token))
     finally:
         clear_window_pid(pid_file)
         instance.shutdown()
@@ -259,7 +256,7 @@ def main() -> None:
     webview_token = read_token_from_stdin()
     window, instance = _wire_window(url, sock_path, api_pid)
     _own_reload_socket(instance, window)
-    _run_webview(window, webview_token, instance, api_pid)
+    _run_webview(webview_token, instance, api_pid)
 
 
 if __name__ == "__main__":
