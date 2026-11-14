@@ -45,14 +45,14 @@ Each finding comes with its reason, the code and a fix plan, and code done right
 ## Get started
 
 1. **Install it.** With Python 3.12 or newer, `pipx install quodeq`, or on macOS `brew install quodeq/tap/quodeq`.
-2. **Have a model at hand.** quodeq works with an AI CLI you already use (Claude Code, Codex, Gemini CLI, GitHub Copilot), an OpenRouter key, or a local model through Ollama, llama.cpp or omlx, in which case the code never leaves your machine. The [benchmarks](https://quodeq.ai/benchmarks/) show how models compare on a known corpus, and the [providers page](https://quodeq.ai/docs/providers/) has the setup for each.
-3. **Run `quodeq`**, the same as `quodeq dashboard`. The dashboard opens with a welcome: add a repository, pick who reviews it, and start the first evaluation. On Linux without a native window, `quodeq --browser` opens it in your browser instead.
+2. **Have a model at hand.** quodeq works with an AI CLI you already use (Claude Code, Codex, Gemini CLI, Antigravity, GitHub Copilot), an OpenRouter key, or a local model through Ollama, llama.cpp or omlx, in which case the code never leaves your machine. The [benchmarks](https://quodeq.ai/benchmarks/) show how models compare on a known corpus, and the [providers page](https://quodeq.ai/docs/providers/) has the setup for each.
+3. **Run `quodeq`**, the same as `quodeq dashboard`. The dashboard opens with a welcome: add a repository, pick who reviews it, and start the first evaluation. Where the native window is not available (Linux without GTK and WebKit, Windows with an ARM64 Python), quodeq opens in your browser; `quodeq --browser` asks for that on any platform.
 
 The [quickstart](https://quodeq.ai/docs/quickstart/) walks through the same steps in more detail.
 
 ## Your own standards
 
-A standard is a set of principles and requirements, and one you add is graded exactly like a built-in one, with its own place in the Overview, the code map and Compare. Write it in the dashboard, import a file, or ask the assistant to draft one from a source you name, such as a style guide or your framework's documentation; nothing is created until you press Apply. Clean Architecture, Domain-Driven Design and Accessibility ship ready to switch on. See [Custom Standards](https://quodeq.ai/docs/standards/).
+A standard is a set of principles and requirements, and one you add is graded exactly like a built-in one, with its own place in the Overview, the code map and Compare. Write it in the dashboard, import a file, or ask the assistant to draft one from a source you name, such as a style guide or your framework's documentation; nothing is created until you press Apply. Clean Architecture, Domain-Driven Design, Accessibility and AI Integration Security ship ready to switch on. See [Custom Standards](https://quodeq.ai/docs/standards/).
 
 ## Go further
 
