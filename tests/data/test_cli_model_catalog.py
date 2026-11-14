@@ -13,7 +13,7 @@ import pytest
 from quodeq.data.cli_models import CatalogUnavailable, fetch_cli_model_catalog, supports_model_catalog
 
 _SESSION = "quodeq.data.cli_models._JsonLinesSession"
-_WHICH = "quodeq.data.cli_models.shutil.which"
+_WHICH = "quodeq.shared.win_launch.shutil.which"
 
 
 class _ScriptedSession:
