@@ -40,3 +40,14 @@ def test_spec_bundles_every_runtime_data_dir(spec: Path) -> None:
     text = spec.read_text(encoding="utf-8")
     missing = sorted(d for d in _runtime_data_dirs() if f'"{d}"' not in text)
     assert not missing, f"{spec.relative_to(_REPO)} has no datas entry for {missing}"
+
+
+@pytest.mark.parametrize("spec", _SPECS, ids=lambda p: p.parent.name)
+def test_spec_bundles_the_help_pages(spec: Path) -> None:
+    """The assistant's help tool reads the Help markdown from the UI sources,
+    which the generic check above skips (frontend tree, ``.md`` files)."""
+    from quodeq.assistant.tools.help_tools import HELP_DIR
+
+    bundled = "/".join(("quodeq",) + HELP_DIR.relative_to(_PKG).parts)
+    assert any(HELP_DIR.glob("*.md"))
+    assert f'"{bundled}"' in spec.read_text(encoding="utf-8")
