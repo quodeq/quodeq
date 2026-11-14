@@ -28,6 +28,7 @@ from quodeq.dashboard._instance import InstanceController
 from quodeq.dashboard._webview_token import read_token_from_stdin
 from quodeq.dashboard.instances import clear_window_pid, record_window_pid
 from quodeq.dashboard._webview_window_about import (  # noqa: F401 — re-export
+    icon_path,
     set_app_icon,
     set_macos_app_identity,
     webview_user_agent,
@@ -236,13 +237,24 @@ def _own_reload_socket(instance: InstanceController, window: webview.Window) -> 
         instance.start_listening(on_reload=make_on_reload(window))
 
 
+def _window_icon() -> str | None:
+    """The .ico for the window on Windows, else None.
+
+    pywebview's WinForms form uses webview.start(icon=...) when given (its docs
+    say GTK/Qt only, but winforms.py reads it too); without it the form takes
+    the icon of sys.executable, which under pip/pipx is python.exe.
+    """
+    return icon_path(".ico") if sys.platform == PLATFORM_WIN32 else None
+
+
 def _run_webview(webview_token: str, instance: InstanceController, api_pid: int) -> None:
     """Block in the webview loop; release the socket and the API process on exit."""
     storage_dir = str(quodeq_dir() / "webview")
     pid_file = record_window_pid()
     try:
         webview.start(private_mode=False, storage_path=storage_dir,
-                      user_agent=webview_user_agent(webview_token))
+                      user_agent=webview_user_agent(webview_token),
+                      icon=_window_icon())
     finally:
         clear_window_pid(pid_file)
         instance.shutdown()
