@@ -52,4 +52,5 @@ jobs:
       - name: Run live sandbox checks
         env:
           QUODEQ_SANDBOX_LIVE: "1"
+          QUODEQ_SANDBOX_LIVE_DIR: ${{ runner.temp }}
         run: uv run pytest tests/sandbox_live -v -rs --tb=short
