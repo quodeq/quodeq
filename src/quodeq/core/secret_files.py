@@ -21,6 +21,7 @@ KIND_CREDENTIAL = "credential"    # the whole file is a credential
 
 _GLOBS: tuple[tuple[str, str], ...] = (
     (".env", KIND_ASSIGNMENTS), (".env.*", KIND_ASSIGNMENTS), ("*.env", KIND_ASSIGNMENTS),
+    (".env-*", KIND_ASSIGNMENTS), (".env_*", KIND_ASSIGNMENTS), (".envrc", KIND_ASSIGNMENTS),
     (".npmrc", KIND_ASSIGNMENTS), (".pypirc", KIND_ASSIGNMENTS),
     ("*.pem", KIND_PRIVATE_KEY), ("*.key", KIND_PRIVATE_KEY),
     ("*.p12", KIND_CREDENTIAL), ("*.pfx", KIND_CREDENTIAL),
