@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
+import { pickSelectOption } from '../../../test-utils/selectOption.js';
 
 const TREND = [
   { runId: 'r3', dateISO: '2026-04-07T10:00:00', dateLabel: 'Apr 7', dimensionDetails: [{ dimension: 'maintainability', score: 6.1 }, { dimension: 'reliability', score: 5.9 }] },
@@ -60,7 +61,7 @@ describe('DimensionScoreHistoryPanel', () => {
       />,
     );
     const select = screen.getByLabelText(/Group score history by/i);
-    fireEvent.change(select, { target: { value: 'month' } });
+    pickSelectOption(select, 'Month');
     expect(onGranularityChange).toHaveBeenCalledWith('month');
   });
 

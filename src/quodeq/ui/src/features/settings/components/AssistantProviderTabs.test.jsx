@@ -3,6 +3,7 @@ import { render, waitFor, act, fireEvent } from '@testing-library/react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import AssistantProviderTabs from './AssistantProviderTabs.jsx';
+import { findSelectOption, pickSelectOption, waitForSelectOption } from '../../../test-utils/selectOption.js';
 
 const CLIENTS = [
   { id: 'claude', label: 'Claude', type: 'cli', installed: true },
@@ -76,7 +77,7 @@ describe('AssistantProviderTabs', () => {
     await waitFor(() => expect(container.querySelectorAll('[role="tablist"]').length).toBe(1));
     expect(queryAllByRole('tab').map((t) => t.textContent)).toEqual(['Default', 'Custom']);
     expect(queryByText(/Follows Analysis/i)).toBeNull();
-    expect(container.querySelector('select')).toBeNull();
+    expect(container.querySelector('[role="combobox"]')).toBeNull();
   });
 
   it('custom mode with a cli provider renders provider pills and a model text input', async () => {
@@ -87,7 +88,7 @@ describe('AssistantProviderTabs', () => {
     // claude is cli → text input, not a select
     const input = container.querySelector('input.settings-model-input');
     expect(input).toBeTruthy();
-    expect(container.querySelector('select')).toBeNull();
+    expect(container.querySelector('[role="combobox"]')).toBeNull();
   });
 
   function withCopilot() {
@@ -105,8 +106,8 @@ describe('AssistantProviderTabs', () => {
   });
 
   it('offers Copilot account models', async () => {
-    const { findByRole } = await withCopilot();
-    expect(await findByRole('option', { name: 'gpt-test' })).toBeTruthy();
+    await withCopilot();
+    expect(await findSelectOption('gpt-test')).toBeTruthy();
   });
 
   it('hides the Copilot login instructions once account models are available', async () => {
@@ -117,18 +118,16 @@ describe('AssistantProviderTabs', () => {
 
   it('changing the Copilot model leaves the active provider untouched', async () => {
     const { getByLabelText } = await withCopilot();
-    fireEvent.change(getByLabelText('Assistant model'), { target: { value: 'gpt-test' } });
+    await waitForSelectOption('gpt-test', () => getByLabelText('Assistant model'));
+    pickSelectOption(getByLabelText('Assistant model'), 'gpt-test');
     expect(localStorage.getItem('cc-active-provider')).toBe('claude');
   });
 
   it('custom mode with an ollama provider renders a model dropdown', async () => {
     localStorage.setItem('cc-assistant-mode', 'custom');
     localStorage.setItem('cc-assistant-active-provider', 'ollama');
-    const { container } = await renderPanel();
-    await waitFor(() => {
-      const opts = container.querySelectorAll('select option');
-      expect([...opts].some((o) => o.value === 'gemma4:26b')).toBe(true);
-    });
+    await renderPanel();
+    expect(await findSelectOption('gemma4:26b')).toBeTruthy();
     expect(fakeApi.getOllamaModels).toHaveBeenCalled();
   });
 

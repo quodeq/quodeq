@@ -3,6 +3,7 @@ import { render, waitFor, fireEvent, screen } from '@testing-library/react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import OmlxTab from './OmlxTab.jsx';
+import { findSelectOption } from '../../../test-utils/selectOption.js';
 
 const fakeApi = {
   getOmlxModels: vi.fn(),
@@ -36,16 +37,13 @@ describe('OmlxTab', () => {
     ]);
     const Wrapper = makeWrapper();
     const state = { model: '', subagents: '4', 'time-limit-min': '60' };
-    const { container } = render(
+    render(
       <Wrapper>
         <OmlxTab state={state} update={vi.fn()} />
       </Wrapper>,
     );
-    await waitFor(() => {
-      const opts = container.querySelectorAll('select option');
-      expect([...opts].some((o) => o.value === 'mlx-community/gemma-3-4b-it-4bit')).toBe(true);
-      expect([...opts].some((o) => o.value === 'mlx-community/qwen3-8b')).toBe(true);
-    });
+    expect(await findSelectOption('mlx-community/gemma-3-4b-it-4bit')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'mlx-community/qwen3-8b' })).toBeInTheDocument();
   });
 
   it('reloads the model list once a saved key has landed', async () => {
