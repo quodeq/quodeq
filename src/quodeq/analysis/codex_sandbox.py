@@ -11,21 +11,25 @@ Codex enforces this on macOS, Linux and Windows, so it covers machines where
 Quodeq has no OS sandbox of its own. A probe runs one read under the same
 profile first; where it fails (an older Codex, a Linux kernel or container
 that refuses the sandbox, an unconfigured Windows sandbox), the scan keeps
-the bypass-plus-OS-sandbox path.
+the bypass-plus-OS-sandbox path. What the repo holds must not decide that:
+see :func:`probe_sample`.
 """
 from __future__ import annotations
 
 import functools
 import json
+import os
 import platform
 import re
+import stat
 import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
 
-from quodeq.shared.constants import SYSTEM_WINDOWS
+from quodeq.core.secret_files import secret_file_kind
+from quodeq.shared.constants import GIT_DIR_NAME, SYSTEM_WINDOWS
 from quodeq.shared.win_launch import launch_argv
 
 _BYPASS_FLAG = "--dangerously-bypass-approvals-and-sandbox"
@@ -36,6 +40,10 @@ _PROBE_TIMEOUT_S = 20
 _VERSION_RE = re.compile(r"(\d+\.\d+\.\d+)")
 _MCP_OVERRIDE_PREFIX = "mcp_servers."
 _APPROVE_TOOLS = ', default_tools_approval_mode = "approve"}'
+SAMPLE_MAX_BYTES = 64 * 1024  # the probe prints its sample
+SAMPLE_SCAN_LIMIT = 2000  # files looked at before giving up on the repo
+_SAMPLE_NAME_RE = re.compile(r"[A-Za-z0-9._-]+")  # nothing sh or cmd.exe acts on
+_OWN_SAMPLE = Path(__file__).resolve()
 
 
 def _toml_str(value: str) -> str:
@@ -110,17 +118,57 @@ def _probe_commands(listed: Path, sample: Path) -> list[list[str]]:
     return [["/bin/sh", "-c", 'ls "$1" >/dev/null && cat "$2"', "sh", str(listed), str(sample)]]
 
 
+def _usable_sample(path: Path, name: str) -> bool:
+    """Whether the probe's verdict on *path* says something about the sandbox
+    and nothing about the file: a regular file (a link could point at one the
+    profile denies), not empty and small (the probe must print it, in time),
+    readable outside the sandbox, with a name no shell reads as syntax, and
+    not a credential file (the profile denies those on purpose)."""
+    if not _SAMPLE_NAME_RE.fullmatch(name) or secret_file_kind(name) is not None:
+        return False
+    try:
+        info = path.lstat()
+    except OSError:
+        return False
+    return (stat.S_ISREG(info.st_mode) and 0 < info.st_size <= SAMPLE_MAX_BYTES
+            and os.access(path, os.R_OK))
+
+
+def probe_sample(repo: Path) -> Path:
+    """The file the probe reads: the first usable one in *repo*, its root
+    first, else this module's own source, which every scan profile can read.
+
+    The repo's author controls its files, so none of them may decide the
+    verdict: an empty or huge first file, a link or an odd name would fail
+    every profile and send the scan to the bypass. With Quodeq's own file
+    the probe still proves the sandbox runs here, only not that it reads
+    the repo, which then holds nothing it could prove that with."""
+    seen = 0
+    for dirpath, dirnames, filenames in os.walk(repo, onerror=lambda _exc: None):
+        dirnames[:] = sorted(d for d in dirnames if d != GIT_DIR_NAME and _SAMPLE_NAME_RE.fullmatch(d))
+        for name in sorted(filenames):
+            seen += 1
+            if seen > SAMPLE_SCAN_LIMIT:
+                return _OWN_SAMPLE
+            if _usable_sample(Path(dirpath) / name, name):
+                return Path(dirpath) / name
+    return _OWN_SAMPLE
+
+
 def native_sandbox_works(
     binary: str, profile: list[str], listed: Path, sample: Path, env: Mapping[str, str],
+    cwd: Path | None = None,
 ) -> bool:
     """Whether this Codex can run the scan profile here: recent enough, and
-    listing *listed* and reading *sample* (a repo file) succeed inside it."""
-    return _probe(binary, tuple(profile), listed, sample, tuple(sorted(env.items())))
+    listing *listed* and reading *sample* (see :func:`probe_sample`) succeed
+    inside it, run from *cwd* (the sample's folder when not given)."""
+    return _probe(binary, tuple(profile), listed, sample, tuple(sorted(env.items())),
+                  cwd or sample.parent)
 
 
 @functools.cache
 def _probe(binary: str, profile: tuple[str, ...], listed: Path, sample: Path,
-           env: tuple[tuple[str, str], ...]) -> bool:
+           env: tuple[tuple[str, str], ...], cwd: Path) -> bool:
     env_map = dict(env)
     version = _version(binary, env_map)
     if version is None or version < _MIN_VERSION:
@@ -128,7 +176,7 @@ def _probe(binary: str, profile: tuple[str, ...], listed: Path, sample: Path,
     try:
         probes = [subprocess.run(
             launch_argv([binary, "sandbox", *profile, "--", *command], env_map),
-            capture_output=True, timeout=_PROBE_TIMEOUT_S, env=env_map, cwd=sample.parent, check=False)
+            capture_output=True, timeout=_PROBE_TIMEOUT_S, env=env_map, cwd=cwd, check=False)
             for command in _probe_commands(listed, sample)]
     except (OSError, subprocess.SubprocessError):
         return False

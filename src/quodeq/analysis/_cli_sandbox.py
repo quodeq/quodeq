@@ -28,11 +28,10 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.analysis.codex_sandbox import (
-    native_args, native_sandbox_works, plain_read_only_args, profile_args,
+    native_args, native_sandbox_works, plain_read_only_args, probe_sample, profile_args,
 )
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.core.secret_files import secret_file_kind
 from quodeq.data.fs.project_standards import project_settings_file, settings_reports_root
 from quodeq.data.fs.secret_files import find_secret_files
 from quodeq.shared.codex_home import user_codex_auth_file
@@ -185,11 +184,11 @@ def _native_args(
     cfg: AnalysisConfig, work_dir: Path, args: list[str], env: Mapping[str, str], log: LogSink,
 ) -> list[str] | None:
     project = _project_dir(cfg)
-    sample = next((p for p in sorted(work_dir.iterdir())
-                   if p.is_file() and secret_file_kind(p.name) is None), None)
-    if project is None or sample is None:
+    if project is None:
         return None
-    readable = [work_dir.resolve(), project, *runtime_readable_dirs("rg")]
+    repo = work_dir.resolve()
+    sample = probe_sample(repo)
+    readable = [repo, project, *runtime_readable_dirs("rg")]
     evidence = cfg.jsonl_file.resolve().parent if cfg.jsonl_file else project
     # Home unreadable where Codex can enforce it, else plain read-only (no
     # writes, no network), which still beats the OS fallbacks on Windows:
@@ -198,7 +197,7 @@ def _native_args(
     profiles = [profile_args(Path.home().resolve(), readable, unreadable),
                 plain_read_only_args(unreadable), plain_read_only_args()]
     for profile in map(list, dict.fromkeys(map(tuple, profiles))):
-        if native_sandbox_works(args[0], profile, evidence, sample.resolve(), env):
+        if native_sandbox_works(args[0], profile, evidence, sample, env, repo):
             if unreadable and profile == profiles[-1]:
                 _warn_secrets_readable(args[0], work_dir, log)
             return native_args(args, profile)

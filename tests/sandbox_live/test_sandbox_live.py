@@ -149,6 +149,21 @@ def test_codex_plain_read_only_confines_when_the_probe_accepts_it(layout, codex)
     assert not _inside(binary, profile, repo, env, _fetch()), "network leaked"
 
 
+def test_codex_probe_verdict_does_not_hang_on_what_the_repo_holds(layout, codex):
+    repo, _, _ = layout
+    binary, env = codex
+    profile = codex_sandbox.plain_read_only_args()
+    if not codex_sandbox.native_sandbox_works(binary, profile, repo, repo / "app.py", env):
+        pytest.skip(f"Codex's read-only sandbox is refused here {_refused(binary, profile, repo, env)}")
+    (repo / ".aaa").write_text("", encoding="utf-8")  # an empty first file
+    bare = repo.parent / "bare"  # nothing the probe could print
+    bare.mkdir()
+    (bare / ".gitkeep").write_text("", encoding="utf-8")
+    assert codex_sandbox.probe_sample(repo) == repo / "app.py"
+    assert codex_sandbox.native_sandbox_works(
+        binary, profile, bare, codex_sandbox.probe_sample(bare), env, bare), "an empty repo failed the probe"
+
+
 def test_this_interpreter_is_what_the_os_sandbox_reads_back():
     # runtime_readable_dirs must cover the interpreter the findings server runs on.
     dirs = [Path(d).resolve() for d in os_sandbox.runtime_readable_dirs()]

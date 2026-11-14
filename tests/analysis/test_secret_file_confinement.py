@@ -65,7 +65,7 @@ def warnings(monkeypatch):
 def test_codex_native_sandbox_denies_the_repo_secret_files(tmp_path, repo, monkeypatch):
     probes: list = []
     monkeypatch.setattr("quodeq.analysis._cli_sandbox.native_sandbox_works",
-                        lambda binary, profile, listed, sample, env: probes.append(sample) or True)
+                        lambda binary, profile, listed, sample, env, cwd: probes.append(sample) or True)
     args = _confine(tmp_path, repo)
     assert probes == [(repo / "app.py").resolve()]
     assert _entry((repo / ".env").resolve(), "none") in next(a for a in args if ".filesystem=" in a)
