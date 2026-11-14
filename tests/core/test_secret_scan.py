@@ -33,6 +33,45 @@ def test_ignores_near_misses(line):
     assert find_secrets(line) == []
 
 
+@pytest.mark.parametrize("line", [
+    f"DB_PASSWORD={GENERIC_VALUE}",
+    f"export API_TOKEN={GENERIC_VALUE}",
+    f"  secret_key: {GENERIC_VALUE}",
+    f"spring.datasource.password = {GENERIC_VALUE}  # prod",
+    f"      - POSTGRES_PASSWORD={GENERIC_VALUE}",
+    f"ENV AUTH_TOKEN={GENERIC_VALUE}",
+    f"JWT_SECRET={GENERIC_VALUE}\r",
+])
+def test_detects_an_unquoted_value_on_a_line_of_its_own(line):
+    (hit,) = find_secrets(f"FIRST=1\n{line}\nLAST=2\n")
+    assert (hit.kind, hit.line) == ("generic_secret", 2)
+    assert f"FIRST=1\n{line}\nLAST=2\n"[hit.start:hit.end] == GENERIC_VALUE
+
+
+@pytest.mark.parametrize("line", [
+    "token = oauth2_access_token_v2_2024",                       # an identifier
+    "password = hashlib.sha256(raw_password_123).hexdigest()",  # a call
+    f"login(password={GENERIC_VALUE})",                          # not the whole line
+    f"token = {GENERIC_VALUE};",                                 # a statement
+    "secretName: tls-2024-prod-cert",                            # names a secret, is not one
+    f"PRIVATE_KEY_PATH=/run/keys/{GENERIC_VALUE}",               # points at one
+    "token_url=https://auth.example.com/oauth2/v2/token/2024",   # a URL
+    "API_TOKEN=${API_TOKEN_FROM_VAULT_2024}",                    # interpolation
+    "PASSWORD=changeme-changeme-1",                              # a placeholder word
+    "DB_PASSWORD=aaaaaaaa11111111aaaaaaaa",                      # no entropy
+    f"COLOUR={GENERIC_VALUE}",                                   # name is not a credential
+])
+def test_ignores_unquoted_near_misses(line):
+    assert find_secrets(line) == []
+
+
+def test_redacting_an_env_file_keeps_keys_and_line_count():
+    text = f"# settings\nDEBUG=true\nDB_PASSWORD={GENERIC_VALUE}\nPORT=8080\n"
+    redacted = redact(text)
+    assert redacted == f"# settings\nDEBUG=true\nDB_PASSWORD={placeholder('generic_secret')}\nPORT=8080\n"
+    assert redact(redacted) == redacted
+
+
 def test_hit_reports_the_line_and_exact_span():
     text = f"a = 1\nb = '{AWS_KEY}'\n"
     (hit,) = find_secrets(text)

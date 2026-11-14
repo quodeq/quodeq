@@ -5,16 +5,23 @@ Extracted from FindingsRouter to keep module sizes small.
 Every text field that leaves here is secret-masked: the snippet and context
 end up in evaluation.db, evidence JSONL, reports, shared publish and SARIF,
 and a credential in the source must reach none of them.
+
+A credential file (``core.secret_files``) is never read here at all. The
+model names the file a finding is about, and text planted in a repository can
+make it name ``.env``; such a finding keeps its file, line and reason and
+gets a placeholder for its code.
 """
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Callable
 
-from quodeq.core.secret_scan import redact
+from quodeq.core.secret_files import secret_file_kind
+from quodeq.core.secret_scan import placeholder, redact
 
 CONTEXT_LINES = 5
 _MAX_SNIPPET_LINES = 40  # cap for scope-level snippets
+SECRET_FILE_SNIPPET = placeholder("secret_file")  # stands in for the code of a credential file
 
 
 def _extract_window(source: str, line: int, end_line: int, context: int) -> list[str]:
@@ -96,22 +103,39 @@ def enrich_code(
     mask_secrets(finding)
 
 
+def _is_secret_file(path: str) -> bool:
+    """True when *path* (either separator) names a credential file."""
+    return secret_file_kind(PureWindowsPath(path).name) is not None
+
+
+def _withhold_code(finding: dict) -> None:
+    finding["snippet"] = SECRET_FILE_SNIPPET
+    finding["context"] = ""
+
+
 def _fill_code(
     finding: dict,
     work_dir: Path | None,
     read_file: Callable[[Path], str],
 ) -> None:
-    if work_dir is None:
-        return
     file_path = finding.get("file")
     if not file_path:
         return
+    if _is_secret_file(str(file_path)):  # whatever the model quoted from it goes too
+        _withhold_code(finding)
+        return
+    if work_dir is None:
+        return
     try:
         full_path = work_dir / file_path
+        resolved = full_path.resolve()
         # Path containment check: prevent traversal outside the work directory.
-        if not full_path.resolve().is_relative_to(work_dir.resolve()):
+        if not resolved.is_relative_to(work_dir.resolve()):
             finding.setdefault("snippet", "")
             finding.setdefault("context", "")
+            return
+        if _is_secret_file(resolved.name):  # a link to one under another name
+            _withhold_code(finding)
             return
         # Redact the whole file before windowing: a window that starts inside
         # a PEM body has no header left to recognise it by.
