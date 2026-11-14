@@ -117,6 +117,15 @@ def test_set_app_icon_logs_windows_taskbar_failure(monkeypatch) -> None:
     assert any("windows taskbar icon not set" in m for m in messages)
 
 
+def test_set_app_icon_on_linux_hands_over_the_png(monkeypatch) -> None:
+    calls: list[str | None] = []
+    monkeypatch.setattr(about.sys, "platform", "linux")
+    monkeypatch.setattr(about, "set_linux_app_identity", calls.append)
+    about.set_app_icon()
+    assert calls and calls[0] is not None and calls[0].endswith("icon.png")
+    assert os.path.isfile(calls[0])
+
+
 def test_kill_api_logs_when_process_is_already_gone(monkeypatch) -> None:
     def _raise(*_a, **_k):
         raise ProcessLookupError(3, "No such process")
