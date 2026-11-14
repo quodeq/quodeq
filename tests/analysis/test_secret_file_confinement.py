@@ -27,7 +27,7 @@ def test_claude_scan_denies_reading_credential_files(tmp_path):
     )
     args, _ = build_ai_cmd("Analyze", config)
     denied = args[args.index("--disallowedTools") + 1].split(",")
-    assert {"Read(./**/.env)", "Read(./**/*.pem)", "Read(./**/id_rsa)"} <= set(denied)
+    assert {"Read(./**/.env)", "Read(./**/*.pem)", "Read(./**/id_rsa*)", "Read(./**/.netrc*)"} <= set(denied)
 
 
 def test_codex_profile_denies_files_inside_a_readable_repo(tmp_path):

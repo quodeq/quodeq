@@ -59,6 +59,22 @@ def test_names_the_assistant_used_to_refuse_stay_refused(registry, repo, name):
     assert _read(registry, name)["ok"] is False
 
 
+@pytest.mark.parametrize("name", [
+    "id_rsa_old", "id_ed25519.bak", ".netrc.bak", ".pgpass.old", ".git-credentials.orig",
+    ".htpasswd-staging", ".npmrc.backup", ".pypirc~",
+])
+def test_a_backup_copy_of_a_credential_file_is_refused(registry, repo, name):
+    (repo / name).write_text("machine example.com login me\n")
+    assert _read(registry, name)["ok"] is False
+
+
+@pytest.mark.parametrize("name", ["id_rsa.pub", ".netrc.example", ".npmrc.dist"])
+def test_a_public_key_or_template_is_readable(registry, repo, name):
+    (repo / name).write_bytes(b"nothing secret\n")
+    out = _read(registry, name)
+    assert out["ok"] and out["result"]["content"] == "nothing secret\n"
+
+
 def test_a_link_to_a_credential_file_is_refused(registry, repo):
     (repo / ".env").write_text("A=1\n")
     try:

@@ -22,18 +22,22 @@ KIND_CREDENTIAL = "credential"    # the whole file is a credential
 _GLOBS: tuple[tuple[str, str], ...] = (
     (".env", KIND_ASSIGNMENTS), (".env.*", KIND_ASSIGNMENTS), ("*.env", KIND_ASSIGNMENTS),
     (".env-*", KIND_ASSIGNMENTS), (".env_*", KIND_ASSIGNMENTS), (".envrc", KIND_ASSIGNMENTS),
-    (".npmrc", KIND_ASSIGNMENTS), (".pypirc", KIND_ASSIGNMENTS),
+    # The names below match by prefix: a backup or renamed copy (id_rsa_old,
+    # .netrc.bak) is the same credential.
+    (".npmrc*", KIND_ASSIGNMENTS), (".pypirc*", KIND_ASSIGNMENTS),
     ("*.pem", KIND_PRIVATE_KEY), ("*.key", KIND_PRIVATE_KEY),
     ("*.p12", KIND_CREDENTIAL), ("*.pfx", KIND_CREDENTIAL),
     ("*.jks", KIND_CREDENTIAL), ("*.keystore", KIND_CREDENTIAL),
-    ("id_rsa", KIND_CREDENTIAL), ("id_dsa", KIND_CREDENTIAL),
-    ("id_ecdsa", KIND_CREDENTIAL), ("id_ed25519", KIND_CREDENTIAL),
-    (".netrc", KIND_CREDENTIAL), (".git-credentials", KIND_CREDENTIAL),
-    (".pgpass", KIND_CREDENTIAL), (".htpasswd", KIND_CREDENTIAL),
+    ("id_rsa*", KIND_CREDENTIAL), ("id_dsa*", KIND_CREDENTIAL),
+    ("id_ecdsa*", KIND_CREDENTIAL), ("id_ed25519*", KIND_CREDENTIAL),
+    (".netrc*", KIND_CREDENTIAL), (".git-credentials*", KIND_CREDENTIAL),
+    (".pgpass*", KIND_CREDENTIAL), (".htpasswd*", KIND_CREDENTIAL),
 )
 
 # Templates checked in on purpose, with placeholder values: readable.
 _TEMPLATE_SUFFIXES = (".example", ".sample", ".template", ".dist")
+# The public half of an SSH key pair holds nothing secret: readable.
+_PUBLIC_KEY_GLOB = "id_*.pub"
 
 SECRET_FILE_GLOBS: tuple[str, ...] = tuple(glob for glob, _ in _GLOBS)
 
@@ -41,6 +45,6 @@ SECRET_FILE_GLOBS: tuple[str, ...] = tuple(glob for glob, _ in _GLOBS)
 def secret_file_kind(name: str) -> str | None:
     """The kind of credential file *name* (a basename) is, or None."""
     lowered = name.lower()
-    if lowered.endswith(_TEMPLATE_SUFFIXES):
+    if lowered.endswith(_TEMPLATE_SUFFIXES) or fnmatchcase(lowered, _PUBLIC_KEY_GLOB):
         return None
     return next((kind for glob, kind in _GLOBS if fnmatchcase(lowered, glob)), None)
