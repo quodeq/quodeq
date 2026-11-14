@@ -6,6 +6,7 @@ import { STEP_ANALYZE, STEP_CONNECT } from '../wizardSteps.js';
 import { WIZARD_SOURCE } from '../onboardingVocab.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { invalidateDimensionCache } from '../../evaluation/hooks/usePluginDimensions.js';
+import { waitForSelectOption } from '../../../test-utils/selectOption.js';
 
 vi.mock('../hooks/useProviderDetection.js', () => ({
   useProviderDetection: () => ({
@@ -90,7 +91,7 @@ describe('OnboardingWizard reviewer step', () => {
   it('later without a pick stores nothing and lands on repositories with the project selected', async () => {
     const { onClose, onLaunch } = renderWizard(ADD_ENTRY);
     await addRepository('/u/me/billing');
-    await screen.findByRole('option', { name: 'Sonnet (default)' });
+    await waitForSelectOption('Sonnet (default)');
     fireEvent.click(screen.getByRole('button', { name: 'later, take me to the project' }));
     expect(onClose).toHaveBeenCalledWith({ saved: true, projectId: 'uuid-9', cloning: false, landed: true });
     expect(onLaunch).not.toHaveBeenCalled();

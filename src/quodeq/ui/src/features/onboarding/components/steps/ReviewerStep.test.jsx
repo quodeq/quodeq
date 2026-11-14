@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { withStableQueryApi } from '../../../../test-utils/withQueryClient.jsx';
 import { invalidateDimensionCache } from '../../../evaluation/hooks/usePluginDimensions.js';
 import ReviewerStep from './ReviewerStep.jsx';
+import { pickSelectOption, waitForSelectOption } from '../../../../test-utils/selectOption.js';
 
 const detection = vi.hoisted(() => ({ value: null }));
 vi.mock('../../hooks/useProviderDetection.js', () => ({ useProviderDetection: () => detection.value }));
@@ -73,7 +74,7 @@ describe('ReviewerStep', () => {
     expect(screen.getByText('✓ billing added')).toBeInTheDocument();
     expect(screen.getByText('the download continues on Repositories. your reviewer is saved for its first evaluation.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'start first evaluation' })).toBeNull();
-    await screen.findByRole('option', { name: 'Sonnet (default)' });
+    await waitForSelectOption('Sonnet (default)');
     fireEvent.click(screen.getByRole('button', { name: 'save and close' }));
     expect(onLater).toHaveBeenCalledTimes(1);
     expect(onStart).not.toHaveBeenCalled();
@@ -107,7 +108,7 @@ describe('ReviewerStep', () => {
     localStorage.setItem('cc-active-provider', 'codex');
     detection.value = detected(['claude-code', 'codex-cli']);
     const { onLater } = renderStep();
-    await screen.findByRole('option', { name: 'Sonnet (default)' });
+    await waitForSelectOption('Sonnet (default)');
     expect(screen.getByRole('radio', { name: 'Codex CLI' })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'later, take me to the project' }));
     expect(onLater).toHaveBeenCalledTimes(1);
@@ -119,8 +120,8 @@ describe('ReviewerStep', () => {
     localStorage.setItem('cc-active-provider', 'codex');
     detection.value = detected(['claude-code', 'codex-cli']);
     renderStep();
-    await screen.findByRole('option', { name: 'Sonnet (default)' });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'opus' } });
+    await waitForSelectOption('Sonnet (default)');
+    pickSelectOption(screen.getByRole('combobox'), 'Opus');
     fireEvent.click(screen.getByRole('button', { name: 'later, take me to the project' }));
     expect(localStorage.getItem('cc-active-provider')).toBe('codex');
     expect(localStorage.getItem('cc-codex-model')).toBe('opus');
@@ -162,7 +163,7 @@ describe('ReviewerStep', () => {
     localStorage.setItem('cc-active-provider', 'gemini');
     detection.value = detected(['claude-code', 'codex-cli']);
     const { onLater } = renderStep();
-    await screen.findByRole('option', { name: 'Sonnet (default)' });
+    await waitForSelectOption('Sonnet (default)');
     fireEvent.click(screen.getByRole('button', { name: 'later, take me to the project' }));
     expect(onLater).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem('cc-active-provider')).toBe('gemini');
@@ -173,7 +174,7 @@ describe('ReviewerStep', () => {
     localStorage.setItem('cc-active-provider', 'codex');
     detection.value = detected(['claude-code', 'codex-cli']);
     renderStep();
-    await screen.findByRole('option', { name: 'Sonnet (default)' });
+    await waitForSelectOption('Sonnet (default)');
     fireEvent.click(screen.getByRole('radio', { name: 'Claude Code' }));
     fireEvent.click(screen.getByRole('button', { name: 'later, take me to the project' }));
     expect(localStorage.getItem('cc-active-provider')).toBe('claude');

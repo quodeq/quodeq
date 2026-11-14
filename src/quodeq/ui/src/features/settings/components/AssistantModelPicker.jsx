@@ -4,6 +4,7 @@ import { settingsKeys } from '../../../api/queryKeys.js';
 import { classifyProvider, PROVIDER_CLASSIFICATION } from './providerUtils.js';
 import { CliModelInput } from './CliProviderRows.jsx';
 import { t } from '../../../strings/index.js';
+import { ModelPickerSelect } from './LocalApiTabLayout.jsx';
 
 const LOCAL_API_CONFIG = {
   ollama: { apiFn: 'getOllamaModels', queryKey: settingsKeys.ollamaModels(), errorLabel: 'Ollama' },
@@ -11,7 +12,7 @@ const LOCAL_API_CONFIG = {
   omlx: { apiFn: 'getOmlxModels', queryKey: settingsKeys.omlxModels(), errorLabel: 'MLX' },
 };
 
-// A <select> of installed models for local-api providers, mirroring OllamaTab's
+// The installed models for local-api providers, mirroring OllamaTab's
 // ModelSelector. Fetches via the provider-specific api fn from useApi().
 function LocalApiModelSelect({ providerId, value, onChange }) {
   const api = useApi();
@@ -22,15 +23,13 @@ function LocalApiModelSelect({ providerId, value, onChange }) {
   });
   return (
     <div className="settings-model-field">
-      <select
+      <ModelPickerSelect
         className={`settings-model-input${value ? '' : ' settings-model-input--required'}`}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={t('settings.assistantModelAria')}
-      >
-        <option value="">{t('settings.pickAModel')}</option>
-        {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
-      </select>
+        models={models}
+        onChange={onChange}
+        ariaLabel={t('settings.assistantModelAria')}
+      />
       {error && (
         <span className="settings-error">
           {t('settings.localApiModelsLoadFailed', { provider: cfg.errorLabel })}

@@ -1833,6 +1833,7 @@
   "standards.refDescPlaceholder": "Description",
   "standards.refNameAria": "Reference name",
   "standards.refTitlePlaceholder": "Title (e.g. Clean Architecture Ch.22)",
+  "standards.cweTypeFilterAria": "Filter by CWE type",
   "standards.refTypeAria": "Reference type",
   "standards.refUrlAria": "Reference URL",
   "standards.refUrlPlaceholder": "URL (optional)",
