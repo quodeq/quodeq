@@ -10,6 +10,7 @@ from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.os_sandbox import external_sandbox_prefix  # noqa: F401 -- re-export
+from quodeq.shared.win_launch import launch_argv
 
 # The spawned agent CLI is network-capable and tool-executing; it must NOT
 # inherit arbitrary secrets from the server process (JIRA_API_TOKEN, GH_TOKEN,
@@ -104,7 +105,7 @@ def mcp_arg_dirs(args: list[str]) -> list[str]:
 def spawn_turn(argv: list[str], *, cwd: Path, env: dict) -> subprocess.Popen:
     assert_no_dangerous_args(argv)
     return subprocess.Popen(
-        argv, cwd=str(cwd), env=env,
+        launch_argv(argv, env), cwd=str(cwd), env=env,
         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding="utf-8", start_new_session=True,
     )

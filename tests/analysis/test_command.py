@@ -77,3 +77,17 @@ def test_register_cli_mcp_falls_back_to_the_module_default_when_no_run_config(mo
 
     assert name == "quodeq-findings"
     assert f"claude:{name}" in DEFAULT_CLI_MCP_REGISTRY
+
+
+def test_unregister_cli_mcp_on_windows_runs_the_npm_shim_under_node(monkeypatch, tmp_path):
+    """The codex.cmd shim never reaches cmd.exe: its node script is spawned directly."""
+    shim = tmp_path / "codex.cmd"
+    shim.write_text('@ECHO off\r\n"%_prog%"  "%dp0%\\cli.js" %*\r\nSET "_prog=node"\r\n', encoding="utf-8")
+    (tmp_path / "cli.js").write_text("", encoding="utf-8")
+    found = {"codex": str(shim), "node": "node.exe"}
+    monkeypatch.setattr("quodeq.shared.win_launch.IS_WIN32", True)
+    monkeypatch.setattr("quodeq.shared.win_launch.shutil.which", lambda name, path=None: found.get(name))
+    calls = []
+    monkeypatch.setattr("quodeq.analysis._command.subprocess.run", lambda argv, **k: calls.append(argv))
+    _unregister_cli_mcp("codex", "quodeq-findings")
+    assert calls == [["node.exe", str(tmp_path / "cli.js"), "mcp", "remove", "quodeq-findings"]]

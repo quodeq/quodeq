@@ -11,6 +11,7 @@ from quodeq.shared import cancellation
 from quodeq.shared.process_kill import terminate_process as _terminate_process
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import sanitize_sensitive
+from quodeq.shared.win_launch import launch_argv
 
 
 class AnalysisError(ProviderError):
@@ -89,7 +90,7 @@ def spawn_and_monitor(
         # start_new_session creates a new process group so we can kill the
         # entire tree (including child processes) when the agent is cancelled.
         process = subprocess.Popen(
-            args, cwd=str(work_dir), env=env,
+            launch_argv(args, env), cwd=str(work_dir), env=env,
             stdout=out, stderr=err, stdin=subprocess.DEVNULL,
             start_new_session=True,
         )
