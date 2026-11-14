@@ -7,6 +7,7 @@ from quodeq.core.constants import PLATFORM_WIN32  # noqa: F401
 
 # sys.platform values for cross-platform branches.
 PLATFORM_DARWIN = "darwin"
+PLATFORM_LINUX = "linux"
 
 # platform.system() values -- a different vocabulary from sys.platform
 # ("Darwin"/"Linux" vs "darwin"/"win32").

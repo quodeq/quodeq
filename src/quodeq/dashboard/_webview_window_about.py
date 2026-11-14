@@ -15,10 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from quodeq.dashboard._webview_diag import diag_stream
 from quodeq.dashboard.dock_name import set_dock_display_name
+from quodeq.dashboard.linux_desktop_entry import set_linux_app_identity
 from quodeq.dashboard._webview_user_agent import (
     WEBVIEW_TOKEN_UA_PREFIX, WEBVIEW_UA_MARKER, quodeq_version, webview_user_agent,
 )
-from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_LINUX, PLATFORM_WIN32
 from quodeq.shared.logging import log_debug
 
 __all__ = [
@@ -55,10 +56,12 @@ _QUODEQ_REPO = "https://github.com/quodeq/quodeq"
 
 _ICON_EXT_ICNS = ".icns"  # macOS dock/About-panel icon format
 _ICON_EXT_ICO = ".ico"  # Windows taskbar icon format
+_ICON_EXT_PNG = ".png"  # Linux hicolor icon (256x256)
+_ICON_FILES = {_ICON_EXT_ICNS: "icon.icns", _ICON_EXT_ICO: "icon.ico", _ICON_EXT_PNG: "icon.png"}
 
 
 def icon_path(ext: str) -> str | None:
-    """Resolve the quodeq icon path for the given extension (.icns or .ico).
+    """Resolve the quodeq icon path for the given extension (.icns, .ico or .png).
 
     Icons live in package data (`quodeq/data/icons/`) so they ship in the
     wheel — that's what makes the dock icon work under `pipx install`,
@@ -68,13 +71,8 @@ def icon_path(ext: str) -> str | None:
         base = Path(sys._MEIPASS) / "quodeq" / "data" / "icons"  # type: ignore[attr-defined]
     else:
         base = Path(__file__).resolve().parent.parent / "data" / "icons"
-    if ext == _ICON_EXT_ICNS:
-        p = base / "icon.icns"
-    elif ext == _ICON_EXT_ICO:
-        p = base / "icon.ico"
-    else:
-        return None
-    return str(p) if p.exists() else None
+    name = _ICON_FILES.get(ext)
+    return str(base / name) if name and (base / name).exists() else None
 
 
 def _build_about_credits() -> object | None:
@@ -271,9 +269,11 @@ def set_macos_app_identity() -> None:
 
 
 def set_app_icon() -> None:
-    """Set the application icon (dock on macOS, taskbar on Windows)."""
+    """Set the application icon (dock on macOS and Linux, taskbar on Windows)."""
     if sys.platform == PLATFORM_DARWIN:
         set_macos_app_identity()
+    elif sys.platform.startswith(PLATFORM_LINUX):
+        set_linux_app_identity(icon_path(_ICON_EXT_PNG))
     elif sys.platform == PLATFORM_WIN32:
         try:
             import ctypes  # noqa: PLC0415

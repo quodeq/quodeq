@@ -113,3 +113,16 @@ def ensure_run_dir(env: dict[str, str] | None = None) -> Path:
 def get_run_dir(env: dict[str, str] | None = None) -> Path:
     """Old name for :func:`ensure_run_dir`, kept as a shim at its old path."""
     return ensure_run_dir(env)
+
+
+def get_xdg_data_home(env: dict[str, str] | None = None) -> Path:
+    """Return the per-user data directory of the XDG base directory spec.
+
+    ``XDG_DATA_HOME`` when it is an absolute path (the spec says to ignore a
+    relative one), else ``~/.local/share``. Linux launcher entries and icons
+    live under it.
+    """
+    from_env = resolve_env(env).get("XDG_DATA_HOME")
+    if from_env and Path(from_env).is_absolute():
+        return Path(from_env)
+    return Path.home() / ".local" / "share"

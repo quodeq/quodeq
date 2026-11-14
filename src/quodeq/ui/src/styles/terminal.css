@@ -2434,13 +2434,6 @@ button.term-sev-badge--clickable:focus-visible {
   outline: none;
   border-color: var(--color-text-muted);
 }
-.term-period-select__caret {
-  position: absolute;
-  right: var(--term-space-2);
-  font-size: 9px;
-  color: var(--color-text-muted);
-  pointer-events: none;
-}
 
 /* ------------------------------------------------------------
    RunHistoryPanel: score-history chart with grouping selector

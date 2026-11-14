@@ -71,7 +71,7 @@ from quodeq.dashboard._webview_window_native_ops import (  # noqa: F401 — re-e
     save_via_dialog,
     send_cancel_evaluation,
 )
-from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_LINUX, PLATFORM_WIN32
 
 _logger = logging.getLogger(__name__)
 
@@ -160,11 +160,15 @@ def _create_window(url: str, api: "WindowApi") -> "webview.Window":
 
     easy_drag is disabled so only the topbar drags the window — otherwise it
     would hijack the resize splitter (a plain <div>).
+
+    The window starts hidden until the page has loaded, except on Linux:
+    pywebview's GTK show() runs show_all() then hide() for a hidden window
+    under Gtk.Application, so make_on_loaded's show() would keep it off screen.
     """
     return webview.create_window(
         "quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
         frameless=(sys.platform == PLATFORM_DARWIN), easy_drag=False,
-        background_color=_WINDOW_BG_COLOR, hidden=True, js_api=api,
+        background_color=_WINDOW_BG_COLOR, hidden=(sys.platform != PLATFORM_LINUX), js_api=api,
     )
 
 

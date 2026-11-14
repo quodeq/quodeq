@@ -64,8 +64,6 @@ def _resolve_paths_and_build(
     repo_root = resolve_path(str(config.repo_root))
 
     chosen_port = choose_ui_port(config.server.port)
-    if chosen_port != config.server.port:
-        log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
     if config.build.dev:
         hooks.check_prereqs()
@@ -146,7 +144,12 @@ def _handed_off_to_running_instance(config: DashboardConfig) -> bool:
     except (ConnectionRefusedError, OSError):
         log_warning("Could not reach the running instance — starting a new one")
         return False
-    log_info("quodeq is already running — brought its window to the front.")
+    # The request is one-way and desktops may refuse to raise a window, so this
+    # can only report that it asked.
+    log_info(
+        "quodeq is already running, so its window was asked to come to the front. "
+        "If you can't see it, run `quodeq stop`, then `quodeq`."
+    )
     return True
 
 
@@ -256,9 +259,12 @@ def run_dashboard(
     once this process is the one starting the server (None records nothing).
     """
     hooks = hooks or DashboardHooks()
+    requested_port = config.server.port
     config = _prepare_launch(config, env, hooks)
     if _launch_preempted(config):
-        return 0
+        return 0  # the taken port is the running instance's own: nothing to warn about
+    if config.server.port != requested_port:
+        log_warning(f"Port {requested_port} is in use. Using {config.server.port} instead.")
     if launch_args is not None:
         record_launch_args(launch_args)
     _log_startup_banner(config)

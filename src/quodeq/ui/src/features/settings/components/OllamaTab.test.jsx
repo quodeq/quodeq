@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { OllamaLogContext } from '../ollama-log/OllamaLogContext.js';
 import OllamaTab from './OllamaTab.jsx';
+import { findSelectOption } from '../../../test-utils/selectOption.js';
 
 const fakeApi = {
   getOllamaModels: vi.fn(),
@@ -40,16 +41,13 @@ describe('OllamaTab', () => {
     ]);
     const Wrapper = makeWrapper();
     const state = { model: '', subagents: '4', 'time-limit-min': '60' };
-    const { container } = render(
+    render(
       <Wrapper>
         <OllamaTab state={state} update={vi.fn()} />
       </Wrapper>,
     );
-    await waitFor(() => {
-      const opts = container.querySelectorAll('select option');
-      expect([...opts].some((o) => o.value === 'llama3.1')).toBe(true);
-      expect([...opts].some((o) => o.value === 'qwen3')).toBe(true);
-    });
+    expect(await findSelectOption('llama3.1')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'qwen3' })).toBeInTheDocument();
   });
 
   it('shows the models error when getOllamaModels rejects', async () => {
