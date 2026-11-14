@@ -38,7 +38,7 @@ Add a `.quodeqignore` file at the scan root to keep fixture, vendored, or genera
 
 By default, quodeq carries findings for unchanged files forward and re-evaluates only files that have changed since the last run. This keeps subsequent scans fast without losing coverage.
 
-A quodeq update that changes a built-in standard re-analyses every file of that dimension once, on its next run. Version 1.16 does this for Security, whose hardcoded-credentials rule changed.
+A quodeq update that changes a built-in standard does not re-analyse files that have not changed: their earlier results are reused, and the evaluation log says they came from an older version of the standard. Run a clean scan when you want every file judged against the new text. Version 1.16 changes Security's hardcoded-credentials rule. quodeq now checks it itself, without a model, on every Security run, so that run can report credentials an earlier one missed.
 
 The **Clean scan** toggle forces a full re-analysis of every file. Use it after a big refactor, when you change standards, or whenever you want a fresh start. The toggle has three states:
 
