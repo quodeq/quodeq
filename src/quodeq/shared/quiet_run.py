@@ -47,12 +47,14 @@ class Spinner:
 
     Use as a context manager; the line is cleared on exit. ``animating`` is
     False off a terminal, so callers can fall back to plain log lines.
+    It is also False when there is no stream at all: a windowed Windows exe
+    has ``sys.stderr`` set to None.
     """
 
     def __init__(self, label: str, stream: IO[str] | None = None) -> None:
         self.label = label
         self._stream = stream or sys.stderr
-        self.animating = self._stream.isatty()
+        self.animating = self._stream is not None and self._stream.isatty()
         self._started = time.monotonic()
         self._frame = 0
 
@@ -86,7 +88,7 @@ class Spinner:
             self._stream.flush()
 
 
-def _wait_with_spinner(proc: subprocess.Popen, label: str, timeout: float, stream: IO[str]) -> None:
+def _wait_with_spinner(proc: subprocess.Popen, label: str, timeout: float, stream: IO[str] | None) -> None:
     with Spinner(label, stream) as spinner:
         while True:
             try:
@@ -98,7 +100,9 @@ def _wait_with_spinner(proc: subprocess.Popen, label: str, timeout: float, strea
                 spinner.tick()
 
 
-def _replay(out: IO[bytes], stream: IO[str]) -> None:
+def _replay(out: IO[bytes], stream: IO[str] | None) -> None:
+    if stream is None:
+        return
     out.seek(0)
     stream.write(out.read().decode(errors="replace"))
     stream.flush()

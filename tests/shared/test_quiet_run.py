@@ -61,3 +61,18 @@ def test_spinner_sleep_keeps_drawing_through_a_long_wait():
         spinner.sleep(0.35)
     assert stream.getvalue().count("Starting the Action API") >= 3
     assert stream.getvalue().endswith("\r\x1b[K")
+
+
+def test_spinner_without_any_stream_stays_silent(monkeypatch):
+    # A windowed Windows exe (PyInstaller console=False) has sys.stderr None.
+    monkeypatch.setattr(sys, "stderr", None)
+    with Spinner("Starting") as spinner:
+        spinner.tick()
+    assert spinner.animating is False
+
+
+def test_failure_without_any_stream_still_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "stderr", None)
+    with pytest.raises(subprocess.CalledProcessError):
+        run_quiet([sys.executable, "-c", "print('boom'); raise SystemExit(3)"],
+                  label="build", cwd=str(tmp_path), timeout=30)
