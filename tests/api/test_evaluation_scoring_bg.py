@@ -116,12 +116,13 @@ def test_get_evaluation_with_dict_shaped_failed_job_does_not_500(client):
         side_effect=_score,
     ):
         resp = client.get("/api/evaluations/j1")
+        # Wait inside the patch: the worker looks the scorer up when it runs,
+        # which can be after the GET has returned.
+        started = scoring_started.wait(timeout=budget(2))
 
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "failed"
-    assert scoring_started.wait(timeout=budget(2)), (
-        "Background scoring thread never started for the dict-shaped job."
-    )
+    assert started, "Background scoring thread never started for the dict-shaped job."
 
 
 class _DroppingRunner:
