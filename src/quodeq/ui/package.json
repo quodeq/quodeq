@@ -69,8 +69,11 @@
     "eslint-plugin-jsx-a11y": {
       "eslint": "$eslint"
     },
-    "seroval": "1.6.8",
-    "seroval-plugins": "1.6.8",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.8"
+    },
+    "seroval": "1.6.12",
+    "seroval-plugins": "1.6.12",
     "source-map-js": "1.2.2"
   }
 }
