@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from quodeq.analysis import codex_sandbox
 from quodeq.analysis.checks.registry import CHECKERS, CheckContext
-from quodeq.analysis.subprocess import AnalysisConfig, build_ai_cmd, confine_cli
+from quodeq.analysis.subprocess import AnalysisConfig, SandboxPolicy, build_ai_cmd, confine_cli
+from quodeq.shared import os_sandbox
 from tests.core._fake_secrets import GENERIC_VALUE
 
 _BYPASS = "--dangerously-bypass-approvals-and-sandbox"
@@ -46,10 +48,18 @@ def repo(tmp_path, monkeypatch):
     return repo
 
 
-def _confine(tmp_path, repo):
+def _confine(tmp_path, repo, policy=SandboxPolicy()):
     cfg = AnalysisConfig(jsonl_file=tmp_path / "evals" / "p" / "r" / "evidence" / "s_evidence.jsonl")
     spec = {"native_sandbox": True, "analysis_sandbox": {"cli_home": ".codex-test"}}
-    return confine_cli(cfg, spec, repo, ["codex", "exec", _BYPASS], {})[0]
+    return confine_cli(cfg, spec, repo, ["codex", "exec", _BYPASS], {}, policy)[0]
+
+
+@pytest.fixture
+def warnings(monkeypatch):
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox._warned_unsandboxed", set())
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox._warned_secrets_readable", set())
+    messages: list[str] = []
+    return messages, SandboxPolicy(log=SimpleNamespace(warning=messages.append))
 
 
 def test_codex_native_sandbox_denies_the_repo_secret_files(tmp_path, repo, monkeypatch):
@@ -67,6 +77,38 @@ def test_codex_keeps_plain_read_only_where_it_cannot_deny_files(tmp_path, repo, 
                         lambda binary, profile, *a: profile == plain)
     args = _confine(tmp_path, repo)
     assert args[args.index("-s") + 1] == "read-only"
+
+
+def test_codex_says_when_its_sandbox_cannot_hide_the_credential_files(tmp_path, repo, monkeypatch,
+                                                                     warnings):
+    plain = codex_sandbox.plain_read_only_args()
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.native_sandbox_works",
+                        lambda binary, profile, *a: profile == plain)
+    messages, policy = warnings
+    _confine(tmp_path, repo, policy)
+    _confine(tmp_path, repo, policy)  # every agent of the run: one warning
+    [message] = messages
+    assert "cannot hide single files" in message and "credential files: .env." in message
+
+
+def test_codex_stays_quiet_when_it_hides_the_credential_files(tmp_path, repo, monkeypatch, warnings):
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.native_sandbox_works", lambda *a: True)
+    messages, policy = warnings
+    _confine(tmp_path, repo, policy)
+    assert messages == []
+
+
+def test_running_without_a_sandbox_names_the_readable_credential_files(tmp_path, repo, monkeypatch,
+                                                                       warnings):
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.native_sandbox_works", lambda *a: False)
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Windows")
+    for i in range(4):
+        (repo / f"k{i}.pem").write_text("x")
+    messages, policy = warnings
+    _confine(tmp_path, repo, policy)
+    [message] = messages
+    assert "without an OS sandbox" in message
+    assert "credential files: .env, k0.pem, k1.pem and 2 more." in message
 
 
 def test_os_sandbox_gets_the_repo_secret_files(tmp_path, repo, monkeypatch):

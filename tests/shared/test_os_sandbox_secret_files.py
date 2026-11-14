@@ -39,6 +39,20 @@ def test_firejail_blacklists_secret_files(monkeypatch):
     assert "--blacklist=/r/.env" in argv
 
 
+def test_firejail_keeps_a_repo_under_home_read_only(monkeypatch):
+    # --read-only=/ alone leaves home writable: firejail mounts it separately.
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(os_sandbox.shutil, "which", lambda b: "/usr/bin/firejail" if b == "firejail" else None)
+    home = Path.home()
+    state, repo = str(home / ".quodeq"), str(home / ".quodeq" / "clones" / "r")
+    evidence = str(home / ".quodeq" / "clones" / "r" / ".out")
+    argv, _ = os_sandbox.external_sandbox_prefix(
+        writable_dirs=[state, evidence], writable_files=[], readonly_dirs=[repo])
+    assert argv.index(f"--read-only={home}") < argv.index(f"--read-write={state}")
+    assert argv.index(f"--read-write={state}") < argv.index(f"--read-only={repo}")
+    assert argv[argv.index(f"--read-only={repo}") + 1] == f"--read-write={evidence}"
+
+
 @pytest.mark.skipif(platform.system() != "Darwin" or not shutil.which("sandbox-exec"),
                     reason="needs macOS sandbox-exec")
 def test_seatbelt_really_blocks_the_secret_file_and_nothing_else(tmp_path):

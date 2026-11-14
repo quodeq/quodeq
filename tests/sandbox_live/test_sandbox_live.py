@@ -29,15 +29,22 @@ _URL = "https://example.com/"
 
 @pytest.fixture
 def layout(tmp_path):
-    """A repo outside home, a writable out dir, and a secret under home."""
-    repo, out = tmp_path / "repo", tmp_path / "out"
-    repo.mkdir()
+    """A repo outside home, a writable out dir, and a secret under home.
+
+    QUODEQ_SANDBOX_LIVE_DIR (the runner's temp) holds them where set: pytest
+    makes its base dir 0o700, which Python 3.13+ turns into an owner-only ACL
+    on Windows, and Codex's restricted token cannot list inside it."""
+    base = Path(os.environ.get("QUODEQ_SANDBOX_LIVE_DIR") or tmp_path.parent) / tmp_path.name
+    repo, out = base / "repo", base / "out"
+    repo.mkdir(parents=True)
     out.mkdir()
     (repo / "app.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / ".env").write_text(_SECRET, encoding="utf-8")
     secret = Path.home() / f".{_SECRET}.txt"
     secret.write_text(_SECRET, encoding="utf-8")
     yield repo, out, secret
     secret.unlink(missing_ok=True)
+    shutil.rmtree(base, ignore_errors=True)
 
 
 def _ok(argv: list[str], cwd: Path) -> bool:
@@ -49,8 +56,10 @@ def _cat(path: Path) -> list[str]:
     return ["cmd.exe", "/c", "type", str(path)] if _WINDOWS else ["/bin/cat", str(path)]
 
 
-def _touch(path: Path) -> list[str]:
-    return ["cmd.exe", "/c", "echo", "x", ">", str(path)] if _WINDOWS else ["/usr/bin/touch", str(path)]
+# No ">" on Windows: npm's codex.cmd goes through cmd.exe, which would
+# redirect outside the sandbox and report a leak that is not one.
+def _create(path: Path) -> list[str]:
+    return ["cmd.exe", "/c", "mkdir", str(path)] if _WINDOWS else ["/usr/bin/touch", str(path)]
 
 
 def _fetch() -> list[str]:
@@ -64,13 +73,14 @@ def test_os_sandbox_confines_what_it_runs(layout):
         prefix, cleanup = os_sandbox.external_sandbox_prefix(
             writable_dirs=[str(out)], writable_files=[],
             readable_home_dirs=[str(repo), *(str(d) for d in os_sandbox.runtime_readable_dirs())],
-            readonly_dirs=[str(repo)])
+            readonly_dirs=[str(repo)], unreadable_files=[str(repo / ".env")])
     except os_sandbox.SandboxUnavailable as exc:
         pytest.skip(f"no OS sandbox here, scans fall back: {exc}")
     try:
         assert _ok([*prefix, *(_cat(repo / "app.py"))], repo), "repo must stay readable"
-        assert _ok([*prefix, *(_touch(out / "ok.txt"))], repo), "out dir must stay writable"
-        assert not _ok([*prefix, *(_touch(repo / "pwned.txt"))], repo), "repo write leaked"
+        assert _ok([*prefix, *(_create(out / "ok.txt"))], repo), "out dir must stay writable"
+        assert not _ok([*prefix, *(_create(repo / "pwned.txt"))], repo), "repo write leaked"
+        assert not _ok([*prefix, *(_cat(repo / ".env"))], repo), "credential file read leaked"
         if prefix[0] != "firejail":  # firejail confines writes only
             assert not _ok([*prefix, *(_cat(secret))], repo), "home read leaked"
     finally:
@@ -124,7 +134,7 @@ def test_codex_profile_confines_when_the_probe_accepts_it(layout, codex):
         pytest.skip(f"Codex's home-limited profile is refused here {_refused(binary, profile, repo, env)}")
     assert _inside(binary, profile, repo, env, _cat(repo / "app.py")), "repo must stay readable"
     assert not _inside(binary, profile, repo, env, _cat(secret)), "home read leaked"
-    assert not _inside(binary, profile, repo, env, _touch(repo / "pwned.txt")), "repo write leaked"
+    assert not _inside(binary, profile, repo, env, _create(repo / "pwned.txt")), "repo write leaked"
     assert not _inside(binary, profile, repo, env, _fetch()), "network leaked"
 
 
@@ -135,7 +145,7 @@ def test_codex_plain_read_only_confines_when_the_probe_accepts_it(layout, codex)
     if not codex_sandbox.native_sandbox_works(binary, profile, repo, repo / "app.py", env):
         pytest.skip(f"Codex's read-only sandbox is refused here {_refused(binary, profile, repo, env)}")
     assert _inside(binary, profile, repo, env, _cat(repo / "app.py")), "repo must stay readable"
-    assert not _inside(binary, profile, repo, env, _touch(repo / "pwned.txt")), "repo write leaked"
+    assert not _inside(binary, profile, repo, env, _create(repo / "pwned.txt")), "repo write leaked"
     assert not _inside(binary, profile, repo, env, _fetch()), "network leaked"
 
 
@@ -143,3 +153,13 @@ def test_this_interpreter_is_what_the_os_sandbox_reads_back():
     # runtime_readable_dirs must cover the interpreter the findings server runs on.
     dirs = [Path(d).resolve() for d in os_sandbox.runtime_readable_dirs()]
     assert any(Path(sys.executable).resolve().is_relative_to(d) for d in dirs)
+
+
+def test_codex_hides_credential_files_when_the_probe_accepts_it(layout, codex):
+    repo, _, _ = layout
+    binary, env = codex
+    profile = codex_sandbox.plain_read_only_args([(repo / ".env").resolve()])
+    if not codex_sandbox.native_sandbox_works(binary, profile, repo, repo / "app.py", env):
+        pytest.skip(f"Codex cannot hide single files here {_refused(binary, profile, repo, env)}")
+    assert _inside(binary, profile, repo, env, _cat(repo / "app.py")), "repo must stay readable"
+    assert not _inside(binary, profile, repo, env, _cat(repo / ".env")), "credential file read leaked"

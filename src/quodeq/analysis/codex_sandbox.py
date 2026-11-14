@@ -99,13 +99,14 @@ def _version(binary: str, env: Mapping[str, str]) -> Version | None:
         return None
 
 
-def _probe_command(listed: Path, sample: Path) -> list[str]:
+def _probe_commands(listed: Path, sample: Path) -> list[list[str]]:
     """List *listed* and read *sample*, as the agent's shell would. On
-    Windows each part is its own argument: embedded quotes reach cmd.exe
-    escaped (\\"), which it rejects."""
+    Windows they are two runs, each part its own argument: npm's ``codex.cmd``
+    goes through cmd.exe, which would run anything after ``&&`` outside the
+    sandbox, and embedded quotes reach cmd.exe escaped (\\"), which it rejects."""
     if platform.system() == SYSTEM_WINDOWS:
-        return ["cmd.exe", "/c", "dir", str(listed), "&&", "type", str(sample)]
-    return ["/bin/sh", "-c", 'ls "$1" >/dev/null && cat "$2"', "sh", str(listed), str(sample)]
+        return [["cmd.exe", "/c", "dir", str(listed)], ["cmd.exe", "/c", "type", str(sample)]]
+    return [["/bin/sh", "-c", 'ls "$1" >/dev/null && cat "$2"', "sh", str(listed), str(sample)]]
 
 
 def native_sandbox_works(
@@ -124,9 +125,10 @@ def _probe(binary: str, profile: tuple[str, ...], listed: Path, sample: Path,
     if version is None or version < _MIN_VERSION:
         return False
     try:
-        probe = subprocess.run(
-            [binary, "sandbox", *profile, "--", *_probe_command(listed, sample)],
+        probes = [subprocess.run(
+            [binary, "sandbox", *profile, "--", *command],
             capture_output=True, timeout=_PROBE_TIMEOUT_S, env=env_map, cwd=sample.parent, check=False)
+            for command in _probe_commands(listed, sample)]
     except (OSError, subprocess.SubprocessError):
         return False
-    return probe.returncode == 0 and bool(probe.stdout)
+    return all(probe.returncode == 0 and probe.stdout for probe in probes)
