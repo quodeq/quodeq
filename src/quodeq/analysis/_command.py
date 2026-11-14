@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import logging
 import subprocess
-import sys
 import threading
 from pathlib import Path
 
@@ -35,6 +34,7 @@ from quodeq.shared.child_env import allowlisted_env
 from quodeq.shared.cli_session_settings import session_settings_args
 from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
+from quodeq.shared.frozen import MCP_FINDINGS, mcp_server_cmd
 from quodeq.shared.log_sink import LoggerSink
 from quodeq.shared.win_launch import launch_argv
 
@@ -110,7 +110,7 @@ def _build_mcp_server_args(
     one server — the per-agent file cap doesn't apply.
     """
     mcp_script = str(Path(__file__).resolve().parent / _MCP_SUBPACKAGE / "findings_server.py")
-    mcp_args = [sys.executable, mcp_script, str(config.jsonl_file.resolve())]
+    mcp_args = mcp_server_cmd(MCP_FINDINGS, [mcp_script], [str(config.jsonl_file.resolve())])
     if config.compiled_dir and config.dimension:
         mcp_args.extend([
             "--compiled-dir", str(config.compiled_dir.resolve()),
