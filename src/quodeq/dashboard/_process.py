@@ -13,7 +13,7 @@ from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.frozen import subprocess_cmd
 from quodeq.shared.logging import log_debug
 from quodeq.shared.process import process_has_arg
-from quodeq.shared.process_kill import stop_process
+from quodeq.shared.process_stop import stop_process
 
 _POLL_INTERVAL_S = 0.1
 PROCESS_WAIT_TIMEOUT_S = 5

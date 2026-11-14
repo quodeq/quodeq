@@ -27,7 +27,7 @@ import webview
 from quodeq.config.services_env import cancel_escalation_window_s
 from quodeq.shared.api_session import session_headers
 from quodeq.shared.constants import LOCALHOST, PLATFORM_LINUX, SCHEME_HTTP, SCHEME_HTTPS
-from quodeq.shared.process_kill import stop_process
+from quodeq.shared.process_stop import stop_process
 
 _logger = logging.getLogger(__name__)
 

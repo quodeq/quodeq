@@ -5,7 +5,7 @@ import signal
 
 import pytest
 
-from quodeq.shared import process_kill
+from quodeq.shared import process_stop as process_kill
 
 _CTRL_BREAK = 1  # signal.CTRL_BREAK_EVENT, which only exists on Windows
 
