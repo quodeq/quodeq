@@ -28,7 +28,7 @@ On a project that has never been evaluated, the card starts with every dimension
 
 ### A remote project
 
-A project someone else published (a *REMOTE* card on Repositories) keeps its **Evaluate** tab, but an evaluation only runs on a local copy, so the tab opens on a card saying the project is remote, with the three steps to its grades: *pull*, *review* and *score*. **pull local copy** brings the code and its history to this machine; the card says *downloading…* while it works, and if a local project already has that name it asks whether to **pull as a copy**. When the copy lands and you are still on the card, the app selects the local copy and stays on Evaluate, where its first run starts as any first run; if you moved away meanwhile, a toast says the local copy is ready, with **evaluate** to open it. A failed pull shows its reason on the card, with **try again**, or in a toast when you had left. See *Pulling a project* in the **Shared Repository** help section.
+A project someone else published (a *REMOTE* card on Repositories) keeps its **Evaluate** tab, but an evaluation only runs on a local copy, so the tab opens on a card saying the project is remote, with the three steps to its grades: *pull*, *review* and *score*. **pull local copy** brings the project and its runs to this machine; the card says *downloading…* while it works, and if a local project already has that name it asks whether to **pull as a copy**. When the copy lands and you are still on the card, the app selects the local copy and stays on Evaluate, where its first run starts as any first run; if you moved away meanwhile, a toast says the local copy is ready, with **evaluate** to open it. A failed pull shows its reason on the card, with **try again**, or in a toast when you had left. See *Pulling a project* in the **Shared Repository** help section.
 
 ### Excluding paths
 
@@ -37,6 +37,8 @@ Add a `.quodeqignore` file at the scan root to keep fixture, vendored, or genera
 ### Incremental and clean scans
 
 By default, quodeq carries findings for unchanged files forward and re-evaluates only files that have changed since the last run. This keeps subsequent scans fast without losing coverage.
+
+A quodeq update that changes a built-in standard re-analyses every file of that dimension once, on its next run. Version 1.16 does this for Security, whose hardcoded-credentials rule changed.
 
 The **Clean scan** toggle forces a full re-analysis of every file. Use it after a big refactor, when you change standards, or whenever you want a fresh start. The toggle has three states:
 

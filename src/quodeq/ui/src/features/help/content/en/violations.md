@@ -49,6 +49,8 @@ The selected finding reads top to bottom: its severity and title as the headline
 | Click a file, folder, requirement or area | Open its findings as one page, the same kind of view. |
 | Select a finding | Show it in full beside the list: its place, actions, reason, rule and code. |
 
+A credential found in the code shows as a placeholder such as `<REDACTED:aws_access_key>`. quodeq masks it before the finding is stored, so the value is not in reports, exports or a shared repository. Hardcoded credentials are reported by quodeq itself at their exact line, without a model.
+
 ### One file, folder or area at a time
 
 The Overview's cards, files, requirements, areas and folders, the Explorer's header, principles, areas and files, and the Map's **View details** open a scoped findings view: the findings of one file, one folder (everything under it), one requirement, one dimension, one principle, one area or the whole project, read as one page. In the workbench, **open file ›** on a finding opens its file the same way. Each one is a new step, so Back returns to where you came from, and the breadcrumb names the scope: the file's name, the folder's path, the requirement, the dimension, the principle, the area, or *project*.
