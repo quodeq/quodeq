@@ -25,6 +25,11 @@ _MODULE_MAP = {
     "menubar": "quodeq.menubar",
 }
 
+# The stdio MCP servers agent CLIs spawn. Each name is also the private flag
+# (``--_<name>``) the frozen entry script dispatches on.
+MCP_FINDINGS = "mcp_findings"
+MCP_ASSISTANT = "mcp_assistant"
+
 # SECURITY: Only allow well-known shell paths to prevent execution of
 # arbitrary binaries via a crafted $SHELL environment variable.
 _ALLOWED_SHELLS = {
@@ -50,6 +55,24 @@ def subprocess_cmd(mode: str, args: list[str] | None = None) -> list[str]:
     if is_frozen():
         return [sys.executable, f"--_{mode}"] + extra
     return [sys.executable, "-m", _MODULE_MAP[mode]] + extra
+
+
+def mcp_server_cmd(
+    server: str, launcher: list[str], args: list[str] | None = None,
+) -> list[str]:
+    """Return the argv an agent CLI runs to start the MCP server *server*.
+
+    Frozen:   [sys.executable, "--_<server>", ...args]
+    Unfrozen: [sys.executable, *launcher, ...args]
+
+    *launcher* is how a Python interpreter starts the server (a script path,
+    or ``-m <module>``). The bundled app is not an interpreter, so there the
+    entry script dispatches on the private flag instead.
+    """
+    extra = args or []
+    if is_frozen():
+        return [sys.executable, f"--_{server}", *extra]
+    return [sys.executable, *launcher, *extra]
 
 
 def dashboard_cmd(args: list[str] | None = None) -> list[str]:
