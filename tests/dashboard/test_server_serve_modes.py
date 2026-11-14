@@ -88,7 +88,7 @@ class TestServeNative:
     @staticmethod
     def _shell(**overrides):
         from quodeq.dashboard._probes import NativeShell
-        defaults = dict(webview_importable=lambda: True, linux_backend_available=lambda: True)
+        defaults = dict(webview_importable=lambda: True, linux_backend_available=lambda: True, windows_backend_available=lambda: True)
         defaults.update(overrides)
         return NativeShell(**defaults)
 

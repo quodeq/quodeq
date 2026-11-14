@@ -84,12 +84,28 @@ def _linux_webview_backend_available() -> bool:
         return False
 
 
+def _windows_webview_backend_available() -> bool:
+    """Return True if pywebview's WinForms backend can load .NET on Windows.
+
+    The backend reaches .NET through pythonnet, whose loader ships its .NET
+    Framework shim for x86/x64 only. On an ARM64 Python without a .NET (Core)
+    runtime to fall back to, ``import clr`` raises RuntimeError, so the window
+    process would die on import while ``import webview`` itself succeeds.
+    """
+    try:
+        import clr  # type: ignore[import-not-found]  # noqa: F401
+        return True
+    except (ImportError, RuntimeError):
+        return False
+
+
 @dataclass(frozen=True)
 class NativeShell:
     """Injectable seam for ``_serve_native``'s native-window collaborators."""
 
     webview_importable: Callable[[], bool] = _webview_importable
     linux_backend_available: Callable[[], bool] = _linux_webview_backend_available
+    windows_backend_available: Callable[[], bool] = _windows_webview_backend_available
     make_instance: Callable[[], InstanceController] = InstanceController
     spawn_window: Callable[..., "subprocess.Popen"] = subprocess.Popen
     open_browser: Callable[[str], object] = webbrowser.open

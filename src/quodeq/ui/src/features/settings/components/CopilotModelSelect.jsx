@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { useCopilotModels } from '../hooks/useCopilotModels.js';
 import { t } from '../../../strings/index.js';
 import CopilotSetupHint from './CopilotSetupHint.jsx';
+import Select from '../../../components/select/Select.jsx';
 
 // Copilot's "let the service pick" entry; it needs a spelled-out label in the
 // dropdown, every other id renders as itself.
@@ -32,20 +33,19 @@ export default function CopilotModelSelect({ label, value, onChange, required, a
   return (
     <div className="settings-model-field">
       {label && <label className="settings-model-label" htmlFor={inputId}>{label}</label>}
-      <select
+      <Select
         id={inputId}
         className={`settings-model-input${required && !value ? ' settings-model-input--required' : ''}`}
         value={value || ''}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
         aria-label={ariaLabel || (label ? t('settings.modelNameAria', { label }) : t('settings.modelAria'))}
         disabled={!models.length}
-      >
-        <option value="">{placeholder || t('settings.pickAModel')}</option>
-        {savedModel && <option value={value} disabled>{t('settings.copilotSavedModel', { model: value })}</option>}
-        {models.map((model) => (
-          <option key={model} value={model}>{model === AUTO_MODEL_ID ? t('settings.copilotAutoModel') : model}</option>
-        ))}
-      </select>
+        options={[
+          { value: '', label: placeholder || t('settings.pickAModel') },
+          ...(savedModel ? [{ value, label: t('settings.copilotSavedModel', { model: value }), disabled: true }] : []),
+          ...models.map((model) => ({ value: model, label: model === AUTO_MODEL_ID ? t('settings.copilotAutoModel') : model })),
+        ]}
+      />
       {isPending && <span className="settings-model-hint" role="status">{t('settings.copilotModelsLoading')}</span>}
     </div>
   );

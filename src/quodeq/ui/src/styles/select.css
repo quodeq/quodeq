@@ -1,0 +1,44 @@
+/* The shared dropdown (components/select/Select.jsx). Imported before the rest
+   of the styles so a control's own class (.settings-model-input, .gf-picker)
+   can resize it. The open list reuses the launcher menu's look. */
+.q-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.q-select:focus { border-color: var(--color-accent); }
+.q-select:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.q-select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.q-select__caret {
+  flex: none;
+  font-size: 9px;
+  color: var(--color-text-muted);
+}
+
+.q-select__option--active { background: var(--color-surface-alt); }
+.q-select__option--selected { color: var(--color-accent); font-weight: 600; }
+.q-select__option[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.q-select__option[aria-disabled="true"]:hover { background: transparent; }

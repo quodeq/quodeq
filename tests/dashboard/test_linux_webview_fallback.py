@@ -36,6 +36,29 @@ def test_serve_native_falls_back_to_browser_when_gtk_missing(monkeypatch) -> Non
     assert served == [True], "should keep serving the API after falling back"
 
 
+def test_serve_native_falls_back_to_browser_when_dotnet_cannot_load(monkeypatch) -> None:
+    # Windows on ARM: pythonnet's .NET shim is x86/x64 only, so the window would die on import.
+    opened: list[str] = []
+    served: list[bool] = []
+    spawned: list[bool] = []
+    monkeypatch.setattr(_server.sys, "platform", "win32")
+    shell = NativeShell(
+        webview_importable=lambda: True,
+        windows_backend_available=lambda: False,
+        spawn_window=lambda *_a, **_k: spawned.append(True),
+        open_browser=opened.append,
+    )
+
+    _server._serve_native(
+        "http://127.0.0.1:7863", None, lambda: None,
+        shell=shell, serve_blocking=lambda proc, stop: served.append(True),
+    )
+
+    assert opened == ["http://127.0.0.1:7863"], "should open the dashboard URL in a browser"
+    assert served == [True], "should keep serving the API after falling back"
+    assert spawned == [], "should not spawn a window that cannot start"
+
+
 # --- Detached launch: the launcher hands the terminal back once the window is up ---
 # (lives here because this file already imports _server; see _detach.py)
 
@@ -72,6 +95,7 @@ def _native(tmp_path: Path, *, window_alive: bool, bind_socket: bool) -> tuple[l
 
     served, stopped = [], []
     shell = NativeShell(webview_importable=lambda: True, linux_backend_available=lambda: True,
+                        windows_backend_available=lambda: True,
                         make_instance=lambda: instance, spawn_window=spawn)
     _server._serve_native("http://127.0.0.1:7863", MagicMock(pid=42), lambda: stopped.append(True),
                           shell=shell, serve_blocking=lambda proc, stop: served.append(True), detach=True)

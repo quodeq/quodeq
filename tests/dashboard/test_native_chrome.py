@@ -101,7 +101,6 @@ class TestMainThreadsWebviewToken:
              patch.object(ww, "make_on_reload", return_value=MagicMock()), \
              patch.object(ww, "make_on_loaded", return_value=MagicMock()), \
              patch.object(ww, "make_on_closing", return_value=MagicMock()), \
-             patch.object(ww, "non_macos_menu", return_value=None), \
              patch.object(ww, "quodeq_dir", return_value=tmp_path), \
              patch.object(ww, "webview") as mock_webview:
             ww.main()
@@ -176,3 +175,12 @@ class TestSetTitlebarTheme:
              patch.object(chrome, "set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("purple")
         mac.assert_not_called()
+
+
+def test_window_starts_hidden_except_on_linux():
+    # On GTK, show() runs show_all() then hide() for a hidden window, so the
+    # loaded handler's show() would keep a hidden window off screen.
+    kwargs_for = TestWindowCreation()._kwargs_for_platform
+    assert kwargs_for("linux")["hidden"] is False
+    assert kwargs_for("darwin")["hidden"] is True
+    assert kwargs_for("win32")["hidden"] is True

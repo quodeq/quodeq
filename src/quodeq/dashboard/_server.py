@@ -20,7 +20,7 @@ from quodeq.dashboard._probes import ApiProbes, NativeShell
 from quodeq.dashboard._process import PROCESS_WAIT_TIMEOUT_S, wait_for_process
 from quodeq.dashboard._session_link import log_launch_link, open_in_browser
 from quodeq.dashboard._webview_token import open_webview_log, spawn_window_with_token, window_token
-from quodeq.shared.constants import SCHEME_HTTP
+from quodeq.shared.constants import PLATFORM_WIN32, SCHEME_HTTP
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
@@ -161,16 +161,24 @@ def _serve_and_wait(
         _serve_blocking(action_api_process, stop_children)
 
 
-def _linux_webview_fallback(
-    action_api_url: str, action_api_process: subprocess.Popen | None,
+_LINUX_BACKEND_MISSING = (
+    "pywebview's Linux GTK+/WebKit backend is missing — "
+    "falling back to opening the dashboard in your browser. "
+    "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
+    "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window."
+)
+_WINDOWS_BACKEND_MISSING = (
+    "pywebview cannot load .NET on this Python (its loader supports x86/x64 only); "
+    "falling back to opening the dashboard in your browser. "
+    "On Windows on ARM, use an x64 Python to get the native window."
+)
+
+
+def _webview_fallback(
+    reason: str, action_api_url: str, action_api_process: subprocess.Popen | None,
     shell: NativeShell, stop_children: typing.Callable, serve_blocking: typing.Callable,
 ) -> None:
-    logging.getLogger(__name__).warning(
-        "pywebview's Linux GTK+/WebKit backend is missing — "
-        "falling back to opening the dashboard in your browser. "
-        "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
-        "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window.",
-    )
+    logging.getLogger(__name__).warning(reason)
     open_in_browser(action_api_url, shell.open_browser)
     serve_blocking(action_api_process, stop_children)
 
@@ -214,8 +222,9 @@ def _serve_native(
     """Open a PyWebView native window with single-instance support.
 
     On Linux, pywebview additionally needs a working GTK+/WebKit2GTK stack
-    (python3-gi, gir1.2-webkit2-4.1) that isn't shipped with the pip wheel.
-    When those bindings are missing we fall back to --browser mode instead
+    (python3-gi, gir1.2-webkit2-4.1) that isn't shipped with the pip wheel;
+    on Windows it needs pythonnet to load .NET, which fails on ARM64 Python.
+    When the backend can't load we fall back to --browser mode instead
     of silently dying after spawning a webview subprocess that immediately
     crashes on import.
     """
@@ -229,7 +238,10 @@ def _serve_native(
         )
 
     if sys.platform.startswith("linux") and not shell.linux_backend_available():
-        _linux_webview_fallback(action_api_url, action_api_process, shell, stop_children, serve_blocking)
+        _webview_fallback(_LINUX_BACKEND_MISSING, action_api_url, action_api_process, shell, stop_children, serve_blocking)
+        return
+    if sys.platform == PLATFORM_WIN32 and not shell.windows_backend_available():
+        _webview_fallback(_WINDOWS_BACKEND_MISSING, action_api_url, action_api_process, shell, stop_children, serve_blocking)
         return
 
     instance = shell.make_instance()

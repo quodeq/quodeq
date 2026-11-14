@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
+import { findSelectOption, pickSelectOption, waitForSelectOption } from '../../../test-utils/selectOption.js';
 
 const CATALOG = [
   { id: 'sol', label: 'GPT Sol', description: 'Workhorse', efforts: ['low', 'ultra'], defaultEffort: 'low', isDefault: true, pinned: false },
@@ -25,7 +26,7 @@ function renderTab({ state, update = vi.fn(), getClientModels }) {
 describe('CliProviderTab with a live model catalog', () => {
   it('lists the account models, marks the default one and describes the selection', async () => {
     renderTab({ state: { model: 'sol' } });
-    expect(await screen.findByRole('option', { name: 'GPT Sol (default)' })).toBeInTheDocument();
+    expect(await findSelectOption('GPT Sol (default)')).toBeInTheDocument();
     expect(screen.getByText('Workhorse')).toBeInTheDocument();
   });
 
@@ -38,8 +39,8 @@ describe('CliProviderTab with a live model catalog', () => {
 
   it('switching to a model without that effort drops it back to Default', async () => {
     const { update } = renderTab({ state: { model: 'sol', effort: 'ultra' } });
-    await screen.findByRole('option', { name: 'GPT Luna' });
-    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'luna' } });
+    await waitForSelectOption('GPT Luna');
+    pickSelectOption(screen.getByLabelText('Model'), 'GPT Luna');
     expect(update).toHaveBeenCalledWith('model', 'luna');
     expect(update).toHaveBeenCalledWith('effort', '');
   });
@@ -57,7 +58,7 @@ describe('CliProviderTab with a live model catalog', () => {
 
   it('refresh asks the server to skip its cached list', async () => {
     const { api } = renderTab({ state: { model: 'sol' } });
-    await screen.findByRole('option', { name: 'GPT Luna' });
+    await waitForSelectOption('GPT Luna');
     fireEvent.click(screen.getByRole('button', { name: 'Refresh the model list' }));
     expect(api.getClientModels).toHaveBeenLastCalledWith('codex', { refresh: true });
   });
