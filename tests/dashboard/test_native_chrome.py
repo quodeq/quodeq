@@ -101,7 +101,6 @@ class TestMainThreadsWebviewToken:
              patch.object(ww, "make_on_reload", return_value=MagicMock()), \
              patch.object(ww, "make_on_loaded", return_value=MagicMock()), \
              patch.object(ww, "make_on_closing", return_value=MagicMock()), \
-             patch.object(ww, "non_macos_menu", return_value=None), \
              patch.object(ww, "quodeq_dir", return_value=tmp_path), \
              patch.object(ww, "webview") as mock_webview:
             ww.main()
@@ -188,11 +187,10 @@ class TestWindowIcon:
     def _start_kwargs(self, monkeypatch, tmp_path, platform):
         monkeypatch.setattr(ww.sys, "platform", platform)
         with patch.object(ww, "quodeq_dir", return_value=tmp_path), \
-             patch.object(ww, "non_macos_menu", return_value=None), \
              patch.object(ww, "record_window_pid", return_value=tmp_path / "pid"), \
              patch.object(ww, "clear_window_pid"), \
              patch.object(ww, "webview") as mock_webview:
-            ww._run_webview(MagicMock(), "", MagicMock(), 0)
+            ww._run_webview("", MagicMock(), 0)
         return mock_webview.start.call_args.kwargs
 
     def test_windows_passes_the_quodeq_ico(self, monkeypatch, tmp_path):
