@@ -101,7 +101,6 @@ class TestMainThreadsWebviewToken:
              patch.object(ww, "make_on_reload", return_value=MagicMock()), \
              patch.object(ww, "make_on_loaded", return_value=MagicMock()), \
              patch.object(ww, "make_on_closing", return_value=MagicMock()), \
-             patch.object(ww, "non_macos_menu", return_value=None), \
              patch.object(ww, "quodeq_dir", return_value=tmp_path), \
              patch.object(ww, "webview") as mock_webview:
             ww.main()
