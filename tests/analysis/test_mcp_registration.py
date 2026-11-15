@@ -195,6 +195,7 @@ def _providers(cfg: dict):
     return patch("quodeq.analysis._command._get_provider_configs", return_value=cfg)
 
 
+@pytest.mark.usefixtures("installed_cli")
 class TestFindingsServerCommandWhenFrozen:
     """The bundle's executable is Quodeq, not Python: every spawn path must
     use the private flag instead of a script path or ``-m``."""

@@ -100,12 +100,12 @@ def _registered_cmd(monkeypatch) -> list[str]:
     return calls[-1]
 
 
-def test_register_cli_mcp_frozen_uses_the_private_flag(monkeypatch, frozen):
+def test_register_cli_mcp_frozen_uses_the_private_flag(monkeypatch, frozen, installed_cli):
     cmd = _registered_cmd(monkeypatch)
     assert cmd[cmd.index("--") + 1:] == _BUNDLE_ARGV
 
 
-def test_register_cli_mcp_from_source_runs_the_module(monkeypatch):
+def test_register_cli_mcp_from_source_runs_the_module(monkeypatch, installed_cli):
     monkeypatch.setattr(sys, "frozen", False, raising=False)
     cmd = _registered_cmd(monkeypatch)
     assert cmd[cmd.index("--") + 1:] == [
