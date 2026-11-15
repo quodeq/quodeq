@@ -16,6 +16,11 @@ KEY = "v|-"
 @pytest.fixture(autouse=True)
 def _cache(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    # Create the cache here, outside every wait_idle: the first open of a file
+    # writes the whole schema, and on a busy runner disk that alone outlasted
+    # the wait when it fell to the background worker.
+    with open_score_cache():
+        pass
 
 
 def _job(run_id: str) -> ChangeJob:
@@ -71,6 +76,8 @@ def test_the_worker_writes_where_the_request_pointed_the_cache(tmp_path) -> None
     shared = tmp_path / "shared.db"
     filler = RunChangeFiller(budget_s=0.0)
     with score_cache_path_override(shared):
+        with open_score_cache():
+            pass  # created before the worker's timed write, like the default cache
         filler.fill([_job("r1")], lambda job: {"shared": True})
     assert filler.wait_idle(timeout=WAIT_S)
     assert _stored(["r1"]) == {}

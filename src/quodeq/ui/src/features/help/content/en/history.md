@@ -30,7 +30,7 @@ The chart appears from the second evaluation, whatever the grouping. If all your
 
 ```figure
 component: ScoreGroupingFigure
-caption: The score history header. The select groups bars by day, week, or month.
+caption: The score history header. The dropdown groups bars by day, week, or month.
 ```
 
 ### The run page

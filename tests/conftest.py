@@ -13,6 +13,7 @@ from quodeq.data.fs._index_cache import clear_index_cache
 from quodeq.services.dashboard import clear_shared_dimension_cache
 from tests._sharding import ENV_VAR, parse_shard, select_shard
 from tests._cwd_guard import _cwd_leak_guard  # noqa: F401 — autouse fixture, registered by import
+from tests._offline_dns import _offline_dns  # noqa: F401 - autouse fixture, registered by import
 from tests._session_client import _session_test_client  # noqa: F401 — autouse fixture, registered by import
 from tests._windows_launch import _windows_launch_rules, installed_cli  # noqa: F401 - fixtures, registered by import
 

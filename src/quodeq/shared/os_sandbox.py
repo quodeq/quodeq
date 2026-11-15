@@ -9,6 +9,10 @@ repo's .env. Metadata stays readable so path resolution keeps working.
 credential files included.
 With *loopback_open_ports* (macOS only), the agent cannot reach services on
 this machine, such as Quodeq's own API, except those ports (a local proxy).
+
+firejail, the Linux fallback where bubblewrap cannot start, is weaker: it
+cannot hide the home, so it denies the known secret stores by name
+(``home_secrets``) and callers say so (:func:`leaves_home_readable`).
 """
 from __future__ import annotations
 
@@ -24,6 +28,7 @@ from typing import Callable
 from urllib.parse import urlsplit
 
 from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
+from quodeq.shared.home_secrets import home_secret_paths
 
 
 def _under_home(path: Path) -> bool:
@@ -57,6 +62,7 @@ class SandboxUnavailable(RuntimeError):
 
 _BWRAP_PROBE_TIMEOUT_S = 5
 _BWRAP = "bwrap"
+_FIREJAIL = "firejail"
 _BIND = "--bind"
 _RO_BIND = "--ro-bind"
 _PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy",
@@ -167,19 +173,27 @@ def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str],
 
 
 def _firejail_prefix(writable: list[str], readonly_dirs: list[str],
-                     unreadable_files: Iterable[str]) -> list[str]:
-    """Writes only: home reads stay open, weaker than bwrap. firejail applies
-    its options in order, so the layering follows bwrap's. ``--read-only=/``
-    alone leaves home writable (firejail mounts it separately), hence home
-    read-only by name, the writable dirs back on top, then the repo
-    read-only again over a writable parent, with writable dirs nested in it
-    restored last."""
-    argv = ["firejail", "--quiet", "--read-only=/", f"--read-only={Path.home()}"]
+                     unreadable: Iterable[str]) -> list[str]:
+    """Weaker than bwrap: writes are confined, but home reads stay open
+    except *unreadable* (files or dirs, each a ``--blacklist``, which makes
+    the path inaccessible). firejail applies its options in order, so the
+    layering follows bwrap's. ``--read-only=/`` alone leaves home writable
+    (firejail mounts it separately), hence home read-only by name, the
+    writable dirs back on top, then the repo read-only again over a writable
+    parent, with writable dirs nested in it restored, and the blacklist
+    last, over whatever holds it."""
+    argv = [_FIREJAIL, "--quiet", "--read-only=/", f"--read-only={Path.home()}"]
     argv += [f"--read-write={d}" for d in writable]
     for r in readonly_dirs:
         argv.append(f"--read-only={r}")
         argv += [f"--read-write={d}" for d in writable if d != r and Path(d).is_relative_to(r)]
-    return argv + [f"--blacklist={f}" for f in unreadable_files]
+    return argv + [f"--blacklist={f}" for f in dict.fromkeys(unreadable)]
+
+
+def leaves_home_readable(prefix: list[str]) -> bool:
+    """Whether *prefix* is the firejail fallback, which cannot hide the home:
+    only the stores in ``home_secrets`` are unreadable under it."""
+    return bool(prefix) and prefix[0] == _FIREJAIL
 
 
 @functools.cache
@@ -231,9 +245,11 @@ def external_sandbox_prefix(*, writable_dirs: list[str], writable_files: list[st
         if shutil.which(_BWRAP) and _bwrap_works():
             return (_bwrap_prefix(writable_dirs, writable_files, readable_home_dirs,
                                   readonly_dirs, unreadable_files), lambda: None)
-        if shutil.which("firejail"):
-            return _firejail_prefix(_writable_paths(writable_dirs, writable_files),
-                                    readonly_dirs or [], unreadable_files), lambda: None
+        if shutil.which(_FIREJAIL):
+            writable = _writable_paths(writable_dirs, writable_files)
+            granted = [*writable, *(readonly_dirs or []), *(readable_home_dirs or [])]
+            return _firejail_prefix(writable, readonly_dirs or [],
+                                    [*unreadable_files, *home_secret_paths(granted)]), lambda: None
         raise SandboxUnavailable(
             "No working OS sandbox: install bubblewrap (and allow it unprivileged "
             "user namespaces) or firejail.")

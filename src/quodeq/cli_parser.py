@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 
+from quodeq import __version__
 from quodeq.core.types.severity import SEVERITY_ORDER
 from quodeq.shared.utils import get_evaluations_dir
 
@@ -250,6 +251,7 @@ def _add_review_subcommand(subparsers) -> None:
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(prog="quodeq")
+    parser.add_argument("--version", action="version", version=f"quodeq {__version__ or 'unknown'}")
     subparsers = parser.add_subparsers(dest="command")
 
     dashboard_parser = subparsers.add_parser("dashboard", help="Run the dashboard")

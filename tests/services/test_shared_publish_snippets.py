@@ -5,10 +5,16 @@ import json
 import tarfile
 from pathlib import Path
 
+import pytest
+
 from quodeq.core.finding_identity import fingerprint, snippet_fingerprint
 from quodeq.data.fs.run_archive import ARCHIVE_FILENAME, archive_run
+from quodeq.data.fs.run_cold import is_cold, trim_run
+from quodeq.data.fs.run_precedents import PRECEDENTS_NAME, read_precedents
+from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+from quodeq.services.dismissed import dismiss_finding
 from quodeq.services.shared_publish import copy_run
-from tests.services._archive_fixtures import make_run
+from tests.services._archive_fixtures import PROJECT, make_run
 
 _CODE = "token = auth['credentials']['secret']"
 _REQ = "S-CON-1"
@@ -85,3 +91,53 @@ def test_opt_in_publishes_the_code(tmp_path):
     dest = tmp_path / "clone" / "run-1"
     copy_run(_run(tmp_path / "local"), dest, with_snippets=True)
     assert _evidence_finding(dest)["snippet"] == _CODE
+
+
+_DISMISSED_CODE = "digest = hashlib.md5(credentials_payload)"
+
+
+@pytest.fixture
+def frozen_run(tmp_path, monkeypatch):
+    """An archived run whose first finding (R0, f0.py line 10) is dismissed."""
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path / "qdir"))
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "qdir" / "score_cache.db"))
+    run = make_run(tmp_path, "run-1", snippet=_DISMISSED_CODE)
+    dismiss_finding(tmp_path / PROJECT, {"project": PROJECT, "req": "R0", "file": "f0.py", "line": 10})
+    SqliteFindingsRepository(run).ensure_projected()
+    archive_run(run)
+    assert _DISMISSED_CODE in (run / PRECEDENTS_NAME).read_text()
+    return run
+
+
+@pytest.mark.parametrize("cold", [False, True], ids=["archived", "cold"])
+def test_a_dismissed_finding_s_code_stays_out_of_the_precedents_sidecar(tmp_path, frozen_run, cold):
+    if cold:
+        trim_run(frozen_run)
+        assert is_cold(frozen_run)
+    local = (frozen_run / PRECEDENTS_NAME).read_bytes()
+    dest = tmp_path / "clone" / "run-1"
+    copy_run(frozen_run, dest)
+    assert (dest / PRECEDENTS_NAME).is_file()
+    assert "hashlib" not in _published_text(dest)
+    assert (frozen_run / PRECEDENTS_NAME).read_bytes() == local  # the local sidecar is read, never rewritten
+
+
+def test_withheld_precedents_still_match_by_fingerprint(tmp_path, frozen_run):
+    dest = tmp_path / "clone" / "run-1"
+    copy_run(frozen_run, dest)
+    pairs = read_precedents(dest, "dismissed")
+    assert [fingerprint(req, snippet) for req, snippet in pairs] == [fingerprint("R0", _DISMISSED_CODE)]
+    assert read_precedents(dest, "semantic") == []  # a token is not text to embed
+
+
+def test_opt_in_publishes_the_precedents_as_they_are(tmp_path, frozen_run):
+    dest = tmp_path / "clone" / "run-1"
+    copy_run(frozen_run, dest, with_snippets=True)
+    assert (dest / PRECEDENTS_NAME).read_bytes() == (frozen_run / PRECEDENTS_NAME).read_bytes()
+
+
+def test_a_malformed_precedents_sidecar_is_published_empty(tmp_path, frozen_run):
+    (frozen_run / PRECEDENTS_NAME).write_text(_DISMISSED_CODE)
+    dest = tmp_path / "clone" / "run-1"
+    copy_run(frozen_run, dest)
+    assert json.loads((dest / PRECEDENTS_NAME).read_text()) == {"version": 1, "dismissed": [], "semantic": []}

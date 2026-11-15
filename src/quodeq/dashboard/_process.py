@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
-import signal
 import subprocess
 import time
 from pathlib import Path
@@ -15,7 +13,7 @@ from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.frozen import subprocess_cmd
 from quodeq.shared.logging import log_debug
 from quodeq.shared.process import process_has_arg
-from quodeq.shared.utils import IS_WIN32
+from quodeq.shared.process_stop import stop_process
 
 _POLL_INTERVAL_S = 0.1
 PROCESS_WAIT_TIMEOUT_S = 5
@@ -24,7 +22,7 @@ _STALE_KILL_DEADLINE_S = 3
 
 def _terminate_pid(pid: int) -> None:
     """Send a termination signal to a process, platform-aware."""
-    os.kill(pid, signal.SIGTERM if not IS_WIN32 else signal.CTRL_BREAK_EVENT)
+    stop_process(pid)
 
 
 def _get_pid_file(env: dict[str, str] | None = None) -> Path:

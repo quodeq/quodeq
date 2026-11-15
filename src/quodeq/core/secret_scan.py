@@ -45,21 +45,49 @@ _TOKEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         r"\beyJ[A-Za-z0-9_\-]{10,}\.eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}")),
 )
 
+_CREDENTIAL_NAME = r"""
+    (?:passw(?:or)?d|pwd|secret|token|api[_\-]?key|access[_\-]?key
+       |private[_\-]?key|credential|auth[_\-]?key)
+"""
 # A quoted literal assigned to a credential-looking name:
 #   password = "..."   "apiKey": "..."   SECRET_TOKEN := '...'
 _KEYWORD_ASSIGNMENT = re.compile(
-    r"""(?ix)
-    (?:passw(?:or)?d|pwd|secret|token|api[_\-]?key|access[_\-]?key
-       |private[_\-]?key|credential|auth[_\-]?key)
+    r"(?ix)" + _CREDENTIAL_NAME + r"""
     [a-z0-9_.\-]*["']?
     \s*(?::=|=>|=|:)\s*
     (?P<q>["'`])(?P<value>[^"'`\s]{16,})(?P=q)
     """
 )
-_VALUE = "value"  # the _KEYWORD_ASSIGNMENT group holding the secret
+# The same without quotes, the way env files, properties, YAML and shell
+# exports write it:   DB_PASSWORD=...   export API_TOKEN=...   secret_key: ...
+# Ordinary code assigns names and calls to such variables all the time, so the
+# assignment must be the whole line and the value one run of token characters
+# (no dots, brackets, quotes or "$": not a call, a path, a URL or a reference).
+_BARE_ASSIGNMENT = re.compile(
+    r"(?imx)^[ \t]*(?:-[ \t]+)?(?:(?:export|env|arg|set)[ \t]+)?(?P<key>[\w.\-]*?"
+    + _CREDENTIAL_NAME + r"""
+    [\w.\-]*)
+    [ \t]*(?::=|=|:)[ \t]*
+    (?P<value>[A-Za-z0-9+/_\-!@\#%^&*~][A-Za-z0-9+/=_\-!@\#%^&*~]{15,})
+    [ \t]*(?:\#.*)?\r?$
+    """
+)
+_VALUE = "value"  # the group holding the secret in both assignment rules
+_KEY = "key"
 _MIN_GENERIC_ENTROPY = 3.5
 # Template and interpolation syntax: a reference to a secret, not one.
 _INDIRECTION_MARKERS = ("${", "{{", "%(", "<", "process.env", "os.environ")
+# A key that says where a secret is or what it is called (secretName,
+# token_url, PRIVATE_KEY_PATH) holds a name, not the secret.
+_NAMING_KEY = re.compile(
+    r"(?i)(?:name|file|path|dir|ur[il]|type|ref|header|field|param|prefix|ttl"
+    r"|expir\w*|timeout|length|algorithm|policy|version|endpoint)s?$"
+)
+# What tells a generated value from a word or an identifier when no quotes do:
+# several digits, and no long run of letters in one case (hex letters aside).
+_MIN_BARE_DIGITS = 3
+_WORD_RUN = re.compile(r"[a-z]{6,}|[A-Z]{6,}")
+_HEX_LETTERS = frozenset("abcdefABCDEF")
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +118,20 @@ def _is_generic_secret(value: str) -> bool:
     return entropy(value) >= _MIN_GENERIC_ENTROPY
 
 
-def find_secrets(text: str) -> list[SecretHit]:
-    """Every secret in *text*, in order of position, without overlaps."""
+def _is_bare_secret(key: str, value: str) -> bool:
+    if _NAMING_KEY.search(key) or sum(c.isdigit() for c in value) < _MIN_BARE_DIGITS:
+        return False
+    if any(not _HEX_LETTERS.issuperset(run) for run in _WORD_RUN.findall(value)):
+        return False
+    return entropy(value) >= _MIN_GENERIC_ENTROPY
+
+
+def find_secrets(text: str, *, unquoted: bool = True) -> list[SecretHit]:
+    """Every secret in *text*, in order of position, without overlaps.
+
+    Without *unquoted* the unquoted-assignment rule is left out, for a caller
+    that reads such lines itself (the credential-file check).
+    """
     found: list[tuple[int, int, str]] = []
 
     def claim(start: int, end: int, kind: str) -> None:
@@ -103,6 +143,9 @@ def find_secrets(text: str) -> list[SecretHit]:
             claim(m.start(), m.end(), kind)
     for m in _KEYWORD_ASSIGNMENT.finditer(text):
         if _is_generic_secret(m.group(_VALUE)):
+            claim(m.start(_VALUE), m.end(_VALUE), "generic_secret")
+    for m in _BARE_ASSIGNMENT.finditer(text) if unquoted else ():
+        if _is_bare_secret(m.group(_KEY), m.group(_VALUE)):
             claim(m.start(_VALUE), m.end(_VALUE), "generic_secret")
 
     found.sort()

@@ -13,7 +13,9 @@ the evidence logs and the reports quotes the code it is about (``snippet``)
 and the lines around it (``context``). Without the opt-in the context is
 dropped and the snippet becomes a token carrying the finding's fingerprint
 (``core.finding_identity.withheld_snippet``), so dismissals, run diffs and
-grades on a clone still match the findings they name.
+grades on a clone still match the findings they name. An archived or cold
+run also keeps the code of its dismissed findings in ``precedents.json``, as
+bare ``(requirement, snippet)`` pairs; those snippets become the same tokens.
 """
 from __future__ import annotations
 
@@ -24,7 +26,9 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from quodeq.core.finding_identity import withheld_snippet
 from quodeq.core.types.project_source import ProjectLocation
 from quodeq.services.wiring import read_json_object, replace_json_file
-from quodeq.services.wiring_sync import ARCHIVE_FILENAME, rewrite_archive_logs, write_replacing
+from quodeq.services.wiring_sync import (
+    ARCHIVE_FILENAME, PRECEDENTS_NAME, rewrite_archive_logs, withhold_precedent_snippets, write_replacing,
+)
 
 _REPORT_PROJECT_FIELD = "project"
 _SNIPPET_FIELD = "snippet"
@@ -102,10 +106,12 @@ def _withhold_member(name: str, data: bytes) -> bytes:
 
 
 def withhold_snippets(paths: Iterable[Path]) -> None:
-    """Take the code out of each published run file in *paths*: logs, run archives and reports."""
+    """Take the code out of each published run file in *paths*: logs, run archives, dismissal sidecars and reports."""
     for path in paths:
         if path.name == ARCHIVE_FILENAME:
             rewrite_archive_logs(path, _withhold_member)
+        elif path.name == PRECEDENTS_NAME:
+            withhold_precedent_snippets(path)
         elif path.suffix == _LOG_SUFFIX:
             original = path.read_bytes()
             data = _withhold_log(original)

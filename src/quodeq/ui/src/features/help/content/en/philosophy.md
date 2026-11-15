@@ -26,4 +26,4 @@ Each principle is scored 0 to 10 in four stages: the broken rules, weighted by h
 
 ### What it evaluates
 
-quodeq ships with six dimensions from ISO 25010, plus Clean Architecture, DDD and WCAG 2.2 Accessibility as opt-in standards (*Quality Dimensions*). It works in any language, and you can write your own standards for whatever quality means in your project (*Custom Standards*).
+quodeq ships with six dimensions from ISO 25010, plus Clean Architecture, DDD, WCAG 2.2 Accessibility and AI Integration Security as opt-in standards (*Quality Dimensions*). It works in any language, and you can write your own standards for whatever quality means in your project (*Custom Standards*).

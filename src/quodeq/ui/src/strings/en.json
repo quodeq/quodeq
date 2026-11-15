@@ -244,7 +244,7 @@
   "common.sizeGb": "{size} GB",
   "common.stillUnreachable": "Still unreachable. The page keeps checking every few seconds; you can also retry now.",
   "common.serverDisconnected": "Server disconnected",
-  "common.serverDisconnectedBody": "The Quodeq server is not running. Start it from the menu bar icon or run:",
+  "common.serverDisconnectedBody": "The Quodeq server is not running. In the macOS desktop app, start it from the menu bar icon. Otherwise run:",
   "common.serverOffline": "Server offline",
   "common.serverRunning": "Server running",
   "common.serverRunningAt": "Server running · {host}",

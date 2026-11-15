@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from quodeq.shared.utils import get_evaluations_dir, get_static_dist
 from quodeq.shared.env import get_dashboard_port
+from quodeq.shared.env_paths import ensure_run_dir
 from quodeq.shared.fault_isolation import run_isolated
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
 from ._build import default_static_dir
@@ -91,12 +94,27 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
     )
 
 
+_LAUNCHER_LOG = "launcher.log"
+
+
 class _StderrLog:
     """Adapts ``sys.stderr`` to the ``Warns`` protocol ``run_isolated``
-    expects (this module has no stdlib logging of its own)."""
+    expects (this module has no stdlib logging of its own).
+
+    The packaged Windows app has no console, so ``sys.stderr`` is None there
+    and a failed start would leave no trace at all. It goes to
+    ``launcher.log`` in the run dir instead, next to ``webview.log``.
+    """
 
     def warning(self, message: str) -> None:
-        print(f"Error: {message}", file=sys.stderr)
+        if sys.stderr is not None:
+            print(f"Error: {message}", file=sys.stderr)
+            return
+        try:
+            with (ensure_run_dir() / _LAUNCHER_LOG).open("a", encoding="utf-8") as log:
+                log.write(f"{datetime.now().isoformat(timespec='seconds')} Error: {message}\n")
+        except (OSError, ValueError) as exc:
+            logging.getLogger(__name__).debug("could not write %s: %s", _LAUNCHER_LOG, exc)
 
 
 def _run(argv: list[str] | None) -> int:

@@ -7,6 +7,12 @@ are private / not user-facing.
 import os
 import sys
 
+# Stdio MCP servers (quodeq.shared.frozen.MCP_FINDINGS / MCP_ASSISTANT). An
+# agent CLI spawns them and speaks JSON-RPC over their stdin and stdout.
+_MCP_FINDINGS_FLAG = "--_mcp_findings"
+_MCP_ASSISTANT_FLAG = "--_mcp_assistant"
+_MCP_FLAGS = (_MCP_FINDINGS_FLAG, _MCP_ASSISTANT_FLAG)
+
 
 def _setup_frozen_env() -> None:
     """Set environment variables for frozen mode."""
@@ -15,16 +21,19 @@ def _setup_frozen_env() -> None:
 
 
 def main() -> int:
+    flag = sys.argv[1] if len(sys.argv) > 1 else ""
     if getattr(sys, "frozen", False):
         _setup_frozen_env()
-        # Load user's shell PATH so CLI tools (claude, node, etc.) are found
-        from quodeq.dashboard._frozen import source_user_path
-        source_user_path()
+        # Load user's shell PATH so CLI tools (claude, node, etc.) are found.
+        # Not for the MCP servers: the login shell would share their JSON-RPC
+        # stdin and delay the handshake, and they inherit the PATH of the app
+        # that started the CLI.
+        if flag not in _MCP_FLAGS:
+            from quodeq.dashboard._frozen import source_user_path
+            source_user_path()
 
     # Internal subprocess dispatch — checked before heavy imports.
-    if len(sys.argv) > 1:
-        flag = sys.argv[1]
-
+    if flag:
         if flag == "--_api":
             from quodeq.api.app import main as api_main
             api_main()
@@ -48,6 +57,19 @@ def main() -> int:
             from quodeq.cli import main as cli_main
             return cli_main()
 
+        if flag == _MCP_FINDINGS_FLAG:
+            # Rewrite argv so the server sees [prog, findings_file, ...flags]
+            sys.argv = [sys.argv[0]] + sys.argv[2:]
+            from quodeq.analysis.mcp.findings_server import main as findings_main
+            findings_main()
+            return 0
+
+        if flag == _MCP_ASSISTANT_FLAG:
+            # Rewrite argv so the server sees [prog, ...flags]
+            sys.argv = [sys.argv[0]] + sys.argv[2:]
+            from quodeq.assistant.mcp.server import main as assistant_main
+            assistant_main()
+            return 0
 
     # Normal dashboard launch — force --no-build in frozen mode
     argv = None
