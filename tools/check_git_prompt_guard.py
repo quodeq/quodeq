@@ -9,7 +9,7 @@ plus ``stdin=subprocess.DEVNULL``. This gate flags a ``subprocess.run`` /
 ``Popen`` / ``check_output`` whose argv list starts with the literal ``"git"``
 or the name ``GIT_BIN`` and lacks either keyword. It follows ``import subprocess
 [as x]`` and ``from subprocess import run [as y]`` bindings, and argv given as
-``args=``.
+``args=``, also when the list is wrapped in ``program_argv(...)``.
 
 Known limitation: argv built in a variable is not followed. The one known site
 the gate cannot see is src/quodeq/assistant/_worktree_git.py (``run_git_bytes``
@@ -38,6 +38,7 @@ BASELINE_PATH = Path(__file__).resolve().parent / "git_prompt_guard_baseline.txt
 _SUBPROCESS_CALLS = frozenset({"run", "Popen", "check_output", "check_call", "call"})
 _GIT_ARGV0 = "git"
 _GIT_BIN_NAME = "GIT_BIN"
+_ARGV_WRAPPER = "program_argv"
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,9 +71,11 @@ def _is_subprocess_call(node: ast.Call, modules: set[str], funcs: set[str]) -> b
 
 
 def _argv_node(node: ast.Call) -> ast.expr | None:
-    if node.args:
-        return node.args[0]
-    return next((kw.value for kw in node.keywords if kw.arg == "args"), None)
+    argv = node.args[0] if node.args else next((kw.value for kw in node.keywords if kw.arg == "args"), None)
+    # program_argv([...]) (shared/win_launch.py) hands the same argv on, resolved for Windows.
+    if isinstance(argv, ast.Call) and isinstance(argv.func, ast.Name) and argv.func.id == _ARGV_WRAPPER and argv.args:
+        return argv.args[0]
+    return argv
 
 
 def _argv_is_git(node: ast.Call) -> bool:

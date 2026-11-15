@@ -12,25 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.shared.win_launch import find_program, launch_argv
+from quodeq.shared.win_launch import find_program, launch_argv, program_argv
+from tests._windows_which import windows_which as _windows_which
 
-_PATHEXT = ("", ".exe", ".cmd", ".bat")
 _SHIM = '@ECHO off\r\n"%_prog%"  "%dp0%\\node_modules\\codex\\bin\\codex.js" %*\r\nREM node\r\n'
-
-
-def _windows_which(cmd: str, path: str | None = None) -> str | None:
-    """shutil.which as it searches on Windows: the current directory first."""
-    dirname, name = os.path.split(cmd)
-    if dirname:
-        dirs = [dirname]
-    else:
-        dirs = [os.curdir, *(path if path is not None else os.environ.get("PATH", "")).split(os.pathsep)]
-    for directory in dirs:
-        for ext in _PATHEXT:
-            candidate = os.path.join(directory, name + ext)
-            if os.path.isfile(candidate):
-                return candidate
-    return None
 
 
 def _program(directory: Path, name: str, text: str = "") -> Path:
@@ -142,3 +127,45 @@ def test_find_program_off_windows_is_shutil_which():
     assert find_program("claude", windows=False, which=which) == "/usr/bin/claude"
     assert find_program("claude", {"PATH": "/opt"}, windows=False, which=which) == "/usr/bin/claude"
     assert calls == [(("claude",), {}), (("claude",), {"path": "/opt"})]
+
+
+def _program_argv(argv: list[str], path: str, **env: str) -> list[str]:
+    return program_argv(argv, {"PATH": path, **env}, windows=True, which=_windows_which)
+
+
+def test_helper_program_in_the_current_directory_is_passed_over(repo, tmp_path):
+    _program(repo, "git.exe")
+    installed = _program(tmp_path / "bin", "git.exe")
+    assert _program_argv(["git", "status"], str(tmp_path / "bin")) == [str(installed), "status"]
+
+
+@pytest.mark.parametrize("name", ["git", "gh", "taskkill", "powershell", "cmd.exe"])
+def test_helper_program_found_only_in_the_current_directory_is_not_found(repo, tmp_path, name):
+    _program(repo, name if name.endswith(".exe") else name + ".exe")
+    with pytest.raises(FileNotFoundError, match="not found on PATH"):
+        _program_argv([name, "/?"], str(tmp_path))
+
+
+def test_helper_program_is_an_exe_as_createprocess_would_pick(repo, tmp_path, monkeypatch):
+    monkeypatch.setattr("quodeq.shared.win_launch._EXE", ".exe")  # also under QUODEQ_TEST_WINDOWS_LAUNCH
+    _program(tmp_path / "wrappers", "git.cmd")
+    installed = _program(tmp_path / "bin", "git.exe")
+    path = os.pathsep.join([str(tmp_path / "wrappers"), str(tmp_path / "bin")])
+    assert _program_argv(["git"], path) == [str(installed)]
+
+
+def test_system_tool_off_path_comes_from_the_system_directory(repo, tmp_path):
+    _program(repo, "taskkill.exe")
+    system = _program(tmp_path / "Windows" / "System32", "taskkill.exe")
+    argv = _program_argv(["taskkill", "/F"], str(tmp_path / "bin"), SystemRoot=str(tmp_path / "Windows"))
+    assert argv == [str(system), "/F"]
+
+
+def test_helper_program_given_by_path_is_used_as_given(repo, tmp_path):
+    argv = [str(repo / "tools" / "git.exe"), "status"]
+    assert _program_argv(argv, str(tmp_path)) is argv
+
+
+def test_helper_program_off_windows_is_untouched():
+    argv = ["git", "status"]
+    assert program_argv(argv, windows=False, which=_windows_which) is argv

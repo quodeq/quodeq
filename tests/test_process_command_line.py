@@ -10,7 +10,7 @@ from quodeq.shared import process
 
 
 @pytest.fixture
-def windows(monkeypatch):
+def windows(monkeypatch, windows_system_tools):
     monkeypatch.setattr(process, "is_pid_alive", lambda pid: True)
     monkeypatch.setattr(process, "_on_windows", lambda: True)
     calls: list[list[str]] = []

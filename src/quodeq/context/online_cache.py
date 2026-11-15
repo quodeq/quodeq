@@ -30,6 +30,7 @@ from quodeq.config.context_env import (
     online_cache_disabled,
 )
 from quodeq.data.git_cli import git_env_floor
+from quodeq.shared.win_launch import program_argv
 
 _logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ def _git(args: list[str], *, cwd: Path | None = None,
     env = git_env_floor(git_child_env())
     try:
         subprocess.run(
-            ["git", *args], check=True, env=env, timeout=timeout,
+            program_argv(["git", *args]), check=True, env=env, timeout=timeout,
             stdin=subprocess.DEVNULL,
             cwd=str(cwd) if cwd is not None else None,
         )

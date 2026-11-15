@@ -69,3 +69,8 @@ def test_ignores_run_on_a_non_subprocess_receiver(tmp_path):
 def test_flags_keyword_argv_without_stdin(tmp_path):
     src = "import subprocess\nsubprocess.run(args=['git', 'x'], env={}, timeout=5)\n"
     assert _hit_lines(tmp_path, src) == [2]
+
+
+def test_flags_an_argv_wrapped_for_windows_lookup(tmp_path):
+    src = "import subprocess\nsubprocess.run(program_argv(['git', 'x']), env={}, timeout=5)\n"
+    assert _hit_lines(tmp_path, src) == [2]

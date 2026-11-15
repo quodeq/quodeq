@@ -162,7 +162,7 @@ def test_apply_leaves_no_patch_artifacts_in_worktree(manager, repo):
     assert ".patch" not in text
 
 
-def test_create_pr_fail_soft_without_gh(manager, monkeypatch):
+def test_create_pr_fail_soft_without_gh(manager, monkeypatch, argv_as_written):
     (manager.path / "app.py").write_bytes(b"print('bye')\n")
     monkeypatch.setattr("quodeq.assistant.worktree.shutil.which", lambda _: None)
     # no origin remote in the fixture repo: push fails first, branch is kept

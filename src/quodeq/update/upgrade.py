@@ -14,6 +14,7 @@ from collections.abc import Callable
 from typing import TextIO
 
 from quodeq import __version__
+from quodeq.shared.win_launch import find_program, program_argv
 from quodeq.update.channel import upgrade_argv
 from quodeq.update.checker import get_status, run_check
 from quodeq.update.compare import is_newer
@@ -51,14 +52,14 @@ def run_upgrade(
     if dry_run:
         print(f"Would run: {command}", file=stream)
         return 0
-    if which(argv[0]) is None:
+    if find_program(argv[0], which=which) is None:
         print(f"{argv[0]} isn't on your PATH. Run the upgrade yourself: {command}", file=stream)
         return 1
 
     target = f" to {latest}" if latest else ""
     print(f"Upgrading quodeq {__version__}{target}: {command}", file=stream, flush=True)
     try:
-        code = run(argv, check=False).returncode
+        code = run(program_argv(argv, which=which), check=False).returncode
     except OSError as exc:
         print(f"Could not start the upgrade ({exc}). Run it yourself: {command}", file=stream)
         return 1

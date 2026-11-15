@@ -49,7 +49,7 @@ class TestKillTree:
 
     @patch("sys.platform", "win32")
     @patch("subprocess.run")
-    def test_windows_taskkill(self, mock_run):
+    def test_windows_taskkill(self, mock_run, argv_as_written):
         from quodeq.shared.process_kill import kill_tree as _kill_tree
         _kill_tree(5678)
         mock_run.assert_called_once()

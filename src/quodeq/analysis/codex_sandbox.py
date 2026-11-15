@@ -30,7 +30,7 @@ from packaging.version import InvalidVersion, Version
 
 from quodeq.core.secret_files import secret_file_kind
 from quodeq.shared.constants import GIT_DIR_NAME, SYSTEM_WINDOWS
-from quodeq.shared.win_launch import launch_argv
+from quodeq.shared.win_launch import launch_argv, program_argv
 
 _BYPASS_FLAG = "--dangerously-bypass-approvals-and-sandbox"
 _CONFIG_FLAG = "-c"
@@ -114,7 +114,8 @@ def _probe_commands(listed: Path, sample: Path) -> list[list[str]]:
     goes through cmd.exe, which would run anything after ``&&`` outside the
     sandbox, and embedded quotes reach cmd.exe escaped (\\"), which it rejects."""
     if platform.system() == SYSTEM_WINDOWS:
-        return [["cmd.exe", "/c", "dir", str(listed)], ["cmd.exe", "/c", "type", str(sample)]]
+        return [program_argv(["cmd.exe", "/c", "dir", str(listed)]),
+                program_argv(["cmd.exe", "/c", "type", str(sample)])]
     return [["/bin/sh", "-c", 'ls "$1" >/dev/null && cat "$2"', "sh", str(listed), str(sample)]]
 
 

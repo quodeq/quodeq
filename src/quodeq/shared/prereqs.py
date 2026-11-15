@@ -6,7 +6,7 @@ import subprocess
 from enum import StrEnum
 from typing import NamedTuple
 
-from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
+from quodeq.shared.win_launch import launch_argv
 
 _INSTALL_HINT_NODE = (
     "Install Node.js + npm from https://nodejs.org/ or via your package manager:\n"
@@ -44,10 +44,12 @@ _NPM_TOOL = _Tool((_NPM, _VERSION_FLAG), _NPM, _MIN_NPM_MAJOR)
 def run_version_cmd(cmd: list[str]) -> str:
     """Run a version command and return its stdout, or raise.
 
-    On Windows ``shell=True`` is required so npm-installed ``.cmd`` shims
-    resolve on PATH. To keep that shell safe, every token in *cmd* is
-    validated against a strict ``[A-Za-z0-9._-]`` charset, so no shell
-    metacharacter (space, ``&``, ``|``, ``>`` ...) can reach ``cmd.exe``.
+    No shell is involved. On Windows :func:`launch_argv` finds the program
+    in the PATH directories (npm-installed ``.cmd`` shims included), never
+    in the current directory, which cmd.exe would search first; a program
+    it cannot find raises ``FileNotFoundError``. Every token in *cmd* is
+    still validated against a strict ``[A-Za-z0-9._-]`` charset, so no
+    metacharacter (space, ``&``, ``|``, ``>`` ...) can reach a batch shim.
     Callers that accept external input (e.g. a provider name from the
     ``AI_CMD`` env var) must still validate at their own layer; this is
     defense in depth.
@@ -58,7 +60,7 @@ def run_version_cmd(cmd: list[str]) -> str:
         if not isinstance(token, str) or not SAFE_CMD_TOKEN_RE.fullmatch(token):
             raise ValueError(f"unsafe command token: {token!r}")
     result = subprocess.run(
-        cmd, capture_output=True, text=True, encoding="utf-8", check=True, shell=_IS_WIN32,
+        launch_argv(cmd), capture_output=True, text=True, encoding="utf-8", check=True,
         timeout=_VERSION_CMD_TIMEOUT_S,
     )
     return result.stdout.strip()

@@ -15,6 +15,7 @@ from quodeq.config.clone_env import git_probe_timeout_s
 from quodeq.data.git_cli import git_env_floor
 from quodeq.shared.constants import GIT_BIN
 from quodeq.shared.git_errors import GitFailureKind, classify_git_output, output_tail
+from quodeq.shared.win_launch import program_argv
 
 # GIT_CONFIG_COUNT / GIT_CONFIG_KEY_n (how the ladder hands git a token) exist
 # since git 2.31 (March 2021).
@@ -41,7 +42,7 @@ def git_version(
     """``(major, minor)`` of the git on PATH, or None when it cannot be read."""
     try:
         proc = run(
-            [GIT_BIN, "--version"], env=git_env_floor(env), stdin=subprocess.DEVNULL,
+            program_argv([GIT_BIN, "--version"]), env=git_env_floor(env), stdin=subprocess.DEVNULL,
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=_VERSION_TIMEOUT_S,
         )
@@ -71,7 +72,8 @@ def probe_remote(
     config_flags = [flag for entry in git_config for flag in ("-c", entry)]
     try:
         proc = run(
-            [GIT_BIN, *config_flags, "ls-remote", "--exit-code", "--heads", "--", url],
+            # The program is resolved on its own so the URL never passes through the lookup.
+            [*program_argv([GIT_BIN]), *config_flags, "ls-remote", "--exit-code", "--heads", "--", url],
             env=git_env_floor(env), stdin=subprocess.DEVNULL,
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=timeout,
