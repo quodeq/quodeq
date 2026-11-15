@@ -21,6 +21,7 @@ from quodeq.data import git_cli
 from quodeq.data.fs import git_access_probe, git_stats, git_stream, shared_repo_git
 from quodeq.data.fs.repo_clone import GitCloneClient
 from quodeq.services.github_gh_cli import gh_status
+from quodeq.shared.prereqs import run_version_cmd
 from tests._windows_which import windows_which
 
 _PROGRAMS = ("git.exe", "gh.exe", "node.exe", "code.cmd", "uv.exe")
@@ -98,3 +99,18 @@ def test_gh_is_started_from_path(windows, site):
     with contextlib.suppress(Exception):
         _GH_SITES[site](windows)
     assert set(windows.started()) == {windows.path_of("gh.exe")}
+
+
+def test_version_probe_starts_the_program_from_path_without_a_shell(windows):
+    with pytest.raises(_Spawned):
+        run_version_cmd(["node", "--version"])
+    argv, kwargs = windows.calls[0]
+    assert argv == [windows.path_of("node.exe"), "--version"]
+    assert not kwargs.get("shell")
+
+
+def test_version_probe_reports_a_program_only_in_the_current_directory_as_missing(windows):
+    (windows.installed / "node.exe").unlink()
+    with pytest.raises(FileNotFoundError):
+        run_version_cmd(["node", "--version"])
+    assert windows.calls == []
