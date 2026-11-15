@@ -1,6 +1,7 @@
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -41,7 +42,7 @@ def test_codex_mcp_config_arg_escapes_special_chars():
     assert "/x y/a\\b.db" in server["args"]
 
 
-def test_unregister_cli_mcp_removes_under_the_lock(monkeypatch):
+def test_unregister_cli_mcp_removes_under_the_lock(monkeypatch, installed_cli):
     """Public unregister must serialize under _lock while it runs `mcp remove`."""
     calls = []
     held = {"during": False}
@@ -55,7 +56,8 @@ def test_unregister_cli_mcp_removes_under_the_lock(monkeypatch):
     mcp_config.unregister_cli_mcp("codex")
 
     assert held["during"] is True  # lock held while removing
-    assert calls == [["codex", "mcp", "remove", "quodeq-assistant"]]
+    # argv[0] is the bare name, or on Windows the stand-in codex.exe it resolved to
+    assert [[Path(argv[0]).stem, *argv[1:]] for argv in calls] == [["codex", "mcp", "remove", "quodeq-assistant"]]
 
 
 def test_register_cli_mcp_wraps_subprocess_failure(monkeypatch):

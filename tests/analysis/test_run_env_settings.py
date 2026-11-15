@@ -102,6 +102,7 @@ def _spawned_argv(tmp_path: Path, cfg: AnalysisConfig) -> list[str]:
     return popen.call_args[0][0]
 
 
+@pytest.mark.usefixtures("installed_cli")
 class TestDirectCallerFallbacks:
     """``run_analysis`` fills what a direct caller left unset from its env."""
 

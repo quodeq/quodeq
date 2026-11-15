@@ -4,7 +4,7 @@ from __future__ import annotations
 import subprocess
 from unittest.mock import MagicMock, patch
 
-
+import pytest
 from quodeq.analysis._command import register_cli_mcp, _unregister_cli_mcp
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.run_types import RunConfig
@@ -18,6 +18,7 @@ from quodeq.analysis.subprocess import DEFAULT_CLI_MCP_REGISTRY
 # register_cli_mcp / _unregister_cli_mcp
 # ---------------------------------------------------------------------------
 
+@pytest.mark.usefixtures("installed_cli")
 class TestRegisterCliMcp:
     def setup_method(self):
         # Clear the process-default registry between tests
@@ -84,6 +85,7 @@ class TestRegisterCliMcp:
         assert "--" not in cmd_args
 
 
+@pytest.mark.usefixtures("installed_cli")
 class TestUnregisterCliMcp:
     def test_unregister_runs_command(self):
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
@@ -92,7 +94,9 @@ class TestUnregisterCliMcp:
             _unregister_cli_mcp("mycli", "quodeq-findings")
             mock_run.assert_called_once()
             cmd = mock_run.call_args.args[0]
-            assert cmd == ["mycli", "mcp", "remove", "quodeq-findings"]
+            # argv[0] is the bare name, or on Windows the stand-in program it resolved to
+            assert "mycli" in cmd[0]
+            assert cmd[1:] == ["mcp", "remove", "quodeq-findings"]
 
     def test_unregister_handles_timeout(self):
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
@@ -108,6 +112,7 @@ class TestUnregisterCliMcp:
             _unregister_cli_mcp("mycli", "quodeq-findings")
 
 
+@pytest.mark.usefixtures("installed_cli")
 class TestRunScopedCliMcpRegistry:
     """The registry is a ``RunConfig`` field (``mcp_registry``), so every
     pool worker thread of one run shares one instance -- see

@@ -46,7 +46,7 @@ def test_unregister_cli_mcp_logs_on_subprocess_failure(monkeypatch, caplog):
     ), f"expected a warning naming the server, got: {[r.message for r in caplog.records]}"
 
 
-def test_register_cli_mcp_allows_known_cli_provider(monkeypatch, tmp_path):
+def test_register_cli_mcp_allows_known_cli_provider(monkeypatch, tmp_path, installed_cli):
     """A registered type='cli' provider (claude) still reaches subprocess.run."""
     calls = []
     monkeypatch.setattr(
@@ -61,7 +61,7 @@ def test_register_cli_mcp_allows_known_cli_provider(monkeypatch, tmp_path):
     assert calls  # subprocess.run was invoked (register, and possibly unregister)
 
 
-def test_register_cli_mcp_falls_back_to_the_module_default_when_no_run_config(monkeypatch, tmp_path):
+def test_register_cli_mcp_falls_back_to_the_module_default_when_no_run_config(monkeypatch, tmp_path, installed_cli):
     """AnalysisConfig(run_config=None) (the common case: tests, one-shot
     callers) shares the process-default registry -- not a fresh one per call,
     which would redo the remove-then-add on every agent."""
@@ -92,3 +92,16 @@ def test_unregister_cli_mcp_on_windows_runs_the_npm_shim_under_node(monkeypatch,
     monkeypatch.setattr("quodeq.analysis._command.subprocess.run", lambda argv, **k: calls.append(argv))
     _unregister_cli_mcp("codex", "quodeq-findings")
     assert calls == [["node.exe", str(tmp_path / "cli.js"), "mcp", "remove", "quodeq-findings"]]
+
+
+def test_register_cli_mcp_returns_none_when_the_cli_is_not_installed_on_windows(monkeypatch, tmp_path, caplog):
+    """A bare name in no PATH directory is refused before the spawn; the caller still just gets None."""
+    (tmp_path / "empty-bin").mkdir()
+    monkeypatch.setattr("quodeq.shared.win_launch.IS_WIN32", True)
+    monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))
+    DEFAULT_CLI_MCP_REGISTRY.clear()
+    with caplog.at_level(logging.WARNING):
+        result = register_cli_mcp("claude", AnalysisConfig(jsonl_file=tmp_path / "findings.jsonl"))
+    assert result is None
+    assert any("Failed to register MCP server" in r.message for r in caplog.records)
+

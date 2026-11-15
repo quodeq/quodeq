@@ -208,7 +208,7 @@ def test_copilot_policy_block_terminates_running_evaluation(tmp_path, monkeypatc
     process.wait.assert_called_once_with(timeout=1)
 
 
-def test_copilot_policy_block_cancels_pool_and_cleans_resources(tmp_path, monkeypatch):
+def test_copilot_policy_block_cancels_pool_and_cleans_resources(tmp_path, monkeypatch, installed_cli):
     from pathlib import Path
 
     from quodeq.analysis.subagents._pool_scaling import should_respawn
