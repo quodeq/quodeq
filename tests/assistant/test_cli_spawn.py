@@ -198,7 +198,7 @@ def test_scratch_cwd_each_call_is_fresh_and_empty(tmp_path):
     assert Path(tmp_path) in cwd2.parents
 
 
-def test_spawn_turn_merges_stderr_into_stdout(tmp_path, monkeypatch):
+def test_spawn_turn_merges_stderr_into_stdout(tmp_path, monkeypatch, installed_cli):
     captured = {}
 
     class _P:

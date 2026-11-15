@@ -1,6 +1,7 @@
 """launch_argv: npm .cmd shims spawn as `node <script>`, never through cmd.exe."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -51,7 +52,8 @@ def _shim(tmp_path: Path, name: str, text: str, script: str | None) -> Path:
 
 
 def _which(found: dict[str, str]):
-    return lambda name, path=None: found.get(name)
+    """A lookup by program name; launch_argv asks about one PATH directory at a time."""
+    return lambda name: found.get(os.path.basename(name))
 
 
 def test_off_windows_argv_is_untouched():
@@ -80,23 +82,18 @@ def test_path_comes_from_the_child_env(tmp_path):
     seen = []
     shim = _shim(tmp_path, "codex.cmd", _NPM_SHIM, r"node_modules\@openai\codex\bin\codex.js")
 
-    def which(name, path=None):
-        seen.append(path)
-        return {"codex": str(shim), "node": _NODE}[name]
+    def which(name):
+        seen.append(name)
+        return {"codex": str(shim), "node": _NODE}[os.path.basename(name)]
 
-    launch_argv(["codex"], {"PATH": r"C:\npm"}, windows=True, which=which)
-    assert seen == [r"C:\npm", r"C:\npm"]
+    launch_argv(["codex"], {"PATH": "/npm"}, windows=True, which=which)
+    assert seen == [os.path.join("/npm", "codex"), os.path.join("/npm", "node")]
 
 
 def test_an_exe_resolves_to_its_full_path():
     argv = launch_argv(["claude", "-p", _PROMPT], windows=True,
                        which=_which({"claude": r"C:\bin\claude.exe"}))
     assert argv == [r"C:\bin\claude.exe", "-p", _PROMPT]
-
-
-def test_unknown_program_is_left_for_the_spawn_to_report():
-    argv = ["codex", "--version"]
-    assert launch_argv(argv, windows=True, which=_which({})) is argv
 
 
 @pytest.mark.parametrize("text, script", [

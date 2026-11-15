@@ -43,7 +43,7 @@ class TestEffortOnTheCommandLine:
         assert not any("model_reasoning_effort" in a for a in args)
 
 
-def test_env_effort_reaches_the_spawned_cli(tmp_path: Path) -> None:
+def test_env_effort_reaches_the_spawned_cli(tmp_path: Path, installed_cli) -> None:
     stream_file = tmp_path / "stream.json"
     stream_file.touch()
     process = MagicMock(returncode=0)
