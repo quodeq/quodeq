@@ -1,5 +1,6 @@
 """Analysis CLIs with bypassed approvals run inside the OS sandbox."""
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -78,3 +79,30 @@ def test_require_sandbox_fails_where_none_works(tmp_path, monkeypatch):
         analysis_sandbox_prefix(
             AnalysisConfig(), {"analysis_sandbox": {"cli_home": ".x"}}, tmp_path, "codex",
             policy=SandboxPolicy(require=True))
+
+
+def _firejail_run(tmp_path, monkeypatch, launcher: str) -> list[str]:
+    """The warnings of two agent spawns confined by *launcher*."""
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.external_sandbox_prefix",
+                        lambda **kw: ([launcher, "--quiet"], lambda: None))
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox._warned_weak_sandbox", set())
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    messages: list[str] = []
+    policy = SandboxPolicy(log=SimpleNamespace(warning=messages.append))
+    for _ in range(2):
+        prefix, _cleanup = analysis_sandbox_prefix(
+            AnalysisConfig(), {"analysis_sandbox": {"cli_home": ".x"}}, tmp_path, "gemini", policy=policy)
+        assert prefix[0] == launcher
+    return messages
+
+
+def test_the_run_says_once_that_firejail_confines_less(tmp_path, monkeypatch):
+    messages = _firejail_run(tmp_path, monkeypatch, "firejail")
+    assert len(messages) == 1
+    assert "gemini" in messages[0] and "firejail" in messages[0]
+    assert "stay readable" in messages[0]
+    assert "—" not in messages[0]
+
+
+def test_a_full_sandbox_says_nothing(tmp_path, monkeypatch):
+    assert _firejail_run(tmp_path, monkeypatch, "bwrap") == []

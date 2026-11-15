@@ -36,6 +36,12 @@ api_pages_dir = src_dir / "quodeq" / "api" / "pages"
 if api_pages_dir.exists():
     datas.append((str(api_pages_dir), "quodeq/api/pages"))
 
+# In-app Help markdown, read by the assistant's help tool
+# (quodeq.assistant.tools.help_tools.HELP_DIR)
+help_dir = src_dir / "quodeq" / "ui" / "src" / "features" / "help" / "content" / "en"
+if help_dir.exists():
+    datas.append((str(help_dir), "quodeq/ui/src/features/help/content/en"))
+
 # Icons live in src/quodeq/data/icons/ (already bundled via data_dir above);
 # keep a local pointer for the EXE() icon= arg below.
 icon_ico = icons_dir / "icon.ico"
@@ -63,6 +69,9 @@ a = Analysis(
         "quodeq.analysis.subprocess",
         "quodeq.core.scoring.engine",
         "quodeq.core.scoring.report",
+        # quodeq - stdio MCP servers (--_mcp_findings, --_mcp_assistant)
+        "quodeq.analysis.mcp.findings_server",
+        "quodeq.assistant.mcp.server",
         # dependencies
         "flask",
         "jsonschema",

@@ -81,10 +81,39 @@ def test_os_sandbox_confines_what_it_runs(layout):
         assert _ok([*prefix, *(_create(out / "ok.txt"))], repo), "out dir must stay writable"
         assert not _ok([*prefix, *(_create(repo / "pwned.txt"))], repo), "repo write leaked"
         assert not _ok([*prefix, *(_cat(repo / ".env"))], repo), "credential file read leaked"
-        if prefix[0] != "firejail":  # firejail confines writes only
+        if prefix[0] != "firejail":  # firejail hides only the known secret stores
             assert not _ok([*prefix, *(_cat(secret))], repo), "home read leaked"
     finally:
         cleanup()
+
+
+def test_firejail_fallback_hides_session_files_and_credential_stores(layout, monkeypatch):
+    if platform.system() != "Linux" or shutil.which("firejail") is None:
+        pytest.skip("the firejail fallback is Linux only and needs firejail")
+    repo, out, _ = layout
+    run_dir, store = Path.home() / f".{_SECRET}-run", Path.home() / ".ssh"
+    made_store = not store.exists()
+    run_dir.mkdir(exist_ok=True)
+    store.mkdir(exist_ok=True)
+    session, key = run_dir / "api-1.session", store / f"{_SECRET}.key"
+    session.write_text(_SECRET, encoding="utf-8")
+    key.write_text(_SECRET, encoding="utf-8")
+    monkeypatch.setenv("QUODEQ_RUN_DIR", str(run_dir))
+    monkeypatch.setattr(os_sandbox, "_bwrap_works", lambda: False)  # as on stock Ubuntu 24.04+
+    try:
+        prefix, _ = os_sandbox.external_sandbox_prefix(
+            writable_dirs=[str(out)], writable_files=[], readable_home_dirs=[str(repo)],
+            readonly_dirs=[str(repo)])
+        assert prefix[0] == "firejail"
+        assert _ok([*prefix, *(_cat(repo / "app.py"))], repo), "repo must stay readable"
+        assert _ok([*prefix, *(_create(out / "ok.txt"))], repo), "out dir must stay writable"
+        assert not _ok([*prefix, *(_cat(session))], repo), "session file read leaked"
+        assert not _ok([*prefix, *(_cat(key))], repo), "credential store read leaked"
+    finally:
+        key.unlink(missing_ok=True)
+        shutil.rmtree(run_dir, ignore_errors=True)
+        if made_store:
+            shutil.rmtree(store, ignore_errors=True)
 
 
 @pytest.fixture
@@ -147,6 +176,21 @@ def test_codex_plain_read_only_confines_when_the_probe_accepts_it(layout, codex)
     assert _inside(binary, profile, repo, env, _cat(repo / "app.py")), "repo must stay readable"
     assert not _inside(binary, profile, repo, env, _create(repo / "pwned.txt")), "repo write leaked"
     assert not _inside(binary, profile, repo, env, _fetch()), "network leaked"
+
+
+def test_codex_probe_verdict_does_not_hang_on_what_the_repo_holds(layout, codex):
+    repo, _, _ = layout
+    binary, env = codex
+    profile = codex_sandbox.plain_read_only_args()
+    if not codex_sandbox.native_sandbox_works(binary, profile, repo, repo / "app.py", env):
+        pytest.skip(f"Codex's read-only sandbox is refused here {_refused(binary, profile, repo, env)}")
+    (repo / ".aaa").write_text("", encoding="utf-8")  # an empty first file
+    bare = repo.parent / "bare"  # nothing the probe could print
+    bare.mkdir()
+    (bare / ".gitkeep").write_text("", encoding="utf-8")
+    assert codex_sandbox.probe_sample(repo) == repo / "app.py"
+    assert codex_sandbox.native_sandbox_works(
+        binary, profile, bare, codex_sandbox.probe_sample(bare), env, bare), "an empty repo failed the probe"
 
 
 def test_this_interpreter_is_what_the_os_sandbox_reads_back():

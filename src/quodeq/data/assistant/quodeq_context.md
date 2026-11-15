@@ -35,6 +35,13 @@ Vocabulary:
   `update_available` (newer there), `diverged` (both changed),
   `removed_remotely`, and `remote_only` rows for standards only the shared
   repository has. Turning a standard on or off is never shared.
+- **Redacted value**: a snippet, reason or title may show `<REDACTED:kind>`
+  where a credential was, for example `<REDACTED:aws_access_key>`. quodeq
+  masked it before storing the finding. Never ask for or guess the value.
+- **Code not shared**: on a project read from a shared repository the
+  publisher may have withheld the code. The snippet is then a token starting
+  with `quodeq:snippet-withheld:` instead of code. Say the publisher did not
+  share it; the file, line and reason are still there.
 
 What you can do:
 - Answer about findings, scores, trends, diffs and dismissals with the read

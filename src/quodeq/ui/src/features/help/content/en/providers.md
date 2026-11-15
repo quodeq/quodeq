@@ -2,7 +2,7 @@
 
 quodeq needs an AI model to read your code. There are three ways to supply one:
 
-- **An AI CLI you already use.** Claude Code, Codex, Gemini CLI or GitHub Copilot. Its sign-in and billing apply; quodeq drives it.
+- **An AI CLI you already use.** Claude Code, Codex, Gemini CLI, Antigravity or GitHub Copilot. Its sign-in and billing apply; quodeq drives it.
 - **A cloud API with your key.** OpenRouter, or any OpenAI-compatible endpoint.
 - **A local model.** Ollama, llama.cpp, or omlx on Apple Silicon. Code never leaves your machine.
 
@@ -28,13 +28,28 @@ On Windows only Claude Code keeps them out. Codex still cannot write or reach th
 
 A credential written directly into a source file still reaches an AI CLI, since evaluating the code means reading it. GitHub Copilot is not covered yet and can open credential files. When no code may leave the machine, use a local model.
 
-### CLI (Claude Code, Codex, Gemini CLI, GitHub Copilot)
+### How the CLI is confined
+
+An AI CLI can be steered by text inside the code it reads, so quodeq limits what it can do during a scan and in the assistant. It never asks you to approve anything.
+
+- **Claude Code** runs under its own permission rules, the same on macOS, Linux and Windows. It may read files in the analysed repository and call quodeq's findings tools; every other tool call is refused. The repository's own Claude settings and hooks are not loaded.
+- **Codex** uses its own read-only sandbox where it works, from Codex 0.162: no writes, no network, and nothing readable under your home except the repository and this project's evaluations. On Windows that read limit needs Codex's elevated sandbox; without it Codex still cannot write or reach the network, but it can read your home. Where its sandbox does not start, Codex runs in the operating system sandbox described next.
+- **Gemini CLI and Antigravity** run inside an operating system sandbox on macOS and Linux. They write only to this project's evaluations, quodeq's run folders, their own home and temp, and under your home they read only those, the repository and what they need to start. On macOS they also cannot connect to services on this machine. Antigravity is limited by its own settings as well, on every platform: it may call quodeq's tools and read the repository, while commands, writes, URLs and the browser are denied.
+- **GitHub Copilot** gets no sandbox from quodeq. It runs with its view, glob and grep tools and quodeq's findings tool only, from a profile of its own.
+
+Codex and Antigravity run from a home of their own under `~/.quodeq`, so your plugins, hooks and MCP servers are not loaded.
+
+On Linux the sandbox is bubblewrap. Where bubblewrap cannot start, firejail is used instead and limits writes only. Where neither works, in a container for example, and on Windows for Gemini CLI, Antigravity and a Codex whose own sandbox does not start, the scan still runs and the evaluation log warns *Running gemini without an OS sandbox*, with the name of the CLI. Set `QUODEQ_REQUIRE_SANDBOX=1` to make such a scan fail instead.
+
+In the assistant the CLI gets quodeq's assistant tools and cannot run commands or write files.
+
+### CLI (Claude Code, Codex, Gemini CLI, Antigravity, GitHub Copilot)
 
 Delegates to an AI CLI you already have authenticated on your machine.
 
 1. Install and sign in to the CLI of your choice.
-2. In **Settings**, *Model*, pick the CLI under **AI Provider**, then the model. Claude Code, Codex and GitHub Copilot list the models your account can use; ↻ reloads the list. For Gemini CLI, run `gemini`, type `/model` to see yours, and copy the id into the field.
-3. Optionally, for Claude Code or Codex, set the **Effort** under the model. It offers the levels the chosen model takes. Higher effort finds more but runs slower and uses more of your plan.
+2. In **Settings**, *Model*, pick the CLI under **AI Provider**, then the model. Claude Code, Codex, Antigravity and GitHub Copilot list the models your account can use; ↻ reloads the list. For Gemini CLI, run `gemini`, type `/model` to see yours, and copy the id into the field.
+3. Optionally, for Claude Code, Codex or Antigravity, set the **Effort** under the model. It offers the levels the chosen model takes. Higher effort finds more but runs slower and uses more of your plan.
 
 #### GitHub Copilot
 
@@ -45,6 +60,13 @@ Delegates to an AI CLI you already have authenticated on your machine.
 > **Policy notes**
 >
 > The profile is dedicated to quodeq: it does not reuse your normal Copilot login, plugins, hooks or MCP servers. Your organization's policy must allow quodeq's MCP servers, `findings` for evaluations and `quodeq-assistant` for the assistant. Login and model discovery do not verify that access; if a server is blocked, the evaluation stops with **Evaluation blocked by Copilot policy** and any completed results are kept with a partial-run warning. Model access and usage limits still apply, and the assistant's web toggle is not available with Copilot.
+
+#### Antigravity
+
+1. Install Google's Antigravity CLI and sign in by running `agy` once, then restart quodeq.
+2. Select **Antigravity CLI** in Settings. The model list comes from `agy models` and shows the models your Google account can use. The last part of a Gemini id, such as `high` or `low`, is its thinking level.
+
+quodeq runs it from a home of its own, `~/.quodeq/agy`, so your rules, plugins, hooks and MCP servers under `~/.gemini` are neither used nor changed.
 
 ### Cloud (OpenRouter or a custom endpoint)
 

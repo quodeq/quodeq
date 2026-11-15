@@ -1,16 +1,21 @@
-"""Path-jailed, read-only access to the analyzed repository."""
+"""Path-jailed, read-only access to the analyzed repository.
+
+Credentials are kept from the model the way a scan keeps them: a credential
+file (``core.secret_files``, the one list scans use) is refused, and what an
+ordinary file holds is redacted (``core.secret_scan``) before it is returned.
+"""
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.core.secret_files import secret_file_kind
+from quodeq.core.secret_scan import redact
 from quodeq.shared.constants import GIT_DIR_NAME
 
 _MAX_FILE_BYTES = 65_536
 _MAX_DIR_ENTRIES = 500
-_DENY_BASENAMES = (".env", "id_rsa", "id_ed25519", ".netrc", ".npmrc", ".pypirc")
-_DENY_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".keystore")
 
 
 def jail(ctx: ToolContext, rel_path: str) -> Path:
@@ -26,8 +31,8 @@ def jail(ctx: ToolContext, rel_path: str) -> Path:
     target = (root / rel_path).resolve()
     if target != root and root not in target.parents:
         raise ToolError("path escapes the analyzed repository")
-    name = target.name.lower()
-    if name.startswith(_DENY_BASENAMES) or name.endswith(_DENY_SUFFIXES):
+    # The name asked for and the one it resolves to: a link may hide either.
+    if any(secret_file_kind(name) for name in (target.name, PureWindowsPath(rel_path).name)):
         raise ToolError("path is on the secrets denylist")
     if target.name.lower() == GIT_DIR_NAME or GIT_DIR_NAME in {p.name.lower() for p in target.parents}:
         raise ToolError("path is inside the .git directory")
@@ -44,7 +49,8 @@ def _read_repo_file(ctx: ToolContext, path: str) -> dict:
         raise ToolError("binary file")
     truncated = len(raw) > _MAX_FILE_BYTES
     text = raw[:_MAX_FILE_BYTES].decode("utf-8", errors="replace")
-    return {"path": path, "content": text, "truncated": truncated}
+    content = redact(text)
+    return {"path": path, "content": content, "truncated": truncated, "redacted": content != text}
 
 
 def _list_repo_dir(ctx: ToolContext, path: str = ".") -> dict:
@@ -61,7 +67,8 @@ def register_repo_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
     registry.register(ToolSpec(
         "read_repo_file",
         "Read one file from the analyzed repository (read-only). Use get_context "
-        "first when unsure whether repoAttached is true.",
+        "first when unsure whether repoAttached is true. Credential values come "
+        "back as <REDACTED:kind> placeholders; never write a placeholder into a file.",
         {"type": "object", "properties": {"path": {"type": "string"}},
          "required": ["path"]},
         lambda **kw: _read_repo_file(ctx, **kw)))

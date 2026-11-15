@@ -162,7 +162,7 @@ def _serve_and_wait(
 
 
 _LINUX_BACKEND_MISSING = (
-    "pywebview's Linux GTK+/WebKit backend is missing — "
+    "pywebview's Linux GTK+/WebKit backend is missing; "
     "falling back to opening the dashboard in your browser. "
     "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
     "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window."

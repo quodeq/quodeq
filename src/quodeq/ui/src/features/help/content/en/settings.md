@@ -6,13 +6,13 @@
 
 Which AI reads your code, how long it may take, and how findings become grades.
 
-- **AI Provider** picks who runs your evaluations: a CLI you have signed in to (Claude Code, Codex, Gemini, Copilot), a hosted API (OpenRouter or a custom OpenAI-compatible endpoint), or a local model server (Ollama, llama.cpp, oMLX). A provider that is not installed shows how to install it.
-- **Model** is the model for that provider. Claude Code, Codex and GitHub Copilot list the models your account can use, and the one the CLI picks by default reads *(default)* (*Other model id* takes one that is not listed); Gemini CLI takes a typed id. A local server lists the models it has; llama.cpp shows the GGUF it has loaded. A local server's own row shows whether it is running, its address (click it to copy) and a console button for its log.
+- **AI Provider** picks who runs your evaluations: a CLI you have signed in to (Claude Code, Codex, Gemini, Antigravity, Copilot), a hosted API (OpenRouter or a custom OpenAI-compatible endpoint), or a local model server (Ollama, llama.cpp, oMLX). A provider that is not installed shows how to install it.
+- **Model** is the model for that provider. Claude Code, Codex, Antigravity and GitHub Copilot list the models your account can use, and the one the CLI picks by default reads *(default)* (*Other model id* takes one that is not listed); Gemini CLI takes a typed id. A local server lists the models it has; llama.cpp shows the GGUF it has loaded. A local server's own row shows whether it is running, its address (click it to copy) and a console button for its log.
 - **API key**, for hosted and some local providers, is write-only: paste a key and press **save key**. quodeq stores it outside the browser, in your system keychain by default, and the row only ever says *key saved*, with **replace** to enter a new one. The key itself is never shown again.
 - **Test** checks the connection to a hosted model and reports its latency.
 - **Evaluation time limit** stops a run after that long. Whatever finished in time is scored, and the next run continues from there.
 - **Max parallel agents** is how many subagents work side by side, from 1 to 10; local servers can measure what your hardware can serve.
-- **Effort**, right under the model for Claude Code and Codex, is how hard the model thinks about each file. It offers the levels the chosen model takes; **Default** leaves it to the CLI, and a change re-analyses every file on the next run.
+- **Effort**, right under the model for Claude Code, Codex and Antigravity, is how hard the model thinks about each file. It offers the levels the chosen model takes; **Default** leaves it to the CLI, and a change re-analyses every file on the next run.
 - **Command**, on a CLI provider, is the command that launches the CLI, checked as you leave the field.
 
 The *Results* section under the model:
@@ -36,8 +36,8 @@ Which model answers in the assistant. **Default** follows your evaluation provid
 Your GitHub account, the evaluations repository, and the local server.
 
 - **GitHub access** shows how quodeq reaches GitHub: signed in through quodeq, using your `gh` login, or not signed in (your own git setup). **sign in with GitHub** starts the sign-in, and **sign out** forgets only the token quodeq stored. See the **Git access** help section.
-- **Shared repository** holds the address of the git repository you publish evaluations to, yours across machines or shared with anyone who has access, with **change** and **disconnect**. The **Shared Repository** help section walks through connect, publish, pull and disconnect.
-- **Local server** shows the **Quodeq server** row: *Running*, *Not reachable* or *Checking…* while it asks. While it runs, the row shows its address (click it to copy), a caption with its version and PID, and a console button that opens the server log. When it is down, the row says how to start it again and that it is checked again every few seconds.
+- **Shared repository** holds the address of the git repository you publish evaluations to, yours across machines or shared with anyone who has access, with **change** and **disconnect**, and **Share code snippets**, which is off by default. The **Shared Repository** help section walks through connect, publish, pull and disconnect.
+- **Local server** shows the **Quodeq server** row: *Running*, *Not reachable* or *Checking…* while it asks. While it runs, the row shows its address (click it to copy), a caption with its version and PID, and a console button that opens the server log. When it is down, the row says how to start it again and that it is checked again every few seconds. The address is for reference: typed into a browser it only shows how to start quodeq, because the server answers the window or browser tab quodeq opened and nothing else. `quodeq dashboard --browser` opens the dashboard in a browser.
 
 ### App
 

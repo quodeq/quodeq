@@ -18,7 +18,7 @@ At the end of each row sit **View** (or **Edit** for a custom standard), **Dupli
 
 ### Built-in standards
 
-quodeq ships with managed standards for the six ISO 25010 dimensions plus Clean Architecture, DDD Design and WCAG 2.2 Accessibility. Their structure is **read-only** and marked as *Managed*, but their numeric thresholds are editable (see below). To turn one off for a project, click its star.
+quodeq ships with managed standards for the six ISO 25010 dimensions plus Clean Architecture, DDD Design, WCAG 2.2 Accessibility and AI Integration Security. Their structure is **read-only** and marked as *Managed*, but their numeric thresholds are editable (see below). To turn one off for a project, click its star.
 
 ### Where your choices are kept
 

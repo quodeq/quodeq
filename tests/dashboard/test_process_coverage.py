@@ -9,17 +9,13 @@ import pytest
 
 
 class TestTerminatePid:
-    # _terminate_pid reads quodeq.dashboard._process.IS_WIN32, which is
-    # captured at import time from sys.platform — patching sys.platform
-    # after import does not flip it. Patch the module attribute directly
-    # so this test can run (and validate POSIX behaviour) on Windows CI too.
-    @patch("quodeq.dashboard._process.IS_WIN32", False)
-    @patch("os.kill")
-    def test_unix(self, mock_kill):
+    # The platform split lives in shared.process_kill.stop_process (tested in
+    # tests/shared/test_stop_process.py); here only the hand-off matters.
+    @patch("quodeq.dashboard._process.stop_process")
+    def test_delegates_to_stop_process(self, stop):
         from quodeq.dashboard._process import _terminate_pid
-        import signal
         _terminate_pid(1234)
-        mock_kill.assert_called_once_with(1234, signal.SIGTERM)
+        stop.assert_called_once_with(1234)
 
 
 class TestGetPidFile:

@@ -130,7 +130,9 @@ def test_kill_api_logs_when_process_is_already_gone(monkeypatch) -> None:
     def _raise(*_a, **_k):
         raise ProcessLookupError(3, "No such process")
 
-    monkeypatch.setattr(native_ops.os, "kill", _raise)
+    # Patch the helper kill_api calls, not os.kill: on Windows the helper asks
+    # with a console event first and treats a vanished process as done.
+    monkeypatch.setattr(native_ops, "stop_process", _raise)
     with patch.object(native_ops._logger, "debug") as debug:
         native_ops.kill_api(424242)  # signature: kill_api(pid: int) -> None
     assert debug.called

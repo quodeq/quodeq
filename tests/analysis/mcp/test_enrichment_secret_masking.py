@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from quodeq.analysis.mcp.enrichment import enrich_code
 from tests.core._fake_secrets import AWS_KEY, PEM
 
@@ -66,3 +68,46 @@ def test_the_model_text_is_masked_without_a_work_dir():
     finding = {"file": "a.py", "line": 1, "snippet": f"k = '{AWS_KEY}'"}
     enrich_code(finding, None, _read)
     assert finding["snippet"] == f"k = '{_PLACEHOLDER}'"
+
+
+_ENV_BODY = "DEBUG=true\nSESSION_SEED=hunter2\nSMTP_PASS=correct horse battery\n"
+_SECRET_FILE = "<REDACTED:secret_file>"
+
+
+@pytest.mark.parametrize(("name", "line"), [
+    (".env", 2), (".env", 0), ("deploy/prod.env", 3), (".git-credentials", 1), ("certs/server.key", 1),
+])
+def test_code_is_never_filled_from_a_credential_file(tmp_path, name, line):
+    """Injected text can make the agent report a finding on .env; the lines must not be stored."""
+    (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / name).write_text(_ENV_BODY)
+    finding = {"file": name, "line": line, "end_line": 40, "reason": "Settings live in the repository"}
+    enrich_code(finding, tmp_path, _read)
+
+    assert (finding["snippet"], finding["context"]) == (_SECRET_FILE, "")
+    assert (finding["file"], finding["line"], finding["reason"]) == (name, line, "Settings live in the repository")
+
+
+def test_the_model_s_own_quote_of_a_credential_file_is_dropped(tmp_path):
+    finding = {"file": ".env", "line": 2, "snippet": "SESSION_SEED=hunter2", "context": "DEBUG=true\nSESSION_SEED=hunter2"}
+    enrich_code(finding, None, _read)
+    assert "hunter2" not in _all_text(finding)
+    assert finding["snippet"] == _SECRET_FILE
+
+
+def test_a_link_to_a_credential_file_is_not_filled_either(tmp_path):
+    (tmp_path / ".env").write_text(_ENV_BODY)
+    try:
+        (tmp_path / "settings.txt").symlink_to(tmp_path / ".env")
+    except OSError:
+        pytest.skip("symlinks are not available here")
+    finding = {"file": "settings.txt", "line": 2}
+    enrich_code(finding, tmp_path, _read)
+    assert finding["snippet"] == _SECRET_FILE
+
+
+def test_a_template_of_a_credential_file_is_still_filled(tmp_path):
+    (tmp_path / ".env.example").write_text("DEBUG=true\nSESSION_SEED=changeme\n")
+    finding = {"file": ".env.example", "line": 2}
+    enrich_code(finding, tmp_path, _read)
+    assert finding["snippet"] == "SESSION_SEED=changeme"

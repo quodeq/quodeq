@@ -3,6 +3,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from quodeq.analysis import codex_sandbox
 from quodeq.analysis.subprocess import AnalysisConfig, confine_cli
 
@@ -92,3 +94,94 @@ def test_confine_cli_falls_back_to_plain_read_only_when_home_limits_are_refused(
     args, _ = confine_cli(cfg, spec, tmp_path / "repo", ["codex", "exec", _BYPASS], {})
     assert args[args.index("-s") + 1] == "read-only"
     assert not any(a.startswith("default_permissions") for a in args)
+
+
+def _probed(tmp_path, monkeypatch, files: dict[str, str]):
+    """Scan a repo holding *files* behind a probe that, like the real one,
+    passes only when the sample it is given prints something. Returns the
+    confined argv and the samples the probe saw."""
+    samples: list[Path] = []
+
+    def probe(_binary, _profile, _listed, sample, *_rest):
+        samples.append(sample)
+        return sample.is_file() and sample.stat().st_size > 0
+
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.native_sandbox_works", probe)
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.external_sandbox_prefix",
+                        lambda **kw: (["sandbox-exec", "-f", "p.sb"], lambda: None))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path / "evals"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for name, text in files.items():
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(text)
+    cfg = AnalysisConfig(jsonl_file=tmp_path / "evals" / "p" / "r" / "evidence" / "s_evidence.jsonl")
+    spec = {"native_sandbox": True, "analysis_sandbox": {"cli_home": ".codex-test"}}
+    args, _ = confine_cli(cfg, spec, repo, ["codex", "exec", _BYPASS], {})
+    return args, samples
+
+
+def test_an_empty_first_file_does_not_switch_codex_to_the_bypass(tmp_path, monkeypatch):
+    args, samples = _probed(tmp_path, monkeypatch, {".aaa": "", ".gitkeep": "", "app.py": "x = 1\n"})
+    assert _BYPASS not in args and args[0] == "codex"
+    assert samples[0].name == "app.py"
+
+
+def test_a_repo_with_files_only_in_subfolders_keeps_codex_sandbox(tmp_path, monkeypatch):
+    args, samples = _probed(tmp_path, monkeypatch, {"src/pkg/app.py": "x = 1\n"})
+    assert _BYPASS not in args
+    assert samples[0].name == "app.py"
+
+
+def test_a_repo_with_nothing_to_sample_is_probed_with_quodeq_own_file(tmp_path, monkeypatch):
+    args, samples = _probed(tmp_path, monkeypatch, {".gitkeep": "", ".env": "TOKEN=1\n"})
+    assert _BYPASS not in args
+    assert samples[0] == Path(codex_sandbox.__file__).resolve()
+
+
+def test_an_empty_repo_keeps_codex_sandbox(tmp_path, monkeypatch):
+    args, _ = _probed(tmp_path, monkeypatch, {})
+    assert _BYPASS not in args
+
+
+def test_probe_sample_never_follows_a_link_out_of_the_repo(tmp_path):
+    repo, outside = tmp_path / "repo", tmp_path / "outside.txt"
+    repo.mkdir()
+    outside.write_text("not the repo's\n")
+    try:
+        (repo / "aaa").symlink_to(outside)
+    except OSError:
+        pytest.skip("symlinks need a privilege on this machine")
+    (repo / "zzz.py").write_text("x = 1\n")
+    assert codex_sandbox.probe_sample(repo) == repo / "zzz.py"
+
+
+def test_probe_sample_skips_what_a_repo_could_use_to_fail_the_probe(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a&b.txt").write_text("cmd.exe would act on this name\n")
+    (repo / "big.bin").write_bytes(b"x" * (codex_sandbox.SAMPLE_MAX_BYTES + 1))
+    (repo / "id_rsa").write_text("a credential file\n")
+    (repo / "ok.txt").write_text("fine\n")
+    assert codex_sandbox.probe_sample(repo) == repo / "ok.txt"
+
+
+def test_probe_sample_stops_looking_after_its_budget(tmp_path, monkeypatch):
+    monkeypatch.setattr(codex_sandbox, "SAMPLE_SCAN_LIMIT", 3)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for name in ("a", "b", "c", "d"):
+        (repo / name).write_text("")
+    (repo / "e.py").write_text("x = 1\n")
+    assert codex_sandbox.probe_sample(repo) == Path(codex_sandbox.__file__).resolve()
+
+
+def test_probe_runs_from_the_given_folder(monkeypatch, tmp_path, installed_cli):
+    cwds: list = []
+    run = _fake_run("0.162.1", 0)
+    monkeypatch.setattr(codex_sandbox.subprocess, "run",
+                        lambda argv, **kw: cwds.append(kw.get("cwd")) or run(argv))
+    sample = tmp_path / "elsewhere" / "f"
+    assert codex_sandbox.native_sandbox_works("codex", ["-c", "cwd=1"], tmp_path, sample, {}, tmp_path)
+    assert cwds[-1] == tmp_path

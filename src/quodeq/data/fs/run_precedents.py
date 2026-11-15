@@ -16,6 +16,7 @@ import json
 import sqlite3
 from pathlib import Path
 
+from quodeq.core.finding_identity import withheld_snippet
 from quodeq.data.fs.run_archive_files import is_plain_file, write_json_sidecar
 from quodeq.data.fs.run_archive_wal import DB_NAME
 
@@ -31,6 +32,7 @@ SEMANTIC_ELIGIBLE_SQL = (
 _NEEDED = frozenset({"verdict", "requirement", "snippet"})
 _VERSION = 1
 _KINDS = ("dismissed", "semantic")
+_PAIR_LEN = 2  # (requirement, snippet)
 
 Pairs = list[tuple[str | None, str | None]]
 
@@ -100,6 +102,29 @@ def read_precedents(run_dir: Path, kind: str) -> Pairs:
         return [(req, snippet) for req, snippet in rows if _text_or_null(req) and _text_or_null(snippet)]
     except (ValueError, KeyError, TypeError) as exc:
         raise RuntimeError(f"malformed {PRECEDENTS_NAME} in {run_dir}: {exc}") from exc
+
+
+def withhold_precedent_snippets(sidecar: Path) -> None:
+    """Rewrite a published copy of the sidecar so it carries no code.
+
+    Each dismissal keeps its requirement and trades its snippet for the token
+    holding the snippet's fingerprint, which is all fingerprint matching reads.
+    The semantic pairs are dropped: they exist to be embedded as text, and a
+    token has none. Anything that is not a well-formed pair is left out rather
+    than published as it is.
+    """
+    try:
+        doc = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        doc = None
+    rows = doc.get("dismissed") if isinstance(doc, dict) else None
+    pairs = [row for row in rows if _is_pair(row)] if isinstance(rows, list) else []
+    dismissed = [[req, None if snippet is None else withheld_snippet(req, snippet)] for req, snippet in pairs]
+    write_json_sidecar(sidecar, {"version": _VERSION, "dismissed": dismissed, "semantic": []})
+
+
+def _is_pair(row: object) -> bool:
+    return isinstance(row, list) and len(row) == _PAIR_LEN and all(_text_or_null(value) for value in row)
 
 
 def _text_or_null(value: object) -> bool:

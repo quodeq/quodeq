@@ -12,9 +12,7 @@ from quodeq.data.cache_store.index import close_all_for_tests
 from quodeq.data.fs._index_cache import clear_index_cache
 from quodeq.services.dashboard import clear_shared_dimension_cache
 from tests._sharding import ENV_VAR, parse_shard, select_shard
-from tests._cwd_guard import _cwd_leak_guard  # noqa: F401 — autouse fixture, registered by import
-from tests._session_client import _session_test_client  # noqa: F401 — autouse fixture, registered by import
-from tests._windows_launch import _windows_launch_rules, argv_as_written, installed_cli, windows_system_tools  # noqa: F401 - fixtures
+from tests._shared_fixtures import *  # noqa: F401,F403 - fixtures, registered by import
 
 # Deep enough to exhaust the C JSON decoder's call stack on a default 8MB
 # main-thread stack. ~160KB of text -- trivially producible by hand or by a
