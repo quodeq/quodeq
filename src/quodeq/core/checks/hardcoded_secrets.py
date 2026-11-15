@@ -95,7 +95,9 @@ def _assignment_hit(text: str) -> tuple[int, str] | None:
 def _first_hit(kind: str, text: str) -> tuple[int, str] | None:
     """Where *text* (a file of *kind*) holds a credential, or None when it
     holds none."""
-    tokens = find_secrets(text)
+    # Unquoted assignments are read by _assignment_hit below, which reports
+    # them as KEY=<placeholder>: the snippet stored findings are matched by.
+    tokens = find_secrets(text, unquoted=False)
     if kind == KIND_PRIVATE_KEY:
         key = next((h for h in tokens if h.kind == PRIVATE_KEY), None)
         return (key.line, placeholder(key.kind)) if key else None
