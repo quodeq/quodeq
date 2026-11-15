@@ -30,6 +30,8 @@ from quodeq.shared.utils import IS_WIN32
 
 _BATCH_SUFFIXES = (".cmd", ".bat")
 _NODE = "node"
+_EXE = ".exe"
+_SYSTEM_DIR = "System32"
 _NODE_EXE = "node.exe"
 # npm's cmd-shim ends with `"%dp0%\node_modules\<pkg>\bin\cli.js" %*`
 # (older versions: `"%~dp0\node_modules\...\cli.js" %*`).
@@ -75,6 +77,32 @@ def launch_argv(
             f"{Path(found).name} is a batch file but not an npm shim, and "
             f"{len(unsafe)} of its arguments hold characters cmd.exe would run. "
             "Point AI_CMD_PATH at the CLI's .exe instead")
+    return [found, *argv[1:]]
+
+
+def program_argv(
+    argv: list[str], env: Mapping[str, str] | None = None, *,
+    windows: bool | None = None, which: Callable[..., str | None] | None = None,
+) -> list[str]:
+    """*argv* for a helper program (git, gh, taskkill...) spawned without a shell.
+
+    Off Windows, and for a program given with a directory part, *argv* is
+    returned as is. On Windows a bare name becomes the full path of its
+    ``.exe`` (the only extension CreateProcess adds), looked up in the PATH
+    directories of *env* (this process when None) and then in the Windows
+    system directory, never in the current directory. Raises
+    :class:`FileNotFoundError`, as the spawn does for a missing program.
+    """
+    if not (IS_WIN32 if windows is None else windows) or not argv or os.path.dirname(argv[0]):
+        return argv
+    which = which or shutil.which
+    environ = resolve_env(env)
+    name = argv[0] if os.path.splitext(argv[0])[1] else argv[0] + _EXE
+    found = _find_on_path(name, environ.get("PATH", ""), which)
+    if found is None and (system_root := environ.get("SystemRoot")):
+        found = which(os.path.join(system_root, _SYSTEM_DIR, name))
+    if found is None:
+        raise FileNotFoundError(errno.ENOENT, f"'{argv[0]}' was not found on PATH", argv[0])
     return [found, *argv[1:]]
 
 
