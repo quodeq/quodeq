@@ -10,6 +10,7 @@ from pathlib import Path
 
 from quodeq.analysis.dimension_aliases import expand_dimension_aliases
 from quodeq.shared.utils import get_evaluations_dir
+from quodeq.shared.win_launch import program_argv
 
 _logger = logging.getLogger(__name__)
 
@@ -35,9 +36,8 @@ def _run_gh(args: list[str]) -> str:
     """
     try:
         result = subprocess.run(
-            ["gh", *args], capture_output=True, text=True, encoding="utf-8", check=True,
-            timeout=_GH_TIMEOUT_S,
-        )
+            program_argv(["gh", *args]), capture_output=True, text=True, encoding="utf-8", check=True,
+            timeout=_GH_TIMEOUT_S)
     except FileNotFoundError:
         raise ReviewError(_GH_MISSING)
     except subprocess.TimeoutExpired:

@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.win_launch import find_program
 
 GH_BIN = "gh"
 GH_TOKEN_TIMEOUT_S = 5
@@ -33,7 +34,7 @@ def gh_status(
 ) -> GhStatus:
     """Whether gh exists and is logged in, with its token when it is. Never raises."""
     resolved = resolve_env(env)
-    gh = which(GH_BIN, path=resolved.get("PATH"))
+    gh = find_program(GH_BIN, resolved, which=which)
     if not gh:
         return GhStatus(False, False)
     try:

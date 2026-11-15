@@ -35,6 +35,7 @@ from pathlib import Path
 
 from quodeq.data.fs.shared_repo_git import git_env
 from quodeq.shared.constants import GIT_BIN
+from quodeq.shared.win_launch import program_argv
 from quodeq.shared.git_errors import output_tail
 
 _logger = logging.getLogger(__name__)
@@ -124,7 +125,7 @@ def run_git_streaming(
     """Run ``git *args``; stream stderr lines to *on_line*; ``(ok, tail)``."""
     try:
         proc = subprocess.Popen(
-            [GIT_BIN, *args], cwd=str(cwd) if cwd else None, env=git_env(env),
+            program_argv([GIT_BIN, *args]), cwd=str(cwd) if cwd else None, env=git_env(env),
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
             start_new_session=not _IS_WINDOWS,
         )

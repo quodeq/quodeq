@@ -28,6 +28,7 @@ from pathlib import Path
 
 from quodeq.data.git_cli import git_env_floor
 from quodeq.shared.constants import GIT_BIN, GIT_FLAG_C, RETRY_JITTER_S
+from quodeq.shared.win_launch import program_argv
 
 _logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ _WORKTREE_TIMEOUT_S = 30
 def _git(repo_dir: Path, *args: str, timeout: float, check: bool = False) -> subprocess.CompletedProcess[str]:
     """Run ``git -C <repo_dir> <args>`` with captured UTF-8 text output."""
     return subprocess.run(
-        [GIT_BIN, GIT_FLAG_C, str(repo_dir), *args],
+        program_argv([GIT_BIN, GIT_FLAG_C, str(repo_dir), *args]),
         capture_output=True, text=True, encoding="utf-8", check=check, timeout=timeout,
         env=git_env_floor(), stdin=subprocess.DEVNULL,
     )

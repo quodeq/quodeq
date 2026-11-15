@@ -42,7 +42,7 @@ def test_pr_push_fail_exact_body(app, client, repo, monkeypatch):
     assert store.get_worktree(sid)["status"] == "active"
 
 
-def test_pr_no_gh_exact_body(app, client, repo, monkeypatch):
+def test_pr_no_gh_exact_body(app, client, repo, monkeypatch, argv_as_written):
     sid, store, manager = _session_with_worktree(app, client, repo)
     _patch_push(monkeypatch)
     monkeypatch.setattr("quodeq.assistant.worktree.shutil.which", lambda _: None)
@@ -57,7 +57,7 @@ def test_pr_no_gh_exact_body(app, client, repo, monkeypatch):
     assert store.get_worktree(sid)["status"] == "active"
 
 
-def test_pr_gh_fail_exact_body(app, client, repo, monkeypatch):
+def test_pr_gh_fail_exact_body(app, client, repo, monkeypatch, argv_as_written):
     from quodeq.assistant.worktree import WorktreeError
     sid, store, manager = _session_with_worktree(app, client, repo)
     _patch_push(monkeypatch)
@@ -79,7 +79,7 @@ def test_pr_gh_fail_exact_body(app, client, repo, monkeypatch):
     assert store.get_worktree(sid)["status"] == "active"
 
 
-def test_pr_success_exact_body(app, client, repo, monkeypatch):
+def test_pr_success_exact_body(app, client, repo, monkeypatch, argv_as_written):
     sid, store, manager = _session_with_worktree(app, client, repo)
     _patch_push(monkeypatch)
     monkeypatch.setattr("quodeq.assistant.worktree.shutil.which", lambda _: "/usr/bin/gh")

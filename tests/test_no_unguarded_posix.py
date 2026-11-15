@@ -57,7 +57,7 @@ _ALLOWLIST: set[str] = {
     # before this line, and the call is wrapped in `except OSError`. Kills the
     # streaming git process group (git plus any ssh/credential helper that
     # holds stderr) at the deadline.
-    "data/fs/git_stream.py:65",
+    "data/fs/git_stream.py:66",
     # kill_external_tree / _descendants: reached only after the
     # `if sys.platform == PLATFORM_WIN32` return (win32 delegates to
     # kill_tree's taskkill /T); ps is wrapped in `except (OSError, ...)`.

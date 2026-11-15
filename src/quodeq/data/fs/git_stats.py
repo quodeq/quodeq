@@ -10,6 +10,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from quodeq.shared.win_launch import program_argv
+
 _DEFAULT_TIMEOUT_S = 5
 
 
@@ -24,7 +26,7 @@ def count_commits_since(
     """
     try:
         proc = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-list", "--count", f"--since={since_iso}", "HEAD"],
+            program_argv(["git", "-C", str(repo_root), "rev-list", "--count", f"--since={since_iso}", "HEAD"]),
             capture_output=True, encoding="utf-8", timeout=timeout_s, check=False,
         )
         if proc.returncode != 0:

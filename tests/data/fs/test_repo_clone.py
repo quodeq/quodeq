@@ -105,7 +105,7 @@ class TestCleanupClonedRepo:
 class TestCloneRepo:
     """The bare git-clone invocation (services keep retry + error mapping)."""
 
-    def test_invokes_git_with_pinned_env_and_timeout(self, tmp_path):
+    def test_invokes_git_with_pinned_env_and_timeout(self, tmp_path, argv_as_written):
         from quodeq.data.fs.repo_clone import clone_repo
 
         with patch("quodeq.data.fs.repo_clone.subprocess.run") as run:
