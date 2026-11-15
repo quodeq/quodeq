@@ -26,6 +26,8 @@ Once a repo is connected, local project cards grow a **publish** button. It uplo
 - Only completed runs are published. Interrupted runs, and runs from old quodeq versions that predate run status tracking, are skipped.
 - One publish runs at a time. While it is busy, the other publish buttons wait.
 - Each publish records who and when, taken from your git `user.name`. Anyone connected sees it on the card.
+- Code stays on your machine unless you turn on **Share code snippets** in Settings, under *Shared repository*. While it is off, published findings keep their file, line and reason, and readers see *Code not shared by the publisher* where the code would be. The choice is kept on this machine and starts from off again when you reconnect.
+- The folder your project sits in is not published. A project added from a url keeps its url, so a reader can clone it.
 
 ### What others see
 
@@ -43,7 +45,7 @@ Opening a shared project is read-only. You can browse every run and finding, but
 
 ### Pulling a project
 
-A *REMOTE* card offers **pull local copy**: it imports the project, runs and all, into your local list so you can evaluate it yourself from there. The card shows *downloading…* while it works and *pulled to local* when done; a failed pull shows an error message. If a local project already has that name, quodeq asks whether to import it as a copy. The project's own **Evaluate** tab offers the same pull, since an evaluation only runs on a local copy, and lands on that copy's Evaluate when the pull is done; see *A remote project* in the **Running Evaluations** help section.
+A *REMOTE* card offers **pull local copy**: it imports the project, runs and all, into your local list so you can evaluate it yourself from there. The code is not part of a published project, so before its first scan the copy asks where the code is: **choose folder** for a copy you already have, or **clone it instead** when the project was added from a url. The card shows *downloading…* while it works and *pulled to local* when done; a failed pull shows an error message. If a local project already has that name, quodeq asks whether to import it as a copy. The project's own **Evaluate** tab offers the same pull, since an evaluation only runs on a local copy, and lands on that copy's Evaluate when the pull is done; see *A remote project* in the **Running Evaluations** help section.
 
 Runs keep the form they were published in. An old run that was archived when it was shared travels compressed, and the first time someone opens it on another machine it takes a few seconds to unpack. Databases are never shared: each machine rebuilds its own from the run's event log, so a pulled project carries no database or machine-local files.
 

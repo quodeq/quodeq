@@ -1,6 +1,6 @@
 ## Quality Dimensions
 
-quodeq evaluates code across six dimensions derived from the ISO/IEC 25010 software-quality standard, plus two architecture dimensions you can opt into.
+quodeq evaluates code across six dimensions derived from the ISO/IEC 25010 software-quality standard, plus opt-in dimensions for architecture, accessibility and AI integration.
 
 ### The six ISO dimensions
 
@@ -19,6 +19,10 @@ quodeq evaluates code across six dimensions derived from the ISO/IEC 25010 softw
 ### Accessibility (opt-in)
 
 - **Accessibility** WCAG 2.2 A and AA as applied to software by EN 301 549: text alternatives, contrast, text scaling, focus, target size, screen reader semantics and platform settings, for Android, iOS and web.
+
+### AI Integration Security (opt-in)
+
+- **AI Integration Security** for code that calls models or runs agents: untrusted content, model output handling, agent privilege and sandboxing, configuration and supply chain, authorization and human control, resource bounds, MCP servers, memory and audit. 34 rules in 8 principles.
 
 These ship **disabled by default**. Open *Standards* and click the star in the standard's **Enabled** column to turn it on for the project. Once on, they appear in Evaluate and Overview alongside the ISO six.
 
