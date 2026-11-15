@@ -10,6 +10,7 @@ RUNTIME_ENV_KEYS = frozenset({
     "USERPROFILE", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "SystemRoot",
     "WINDIR", "PATHEXT", "TEMP", "TMP",
     "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+    "ALL_PROXY", "all_proxy",
     "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR",
 })
 _LOCALE_PREFIX = "LC_"
