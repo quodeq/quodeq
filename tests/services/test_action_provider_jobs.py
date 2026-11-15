@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import subprocess
 import threading
 from pathlib import Path
 
@@ -14,14 +15,40 @@ _FAKE_REPORT_PATH = "Report path: /app/reports/sample-project/20260220/evaluatio
 _TEST_TIMEOUT_S = 5.0
 
 
+class _DrainSignal:
+    """Line iterator over the fake output that records when the reader hit EOF."""
+
+    def __init__(self, text: str) -> None:
+        self._lines = iter(io.StringIO(text))
+        self.drained = threading.Event()
+
+    def __iter__(self) -> "_DrainSignal":
+        return self
+
+    def __next__(self) -> str:
+        try:
+            return next(self._lines)
+        except StopIteration:
+            self.drained.set()
+            raise
+
+
 class FakeProcess:
-    """Simulate a subprocess with merged stdout/stderr (subprocess.STDOUT)."""
+    """Simulate a subprocess with merged stdout/stderr (subprocess.STDOUT).
+
+    It exits once its output has been read to the end, like a child that
+    blocks on its pipe. The manager reads the stream and waits for the exit on
+    two threads; a process that had "exited" before the reader ran let the
+    completion callback fire with the markers and log lines not yet applied.
+    """
     def __init__(self, stdout: str = "", stderr: str = "", returncode: int = 0) -> None:
         # Merge stderr into stdout to match real subprocess.STDOUT behaviour
-        self.stdout = io.StringIO(stdout + stderr)
+        self.stdout = _DrainSignal(stdout + stderr)
         self._returncode = returncode
 
     def wait(self, timeout=None) -> int:
+        if not self.stdout.drained.wait(timeout):
+            raise subprocess.TimeoutExpired("fake", timeout)
         return self._returncode
 
 
