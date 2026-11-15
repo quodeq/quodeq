@@ -149,3 +149,32 @@ def test_public_addresses_returns_the_answer_it_judged():
 def test_public_addresses_refuses_unresolvable_or_internal(answer):
     with pytest.raises(ValueError):
         ssrf.public_addresses("rebind.example.com", resolve=lambda host: answer)
+
+
+@pytest.mark.parametrize("address", [
+    "100.64.0.1",          # carrier-grade NAT / Tailscale, first host
+    "100.100.100.100",     # Tailscale's own resolver
+    "100.127.255.254",     # last host of 100.64.0.0/10
+    "::ffff:100.64.0.1",   # the same range, IPv4-mapped
+    "fec0::1",             # deprecated IPv6 site-local
+])
+def test_non_global_ranges_python_does_not_call_private_are_internal(address):
+    assert ssrf.is_internal_ip(address) is True
+
+
+@pytest.mark.parametrize("address", [
+    "100.63.255.255",        # just below the carrier-grade NAT range
+    "100.128.0.1",           # just above it
+    "8.8.8.8",
+    "140.82.121.3",
+    "2606:4700:4700::1111",
+    "2001:4860:4860::8888",
+])
+def test_public_addresses_next_to_those_ranges_stay_public(address):
+    assert ssrf.is_internal_ip(address) is False
+
+
+def test_a_carrier_grade_nat_answer_is_refused():
+    assert ssrf.is_private_address("100.64.0.1") is True
+    with pytest.raises(ValueError, match="private/internal"):
+        ssrf.public_addresses("tailnet.example", resolve=lambda _host: ("100.101.102.103",))

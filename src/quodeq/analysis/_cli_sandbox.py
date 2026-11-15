@@ -14,6 +14,9 @@ this machine (Quodeq's own API), except a local proxy.
 Quodeq's other state stays out of reach on purpose: other projects' clones
 and evidence, the assistant database and the settings of other projects.
 
+Under firejail (Linux where bubblewrap cannot start) the home stays readable
+but for the known secret stores and Quodeq's run dir; the run log says so.
+
 Where no OS sandbox works (Windows, a container, Linux without a usable
 bubblewrap or firejail) the scan still runs, as it did before the sandbox
 existed, with the limits that need none: the env allowlist and, for Codex,
@@ -28,22 +31,23 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.analysis.codex_sandbox import (
-    native_args, native_sandbox_works, plain_read_only_args, profile_args,
+    native_args, native_sandbox_works, plain_read_only_args, probe_sample, profile_args,
 )
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.core.secret_files import secret_file_kind
 from quodeq.data.fs.project_standards import project_settings_file, settings_reports_root
 from quodeq.data.fs.secret_files import find_secret_files
 from quodeq.shared.codex_home import user_codex_auth_file
 from quodeq.shared.os_sandbox import (
     SandboxUnavailable,
     external_sandbox_prefix,
+    leaves_home_readable,
     loopback_proxy_ports,
     runtime_readable_dirs,
 )
 
 _warned_unsandboxed: set[str] = set()  # one warning per CLI per process, not per agent spawn
+_warned_weak_sandbox: set[str] = set()  # likewise, for the firejail fallback
 _warned_secrets_readable: set[tuple[str, Path]] = set()  # per CLI and repo
 _NAMED_SECRET_FILES = 3  # how many a warning names before "and N more"
 
@@ -127,7 +131,16 @@ def analysis_sandbox_prefix(
     readable = [*_readable_dirs(cfg, work_dir, binary),
                 *(Path.home() / d for d in spec.get("readable_home_dirs", ()))]
     try:
-        return _sandbox_prefix(work_dir, env, writable, readable)
+        prefix, cleanup = _sandbox_prefix(work_dir, env, writable, readable)
+        if leaves_home_readable(prefix) and binary not in _warned_weak_sandbox:
+            _warned_weak_sandbox.add(binary)
+            policy.log.warning(
+                f"Running {binary} under firejail, which confines less than bubblewrap. "
+                "Writes are blocked, and so are reads of the usual credential folders in "
+                "your home and of Quodeq's session files, but other files under your home "
+                "stay readable. For the full sandbox, install bubblewrap and allow it "
+                "unprivileged user namespaces.")
+        return prefix, cleanup
     except SandboxUnavailable as exc:
         if policy.require:
             raise
@@ -185,11 +198,11 @@ def _native_args(
     cfg: AnalysisConfig, work_dir: Path, args: list[str], env: Mapping[str, str], log: LogSink,
 ) -> list[str] | None:
     project = _project_dir(cfg)
-    sample = next((p for p in sorted(work_dir.iterdir())
-                   if p.is_file() and secret_file_kind(p.name) is None), None)
-    if project is None or sample is None:
+    if project is None:
         return None
-    readable = [work_dir.resolve(), project, *runtime_readable_dirs("rg")]
+    repo = work_dir.resolve()
+    sample = probe_sample(repo)
+    readable = [repo, project, *runtime_readable_dirs("rg")]
     evidence = cfg.jsonl_file.resolve().parent if cfg.jsonl_file else project
     # Home unreadable where Codex can enforce it, else plain read-only (no
     # writes, no network), which still beats the OS fallbacks on Windows:
@@ -198,7 +211,7 @@ def _native_args(
     profiles = [profile_args(Path.home().resolve(), readable, unreadable),
                 plain_read_only_args(unreadable), plain_read_only_args()]
     for profile in map(list, dict.fromkeys(map(tuple, profiles))):
-        if native_sandbox_works(args[0], profile, evidence, sample.resolve(), env):
+        if native_sandbox_works(args[0], profile, evidence, sample, env, repo):
             if unreadable and profile == profiles[-1]:
                 _warn_secrets_readable(args[0], work_dir, log)
             return native_args(args, profile)

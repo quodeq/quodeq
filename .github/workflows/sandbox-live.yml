@@ -12,6 +12,7 @@ on:
     branches: [develop, main]
     paths:
       - 'src/quodeq/shared/os_sandbox.py'
+      - 'src/quodeq/shared/home_secrets.py'
       - 'src/quodeq/analysis/codex_sandbox.py'
       - 'src/quodeq/analysis/_cli_sandbox.py'
       - 'tests/sandbox_live/**'
