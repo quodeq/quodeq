@@ -8,6 +8,7 @@ helpers in _csp_helpers.py.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -44,10 +45,18 @@ def test_csp_no_unsafe_eval_or_inline_scripts(csp):
     assert "'unsafe-eval'" not in script_src, "script-src must not contain 'unsafe-eval'"
 
 
-def test_csp_allows_google_fonts(csp):
-    """CSP must allow Google Fonts (used by the dashboard) to avoid breaking the UI."""
-    assert "fonts.googleapis.com" in csp
-    assert "fonts.gstatic.com" in csp
+def test_csp_names_no_third_party_host(csp):
+    """The window sends the launch session in its User-Agent, so the page may
+    load nothing from another host. Fonts ship with the app."""
+    assert "https://" not in csp
+    assert _directive(csp, "font-src") == "font-src 'self'"
+    assert _directive(csp, "style-src") == "style-src 'self' 'unsafe-inline'"
+
+
+def test_page_shell_loads_nothing_from_another_host():
+    """The policy would block it; the page must not ask in the first place."""
+    shell = Path(security.__file__).parents[1] / "ui" / "index.html"
+    assert "://" not in shell.read_text(encoding="utf-8")
 
 
 def test_alt_port_origins_built_once_as_module_constant(csp):

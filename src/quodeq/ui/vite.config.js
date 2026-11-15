@@ -16,6 +16,9 @@ export default defineConfig({
     emptyOutDir: true,
     // The Python-driven build captures Vite's output, so skip the gzip report.
     reportCompressedSize: !process.env.QUODEQ_BUILD_QUIET,
+    // Fonts stay files: the page's CSP allows fonts from the app only, so one
+    // inlined as a data: URI would be refused. Other assets keep the default.
+    assetsInlineLimit: (filePath) => (filePath.endsWith('.woff2') ? false : undefined),
     rollupOptions: {
       output: {
         manualChunks(id) {
