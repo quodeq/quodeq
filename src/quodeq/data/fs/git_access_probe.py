@@ -72,7 +72,8 @@ def probe_remote(
     config_flags = [flag for entry in git_config for flag in ("-c", entry)]
     try:
         proc = run(
-            program_argv([GIT_BIN, *config_flags, "ls-remote", "--exit-code", "--heads", "--", url]),
+            # The program is resolved on its own so the URL never passes through the lookup.
+            [*program_argv([GIT_BIN]), *config_flags, "ls-remote", "--exit-code", "--heads", "--", url],
             env=git_env_floor(env), stdin=subprocess.DEVNULL,
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=timeout,
