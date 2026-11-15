@@ -22,6 +22,7 @@ from quodeq.data.fs import git_access_probe, git_stats, git_stream, shared_repo_
 from quodeq.data.fs.repo_clone import GitCloneClient
 from quodeq.services.github_gh_cli import gh_status
 from quodeq.shared.prereqs import run_version_cmd
+from quodeq.terminal.links import detect_editor
 from tests._windows_which import windows_which
 
 _PROGRAMS = ("git.exe", "gh.exe", "node.exe", "code.cmd", "uv.exe")
@@ -114,3 +115,8 @@ def test_version_probe_reports_a_program_only_in_the_current_directory_as_missin
     with pytest.raises(FileNotFoundError):
         run_version_cmd(["node", "--version"])
     assert windows.calls == []
+
+
+def test_editor_is_detected_on_path(windows):
+    editor = detect_editor(isfile=lambda path: False, platform="win32")
+    assert editor.path == windows.path_of("code.cmd")

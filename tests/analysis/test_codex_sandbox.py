@@ -44,7 +44,7 @@ def test_probe_rejects_a_sandbox_that_fails_here(monkeypatch, tmp_path):
     assert not codex_sandbox.native_sandbox_works("codex", [], tmp_path, tmp_path / "f", {})
 
 
-def test_windows_probe_runs_each_command_inside_the_sandbox(monkeypatch, tmp_path, installed_cli):
+def test_windows_probe_runs_each_command_inside_the_sandbox(monkeypatch, tmp_path, installed_cli, windows_system_tools):
     # npm's codex.cmd goes through cmd.exe: a "&&" would run its right side unconfined.
     monkeypatch.setattr(codex_sandbox.platform, "system", lambda: "Windows")
     calls: list = []

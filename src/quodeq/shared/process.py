@@ -14,6 +14,7 @@ import time
 
 from quodeq.shared.constants import PLATFORM_WIN32
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.win_launch import program_argv
 
 
 def is_pid_alive(pid: int) -> bool:
@@ -84,7 +85,7 @@ def process_has_arg(pid: int, token: str) -> bool:
         return False
     try:
         out = subprocess.run(
-            _command_line_cmd(pid),
+            program_argv(_command_line_cmd(pid)),
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=_PS_TIMEOUT_S, check=False,
         ).stdout

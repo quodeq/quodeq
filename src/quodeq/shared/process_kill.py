@@ -14,6 +14,7 @@ import sys
 from typing import Any
 
 from quodeq.shared.constants import PLATFORM_WIN32
+from quodeq.shared.win_launch import program_argv
 
 _logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ _KILL_WAIT_TIMEOUT_S = 5
 def _run_taskkill(pid: int) -> subprocess.CompletedProcess[bytes]:
     """Windows: force-kill the tree rooted at *pid* (``taskkill /T``). Raises what ``subprocess.run`` raises."""
     return subprocess.run(
-        ["taskkill", "/F", "/T", "/PID", str(pid)],
+        program_argv(["taskkill", "/F", "/T", "/PID", str(pid)]),
         capture_output=True, timeout=_TERMINATE_TIMEOUT_S,
     )
 

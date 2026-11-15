@@ -35,7 +35,7 @@ def _run(latest="99.0.0", argv=_ARGV, returncode=0, **kwargs):
     return code, out.getvalue(), calls
 
 
-def test_runs_the_detected_command(no_network) -> None:
+def test_runs_the_detected_command(no_network, argv_as_written) -> None:
     code, out, calls = _run()
     assert code == 0
     assert calls == [_ARGV]
@@ -56,7 +56,7 @@ def test_up_to_date_runs_nothing(no_network) -> None:
     assert "is the latest version" in out
 
 
-def test_unknown_latest_still_upgrades(no_network) -> None:
+def test_unknown_latest_still_upgrades(no_network, argv_as_written) -> None:
     code, _out, calls = _run(latest=None)
     assert code == 0
     assert calls == [_ARGV]

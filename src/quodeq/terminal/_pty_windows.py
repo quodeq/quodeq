@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import logging
-import shutil
 import time
 
 from winpty import PtyProcess  # type: ignore[import-untyped]
 
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.win_launch import find_program, program_argv
 from quodeq.terminal.constants import PTY_READ_MAX_BYTES
 
 _logger = logging.getLogger(__name__)
@@ -23,10 +23,10 @@ _EMPTY_READ_SLEEP_S = 0.05
 def resolve_shell(env: dict[str, str] | None = None) -> str:
     src = resolve_env(env)
     for cand in ("pwsh", "powershell"):
-        found = shutil.which(cand)
+        found = find_program(cand)
         if found:
             return found
-    return src.get("COMSPEC", "cmd.exe")
+    return src.get("COMSPEC") or program_argv(["cmd.exe"])[0]
 
 
 class WindowsPty:
