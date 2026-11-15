@@ -155,6 +155,45 @@ jobs:
           if (-not $ok) { throw "exe did not serve /api/health within 120s" }
           Write-Host "Packaged exe served /api/health OK after $([int]$sw.Elapsed.TotalSeconds)s"
 
+      - name: Smoke test exe (started without a console)
+        shell: pwsh
+        # The exe is built with console=False, so started from Explorer or the
+        # Start menu it has no stdout or stderr at all. 1.14.0 to 1.15.2 crashed
+        # there before the window opened (a spinner called isatty() on None),
+        # and the headless test above never ran that path. Win32_Process.Create
+        # starts the exe without standard handles, the same way Explorer does.
+        # The exe must still be running once its API answers. Non-blocking for
+        # the same reason as the headless test.
+        continue-on-error: true
+        run: |
+          $exe = (Resolve-Path "dist\dashboard-build\dist\Quodeq\Quodeq.exe").Path
+          $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "`"$exe`"" }
+          if ($r.ReturnValue -ne 0) { throw "could not start the exe (Win32_Process.Create returned $($r.ReturnValue))" }
+          $main = $r.ProcessId
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $ok = $false
+          try {
+            while ($sw.Elapsed.TotalSeconds -lt 120) {
+              if (-not (Get-Process -Id $main -ErrorAction SilentlyContinue)) { Write-Host "exe exited early"; break }
+              try {
+                $h = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:7863/api/health" -TimeoutSec 5
+                if ($h.StatusCode -eq 200) { $ok = $true; break }
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            # The crash came right after the API answered, so look again a little later.
+            if ($ok) { Start-Sleep -Seconds 10 }
+            $alive = [bool](Get-Process -Id $main -ErrorAction SilentlyContinue)
+            Write-Host "Quodeq.exe processes:"
+            Get-CimInstance Win32_Process -Filter "Name='Quodeq.exe'" |
+              ForEach-Object { Write-Host "  $($_.ProcessId) parent=$($_.ParentProcessId) $($_.CommandLine)" }
+          } finally {
+            Get-CimInstance Win32_Process -Filter "Name='Quodeq.exe'" |
+              ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          }
+          if (-not $ok) { throw "exe started without a console did not serve /api/health within 120s" }
+          if (-not $alive) { throw "exe started without a console exited after its API came up" }
+          Write-Host "Packaged exe stayed up without a console ($([int]$sw.Elapsed.TotalSeconds)s)"
+
       - name: Upload zip as workflow artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
