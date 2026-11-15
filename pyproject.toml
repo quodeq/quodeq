@@ -189,6 +189,13 @@ source-exclude = [
     "src/quodeq/ui/node_modules",
     "src/quodeq/ui/.mypy_cache",
     "**/.DS_Store",
+    # The UI's tests (~0.8 MB compressed) are not needed to rebuild the app,
+    # and the Python tests are not in the tarball either.
+    "src/quodeq/ui/src/**/__tests__",
+    "src/quodeq/ui/src/**/*.test.js",
+    "src/quodeq/ui/src/**/*.test.jsx",
+    "src/quodeq/ui/src/**/*.test.mjs",
+    "src/quodeq/ui/src/**/*.snap",
 ]
 
 [[tool.mypy.overrides]]
