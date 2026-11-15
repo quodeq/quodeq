@@ -15,7 +15,6 @@ import json
 import logging
 import os
 import shutil
-import signal
 import sys
 import tempfile
 import urllib.parse
@@ -27,7 +26,8 @@ import webview
 
 from quodeq.config.services_env import cancel_escalation_window_s
 from quodeq.shared.api_session import session_headers
-from quodeq.shared.constants import LOCALHOST, PLATFORM_LINUX, PLATFORM_WIN32, SCHEME_HTTP, SCHEME_HTTPS
+from quodeq.shared.constants import LOCALHOST, PLATFORM_LINUX, SCHEME_HTTP, SCHEME_HTTPS
+from quodeq.shared.process_stop import stop_process
 
 _logger = logging.getLogger(__name__)
 
@@ -170,8 +170,7 @@ def _stream_to(url: str | urllib.request.Request, target: Path) -> None:
 def kill_api(pid: int) -> None:
     """Terminate the Flask API process."""
     try:
-        sig = signal.SIGTERM if sys.platform != PLATFORM_WIN32 else signal.CTRL_BREAK_EVENT
-        os.kill(pid, sig)
+        stop_process(pid)
     except (OSError, ProcessLookupError) as exc:
         _logger.debug("action API process already gone or not killable: %s", exc)
 
