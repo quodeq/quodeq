@@ -5,11 +5,11 @@ import json
 import logging
 import os
 import subprocess
-import sys
 import threading
 from pathlib import Path
 
 from quodeq.shared.agy_home import mcp_register_overrides
+from quodeq.shared.frozen import MCP_ASSISTANT, mcp_server_cmd
 from quodeq.shared.mcp import codex_mcp_override
 from quodeq.shared.win_launch import launch_argv
 
@@ -23,18 +23,13 @@ _lock = threading.Lock()
 
 def _server_argv(server_args: list[str]) -> list[str]:
     """The full argv that launches the assistant MCP server."""
-    return [sys.executable, *_server_module_args(server_args)]
-
-
-def _server_module_args(server_args: list[str]) -> list[str]:
-    """The interpreter arguments that launch the server, without the interpreter."""
-    return [*_SERVER_MODULE, *server_args]
+    return mcp_server_cmd(MCP_ASSISTANT, _SERVER_MODULE, server_args)
 
 
 def write_mcp_config(server_args: list[str], path: Path, *, tools: tuple[str, ...] | None = None) -> None:
     """Write an MCP config file declaring the assistant server at ``path``."""
-    payload = {"mcpServers": {_SERVER_NAME: {
-        "command": sys.executable, "args": _server_module_args(server_args)}}}
+    argv = _server_argv(server_args)
+    payload = {"mcpServers": {_SERVER_NAME: {"command": argv[0], "args": argv[1:]}}}
     if tools is not None:
         payload["mcpServers"][_SERVER_NAME]["tools"] = list(tools)
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -50,7 +45,7 @@ def codex_mcp_config_arg(server_args: list[str]) -> str:
     would clobber each other's per-session args and a finished turn would remove
     the server out from under a still-running one.
     """
-    return codex_mcp_override(_SERVER_NAME, _server_module_args(server_args))
+    return codex_mcp_override(_SERVER_NAME, _server_argv(server_args))
 
 
 def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True) -> None:

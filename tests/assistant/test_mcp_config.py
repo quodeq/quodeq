@@ -64,3 +64,47 @@ def test_register_cli_mcp_wraps_subprocess_failure(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _boom)
     with pytest.raises(RuntimeError, match="Could not register"):
         register_cli_mcp("claude", [])
+
+
+# The desktop bundle's sys.executable is Quodeq itself, so `-m <module>` would
+# reach the dashboard CLI; every path must use the private flag there.
+_SERVER_ARGS = ["--db-path", "/x/a.db", "--session-id", "s1"]
+_BUNDLE_ARGV = [sys.executable, "--_mcp_assistant", *_SERVER_ARGS]
+
+
+@pytest.fixture
+def frozen(monkeypatch):
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+
+
+def test_write_mcp_config_frozen_uses_the_private_flag(tmp_path, frozen):
+    path = tmp_path / "mcp.json"
+    write_mcp_config(_SERVER_ARGS, path)
+    server = json.loads(path.read_text())["mcpServers"]["quodeq-assistant"]
+    assert [server["command"], *server["args"]] == _BUNDLE_ARGV
+
+
+def test_codex_mcp_config_arg_frozen_uses_the_private_flag(frozen):
+    import tomllib
+    arg = mcp_config.codex_mcp_config_arg(_SERVER_ARGS)
+    server = tomllib.loads(arg)["mcp_servers"]["quodeq-assistant"]
+    assert [server["command"], *server["args"]] == _BUNDLE_ARGV
+
+
+def _registered_cmd(monkeypatch) -> list[str]:
+    calls = []
+    monkeypatch.setattr(mcp_config.subprocess, "run", lambda cmd, **_kw: calls.append(cmd))
+    register_cli_mcp("codex", _SERVER_ARGS)
+    return calls[-1]
+
+
+def test_register_cli_mcp_frozen_uses_the_private_flag(monkeypatch, frozen):
+    cmd = _registered_cmd(monkeypatch)
+    assert cmd[cmd.index("--") + 1:] == _BUNDLE_ARGV
+
+
+def test_register_cli_mcp_from_source_runs_the_module(monkeypatch):
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+    cmd = _registered_cmd(monkeypatch)
+    assert cmd[cmd.index("--") + 1:] == [
+        sys.executable, "-m", "quodeq.assistant.mcp.server", *_SERVER_ARGS]

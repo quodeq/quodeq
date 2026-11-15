@@ -171,3 +171,86 @@ class TestReleaseAll:
             registry.release_all()
             registry.release_all()
         mock_run.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Findings server command inside the desktop bundle
+# ---------------------------------------------------------------------------
+
+_BUNDLE_FLAG = "--_mcp_findings"
+
+
+def _frozen(value: bool = True):
+    import sys
+
+    return patch.object(sys, "frozen", value, create=True)
+
+
+def _providers(cfg: dict):
+    return patch("quodeq.analysis._command._get_provider_configs", return_value=cfg)
+
+
+class TestFindingsServerCommandWhenFrozen:
+    """The bundle's executable is Quodeq, not Python: every spawn path must
+    use the private flag instead of a script path or ``-m``."""
+
+    def setup_method(self):
+        DEFAULT_CLI_MCP_REGISTRY.clear()
+
+    def _registered_argv(self, tmp_path, frozen: bool) -> list[str]:
+        config = AnalysisConfig(jsonl_file=tmp_path / "findings.jsonl")
+        with _frozen(frozen), _providers({"mycli": {"type": "cli"}}), \
+             patch("quodeq.analysis._command.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            register_cli_mcp("mycli", config)
+        register_cmd = mock_run.call_args_list[-1].args[0]
+        return register_cmd[register_cmd.index("--") + 1:]
+
+    def test_cli_register_uses_the_private_flag(self, tmp_path):
+        import sys
+
+        argv = self._registered_argv(tmp_path, frozen=True)
+        assert argv[:3] == [sys.executable, _BUNDLE_FLAG, str((tmp_path / "findings.jsonl").resolve())]
+        assert not any(a.endswith("findings_server.py") for a in argv)
+
+    def test_cli_register_from_source_runs_the_script(self, tmp_path):
+        import sys
+
+        argv = self._registered_argv(tmp_path, frozen=False)
+        assert argv[0] == sys.executable
+        assert argv[1].endswith("findings_server.py")
+        assert argv[2] == str((tmp_path / "findings.jsonl").resolve())
+
+    def test_config_file_uses_the_private_flag(self, tmp_path):
+        import json
+        import sys
+
+        from quodeq.analysis.subprocess import build_ai_cmd
+
+        jsonl = tmp_path / "findings.jsonl"
+        config = AnalysisConfig(ai_cmd="claude", jsonl_file=jsonl)
+        with _frozen(), _providers({"claude": {"type": "cli", "cmd": "claude"}}):
+            _, mcp_path = build_ai_cmd("Analyze", config)
+        try:
+            server = json.loads(mcp_path.read_text())["mcpServers"]["findings"]
+        finally:
+            mcp_path.unlink(missing_ok=True)
+        assert server["command"] == sys.executable
+        assert server["args"][:2] == [_BUNDLE_FLAG, str(jsonl.resolve())]
+
+    def test_codex_override_uses_the_private_flag(self, tmp_path):
+        import sys
+        import tomllib
+
+        from quodeq.analysis.subprocess import build_ai_cmd
+
+        jsonl = tmp_path / "findings.jsonl"
+        config = AnalysisConfig(ai_cmd="codex", jsonl_file=jsonl)
+        cfg = {"codex": {"type": "cli", "cmd": "codex", "mcp_style": "config-arg"}}
+        with _frozen(), _providers(cfg):
+            args, _ = build_ai_cmd("Analyze", config)
+        override = next(a for a in args if str(a).startswith("mcp_servers.findings="))
+        server = tomllib.loads(override)["mcp_servers"]["findings"]
+        assert server["command"] == sys.executable
+        assert server["args"][:2] == [_BUNDLE_FLAG, str(jsonl.resolve())]
+        assert "-m" not in server["args"]
