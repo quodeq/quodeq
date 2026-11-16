@@ -7,11 +7,13 @@ from quodeq.core.constants import PLATFORM_WIN32  # noqa: F401
 
 # sys.platform values for cross-platform branches.
 PLATFORM_DARWIN = "darwin"
+PLATFORM_LINUX = "linux"
 
 # platform.system() values -- a different vocabulary from sys.platform
 # ("Darwin"/"Linux" vs "darwin"/"win32").
 SYSTEM_DARWIN = "Darwin"
 SYSTEM_LINUX = "Linux"
+SYSTEM_WINDOWS = "Windows"
 MACHINE_ARM64 = "arm64"  # platform.machine() on Apple silicon (Homebrew prefix, native tooling picks)
 
 # URL schemes the app's fetchers and SSRF guards allow.

@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import stat
 import sys
+import threading
 import time
 
 import pytest
@@ -53,13 +54,55 @@ def _pid(seen: list[str], key: str) -> int:
     return int(next(s for s in seen if s.startswith(key + "=")).split("=")[1])
 
 
+class _DeadlineOnCue(threading.Thread):
+    """The deadline timer, fired by the test's cue instead of the clock."""
+
+    def __init__(self, cue: threading.Event, function, args) -> None:
+        super().__init__(daemon=True)
+        self._cue, self._function, self._args = cue, function, args
+        self._cancelled = False
+
+    def run(self) -> None:
+        self._cue.wait()
+        if not self._cancelled:
+            self._function(*self._args)
+
+    def cancel(self) -> None:
+        self._cancelled = True
+        self._cue.set()
+
+
+class _CuedThreading:
+    """``threading`` as git_stream sees it, with the deadline timer on *cue*."""
+
+    def __init__(self, cue: threading.Event) -> None:
+        self._cue = cue
+
+    def Timer(self, _interval, function, args):  # noqa: N802 - mirrors threading.Timer
+        return _DeadlineOnCue(self._cue, function, args)
+
+    def __getattr__(self, name: str):
+        return getattr(threading, name)
+
+
 def test_grandchild_holding_stderr_cannot_hang_the_deadline(tmp_path, monkeypatch):
+    # The deadline fires once the grandchild is known to exist. On the clock
+    # it could fire before a slow interpreter start had spawned it.
     _install(tmp_path, monkeypatch, _GRANDCHILD)
     seen: list[str] = []
-    started = time.monotonic()
-    result = run_git_streaming(["clone"], timeout=1, env=_ENV, on_line=seen.append)
+    grandchild_up = threading.Event()
+    deadline_at: list[float] = []
+
+    def on_line(line: str) -> None:
+        seen.append(line)
+        if line.startswith("child="):
+            deadline_at.append(time.monotonic())
+            grandchild_up.set()
+
+    monkeypatch.setattr(git_stream, "threading", _CuedThreading(grandchild_up))
+    result = run_git_streaming(["clone"], timeout=1, env=_ENV, on_line=on_line)
     assert result == (False, "git command timed out")
-    assert time.monotonic() - started < 4
+    assert time.monotonic() - deadline_at[0] < 3
     assert _gone(_pid(seen, "child"))
 
 

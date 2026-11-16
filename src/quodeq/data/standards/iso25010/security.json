@@ -14,6 +14,7 @@
           "cwe": [
             798
           ],
+          "check": "hardcoded-secrets",
           "severity": "critical"
         },
         {

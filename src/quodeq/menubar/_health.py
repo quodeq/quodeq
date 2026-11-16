@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from quodeq.shared.api_session import session_headers
 from quodeq.shared.constants import CMD_DISCOVERY_TIMEOUT_S
 
 _HEALTH_TIMEOUT = 1.0
@@ -93,8 +94,10 @@ def health_check(port: int) -> bool:
 def is_evaluating(port: int) -> bool:
     """Check if any evaluation job is currently running."""
     try:
-        url = f"{_LOCAL_BASE_URL}:{port}{_API_EVALUATIONS_PATH}?limit=1&status=running"
-        with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
+        base_url = f"{_LOCAL_BASE_URL}:{port}"
+        req = urllib.request.Request(
+            f"{base_url}{_API_EVALUATIONS_PATH}?limit=1&status=running", headers=session_headers(base_url))
+        with urllib.request.urlopen(req, timeout=_HEALTH_TIMEOUT) as r:
             return any(j.get("status") == _JOB_STATUS_RUNNING for j in json.loads(r.read()))
     except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):
         return False

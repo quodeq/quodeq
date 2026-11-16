@@ -43,11 +43,15 @@ class _FakeStream:
         return False
 
 
+_PUBLIC_IP = "93.184.215.14"
+
+
 @pytest.fixture()
 def no_ssrf(monkeypatch):
     # behavior tests must not resolve DNS; the SSRF path is tested separately
     # below with IP literals (which never hit the network)
     monkeypatch.setattr(_web_tools, "url_safety_error", lambda url, **kw: None)
+    monkeypatch.setattr(_web_tools, "resolve_addresses", lambda host: (_PUBLIC_IP,))
 
 
 def _fake_stream(resp):
@@ -66,7 +70,7 @@ def test_fetch_url_rejects_private_addresses():
 
 def test_fetch_url_returns_redirect_without_following(no_ssrf, monkeypatch):
     resp = _FakeStreamResponse(status=302, headers={"location": "https://other.example/x"})
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     out = _web_tools._fetch_url("https://example.com/a")
     assert out["redirect_to"] == "https://other.example/x"
     assert "text" not in out
@@ -75,7 +79,7 @@ def test_fetch_url_returns_redirect_without_following(no_ssrf, monkeypatch):
 def test_fetch_url_extracts_text_and_strips_script(no_ssrf, monkeypatch):
     html = b"<html><head><title>T</title></head><body><script>evil()</script><p>Hello <b>world</b></p></body></html>"
     resp = _FakeStreamResponse(headers={"content-type": "text/html; charset=utf-8"}, body=html)
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     out = _web_tools._fetch_url("https://example.com/a")
     assert "Hello world" in out["text"]
     assert "evil" not in out["text"]
@@ -84,7 +88,7 @@ def test_fetch_url_extracts_text_and_strips_script(no_ssrf, monkeypatch):
 def test_fetch_url_truncates_long_text(no_ssrf, monkeypatch):
     body = b"<html><body><p>" + b"a" * 20_000 + b"</p></body></html>"
     resp = _FakeStreamResponse(headers={"content-type": "text/html"}, body=body)
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     out = _web_tools._fetch_url("https://example.com/a")
     assert out["truncated"] is True
     assert len(out["text"]) <= _web_tools._MAX_TEXT_CHARS
@@ -92,7 +96,7 @@ def test_fetch_url_truncates_long_text(no_ssrf, monkeypatch):
 
 def test_fetch_url_http_status_error(no_ssrf, monkeypatch):
     resp = _FakeStreamResponse(status=404)
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     with pytest.raises(ToolError, match="404"):
         _web_tools._fetch_url("https://example.com/missing")
 
@@ -100,14 +104,14 @@ def test_fetch_url_http_status_error(no_ssrf, monkeypatch):
 def test_fetch_url_network_error_is_tool_error(no_ssrf, monkeypatch):
     def boom(method, url, **kwargs):
         raise httpx.ConnectError("refused")
-    monkeypatch.setattr(httpx, "stream", boom)
+    monkeypatch.setattr(_web_tools, "_open_stream", boom)
     with pytest.raises(ToolError, match="refused"):
         _web_tools._fetch_url("https://example.com/a")
 
 
 def test_fetch_url_rejects_binary_content(no_ssrf, monkeypatch):
     resp = _FakeStreamResponse(headers={"content-type": "image/png"}, body=b"\x89PNG")
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     with pytest.raises(ToolError, match="content type"):
         _web_tools._fetch_url("https://example.com/logo.png")
 
@@ -118,7 +122,7 @@ def test_fetch_url_survives_unknown_charset(no_ssrf, monkeypatch):
     resp = _FakeStreamResponse(
         headers={"content-type": "text/html; charset=zlib_codec"},
         body=b"<p>hi</p>", encoding="zlib_codec")
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     out = _web_tools._fetch_url("https://example.com/a")
     assert "hi" in out["text"]
 
@@ -128,7 +132,7 @@ def test_fetch_url_content_type_case_insensitive(no_ssrf, monkeypatch):
     resp = _FakeStreamResponse(
         headers={"content-type": "Text/HTML; charset=utf-8"},
         body=b"<p>Hello <b>world</b></p>")
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     out = _web_tools._fetch_url("https://example.com/a")
     assert "Hello world" in out["text"]
 
@@ -137,13 +141,13 @@ def test_fetch_url_honors_declared_charset(no_ssrf, monkeypatch):
     resp = _FakeStreamResponse(
         headers={"content-type": "text/plain; charset=iso-8859-1"},
         body=b"caf\xe9", encoding="iso-8859-1")
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     assert _web_tools._fetch_url("https://example.com/a")["text"] == "café"
 
 
 def test_fetch_url_redirect_without_location_header(no_ssrf, monkeypatch):
     resp = _FakeStreamResponse(status=301, headers={})
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     out = _web_tools._fetch_url("https://example.com/a")
     assert out["redirect_to"] == ""
     assert "text" not in out
@@ -159,7 +163,7 @@ def test_fetch_url_byte_cap_sets_truncated(no_ssrf, monkeypatch):
     # so truncated must be True even though the text itself is short
     body = b"<br>" * (3 * 1024 * 1024 // 4)
     resp = _FakeStreamResponse(headers={"content-type": "text/html"}, body=body)
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     out = _web_tools._fetch_url("https://example.com/a")
     assert out["truncated"] is True
     assert len(out["text"]) <= _web_tools._MAX_TEXT_CHARS
@@ -184,7 +188,7 @@ def test_fetch_url_deadline_fires_on_slow_drip(no_ssrf, monkeypatch):
     # wedge the turn thread past the budget
     resp = _FakeStreamResponse(headers={"content-type": "text/html"},
                                chunks=[b"a", b"b", b"c"])
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     monkeypatch.setattr(_web_tools, "time", _FakeClock())
     with pytest.raises(ToolError, match="time budget"):
         _web_tools._fetch_url("https://example.com/slow")
@@ -195,7 +199,7 @@ def test_fetch_url_keeps_trailing_text_near_bare_ampersand(no_ssrf, monkeypatch)
     # after a bare & and silently drops it
     resp = _FakeStreamResponse(headers={"content-type": "text/html"},
                                body=b"<p>Hello</p>ends with &am")
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     out = _web_tools._fetch_url("https://example.com/a")
     assert "ends with" in out["text"]
 
@@ -206,7 +210,7 @@ def test_fetch_url_invalid_url_is_tool_error(no_ssrf, monkeypatch):
     def boom(method, url, **kwargs):
         raise httpx.InvalidURL("Invalid non-printable ASCII character in URL")
 
-    monkeypatch.setattr(httpx, "stream", boom)
+    monkeypatch.setattr(_web_tools, "_open_stream", boom)
     with pytest.raises(ToolError, match="could not fetch"):
         _web_tools._fetch_url("https://example.com/\tweird")
 
@@ -218,6 +222,42 @@ def test_fetch_url_binary_content_rejected_before_body_read(no_ssrf, monkeypatch
         raise AssertionError("body must not be read for binary content")
 
     resp.iter_bytes = explode
-    monkeypatch.setattr(httpx, "stream", _fake_stream(resp))
+    monkeypatch.setattr(_web_tools, "_open_stream", _fake_stream(resp))
     with pytest.raises(ToolError, match="content type"):
         _web_tools._fetch_url("https://example.com/logo.png")
+
+
+def _recording_stream(calls, resp=None):
+    def fake(method, url, **kwargs):
+        calls.append((url, kwargs))
+        return _FakeStream(resp or _FakeStreamResponse(headers={"content-type": "text/plain"}, body=b"ok"))
+    return fake
+
+
+def test_fetch_url_refuses_a_rebinding_answer(no_ssrf, monkeypatch):
+    # The first lookup (url_safety_error) passed; the answer used to connect
+    # is judged on its own, so a host that rebinds to loopback is refused.
+    monkeypatch.setattr(_web_tools, "resolve_addresses", lambda host: ("127.0.0.1",))
+    calls = []
+    monkeypatch.setattr(_web_tools, "_open_stream", _recording_stream(calls))
+    with pytest.raises(ToolError):
+        _web_tools._fetch_url("https://rebind.example.com/a")
+    assert calls == []
+
+
+def test_fetch_url_connects_to_the_judged_address(no_ssrf, monkeypatch):
+    calls = []
+    monkeypatch.setattr(_web_tools, "_open_stream", _recording_stream(calls))
+    _web_tools._fetch_url("https://example.com:8443/a?b=1")
+    url, kwargs = calls[0]
+    assert str(url) == f"https://{_PUBLIC_IP}:8443/a?b=1"
+    assert kwargs["headers"]["Host"] == "example.com:8443"
+    assert kwargs["extensions"] == {"sni_hostname": "example.com"}
+
+
+def test_fetch_url_pins_ipv6_answers_in_brackets(no_ssrf, monkeypatch):
+    monkeypatch.setattr(_web_tools, "resolve_addresses", lambda host: ("2606:2800::1",))
+    calls = []
+    monkeypatch.setattr(_web_tools, "_open_stream", _recording_stream(calls))
+    _web_tools._fetch_url("https://example.com/a")
+    assert str(calls[0][0]) == "https://[2606:2800::1]/a"

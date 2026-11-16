@@ -70,7 +70,7 @@ def test_non_scout_providers_honours_injected_env(monkeypatch):
     monkeypatch.setenv("QUODEQ_NON_SCOUT_PROVIDERS", "claude")
     assert analysis_env.non_scout_providers(
         env={"QUODEQ_NON_SCOUT_PROVIDERS": " codex , claude "}) == ("codex", "claude")
-    assert analysis_env.non_scout_providers(env={}) == ("codex", "gemini")
+    assert analysis_env.non_scout_providers(env={}) == ("codex", "gemini", "agy")
 
 
 def test_subagent_model_override_prefers_the_service_variable(monkeypatch):

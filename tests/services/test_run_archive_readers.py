@@ -37,7 +37,7 @@ def test_publishing_an_archived_run_carries_its_event_log_and_evidence(tmp_path)
     evidence = (run / _EVIDENCE).read_bytes()  # CRLF on Windows: compare the bytes the run holds
     archive_run(run)
     dest = tmp_path / "clone" / _RUN
-    copy_run(run, dest)
+    copy_run(run, dest, with_snippets=True)  # byte for byte: the opt-in leaves the logs as they are
     with tarfile.open(dest / "archive.tar.gz", "r:gz") as tar:
         assert tar.extractfile("events.jsonl").read() == events
         assert tar.extractfile(_EVIDENCE).read() == evidence

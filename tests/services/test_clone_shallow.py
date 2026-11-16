@@ -159,7 +159,7 @@ def _argv_with(resolved, url: str, tmp_path) -> list[str]:
     return run_mock.call_args[0][0]
 
 
-def test_https_clone_pins_every_resolved_address_before_the_subcommand(tmp_path) -> None:
+def test_https_clone_pins_every_resolved_address_before_the_subcommand(tmp_path, argv_as_written) -> None:
     argv = _argv_with(("140.82.121.3", "2606:50c0:8000::153"), "https://github.com/acme/repo.git", tmp_path)
 
     assert argv[:3] == ["git", "-c", "http.curloptResolve=github.com:443:140.82.121.3,2606:50c0:8000::153"]
@@ -172,7 +172,7 @@ def test_pin_uses_the_port_in_the_url(tmp_path) -> None:
     assert argv[2] == "http.curloptResolve=git.example:8080:140.82.121.3"
 
 
-def test_scp_form_remote_is_not_pinned(tmp_path) -> None:
+def test_scp_form_remote_is_not_pinned(tmp_path, argv_as_written) -> None:
     with patch("quodeq.services._fs_clone.resolve_addresses") as resolve, \
          patch("quodeq.data.fs.repo_clone.subprocess.run") as run_mock:
         run_git_clone("git@github.com:acme/repo.git", tmp_path / "dest", shallow_months=0)

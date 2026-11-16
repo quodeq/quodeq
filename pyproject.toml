@@ -1,6 +1,6 @@
 [project]
 name = "quodeq"
-version = "1.15.2"
+version = "1.16.0"
 description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
 license = "MIT"
@@ -51,12 +51,19 @@ Issues = "https://github.com/quodeq/quodeq/issues"
 
 [dependency-groups]
 dev = [
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
     "pytest-xdist==3.8.0",
-    "ruff==0.17.1",
+    "ruff==0.17.3",
     "vulture==2.16",
+]
+# Desktop bundle toolchain (packaging/macos, packaging/windows). Kept out of
+# `dev` so a plain `uv sync` stays lean, but locked in uv.lock so the DMG and
+# Windows zip are built by a reviewed PyInstaller, not whatever PyPI serves
+# on release day.
+desktop = [
+    "pyinstaller==6.22.3",
 ]
 
 [project.scripts]
@@ -182,6 +189,13 @@ source-exclude = [
     "src/quodeq/ui/node_modules",
     "src/quodeq/ui/.mypy_cache",
     "**/.DS_Store",
+    # The UI's tests (~0.8 MB compressed) are not needed to rebuild the app,
+    # and the Python tests are not in the tarball either.
+    "src/quodeq/ui/src/**/__tests__",
+    "src/quodeq/ui/src/**/*.test.js",
+    "src/quodeq/ui/src/**/*.test.jsx",
+    "src/quodeq/ui/src/**/*.test.mjs",
+    "src/quodeq/ui/src/**/*.snap",
 ]
 
 [[tool.mypy.overrides]]

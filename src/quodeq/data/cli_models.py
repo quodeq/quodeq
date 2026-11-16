@@ -14,24 +14,28 @@ import json
 import logging
 import os
 import queue
-import shutil
 import subprocess
 import tempfile
 import threading
 import time
 
+from quodeq.shared.win_launch import find_program, launch_argv
 
-def run_cli_models_command(client_id: str, *, timeout_s: float) -> str:
-    """Run ``<client_id> /models`` and return its stdout, or "" on any failure.
+
+def run_cli_models_command(
+    client_id: str, *, timeout_s: float, args: tuple[str, ...] = ("/models",),
+) -> str:
+    """Run ``<client_id> <args>`` (``/models`` by default; agy's is ``models``)
+    and return its stdout, or "" on any failure.
 
     "" covers: the binary is not installed, it times out, it exits non-zero,
     or the process cannot be started at all.
     """
-    if not shutil.which(client_id):
+    if not find_program(client_id):
         return ""
     try:
         result = subprocess.run(
-            [client_id, "/models"],
+            launch_argv([client_id, *args]),
             capture_output=True,
             text=True, encoding="utf-8",
             timeout=timeout_s,
@@ -86,7 +90,7 @@ class _JsonLinesSession:
         self._deadline = deadline
         self._lines: queue.Queue[str | None] = queue.Queue()
         self._process = subprocess.Popen(
-            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            launch_argv(argv, env), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding="utf-8", env=env, cwd=tempfile.gettempdir(),
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == _OS_NAME_NT else 0,
         )
@@ -223,7 +227,7 @@ def fetch_cli_model_catalog(client_id: str, *, env: dict[str, str], timeout_s: f
     answers with something that is not a model list.
     """
     argv_tail, read = _CATALOG_READERS[client_id]
-    executable = shutil.which(client_id)
+    executable = find_program(client_id)
     if not executable:
         raise CatalogUnavailable("the CLI is not installed")
     try:

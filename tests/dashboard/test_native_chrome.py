@@ -57,17 +57,13 @@ class TestWindowCreation:
 
 
 class TestUaMarkerNoDrift:
-    def test_marker_matches_security_module(self):
-        from quodeq.api import security
-        assert ww.WEBVIEW_UA_MARKER == security._WEBVIEW_UA_MARKER
-
     def test_user_agent_carries_marker(self):
         assert ww.WEBVIEW_UA_MARKER in ww.webview_user_agent()
 
-    def test_token_prefix_matches_security_module(self):
-        from quodeq.api import security
+    def test_token_prefix_is_the_one_the_api_reads(self):
         from quodeq.dashboard import _webview_window_about
-        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX == security._WEBVIEW_TOKEN_UA_PREFIX
+        from quodeq.shared.api_session import WEBVIEW_TOKEN_UA_PREFIX
+        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX == WEBVIEW_TOKEN_UA_PREFIX
 
     def test_user_agent_without_token_has_no_token_prefix(self):
         """The marker alone is not the security check — no token, no token prefix."""
@@ -105,7 +101,6 @@ class TestMainThreadsWebviewToken:
              patch.object(ww, "make_on_reload", return_value=MagicMock()), \
              patch.object(ww, "make_on_loaded", return_value=MagicMock()), \
              patch.object(ww, "make_on_closing", return_value=MagicMock()), \
-             patch.object(ww, "non_macos_menu", return_value=None), \
              patch.object(ww, "quodeq_dir", return_value=tmp_path), \
              patch.object(ww, "webview") as mock_webview:
             ww.main()
@@ -180,3 +175,42 @@ class TestSetTitlebarTheme:
              patch.object(chrome, "set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("purple")
         mac.assert_not_called()
+
+
+def test_window_starts_hidden_except_on_linux():
+    # On GTK, show() runs show_all() then hide() for a hidden window, so the
+    # loaded handler's show() would keep a hidden window off screen.
+    kwargs_for = TestWindowCreation()._kwargs_for_platform
+    assert kwargs_for("linux")["hidden"] is False
+    assert kwargs_for("darwin")["hidden"] is True
+    assert kwargs_for("win32")["hidden"] is True
+
+
+class TestWindowIcon:
+    """On Windows the form icon must be quodeq's .ico, handed to webview.start.
+
+    pywebview's WinForms backend falls back to ExtractIconW(sys.executable),
+    which under a pip/pipx install is python.exe's icon.
+    """
+
+    def _start_kwargs(self, monkeypatch, tmp_path, platform):
+        monkeypatch.setattr(ww.sys, "platform", platform)
+        with patch.object(ww, "quodeq_dir", return_value=tmp_path), \
+             patch.object(ww, "record_window_pid", return_value=tmp_path / "pid"), \
+             patch.object(ww, "clear_window_pid"), \
+             patch.object(ww, "webview") as mock_webview:
+            ww._run_webview("", MagicMock(), 0)
+        return mock_webview.start.call_args.kwargs
+
+    def test_windows_passes_the_quodeq_ico(self, monkeypatch, tmp_path):
+        icon = self._start_kwargs(monkeypatch, tmp_path, "win32")["icon"]
+        assert icon is not None and icon.endswith("icon.ico")
+
+    def test_ico_resolves_to_a_bundled_file(self):
+        assert ww.icon_path(".ico") is not None
+
+    def test_other_platforms_pass_no_icon(self, monkeypatch, tmp_path):
+        assert self._start_kwargs(monkeypatch, tmp_path, "darwin")["icon"] is None
+
+    def test_icon_is_a_start_kwarg(self):
+        assert "icon" in inspect.signature(real_webview.start).parameters

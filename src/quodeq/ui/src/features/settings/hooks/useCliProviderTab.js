@@ -8,6 +8,7 @@ const MODEL_HINTS = {
   claude: tRich('settings.modelHintClaude'),
   codex: tRich('settings.modelHintCodex'),
   gemini: tRich('settings.modelHintGemini'),
+  agy: tRich('settings.modelHintAgy'),
   copilot: tRich('settings.modelHintCopilot'),
 };
 

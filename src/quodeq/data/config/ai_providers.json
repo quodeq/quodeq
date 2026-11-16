@@ -33,8 +33,13 @@
     "supports_turns": true,
     "effort_levels": ["low", "medium", "high", "xhigh", "max"],
     "effort_args": ["--effort", "{effort}"],
-    "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
-    "mcp_strict_args": ["--strict-mcp-config"],
+    "mcp_permission_args": ["--permission-mode", "dontAsk"],
+    "mcp_strict_args": ["--strict-mcp-config", "--setting-sources", "user"],
+    "env_passthrough_prefixes": ["ANTHROPIC_", "CLAUDE_"],
+    "env_passthrough_when": {
+      "CLAUDE_CODE_USE_BEDROCK": ["AWS_"],
+      "CLAUDE_CODE_USE_VERTEX": ["GOOGLE_", "CLOUD_ML_", "VERTEX_", "GCLOUD_"]
+    },
     "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
     "env_remove": ["CLAUDECODE"],
     "assistant": {
@@ -52,7 +57,7 @@
     "order": 2,
     "cmd": "codex",
     "cmd_subcommand": "exec",
-    "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
+    "base_args": "--json --dangerously-bypass-approvals-and-sandbox -c tools.web_search=false --skip-git-repo-check",
     "prompt_style": "positional",
     "mcp_style": "config-arg",
     "supports_tools": false,
@@ -61,9 +66,12 @@
     "effort_levels": ["low", "medium", "high", "xhigh", "max", "ultra"],
     "effort_args": ["-c", "model_reasoning_effort=\"{effort}\""],
     "mcp_permission_args": [],
+    "env_passthrough_prefixes": ["OPENAI_", "CODEX_API_KEY"],
     "env_set_if_missing": {},
     "env_remove": [],
     "requires_external_sandbox": true,
+    "analysis_sandbox": {"cli_home_env": "CODEX_HOME", "cli_home": ".quodeq/codex"},
+    "native_sandbox": true,
     "assistant": {
       "assistant_args": ["--json", "--dangerously-bypass-approvals-and-sandbox",
                          "--disable", "shell_tool", "-c", "tools.web_search=false",
@@ -84,6 +92,8 @@
     "mcp_style": "cli-register",
     "mcp_add_separator": false,
     "mcp_permission_args": ["--allowed-mcp-server-names", "quodeq-findings"],
+    "env_passthrough_prefixes": ["GEMINI_", "GOOGLE_"],
+    "analysis_sandbox": {"cli_home": ".gemini"},
     "supports_tools": false,
     "supports_budget": false,
     "supports_turns": false,
@@ -94,6 +104,54 @@
                          "--allowed-mcp-server-names", "quodeq-assistant"],
       "resume_style": "gemini-resume",
       "session_id_source": "preassign",
+      "system_prompt_style": "message-prefix"
+    }
+  },
+  "agy": {
+    "type": "cli",
+    "order": 3,
+    "cmd": "agy",
+    "cmd_subcommand": "",
+    "base_args": "--output-format stream-json --disable-slash-commands",
+    "prompt_style": "flag",
+    "prompt_flag": "-p",
+    "mcp_style": "cli-register",
+    "mcp_permission_args": [],
+    "session_settings": {
+      "flag": "--settings",
+      "settings": {
+        "permissions": {
+          "allow": ["mcp(quodeq-findings/*)", "read_file({repo})", "read_file({agy_brain})"],
+          "deny": ["write_file(/)", "command(*)", "read_url(*)", "execute_url(*)", "browser(*)"]
+        }
+      }
+    },
+    "isolated_cwd": true,
+    "repo_preamble": "Repository root: {root}\nResolve relative source paths against this root and read each file by its absolute path. Listing directories and shell commands are unavailable: take the files to review from get_next_files and skip any step that lists or globs the repo.\n\n",
+    "models_args": ["models"],
+    "effort_levels": ["low", "medium", "high", "xhigh", "max"],
+    "effort_args": ["--effort", "{effort}"],
+    "env_passthrough_prefixes": ["AGY_", "GEMINI_", "GOOGLE_"],
+    "analysis_sandbox": {"cli_home_env": "HOME", "cli_home": ".quodeq/agy",
+                         "readable_home_dirs": ["Library/Keychains"]},
+    "supports_tools": false,
+    "supports_budget": false,
+    "supports_turns": false,
+    "env_set_if_missing": {},
+    "env_remove": [],
+    "assistant": {
+      "assistant_args": ["--output-format", "stream-json", "--disable-slash-commands"],
+      "session_settings": {
+        "flag": "--settings",
+        "settings": {
+            "permissions": {
+            "allow": ["mcp(quodeq-assistant/*)", "read_file({agy_brain})"],
+            "deny": ["write_file(/)", "command(*)", "read_url(*)", "execute_url(*)", "browser(*)"]
+          }
+        }
+      },
+      "resume_style": "conversation-flag",
+      "session_id_source": "parse-jsonl",
       "system_prompt_style": "message-prefix"
     }
   },
@@ -113,6 +171,9 @@
     "mcp_server_tools": ["*"],
     "mcp_strict_args": [],
     "mcp_permission_args": ["--allow-tool", "findings"],
+    "isolated_cwd": true,
+    "repo_add_dir_flag": "--add-dir",
+    "repo_preamble": "Repository root: {root}\nResolve relative source paths against this root.\nUse view, glob and grep where instructions refer to Read, Glob and Grep. Shell tools are unavailable.\n\n",
     "assistant": {
       "assistant_args": ["--output-format", "json", "--stream", "on",
                          "--no-auto-update", "--no-custom-instructions", "--no-ask-user",

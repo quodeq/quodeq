@@ -1,0 +1,227 @@
+"""OS sandbox for agent CLIs whose own approvals/sandbox an analysis run bypasses.
+
+Codex cancels MCP tool calls under its own sandbox, so it runs with
+--dangerously-bypass-approvals-and-sandbox; Gemini's plan mode is overridden
+in folders it does not trust. Either way the CLI keeps tools a
+prompt-injected repo could steer, so it runs inside an OS sandbox Quodeq
+controls: writes only to this project's evaluations, the run's queue, the
+result cache, the CLI's own home and temp; no reads of file contents under
+the user's home except those, the analysed repo, the standards and what the
+CLI and the findings server need to run; no reads of the repo's own
+credential files (``core.secret_files``); and no connections to services on
+this machine (Quodeq's own API), except a local proxy.
+
+Quodeq's other state stays out of reach on purpose: other projects' clones
+and evidence, the assistant database and the settings of other projects.
+
+Under firejail (Linux where bubblewrap cannot start) the home stays readable
+but for the known secret stores and Quodeq's run dir; the run log says so.
+
+Where no OS sandbox works (Windows, a container, Linux without a usable
+bubblewrap or firejail) the scan still runs, as it did before the sandbox
+existed, with the limits that need none: the env allowlist and, for Codex,
+the dedicated home without account apps, plugins or the user's MCP
+servers. *require_sandbox* makes it fail instead.
+"""
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable
+
+from quodeq.analysis.codex_sandbox import (
+    native_args, native_sandbox_works, plain_read_only_args, probe_sample, profile_args,
+)
+from quodeq.analysis._config import AnalysisConfig
+from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.data.fs.project_standards import project_settings_file, settings_reports_root
+from quodeq.data.fs.secret_files import find_secret_files
+from quodeq.shared.codex_home import user_codex_auth_file
+from quodeq.shared.os_sandbox import (
+    SandboxUnavailable,
+    external_sandbox_prefix,
+    leaves_home_readable,
+    loopback_proxy_ports,
+    runtime_readable_dirs,
+)
+
+_warned_unsandboxed: set[str] = set()  # one warning per CLI per process, not per agent spawn
+_warned_weak_sandbox: set[str] = set()  # likewise, for the firejail fallback
+_warned_secrets_readable: set[tuple[str, Path]] = set()  # per CLI and repo
+_NAMED_SECRET_FILES = 3  # how many a warning names before "and N more"
+
+
+@dataclass(frozen=True)
+class SandboxPolicy:
+    """What a scan does where no OS sandbox works: warn on *log* and run
+    without one, or, with *require*, fail."""
+
+    require: bool = False
+    log: LogSink = field(default=NULL_LOG)
+
+
+def _project_dir(cfg: AnalysisConfig) -> Path | None:
+    """``<reports>/<project>`` for ``<project>/<run>/evidence/<dim>_evidence.jsonl``."""
+    if cfg.jsonl_file is None:
+        return None
+    return cfg.jsonl_file.resolve().parent.parent.parent
+
+
+def _run_writable_dirs(cfg: AnalysisConfig) -> list[Path]:
+    """Where the findings server writes: the project's evaluations (the run's
+    evidence and events, and the precedent reads of its earlier runs, whose
+    SQLite files need their -shm alongside), the queue and the cache."""
+    dirs: list[Path] = []
+    if (project := _project_dir(cfg)) is not None:
+        dirs.append(project)
+    if cfg.queue_path is not None:
+        dirs.append(cfg.queue_path.resolve().parent)
+    if cfg.cache_root is not None:
+        dirs.append(Path(cfg.cache_root).resolve())
+    return dirs
+
+
+def _settings_dir(cfg: AnalysisConfig) -> list[Path]:
+    """The dir of the standards settings the findings server reads (a scoped
+    child reads its parent project's)."""
+    project = _project_dir(cfg)
+    if project is None or not project.name:
+        return []
+    return [project_settings_file(settings_reports_root(), project.name, migrate=False).parent]
+
+
+def _readable_dirs(cfg: AnalysisConfig, work_dir: Path, binary: str) -> list[Path]:
+    dirs = [work_dir.resolve(), *runtime_readable_dirs(binary), *_settings_dir(cfg)]
+    if cfg.compiled_dir is not None:
+        # The standards root (compiled/'s parent) keys the findings cache.
+        compiled = Path(cfg.compiled_dir).resolve()
+        dirs += [compiled, compiled.parent]
+    return dirs
+
+
+def _cli_home(spec: dict, env: Mapping[str, str]) -> Path:
+    """The CLI's own state dir: from an env var Quodeq set (Codex's dedicated
+    home), else a path under the user's home."""
+    if (var := spec.get("cli_home_env")) and env.get(var):
+        return Path(env[var])
+    return Path.home() / spec["cli_home"]
+
+
+def analysis_sandbox_prefix(
+    cfg: AnalysisConfig, provider_cfg: dict, work_dir: Path, binary: str,
+    env: Mapping[str, str] | None = None, policy: SandboxPolicy = SandboxPolicy(),
+) -> tuple[list[str], Callable[[], None]]:
+    """The sandbox launcher prefix for this run's CLI, or ``([], no-op)`` when
+    the provider declares no ``analysis_sandbox`` or no sandbox works here.
+    *env* is the CLI's env.
+
+    Raises SandboxUnavailable instead of running unsandboxed when
+    ``policy.require`` is set.
+    """
+    spec = provider_cfg.get("analysis_sandbox")
+    if not spec:
+        return [], lambda: None
+    env = env or {}
+    cli_home = _cli_home(spec, env)
+    cli_home.mkdir(parents=True, exist_ok=True)
+    writable = [cli_home, *_run_writable_dirs(cfg)]
+    # Where the CLI keeps what it needs to sign in outside its own home (agy:
+    # its Google token sits in the macOS keychain, under ~/Library/Keychains).
+    readable = [*_readable_dirs(cfg, work_dir, binary),
+                *(Path.home() / d for d in spec.get("readable_home_dirs", ()))]
+    try:
+        prefix, cleanup = _sandbox_prefix(work_dir, env, writable, readable)
+        if leaves_home_readable(prefix) and binary not in _warned_weak_sandbox:
+            _warned_weak_sandbox.add(binary)
+            policy.log.warning(
+                f"Running {binary} under firejail, which confines less than bubblewrap. "
+                "Writes are blocked, and so are reads of the usual credential folders in "
+                "your home and of Quodeq's session files, but other files under your home "
+                "stay readable. For the full sandbox, install bubblewrap and allow it "
+                "unprivileged user namespaces.")
+        return prefix, cleanup
+    except SandboxUnavailable as exc:
+        if policy.require:
+            raise
+        if binary not in _warned_unsandboxed:
+            _warned_unsandboxed.add(binary)
+            policy.log.warning(f"Running {binary} without an OS sandbox: {exc} "
+                               f"{_readable_secrets_note(work_dir)}"
+                               "Set QUODEQ_REQUIRE_SANDBOX=1 to fail instead.")
+        return [], lambda: None
+
+
+def _readable_secrets_note(work_dir: Path) -> str:
+    """A sentence naming the repo's credential files an unconfined CLI can
+    read, or nothing when it has none."""
+    found = sorted({f.relative_to(work_dir).as_posix() for f in find_secret_files(work_dir)
+                    if f.is_relative_to(work_dir)})
+    if not found:
+        return ""
+    named = ", ".join(found[:_NAMED_SECRET_FILES])
+    more = f" and {len(found) - _NAMED_SECRET_FILES} more" if len(found) > _NAMED_SECRET_FILES else ""
+    return f"It can read the repo's credential files: {named}{more}. "
+
+
+def _sandbox_prefix(
+    work_dir: Path, env: Mapping[str, str], writable: list[Path], readable: list[Path],
+) -> tuple[list[str], Callable[[], None]]:
+    # The dedicated Codex home links to the user's login, which Codex rewrites
+    # on refresh: that one file, not the user's ~/.codex.
+    auth = user_codex_auth_file(env)
+    return external_sandbox_prefix(
+        writable_dirs=[str(d) for d in writable],
+        writable_files=[str(auth)] if auth else [],
+        readable_home_dirs=[str(d) for d in readable],
+        readonly_dirs=[str(work_dir.resolve())],
+        loopback_open_ports=loopback_proxy_ports(env),
+        unreadable_files=[str(f) for f in find_secret_files(work_dir)],
+    )
+
+
+def confine_cli(
+    cfg: AnalysisConfig, provider_cfg: dict, work_dir: Path, args: list[str],
+    env: Mapping[str, str], policy: SandboxPolicy = SandboxPolicy(),
+) -> tuple[list[str], Callable[[], None]]:
+    """*args* confined as well as this machine allows: the CLI's own sandbox
+    where the provider has one that works here (Codex), else the OS sandbox,
+    else, unless *policy* requires one, unconfined."""
+    if provider_cfg.get("native_sandbox") and (
+            native := _native_args(cfg, work_dir, args, env, policy.log)):
+        return native, lambda: None
+    prefix, cleanup = analysis_sandbox_prefix(cfg, provider_cfg, work_dir, args[0], env, policy)
+    return [*prefix, *args], cleanup
+
+
+def _native_args(
+    cfg: AnalysisConfig, work_dir: Path, args: list[str], env: Mapping[str, str], log: LogSink,
+) -> list[str] | None:
+    project = _project_dir(cfg)
+    if project is None:
+        return None
+    repo = work_dir.resolve()
+    sample = probe_sample(repo)
+    readable = [repo, project, *runtime_readable_dirs("rg")]
+    evidence = cfg.jsonl_file.resolve().parent if cfg.jsonl_file else project
+    # Home unreadable where Codex can enforce it, else plain read-only (no
+    # writes, no network), which still beats the OS fallbacks on Windows:
+    # with the repo's credential files denied if it can, else without.
+    unreadable = [p.resolve() for p in find_secret_files(work_dir)]
+    profiles = [profile_args(Path.home().resolve(), readable, unreadable),
+                plain_read_only_args(unreadable), plain_read_only_args()]
+    for profile in map(list, dict.fromkeys(map(tuple, profiles))):
+        if native_sandbox_works(args[0], profile, evidence, sample, env, repo):
+            if unreadable and profile == profiles[-1]:
+                _warn_secrets_readable(args[0], work_dir, log)
+            return native_args(args, profile)
+    return None
+
+
+def _warn_secrets_readable(binary: str, work_dir: Path, log: LogSink) -> None:
+    if (binary, work_dir) in _warned_secrets_readable:
+        return
+    _warned_secrets_readable.add((binary, work_dir))
+    log.warning("Codex's sandbox blocks writes and network here but cannot hide single "
+                "files (on Windows that needs its elevated sandbox backend). "
+                f"{_readable_secrets_note(work_dir)}")

@@ -33,6 +33,7 @@ EXEMPT = {
     "shared_config_put": "starts the connect job, which fills the team listing (its own cache), not the local projects",
     "refresh_project": "moves a project's working copy to a newer commit; the project set and its listing are unchanged",
     "shared_refresh": "starts the refresh job, which updates the team listing (its own cache), not the local projects",
+    "shared_snippets_put": "stores whether a publish carries code snippets; no project is added, removed or changed",
 }
 
 MUTATION_ROUTES = [

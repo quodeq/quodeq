@@ -40,6 +40,7 @@ _DEFAULT_DIMENSION_WEIGHTS: dict[str, float] = {
     "clean-architecture": 1.0,
     "domain-driven-design": 1.0,
     "accessibility": 1.0,
+    "ai-integration-security": 1.0,
 }
 
 # Slider ranges: validation enforces them and the editor reads them (ranges_to_dict).

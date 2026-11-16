@@ -117,11 +117,22 @@ def test_set_app_icon_logs_windows_taskbar_failure(monkeypatch) -> None:
     assert any("windows taskbar icon not set" in m for m in messages)
 
 
+def test_set_app_icon_on_linux_hands_over_the_png(monkeypatch) -> None:
+    calls: list[str | None] = []
+    monkeypatch.setattr(about.sys, "platform", "linux")
+    monkeypatch.setattr(about, "set_linux_app_identity", calls.append)
+    about.set_app_icon()
+    assert calls and calls[0] is not None and calls[0].endswith("icon.png")
+    assert os.path.isfile(calls[0])
+
+
 def test_kill_api_logs_when_process_is_already_gone(monkeypatch) -> None:
     def _raise(*_a, **_k):
         raise ProcessLookupError(3, "No such process")
 
-    monkeypatch.setattr(native_ops.os, "kill", _raise)
+    # Patch the helper kill_api calls, not os.kill: on Windows the helper asks
+    # with a console event first and treats a vanished process as done.
+    monkeypatch.setattr(native_ops, "stop_process", _raise)
     with patch.object(native_ops._logger, "debug") as debug:
         native_ops.kill_api(424242)  # signature: kill_api(pid: int) -> None
     assert debug.called
@@ -205,7 +216,7 @@ def test_send_token_logs_on_write_failure() -> None:
     window_proc = MagicMock()
     window_proc.stdin.write.side_effect = ValueError("bad token")
     with patch.object(webview_token._logger, "debug") as debug:
-        webview_token._send_token(window_proc)  # signature: (window_proc: subprocess.Popen | None) -> None
+        webview_token._send_token(window_proc, "tok")
     assert debug.called
     assert "webview token handoff failed" in debug.call_args.args[0]
 
@@ -218,7 +229,7 @@ def test_send_token_logs_close_failure_instead_of_swallowing_it(exc) -> None:
     window_proc = MagicMock()
     window_proc.stdin.close.side_effect = exc
     with patch.object(webview_token._logger, "debug") as debug:
-        webview_token._send_token(window_proc)  # must not raise
+        webview_token._send_token(window_proc, "tok")  # must not raise
     assert debug.called
     assert "stdin close failed" in debug.call_args.args[0]
 

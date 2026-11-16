@@ -23,6 +23,7 @@ import quodeq
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.utils import IS_WIN32
+from quodeq.shared.win_launch import find_program, program_argv
 from quodeq.update.channel import TOOL_BREW, detect_tool, upgrade_argv
 
 _logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ def unsupported_reason(
     package_dir = _package_dir(package_file)
     if not _INSTALL_DIRS.intersection(package_dir.parts):
         return REASON_EDITABLE
-    if which(argv[0]) is None:
+    if find_program(argv[0], which=which) is None:
         return REASON_NO_TOOL
     if detect_tool(resolve_env(env), package_file) is None:  # the pip fallback
         if _externally_managed():
@@ -139,7 +140,7 @@ def _tail(stdout: str | bytes | None, stderr: str | bytes | None) -> str:
 def _run_upgrade(argv: list[str], run: Callable[..., subprocess.CompletedProcess]) -> None:
     try:
         result = run(
-            argv, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            program_argv(argv), capture_output=True, text=True, encoding="utf-8", errors="replace",
             stdin=subprocess.DEVNULL, timeout=_UPGRADE_TIMEOUT_S, check=False,
         )
     except subprocess.TimeoutExpired as exc:

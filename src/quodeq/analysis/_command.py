@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import logging
 import subprocess
-import sys
 import threading
 from pathlib import Path
 
@@ -30,15 +29,26 @@ from quodeq.analysis._mcp_arg_builders import (
 from quodeq.analysis.provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.config.process_env import process_environment_copy
 from quodeq.config.provider import Provider, ProviderType
+from quodeq.shared.agy_home import agy_brain_dir, dedicated_agy_home, mcp_register_overrides
+from quodeq.shared.child_env import allowlisted_env
+from quodeq.shared.cli_session_settings import session_settings_args
+from quodeq.shared.codex_home import dedicated_codex_home, provider_env_keys
 from quodeq.shared.copilot import build_copilot_env
+from quodeq.shared.frozen import MCP_FINDINGS, mcp_server_cmd
 from quodeq.shared.log_sink import LoggerSink
+from quodeq.shared.win_launch import launch_argv
 
 _log = logging.getLogger(__name__)
 
 
+# Dropped even when an allowlisted prefix (QUODEQ_) would let them through.
 _SENSITIVE_ENV_KEYS = frozenset({
-    "QUODEQ_API_KEY", "DATABASE_URL", "SECRET_KEY",
+    "QUODEQ_API_KEY", "QUODEQ_WEBVIEW_TOKEN", "DATABASE_URL", "SECRET_KEY",
 })
+# The findings server the CLI spawns reads QUODEQ_* settings and, from a
+# source checkout, needs PYTHONPATH to import quodeq.
+_ANALYSIS_ENV_PREFIXES = ("QUODEQ_",)
+_ANALYSIS_ENV_KEYS = ("PYTHONPATH",)
 
 _MCP_SUBPACKAGE = "mcp"  # this module's mcp/ subpackage, holding findings_server.py
 _MCP_SUBCOMMAND = "mcp"  # the provider CLI's `<cmd> mcp add/remove` namespace
@@ -62,14 +72,15 @@ def build_ai_cmd(
         config, provider_cfg, work_dir, log=LoggerSink(_log),
     )
     args.extend(mcp_args)
-    if cmd == Provider.COPILOT and work_dir is not None:
+    args.extend(session_settings_args(
+        provider_cfg.get("session_settings"), {"repo": work_dir, "agy_brain": agy_brain_dir()}))
+    if provider_cfg.get("isolated_cwd") and work_dir is not None:
+        # The CLI runs outside the repo (subprocess._run_cli_analysis), so
+        # the prompt names the root its relative paths resolve against.
         root = str(work_dir.resolve())
-        args.extend(["--add-dir", root])
-        prompt = (
-            f"Repository root: {root}\nResolve relative source paths against this root.\n"
-            "Use view, glob and grep where instructions refer to Read, Glob and Grep. "
-            "Shell tools are unavailable.\n\n" + prompt
-        )
+        if add_dir := provider_cfg.get("repo_add_dir_flag"):
+            args.extend([add_dir, root])
+        prompt = provider_cfg.get("repo_preamble", "").replace("{root}", root) + prompt
     args.extend(build_model_budget_prompt_args(prompt, config, provider_cfg, model, log=LoggerSink(_log)))
 
     return args, mcp_config_path
@@ -99,7 +110,7 @@ def _build_mcp_server_args(
     one server — the per-agent file cap doesn't apply.
     """
     mcp_script = str(Path(__file__).resolve().parent / _MCP_SUBPACKAGE / "findings_server.py")
-    mcp_args = [sys.executable, mcp_script, str(config.jsonl_file.resolve())]
+    mcp_args = mcp_server_cmd(MCP_FINDINGS, [mcp_script], [str(config.jsonl_file.resolve())])
     if config.compiled_dir and config.dimension:
         mcp_args.extend([
             "--compiled-dir", str(config.compiled_dir.resolve()),
@@ -154,7 +165,8 @@ class CliMcpRegistry:
 
     def __init__(self) -> None:
         self._cli_mcp_lock = threading.Lock()
-        self._cli_mcp_registered: set[str] = set()  # tracks (cmd, name) pairs
+        # "cmd:name" -> (cmd, name, ai_cmd_path), what release_all needs to undo it
+        self._cli_mcp_registered: dict[str, tuple[str, str, str | None]] = {}
 
     def ensure_registered(
         self, cmd: str, config: AnalysisConfig, work_dir: Path | None = None,
@@ -180,18 +192,34 @@ class CliMcpRegistry:
             provider_cfg = _get_provider_configs().get(cmd, {})
             # Codex/Copilot use "-- cmd args", Gemini uses "cmd args" (no separator)
             use_separator = provider_cfg.get("mcp_add_separator", True)
-            register_cmd = [cmd_binary(cmd, config.ai_cmd_path), _MCP_SUBCOMMAND, "add", name]
+            register_env, add_flags = mcp_register_overrides(cmd)
+            register_cmd = [cmd_binary(cmd, config.ai_cmd_path), _MCP_SUBCOMMAND, "add", *add_flags, name]
             if use_separator:
                 register_cmd.append("--")
             register_cmd.extend(mcp_args)
             _log.debug("Registering MCP server '%s': %s", name, " ".join(register_cmd))
             try:
-                subprocess.run(register_cmd, check=True, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S)
-                self._cli_mcp_registered.add(key)
+                subprocess.run(launch_argv(register_cmd, register_env), check=True, capture_output=True,
+                               timeout=_MCP_REGISTER_TIMEOUT_S, env=register_env)
+                self._cli_mcp_registered[key] = (cmd, name, config.ai_cmd_path)
                 return name
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
                 _log.warning("Failed to register MCP server '%s' via '%s mcp add': %s", name, cmd, exc)
                 return None
+
+    def release_all(self) -> None:
+        """Remove every server this registry registered (``<cmd> mcp remove``).
+
+        ``mcp add`` writes a persistent entry in the CLI's own settings, so a
+        run calls this when it ends; otherwise the entry outlives the scan.
+        Runs with the same cwd and default scope as the add, so it removes
+        exactly what the add wrote. Idempotent.
+        """
+        with self._cli_mcp_lock:
+            registered = list(self._cli_mcp_registered.values())
+            self._cli_mcp_registered.clear()
+            for cmd, name, ai_cmd_path in registered:
+                _unregister_cli_mcp(cmd, name, ai_cmd_path)
 
     def clear(self) -> None:
         """Drop every cached registration (test isolation)."""
@@ -223,25 +251,44 @@ def _unregister_cli_mcp(cmd: str, name: str, ai_cmd_path: str | None = None) -> 
     """Remove the findings MCP server via `<cmd> mcp remove`."""
     if not _is_known_cli_provider(cmd):
         return
+    env = mcp_register_overrides(cmd)[0]
     try:
         subprocess.run(
-            [cmd_binary(cmd, ai_cmd_path), _MCP_SUBCOMMAND, "remove", name],
-            check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S,
+            launch_argv([cmd_binary(cmd, ai_cmd_path), _MCP_SUBCOMMAND, "remove", name], env),
+            check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S, env=env,
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+    except (subprocess.TimeoutExpired, OSError) as exc:
         _log.warning("Failed to unregister MCP server '%s' via '%s mcp remove': %s", name, cmd, exc)
 
 
 def build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
-    """Build the subprocess environment, removing sensitive variables.
+    """Build the subprocess environment from an allowlist.
 
-    The ``None`` default resolves to the process environment in the config
-    layer; an injected ``{}`` means "no variables set".
+    The agent CLI runs tool calls a prompt-injected repo can steer, so it gets
+    only runtime keys, QUODEQ_* settings and its provider's own auth prefixes
+    (``env_passthrough_prefixes``), never the server's other secrets. The
+    ``None`` default resolves to the process environment in the config layer;
+    an injected ``{}`` means "no variables set".
     """
-    env = process_environment_copy(env)
+    source = process_environment_copy(env)
+    provider_cfg = _get_provider_configs().get(ai_cmd or "", {})
+    api_key_env = provider_cfg.get("api_key_env")
+    # A provider backend switched on in the env brings its own credentials
+    # (Claude on Bedrock: AWS_*; on Vertex: GOOGLE_*, CLOUD_ML_*).
+    switched = [prefix for switch, prefixes in provider_cfg.get("env_passthrough_when", {}).items()
+                if source.get(switch) for prefix in prefixes]
+    # Codex custom model providers (Azure, ...) name their own key variable.
+    codex_keys = provider_env_keys(source) if ai_cmd == Provider.CODEX else []
+    env = allowlisted_env(
+        source, keys=(*_ANALYSIS_ENV_KEYS, *([api_key_env] if api_key_env else []), *codex_keys),
+        prefixes=(*_ANALYSIS_ENV_PREFIXES, *provider_cfg.get("env_passthrough_prefixes", ()), *switched),
+    )
     for key in _SENSITIVE_ENV_KEYS:
         env.pop(key, None)
-    provider_cfg = _get_provider_configs().get(ai_cmd or "", {})
+    if ai_cmd == Provider.CODEX:
+        env["CODEX_HOME"] = str(dedicated_codex_home(source))
+    if ai_cmd == Provider.AGY:
+        env["HOME"] = str(dedicated_agy_home(source))
     for key, val in provider_cfg.get("env_set_if_missing", {}).items():
         if key not in env:
             env[key] = val

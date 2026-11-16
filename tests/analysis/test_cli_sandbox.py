@@ -1,0 +1,108 @@
+"""Analysis CLIs with bypassed approvals run inside the OS sandbox."""
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from quodeq.analysis.subprocess import AnalysisConfig, SandboxPolicy, analysis_sandbox_prefix
+from quodeq.shared import os_sandbox
+
+
+def test_provider_without_sandbox_spec_runs_unwrapped(tmp_path):
+    prefix, cleanup = analysis_sandbox_prefix(AnalysisConfig(), {}, tmp_path, "claude")
+    assert prefix == []
+    cleanup()
+
+
+@pytest.fixture
+def captured(tmp_path, monkeypatch):
+    seen: dict = {}
+
+    def fake_prefix(**kwargs):
+        seen.update(kwargs)
+        return ["sandbox-exec", "-f", "p.sb"], lambda: None
+
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.external_sandbox_prefix", fake_prefix)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path / "evals"))
+    return seen
+
+
+def _run(tmp_path, spec, env=None):
+    cfg = AnalysisConfig(jsonl_file=tmp_path / "evals" / "proj" / "run1" / "evidence" / "q_evidence.jsonl")
+    repo = tmp_path / "repo"
+    repo.mkdir(exist_ok=True)
+    return analysis_sandbox_prefix(cfg, {"analysis_sandbox": spec}, repo, "codex", env)
+
+
+def test_sandboxed_provider_gets_repo_readable_and_project_writable(tmp_path, captured):
+    prefix, _ = _run(tmp_path, {"cli_home": ".codex-test"})
+    assert prefix[0] == "sandbox-exec"
+    assert str((tmp_path / "repo").resolve()) in captured["readable_home_dirs"]
+    assert str((tmp_path / "evals" / "proj").resolve()) in captured["writable_dirs"]
+    assert str(tmp_path / ".codex-test") in captured["writable_dirs"]
+
+
+def test_quodeq_state_outside_the_project_is_not_granted(tmp_path, captured):
+    _run(tmp_path, {"cli_home": ".codex-test"})
+    granted = [*captured["writable_dirs"], *captured["readable_home_dirs"]]
+    assert str(tmp_path / ".quodeq") not in granted
+    assert str((tmp_path / "evals").resolve()) not in granted
+
+
+def test_cli_home_follows_the_env_var_quodeq_set(tmp_path, captured):
+    home = tmp_path / "state" / "codex"
+    _run(tmp_path, {"cli_home_env": "CODEX_HOME", "cli_home": ".codex-test"}, {"CODEX_HOME": str(home)})
+    assert str(home) in captured["writable_dirs"]
+    assert str(tmp_path / ".codex-test") not in captured["writable_dirs"]
+
+
+def test_loopback_is_blocked_except_a_local_proxy(tmp_path, captured):
+    _run(tmp_path, {"cli_home": ".x"}, {"HTTPS_PROXY": "http://127.0.0.1:3128"})
+    assert captured["loopback_open_ports"] == [3128]
+
+
+def test_runs_without_a_sandbox_where_none_works(tmp_path, monkeypatch):
+    # Windows, a container, Linux without a usable bwrap: the scan still runs.
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    prefix, cleanup = analysis_sandbox_prefix(
+        AnalysisConfig(), {"analysis_sandbox": {"cli_home": ".x"}}, tmp_path, "codex")
+    assert prefix == []
+    cleanup()
+
+
+def test_require_sandbox_fails_where_none_works(tmp_path, monkeypatch):
+    monkeypatch.setattr(os_sandbox.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    with pytest.raises(os_sandbox.SandboxUnavailable):
+        analysis_sandbox_prefix(
+            AnalysisConfig(), {"analysis_sandbox": {"cli_home": ".x"}}, tmp_path, "codex",
+            policy=SandboxPolicy(require=True))
+
+
+def _firejail_run(tmp_path, monkeypatch, launcher: str) -> list[str]:
+    """The warnings of two agent spawns confined by *launcher*."""
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox.external_sandbox_prefix",
+                        lambda **kw: ([launcher, "--quiet"], lambda: None))
+    monkeypatch.setattr("quodeq.analysis._cli_sandbox._warned_weak_sandbox", set())
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    messages: list[str] = []
+    policy = SandboxPolicy(log=SimpleNamespace(warning=messages.append))
+    for _ in range(2):
+        prefix, _cleanup = analysis_sandbox_prefix(
+            AnalysisConfig(), {"analysis_sandbox": {"cli_home": ".x"}}, tmp_path, "gemini", policy=policy)
+        assert prefix[0] == launcher
+    return messages
+
+
+def test_the_run_says_once_that_firejail_confines_less(tmp_path, monkeypatch):
+    messages = _firejail_run(tmp_path, monkeypatch, "firejail")
+    assert len(messages) == 1
+    assert "gemini" in messages[0] and "firejail" in messages[0]
+    assert "stay readable" in messages[0]
+    assert "—" not in messages[0]
+
+
+def test_a_full_sandbox_says_nothing(tmp_path, monkeypatch):
+    assert _firejail_run(tmp_path, monkeypatch, "bwrap") == []

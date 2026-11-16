@@ -165,6 +165,8 @@ def main(argv: list[str] | None = None) -> int:
     configure_stdio_utf8()
     _install_broken_pipe_guard()
     load_env_file(default_paths())
+    from quodeq.shared.state_permissions import secure_state_dir
+    secure_state_dir()  # evaluated code lives here: never readable by other accounts
     parser = build_parser()
     args, remaining = parser.parse_known_args(argv)
     command = getattr(args, "handler_command", None) or args.command

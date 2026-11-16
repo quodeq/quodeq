@@ -70,6 +70,7 @@ const CODE_KEYS = {
   TOO_LARGE: 'apiError.tooLarge',
   RATE_LIMITED: 'apiError.rateLimited',
   UNAUTHORIZED: 'apiError.unauthorized',
+  SESSION_REQUIRED: 'apiError.sessionRequired',
   FORBIDDEN: 'apiError.forbidden',
 
   // Evaluations repository: connect (PUT /api/shared/config), refresh,

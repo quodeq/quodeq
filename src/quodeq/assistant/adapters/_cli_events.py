@@ -50,10 +50,13 @@ def _absorb_complete_message(event_texts: list[str], etype: str | None, state: _
     state.texts.extend(event_texts)
     # complete events echo text the drawer already shows (an
     # `assistant`/`result` message repeats streamed deltas). Gate on
-    # content, not presence, so a differing echo still emits.
+    # content, not presence, so a differing echo still emits. agy's `result`
+    # repeats only its last message, the tail of deltas that also carried
+    # the text written before its tool calls.
     joined = "".join(event_texts)
     is_echo = (joined == state.partial_buf
-               or (etype == EVENT_TYPE_RESULT and joined == state.last_full))
+               or (etype == EVENT_TYPE_RESULT
+                   and (joined == state.last_full or (joined and state.partial_buf.endswith(joined)))))
     if not is_echo:
         for t in event_texts:
             state.emit({"type": FrameType.TOKEN, "text": t})

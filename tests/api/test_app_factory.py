@@ -126,7 +126,8 @@ class TestMainFunction:
         mock_run = MagicMock()
         with patch("quodeq.api.app.create_app") as mock_create, \
              patch("quodeq.api.app.signal.signal") as mock_signal, \
-             patch("quodeq.api.app._start_background_work"):
+             patch("quodeq.api.app._start_background_work"), \
+             patch("quodeq.api.app.publish_session") as mock_publish:
             mock_app = MagicMock()
             mock_app.run = mock_run
             mock_app.config = {"_provider": MagicMock()}
@@ -135,6 +136,8 @@ class TestMainFunction:
             main(env={"QUODEQ_API_KEY": "test-key"})
             mock_create.assert_called_once()
             mock_run.assert_called_once()
+            mock_publish.assert_called_once()
+            assert mock_publish.call_args.args[0] is mock_app
             assert mock_signal.called, "main() should install signal handlers"
 
     def test_main_forwards_env_to_configure_stdio_utf8(self, monkeypatch):
@@ -145,6 +148,7 @@ class TestMainFunction:
         with patch("quodeq.api.app.create_app") as mock_create, \
              patch("quodeq.api.app.signal.signal"), \
              patch("quodeq.api.app._start_background_work"), \
+             patch("quodeq.api.app.publish_session"), \
              patch("quodeq.shared.text_io.configure_stdio_utf8", mock_configure):
             mock_app = MagicMock()
             mock_app.config = {"_provider": MagicMock()}

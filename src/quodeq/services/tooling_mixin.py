@@ -40,7 +40,7 @@ _DEFAULT_CLIENT_SORT_ORDER = 50  # ai_providers.json's "order" default when unse
 _REQUIRES_PLATFORM_DARWIN_ARM64 = "darwin-arm64"  # ai_providers.json's "requires_platform" value
 
 
-_DEFAULT_CLIENT_IDS = frozenset({Provider.CLAUDE, Provider.CODEX, Provider.GEMINI, Provider.COPILOT})
+_DEFAULT_CLIENT_IDS = frozenset({Provider.CLAUDE, Provider.CODEX, Provider.GEMINI, Provider.AGY, Provider.COPILOT})
 
 
 def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
@@ -81,7 +81,8 @@ class FsToolingMixin(FsBrowseMixin):
     # (comma-separated list of client IDs, e.g. "claude,codex").
     _CLI_CANDIDATES = [
         {"id": "claude", "label": "Claude"}, {"id": "codex", "label": "Codex"},
-        {"id": "gemini", "label": "Gemini"}, {"id": "copilot", "label": "GitHub Copilot"},
+        {"id": "gemini", "label": "Gemini"}, {"id": "agy", "label": "Antigravity"},
+        {"id": "copilot", "label": "GitHub Copilot"},
     ]
 
     def __init__(self) -> None:
@@ -157,7 +158,8 @@ class FsToolingMixin(FsBrowseMixin):
             return {"models": []}
         if client_id == Provider.COPILOT:
             return fetch_copilot_models(env=env)
-        output = run_cli_models_command(client_id, timeout_s=_CLI_MODEL_TIMEOUT_S)
+        models_args = tuple(get_provider_configs().get(client_id, {}).get("models_args", ("/models",)))
+        output = run_cli_models_command(client_id, timeout_s=_CLI_MODEL_TIMEOUT_S, args=models_args)
         models = []
         for line in output.splitlines():
             token = line.strip().split()[0] if line.strip() else ""

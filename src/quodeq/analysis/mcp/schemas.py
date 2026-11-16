@@ -77,3 +77,10 @@ MARK_FILE_DONE_SCHEMA = {
     },
     "required": ["file", "status"],
 }
+
+GET_STANDARDS_NAME = "get_standards"
+GET_STANDARDS_DESC = (
+    "Return the standards checklist for this evaluation: every requirement ID "
+    "you may cite in report_finding. Call this once, before analysing any file."
+)
+GET_STANDARDS_SCHEMA: dict = {"type": "object", "properties": {}}

@@ -72,11 +72,11 @@ class TestModelReachesSubprocess:
     """The --model flag in the spawned CLI must match the configured ai_model."""
 
     @pytest.mark.parametrize("configured", [_MODEL_HAIKU, _MODEL_SONNET, _MODEL_OPUS])
-    def test_configured_model_reaches_cli(self, tmp_path: Path, configured: str) -> None:
+    def test_configured_model_reaches_cli(self, tmp_path: Path, configured: str, installed_cli) -> None:
         args = _capture_popen_args(tmp_path, configured)
         assert _extract_model_from_args(args) == configured
 
-    def test_no_model_flag_when_none(self, tmp_path: Path) -> None:
+    def test_no_model_flag_when_none(self, tmp_path: Path, installed_cli) -> None:
         """When ai_model is None and no env, --model should not appear (uses provider default)."""
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("AI_MODEL", None)

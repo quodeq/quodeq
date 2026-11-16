@@ -42,6 +42,11 @@ export default [
           MethodDefinition: false,
         },
         enableFixer: false,
+        // Since eslint-plugin-jsdoc 65.3.5, publicOnly also reaches the members
+        // of exported object literals. One-line members (the query-key
+        // factories in api/queryKeys.js) name what they return; a block above
+        // each would repeat the name.
+        minLineCount: 2,
       }],
     },
   },

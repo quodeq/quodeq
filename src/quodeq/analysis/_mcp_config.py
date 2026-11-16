@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import tempfile
 from pathlib import Path
 
 from quodeq.analysis._config import AgentParams
+from quodeq.shared.frozen import MCP_FINDINGS, mcp_server_cmd
 from quodeq.shared.mcp import codex_mcp_override
 
 _SERVER_NAME = "findings"
@@ -56,15 +56,15 @@ def create_mcp_config(
     """Create a temporary MCP config file pointing to the findings server."""
     ap = agent_params or AgentParams()
     mcp_script = str(Path(__file__).resolve().parent / "mcp" / "findings_server.py")
-    mcp_args = [
-        mcp_script, str(jsonl_file.resolve()),
+    argv = mcp_server_cmd(MCP_FINDINGS, [mcp_script], [
+        str(jsonl_file.resolve()),
         *_findings_server_args(compiled_dir, dimension, ap),
-    ]
+    ])
     config = {
         "mcpServers": {
             _SERVER_NAME: {
-                "command": sys.executable,
-                "args": mcp_args,
+                "command": argv[0],
+                "args": argv[1:],
             }
         }
     }
@@ -89,8 +89,8 @@ def codex_mcp_config_arg(
 ) -> str:
     """Return a Codex ``-c`` TOML override for the findings MCP server."""
     ap = agent_params or AgentParams()
-    args = [
-        *_SERVER_MODULE, str(jsonl_file.resolve()),
+    argv = mcp_server_cmd(MCP_FINDINGS, _SERVER_MODULE, [
+        str(jsonl_file.resolve()),
         *_findings_server_args(compiled_dir, dimension, ap),
-    ]
-    return codex_mcp_override(_SERVER_NAME, args)
+    ])
+    return codex_mcp_override(_SERVER_NAME, argv)

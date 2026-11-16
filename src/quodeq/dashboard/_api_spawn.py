@@ -9,6 +9,7 @@ from pathlib import Path
 from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.logging import log_warning
+from quodeq.shared.process_kill import kill_proc_tree
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_evaluations_dir
 
 from quodeq.dashboard._api_health_check import wait_for_action_api
@@ -77,7 +78,16 @@ def spawn_action_api(
 
 
 def _terminate_then_kill(process: subprocess.Popen) -> None:
-    """SIGTERM *process*; if it outlives the grace period, SIGKILL and reap it."""
+    """SIGTERM *process*; if it outlives the grace period, SIGKILL and reap it.
+
+    Windows: kill the whole tree instead. A venv's python.exe is a launcher
+    that runs the real interpreter as its child, so TerminateProcess on the
+    launcher alone would orphan the API, still holding the port.
+    """
+    if _IS_WIN32:
+        kill_proc_tree(process)
+        process.wait(timeout=TERMINATE_GRACE_SECONDS)
+        return
     process.terminate()
     try:
         process.wait(timeout=TERMINATE_GRACE_SECONDS)
@@ -96,7 +106,7 @@ def spawn_and_wait(
     """Spawn the action API on *port* and wait for it to become healthy."""
     process = spawn_action_api(port, pid_file_path, default_host, api_config)
     try:
-        wait_for_action_api(base_url)
+        wait_for_action_api(base_url, alive=lambda: process.poll() is None)
     except (subprocess.TimeoutExpired, OSError, TimeoutError):
         if process.poll() is None:
             _terminate_then_kill(process)

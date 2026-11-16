@@ -25,6 +25,7 @@ const INSTALL_INSTRUCTIONS = {
   claude: tRich('settings.installHintClaude'),
   codex: tRich('settings.installHintCodex'),
   gemini: tRich('settings.installHintGemini'),
+  agy: tRich('settings.installHintAgy'),
   copilot: tRich('settings.installHintCopilot'),
 };
 

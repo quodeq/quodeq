@@ -18,7 +18,7 @@ from quodeq.api._rate_limit import (
 from quodeq import __version__
 from quodeq.shared.instance_id import read_instance_id
 from quodeq.api.routes_registry import register_all_routes
-from quodeq.api.security import configure_security
+from quodeq.api.security import configure_security, publish_session
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
 from quodeq.services.scored_jobs_registry import ScoringClaims
@@ -284,8 +284,7 @@ def main(env: dict[str, str] | None = None) -> None:
     """Start the Flask development server using environment configuration."""
     from quodeq.shared.text_io import configure_stdio_utf8
     configure_stdio_utf8(env)
-    # SECURITY: API key read from environment. For hardened deployments,
-    # consider a secrets manager or platform keychain instead.
+    # SECURITY: API key from the environment; a hardened deployment wants a secrets manager.
     app = create_app(
         static_dist=get_static_dist(env),
         api_key=resolve_env(env).get("QUODEQ_API_KEY"),
@@ -293,6 +292,7 @@ def main(env: dict[str, str] | None = None) -> None:
     )
     _install_shutdown_handlers()
     _start_background_work(app, env)
+    publish_session(app, env)
     _serve(app, env)
 
 

@@ -18,3 +18,10 @@ class McpMethod(StrEnum):
     TOOLS_LIST = "tools/list"
     TOOLS_CALL = "tools/call"
     PING = "ping"
+
+
+# Per-tool ``_meta`` both servers attach in ``tools/list``. Antigravity's CLI
+# (agy) otherwise loads MCP tools on demand, reading each schema from a file
+# under its own home that a scan's permission rules may not let it read.
+# Other clients ignore unknown ``_meta`` keys, as the MCP spec allows.
+TOOL_META = {"antigravity/alwaysLoad": True}

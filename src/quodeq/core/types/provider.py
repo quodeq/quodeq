@@ -16,6 +16,7 @@ class Provider(StrEnum):
     CLAUDE = "claude"
     CODEX = "codex"
     GEMINI = "gemini"
+    AGY = "agy"  # Google's Antigravity CLI
     COPILOT = "copilot"
     OLLAMA = "ollama"
     LLAMACPP = "llamacpp"

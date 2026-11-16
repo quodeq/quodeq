@@ -36,12 +36,12 @@ from quodeq.services.shared_refresh_job import (
     start_refresh,
 )
 from quodeq.services.shared_repo import disconnect_shared_repo, last_synced_at, read_state
-from quodeq.services.shared_settings import read_settings
+from quodeq.services.shared_settings import read_settings, set_publish_snippets
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
 
 from ._url_body import required_url_or_error
-from .helpers import json_error
+from .helpers import json_error, json_object_or_error, jsonify_error
 from .routes_common import reports_dir, sync_block
 from .routes_shared_common import no_shared_repo_error
 
@@ -75,6 +75,8 @@ def shared_status() -> Response:
         {
             "configured": settings.url is not None,
             "url": settings.url,
+            # Whether a publish to this repository carries code snippets (opt-in).
+            "withSnippets": settings.with_snippets,
             "lastSynced": synced,
             "syncing": is_connect_running() or is_refresh_running() or is_pull_running(),
             # Reserved for sync-level failures; always present so the UI
@@ -192,7 +194,8 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
     url, access, error = _connected_access()
     if error is not None:
         return error
-    outcome = start_publish(project, url, evaluations_root=Path(reports_dir()), env=access.env)
+    outcome = start_publish(project, url, evaluations_root=Path(reports_dir()), env=access.env,
+                            with_snippets=read_settings().with_snippets)
     if outcome == PublishStartResult.ALREADY_RUNNING:
         return json_error("a publish is already running", HTTPStatus.CONFLICT, "PUBLISH_IN_PROGRESS")
     if outcome != PublishStartResult.STARTED:
@@ -204,6 +207,19 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
     return jsonify({"started": True}), HTTPStatus.ACCEPTED
 
 
+def shared_snippets_put() -> Response | tuple[Response, int]:
+    """Opt the connected shared repository in to (or out of) code snippets: ``{"withSnippets": bool}``."""
+    body = json_object_or_error(CODE_INVALID_INPUT)
+    if isinstance(body, tuple):
+        return jsonify_error(body)
+    enabled = body.get("withSnippets")
+    if not isinstance(enabled, bool):
+        return json_error("withSnippets must be true or false", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
+    if not set_publish_snippets(enabled, log=SHARED_LOG):
+        return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
+    return jsonify({"withSnippets": enabled})
+
+
 def register_shared_config_routes(app: Flask, provider: ActionProvider) -> None:
     """Bind the shared-repo status, config, refresh and publish routes."""
     app.get("/api/shared/status")(shared_status)
@@ -211,6 +227,7 @@ def register_shared_config_routes(app: Flask, provider: ActionProvider) -> None:
     app.delete("/api/shared/config", endpoint="shared_config_delete")(partial(shared_config_delete, provider))
 
     app.get("/api/shared/invite")(shared_invite)
+    app.put("/api/shared/snippets")(shared_snippets_put)
 
     @app.post("/api/shared/refresh")
     def shared_refresh() -> Response | tuple[Response, int]:

@@ -70,6 +70,13 @@
       "source": "WCAG 2.2 (W3C, 2023) and EN 301 549 v3.2.1 (ETSI, 2021)",
       "type": "wcag",
       "subtype": "2.2"
+    },
+    {
+      "id": "ai-integration-security",
+      "name": "AI Integration Security",
+      "weight": 1.0,
+      "source": "OWASP AISVS 1.0, OWASP Top 10 for LLM Applications 2025, MITRE CWE",
+      "type": "quodeq"
     }
   ]
 }

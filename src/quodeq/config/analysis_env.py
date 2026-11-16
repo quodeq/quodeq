@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from quodeq.shared import env_int
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.csv_values import split_csv
 
@@ -26,6 +27,12 @@ def failure_streak_override(env: Mapping[str, str] | None = None) -> int | None:
         return int(raw)
     except ValueError:
         return None
+
+
+def require_os_sandbox(env: Mapping[str, str] | None = None) -> bool:
+    """True when QUODEQ_REQUIRE_SANDBOX=1: a scan whose CLI cannot be put in an
+    OS sandbox fails instead of running with only the CLI's own limits."""
+    return resolve_env(env).get("QUODEQ_REQUIRE_SANDBOX") == ENV_TRUTHY
 
 
 def _digits_override(var: str, env: Mapping[str, str] | None) -> int | None:
@@ -105,7 +112,7 @@ MAX_STANDARDS_CHARS_DEFAULT = 50000  # full standards for models with large cont
 MCP_MAX_BATCH_DEFAULT = 1000
 AI_TOOLS_DEFAULT = "Glob,Grep,Read"
 BASE_AI_ARGS_DEFAULT = "--print --output-format stream-json --verbose"
-NON_SCOUT_PROVIDERS_DEFAULT = "codex,gemini"
+NON_SCOUT_PROVIDERS_DEFAULT = "codex,gemini,agy"
 AGENT_FAILURE_STREAK_DEFAULT = 5
 FAILURE_STREAK_THRESHOLD_DEFAULT = 5  # consecutive file_done errors that trip the dim breaker
 

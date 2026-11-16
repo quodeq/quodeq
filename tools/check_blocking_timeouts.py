@@ -52,7 +52,7 @@ ALLOWLIST: frozenset[str] = frozenset({
     "src/quodeq/data/copilot_models.py:153:subprocess-wait",
     # process.wait() right after process.kill(), in _terminate_then_kill's
     # TimeoutExpired branch (the post-SIGTERM wait carries a timeout).
-    "src/quodeq/dashboard/_api_spawn.py:86:subprocess-wait",
+    "src/quodeq/dashboard/_api_spawn.py:96:subprocess-wait",
     # openai.OpenAI(**_client_kwargs(...)): timeout always set by
     # _client_kwargs() (defaults to BATCH_TIMEOUT when none is passed in).
     "src/quodeq/llm_bridge/embeddings.py:88:http-no-timeout",

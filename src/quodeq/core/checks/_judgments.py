@@ -6,6 +6,8 @@ all. Those are exactly the fields that decide how a finding scores.
 """
 from __future__ import annotations
 
+import dataclasses
+
 from quodeq.core.checks.model import SourceLocation
 from quodeq.core.events.models import Judgment
 from quodeq.core.types.finding_type import FindingType
@@ -21,6 +23,14 @@ def violation(*, req: str, dimension: str, at: SourceLocation,
         practice_id=req, req=req, verdict=FindingType.VIOLATION, dimension=dimension,
         file=at.file, line=at.line, title=title, reason=reason,
         severity=SEVERITY, confidence=FULL_CONFIDENCE,  # a static fact is not a guess
+    )
+
+
+def critical(judgment: Judgment, *, snippet: str, violation_type: str) -> Judgment:
+    """*judgment* as a violation exploitable as written, such as a credential
+    in the repo. *snippet* must already be masked: it is stored as is."""
+    return dataclasses.replace(
+        judgment, severity=Severity.CRITICAL, snippet=snippet, violation_type=violation_type,
     )
 
 

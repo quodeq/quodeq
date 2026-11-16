@@ -5,11 +5,13 @@ import json
 import logging
 import os
 import subprocess
-import sys
 import threading
 from pathlib import Path
 
+from quodeq.shared.agy_home import mcp_register_overrides
+from quodeq.shared.frozen import MCP_ASSISTANT, mcp_server_cmd
 from quodeq.shared.mcp import codex_mcp_override
+from quodeq.shared.win_launch import launch_argv
 
 _logger = logging.getLogger(__name__)
 
@@ -21,18 +23,13 @@ _lock = threading.Lock()
 
 def _server_argv(server_args: list[str]) -> list[str]:
     """The full argv that launches the assistant MCP server."""
-    return [sys.executable, *_server_module_args(server_args)]
-
-
-def _server_module_args(server_args: list[str]) -> list[str]:
-    """The interpreter arguments that launch the server, without the interpreter."""
-    return [*_SERVER_MODULE, *server_args]
+    return mcp_server_cmd(MCP_ASSISTANT, _SERVER_MODULE, server_args)
 
 
 def write_mcp_config(server_args: list[str], path: Path, *, tools: tuple[str, ...] | None = None) -> None:
     """Write an MCP config file declaring the assistant server at ``path``."""
-    payload = {"mcpServers": {_SERVER_NAME: {
-        "command": sys.executable, "args": _server_module_args(server_args)}}}
+    argv = _server_argv(server_args)
+    payload = {"mcpServers": {_SERVER_NAME: {"command": argv[0], "args": argv[1:]}}}
     if tools is not None:
         payload["mcpServers"][_SERVER_NAME]["tools"] = list(tools)
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -48,7 +45,7 @@ def codex_mcp_config_arg(server_args: list[str]) -> str:
     would clobber each other's per-session args and a finished turn would remove
     the server out from under a still-running one.
     """
-    return codex_mcp_override(_SERVER_NAME, _server_module_args(server_args))
+    return codex_mcp_override(_SERVER_NAME, _server_argv(server_args))
 
 
 def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True) -> None:
@@ -61,12 +58,14 @@ def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True
     """
     with _lock:
         _unregister_locked(cmd)
-        register_cmd = [cmd, "mcp", "add", _SERVER_NAME]
+        register_env, add_flags = mcp_register_overrides(cmd)
+        register_cmd = [cmd, "mcp", "add", *add_flags, _SERVER_NAME]
         if separator:
             register_cmd.append("--")
         register_cmd.extend(_server_argv(server_args))
         try:
-            subprocess.run(register_cmd, check=True, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
+            subprocess.run(launch_argv(register_cmd, register_env), check=True, capture_output=True,
+                           timeout=_REGISTER_TIMEOUT_S, env=register_env)
         except (OSError, subprocess.SubprocessError) as exc:
             raise RuntimeError(f"Could not register the quodeq assistant MCP server with {cmd}: {exc}") from exc
 
@@ -74,8 +73,9 @@ def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True
 def _unregister_locked(cmd: str) -> None:
     """Remove the server from a CLI's registry. Caller must hold `_lock`."""
     try:
-        subprocess.run([cmd, "mcp", "remove", _SERVER_NAME],
-                       check=False, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
+        env = mcp_register_overrides(cmd)[0]
+        subprocess.run(launch_argv([cmd, "mcp", "remove", _SERVER_NAME], env),
+                       check=False, capture_output=True, timeout=_REGISTER_TIMEOUT_S, env=env)
     except (OSError, subprocess.SubprocessError) as exc:
         _logger.debug("MCP server unregister via %s failed: %s", cmd, exc)
 

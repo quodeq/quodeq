@@ -9,6 +9,8 @@ from the orchestrator's API branch, gated on web_enabled + LOCAL_PROVIDERS.
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from html.parser import HTMLParser
 from http import HTTPStatus
 from urllib.parse import parse_qs, urlparse
@@ -16,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.shared.ssrf import public_addresses, resolve_addresses
 from quodeq.shared.url_validation import url_safety_error
 from quodeq.core.utils.numbers import clamp
 
@@ -212,6 +215,37 @@ def _decode_fetch_body(body: bytes, encoding: str, content_type: str) -> str:
     return text
 
 
+@contextmanager
+def _open_stream(method: str, url: httpx.URL, **kwargs) -> Iterator[httpx.Response]:
+    """``httpx.stream`` with request *extensions*, which the top-level helper
+    does not accept (the pinned connection needs ``sni_hostname``)."""
+    extensions = kwargs.pop("extensions", None)
+    timeout = kwargs.pop("timeout")
+    follow_redirects = kwargs.pop("follow_redirects")
+    with httpx.Client(timeout=timeout, follow_redirects=follow_redirects) as client:
+        with client.stream(method, url, extensions=extensions, **kwargs) as resp:
+            yield resp
+
+
+def _pinned_target(url: str) -> tuple[httpx.URL, dict[str, str], dict[str, str]]:
+    """Resolve the host once, judge that answer, and aim the request at it.
+
+    url_safety_error resolves too, but httpx would resolve a third time when
+    connecting, and a rebinding host can answer that lookup with 127.0.0.1 or
+    169.254.169.254. Connecting to the judged IP closes the window; the Host
+    header and TLS SNI keep the original name, so virtual hosting and
+    certificate verification still check the name the model asked for.
+    """
+    target = httpx.URL(url)
+    hostname = target.raw_host.decode("ascii")
+    try:
+        addresses = public_addresses(hostname, resolve=resolve_addresses)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
+    headers = {"User-Agent": _USER_AGENT, "Host": target.netloc.decode("ascii")}
+    return target.copy_with(host=addresses[0]), headers, {"sni_hostname": hostname}
+
+
 def _fetch_url(url: str) -> dict:
     if not isinstance(url, str):
         raise ToolError("url must be a string")
@@ -219,7 +253,8 @@ def _fetch_url(url: str) -> dict:
     if unsafe:
         raise ToolError(unsafe)
     try:
-        with httpx.stream("GET", url, headers={"User-Agent": _USER_AGENT},
+        pinned, headers, extensions = _pinned_target(url)
+        with _open_stream("GET", pinned, headers=headers, extensions=extensions,
                           timeout=_TIMEOUT, follow_redirects=False) as resp:
             redirect = _fetch_url_redirect_payload(url, resp)
             if redirect is not None:

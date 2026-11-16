@@ -64,7 +64,7 @@ class TestCheckCliProvider:
             with pytest.raises(RuntimeError, match="dashboard Settings"):
                 _check_cli_provider("codex")
 
-    def test_valid_claude_passes(self):
+    def test_valid_claude_passes(self, installed_cli):
         result = subprocess.CompletedProcess([], 0, stdout="1.0.0\n")
         with patch("subprocess.run", return_value=result):
             _check_cli_provider("claude")
@@ -175,7 +175,7 @@ class TestCompositeChecks:
             with pytest.raises(RuntimeError, match="No AI provider configured"):
                 check_evaluate_prereqs()
 
-    def test_evaluate_with_cli_provider_checks_binary(self):
+    def test_evaluate_with_cli_provider_checks_binary(self, installed_cli):
         result = subprocess.CompletedProcess([], 0, stdout="1.0.0\n")
         with patch.dict("os.environ", {"AI_PROVIDER": "claude"}):
             with patch("subprocess.run", return_value=result):
@@ -206,7 +206,7 @@ class TestProviderInjection:
                 _check_cli_provider("x & echo PWNED")
             mock_run.assert_not_called()
 
-    def test_check_cli_provider_accepts_valid_name(self):
+    def test_check_cli_provider_accepts_valid_name(self, installed_cli):
         result = subprocess.CompletedProcess([], 0, stdout="1.0.0\n")
         with patch("subprocess.run", return_value=result):
             _check_cli_provider("claude")  # must not raise

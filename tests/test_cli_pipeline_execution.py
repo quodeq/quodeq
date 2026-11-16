@@ -126,3 +126,20 @@ class TestSaveManifest:
         manifest = MagicMock()
         mock_to_dict.return_value = {}
         save_manifest(manifest, tmp_path)  # should not raise
+
+
+class TestExecutePipelineReleasesMcp:
+    """The run's CLI-registered MCP server (gemini mcp add) is removed however
+    the pipeline ends, so no registration outlives the scan."""
+
+    @patch("quodeq._cli_pipeline_exec.run", side_effect=RuntimeError("boom"))
+    def test_released_when_the_pipeline_raises(self, _mock_run, tmp_path):
+        from quodeq.cli import execute_pipeline
+        args = argparse.Namespace(evidence_only=True, mode="numerical")
+        config = MagicMock()
+        config.options.skip_scoring = True
+        try:
+            execute_pipeline(args, config, tmp_path, tmp_path)
+        except RuntimeError:
+            pass
+        config.mcp_registry.release_all.assert_called_once_with()

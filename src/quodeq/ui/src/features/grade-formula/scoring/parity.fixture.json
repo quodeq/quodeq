@@ -203,6 +203,7 @@
     "ceilScale": 0.5,
     "dimensionWeights": {
      "accessibility": 1.0,
+     "ai-integration-security": 1.0,
      "clean-architecture": 1.0,
      "domain-driven-design": 1.0,
      "flexibility": 1.0,
@@ -1439,6 +1440,7 @@
     "ceilScale": 0.5,
     "dimensionWeights": {
      "accessibility": 1.0,
+     "ai-integration-security": 1.0,
      "clean-architecture": 1.0,
      "domain-driven-design": 1.0,
      "flexibility": 1.0,
@@ -2675,6 +2677,7 @@
     "ceilScale": 1.4,
     "dimensionWeights": {
      "accessibility": 1.0,
+     "ai-integration-security": 1.0,
      "clean-architecture": 1.0,
      "domain-driven-design": 1.0,
      "flexibility": 1.0,
@@ -3911,6 +3914,7 @@
     "ceilScale": 0.5,
     "dimensionWeights": {
      "accessibility": 1.0,
+     "ai-integration-security": 1.0,
      "clean-architecture": 1.0,
      "domain-driven-design": 1.0,
      "flexibility": 1.0,
@@ -5147,6 +5151,7 @@
     "ceilScale": 0.0,
     "dimensionWeights": {
      "accessibility": 1.0,
+     "ai-integration-security": 1.0,
      "clean-architecture": 1.0,
      "domain-driven-design": 1.0,
      "flexibility": 1.0,

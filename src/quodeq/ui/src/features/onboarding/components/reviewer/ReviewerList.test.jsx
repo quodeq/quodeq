@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { withStableQueryApi } from '../../../../test-utils/withQueryClient.jsx';
 import { useReviewerChoice } from '../../../reviewer/hooks/useReviewerChoice.js';
 import ReviewerList from './ReviewerList.jsx';
+import { findSelectOption, pickSelectOption, waitForSelectOption } from '../../../../test-utils/selectOption.js';
 
 const CATALOG = [
   { id: 'opus', label: 'Opus', efforts: ['low', 'high'], defaultEffort: 'low', isDefault: false, pinned: false },
@@ -34,25 +35,24 @@ function renderList({ ids = ['claude-code', 'ollama'], getClientModels, onOpenSe
 describe('ReviewerList', () => {
   it('selected row shows model and effort fields, others a summary', async () => {
     renderList();
-    expect(await screen.findByRole('option', { name: 'Sonnet (default)' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Effort' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Default (Low)' })).toBeInTheDocument();
+    await waitForSelectOption('Sonnet (default)');
+    pickSelectOption(screen.getByRole('combobox', { name: 'Effort' }), 'Default (Low)');
     expect(screen.getByText('no model picked')).toBeInTheDocument();
     expect(screen.getAllByRole('combobox', { name: 'Model' })).toHaveLength(1);
   });
 
   it('no row carries a recommended label', async () => {
     renderList({ ids: ['claude-code', 'codex-cli', 'ollama', 'openai'] });
-    await screen.findByRole('option', { name: 'Sonnet (default)' });
+    await waitForSelectOption('Sonnet (default)');
     expect(screen.queryByText(/recommended/i)).toBeNull();
   });
 
   it('an unselected row summarises its model and default effort', async () => {
     renderList();
-    await screen.findByRole('option', { name: 'Sonnet (default)' });
+    await waitForSelectOption('Sonnet (default)');
     fireEvent.click(screen.getByRole('radio', { name: 'Ollama' }));
     expect(await screen.findByText('Sonnet · default effort')).toBeInTheDocument();
-    expect(await screen.findByRole('option', { name: 'qwen3:8b' })).toBeInTheDocument();
+    expect(await findSelectOption('qwen3:8b')).toBeInTheDocument();
   });
 
   it('failed catalog shows the typed model id field', async () => {

@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+from quodeq.shared.win_launch import find_program
 
 _logger = logging.getLogger(__name__)
 
@@ -192,7 +192,7 @@ def resolve_path(token: str, bases: list[str], *, ops: PathOps = _OS_PATH_OPS) -
 
 def detect_editor(
     *,
-    which=shutil.which,
+    which=find_program,
     isfile=os.path.isfile,
     platform: str = sys.platform,
 ) -> Editor | None:

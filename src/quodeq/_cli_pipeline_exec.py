@@ -40,7 +40,18 @@ def execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: 
     caught here — they propagate to run_pipeline_with_cleanup so that
     RunLifecycleContext.__exit__ can write state=failed before the error is
     mapped to exit code 1.
+
+    However the pipeline ends, the run's CLI-registered MCP server (``gemini
+    mcp add``) is removed so the registration does not outlive the scan.
     """
+    try:
+        return _run_pipeline(args, config, evidence_dir, evaluation_dir)
+    finally:
+        config.mcp_registry.release_all()
+
+
+def _run_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
+    """The body of :func:`execute_pipeline`, which wraps it in MCP cleanup."""
     if args.evidence_only or config.options.skip_scoring:
         label = "PR diff" if config.options.skip_scoring else "evidence collection"
         log_info(f"Starting {label} (this may take several minutes per dimension)...")

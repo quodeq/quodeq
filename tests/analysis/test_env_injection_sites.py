@@ -56,7 +56,7 @@ def test_ai_tools_and_base_args_honour_injected_env(monkeypatch):
 def test_non_scout_providers_honours_injected_env(monkeypatch):
     monkeypatch.setenv("QUODEQ_NON_SCOUT_PROVIDERS", "claude")
     assert _non_scout_providers(env={"QUODEQ_NON_SCOUT_PROVIDERS": "codex"}) == ("codex",)
-    assert _non_scout_providers(env={}) == ("codex", "gemini")
+    assert _non_scout_providers(env={}) == ("codex", "gemini", "agy")
 
 
 def test_default_subagent_model_honours_injected_env(monkeypatch):
@@ -110,8 +110,8 @@ def test_omlx_credential_loader_honours_the_injected_env(monkeypatch, tmp_path: 
 
 def test_build_analysis_env_uses_the_injected_mapping(monkeypatch):
     monkeypatch.setenv("FROM_PROCESS", "1")
-    built = build_analysis_env(None, {"KEEP": "yes"})
-    assert built["KEEP"] == "yes"
+    built = build_analysis_env(None, {"PATH": "yes"})
+    assert built["PATH"] == "yes"
     assert "FROM_PROCESS" not in built
     assert build_analysis_env(None, {}) == {}
 

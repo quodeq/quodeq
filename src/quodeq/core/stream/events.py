@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from typing import Callable
 
+from quodeq.core.stream.agy_events import normalize_event
+
 BLOCK_TYPE_TOOL_USE = "tool_use"  # Claude assistant-message content block type (also read by assistant/adapters/_stream.py)
 _FILE_READ_TOOLS = frozenset({"Read", "Grep"})
 BLOCK_TYPE_TEXT = "text"  # Claude assistant-message content block type
@@ -131,12 +133,15 @@ def extract_files_from_blocks(blocks: list) -> set[str]:
 
 
 def parse_stream_event(line: str) -> dict | None:
-    """Parse a single stream event line, returning None for empty or invalid lines."""
+    """Parse a single stream event line, returning None for empty or invalid lines.
+
+    An agy event comes back in the Claude shape (see ``agy_events``).
+    """
     stripped = line.strip()
     if not stripped:
         return None
     try:
-        return json.loads(stripped)
+        return normalize_event(json.loads(stripped))
     except json.JSONDecodeError:
         return None
 

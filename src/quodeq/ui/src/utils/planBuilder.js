@@ -7,13 +7,15 @@ import {
 } from './planConstants.js';
 import { KNOWN_SEVERITIES } from './constants.js';
 import { normalizeSeverity } from './severity.js';
+import { shownSnippet } from './withheldSnippet.js';
 
 const PLAN_SNIPPET_MAX_LINES = 5;
 
 /**
  * Cap a code snippet for plan output — show only the first few lines.
  */
-function capSnippet(snippet) {
+function capSnippet(raw) {
+  const snippet = shownSnippet(raw);
   if (!snippet) return snippet;
   const lines = snippet.split('\n');
   if (lines.length <= PLAN_SNIPPET_MAX_LINES) return snippet;
@@ -98,7 +100,7 @@ function renderEntryLines(v, i, { titleFor, refLine }) {
     lines.push('', ref);
   }
 
-  if (v.snippet) {
+  if (capSnippet(v.snippet)) {
     lines.push('', '**Affected code:**');
     lines.push('```');
     capSnippet(v.snippet).split('\n').forEach((l) => lines.push(l));
@@ -270,7 +272,7 @@ export function buildSingleViolationPlanText(v, title, opts = {}) {
     `**Severity:** ${v.severity || 'unknown'}`,
   ];
   if (loc) lines.push(`**File:** ${loc}`);
-  if (v.snippet) lines.push('', '## Affected Code', '```', capSnippet(v.snippet), '```');
+  if (capSnippet(v.snippet)) lines.push('', '## Affected Code', '```', capSnippet(v.snippet), '```');
   if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
   const hint = getFixHint(v.req);
   if (hint) lines.push('', `**Expected fix:** ${hint}`);

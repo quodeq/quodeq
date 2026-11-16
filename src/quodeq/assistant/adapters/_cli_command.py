@@ -5,12 +5,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, NamedTuple
 
 from quodeq.assistant.adapters.cli_config import (
-    RESUME_STYLE_GEMINI, SESSION_ID_SOURCE_PARSE_JSONL, SYSTEM_PROMPT_STYLE_ARGV_APPEND,
-    CliChatConfig,
+    RESUME_STYLE_CONVERSATION_FLAG, RESUME_STYLE_GEMINI, SESSION_ID_SOURCE_PARSE_JSONL,
+    SYSTEM_PROMPT_STYLE_ARGV_APPEND, CliChatConfig,
 )
 from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE, PROMPT_STYLE_POSITIONAL,
 )
+from quodeq.shared.agy_home import agy_brain_dir
+from quodeq.shared.cli_session_settings import session_settings_args
 from quodeq.shared.models import normalize_model_id
 
 if TYPE_CHECKING:
@@ -28,6 +30,7 @@ _FLAG_APPEND_SYSTEM_PROMPT = "--append-system-prompt"
 _FLAG_SESSION_ID = "--session-id"
 _FLAG_RESUME = "--resume"
 _FLAG_GEMINI_RESUME = "-r"
+_FLAG_CONVERSATION = "--conversation"
 _FLAG_DISALLOWED_TOOLS = "--disallowedTools"
 _FLAG_ALLOWED_TOOLS = "--allowedTools"
 
@@ -95,9 +98,12 @@ class TurnArgvRequest:
 def _resume_args(cfg: CliChatConfig, prior: str | None, new_id: str) -> tuple[list[str], str | None, bool]:
     """Return (session-related argv fragment, assigned id, needs_parse)."""
     if cfg.session_id_source == SESSION_ID_SOURCE_PARSE_JSONL:
-        # codex: turn 1 plain exec (parse id); turn N `resume <id>` after subcommand
+        # codex: turn 1 plain exec (parse id); turn N `resume <id>` after subcommand.
+        # agy: the same, but turn N names the id with --conversation.
         if prior is None:
             return [], None, True
+        if cfg.resume_style == RESUME_STYLE_CONVERSATION_FLAG:
+            return [_FLAG_CONVERSATION, prior], None, False
         return ["resume", prior], None, False
     # preassign providers (claude, gemini)
     if prior is None:
@@ -129,12 +135,14 @@ def build_turn_argv(cfg: CliChatConfig, request: TurnArgvRequest) -> CliTurnSpec
     resume_frag, assigned, needs_parse = _resume_args(
         cfg, request.prior_session_id, request.new_session_id)
     # codex `resume <id>` must sit immediately after the `exec` subcommand
-    if cfg.session_id_source == SESSION_ID_SOURCE_PARSE_JSONL and resume_frag:
+    if (cfg.session_id_source == SESSION_ID_SOURCE_PARSE_JSONL and resume_frag
+            and cfg.resume_style != RESUME_STYLE_CONVERSATION_FLAG):
         argv.extend(resume_frag)
         resume_frag = []
 
     argv.extend(_with_web_access(cfg.assistant_args) if request.web_enabled
                else cfg.assistant_args)
+    argv.extend(session_settings_args(cfg.session_settings, {"agy_brain": agy_brain_dir()}))
     if resume_frag:
         argv.extend(resume_frag)
     if request.mcp_config_path and cfg.mcp_style == MCP_STYLE_CONFIG_FILE:

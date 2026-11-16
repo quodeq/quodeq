@@ -25,6 +25,7 @@ from quodeq.services.fs_project_helpers import (
     max_projects_listed,
 )
 from quodeq.services._repo_index import RepoIdentity, rekey_repo_index_entry, remove_repo_index_entries
+from quodeq.services.project_leftovers import purge_project_leftovers
 from quodeq.services.wiring import (
     find_children,
     is_valid_repo_url,
@@ -250,10 +251,12 @@ def delete_project(reports_dir: str, project: str) -> bool:
     # index entry just because the parent dir removal then fails.
     if not remove_project_dir(project_path):
         remove_repo_index_entries(reports_root, removed_ids)
+        purge_project_leftovers(reports_root, removed_ids, log=SHARED_LOG)
         return False
 
     removed_ids.add(project)
     remove_repo_index_entries(reports_root, removed_ids)
+    purge_project_leftovers(reports_root, removed_ids, log=SHARED_LOG)
     return children_removed
 
 

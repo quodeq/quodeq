@@ -3,6 +3,7 @@ import { KNOWN_SEVERITIES } from '../constants.js';
 import { SEVERITY, SEVERITY_FILTER_ALL } from '../../vocab/severity.js';
 import { FINDING_TYPE } from '../../vocab/findingType.js';
 import { roundOneDecimal } from '../rounding.js';
+import { shownSnippet } from '../withheldSnippet.js';
 
 const SNIPPET_MAX_LINES = 5;
 // Short run-id shown in report headers ("**Run:** 3f9c1a2b").
@@ -36,7 +37,8 @@ export function formatScore(value) {
  * Truncates a code snippet to the first few lines, appending a count of what
  * was dropped, so one huge finding cannot dominate a report.
  */
-export function capSnippet(snippet) {
+export function capSnippet(raw) {
+  const snippet = shownSnippet(raw);
   if (!snippet) return '';
   const lines = snippet.split('\n');
   if (lines.length <= SNIPPET_MAX_LINES) return snippet;

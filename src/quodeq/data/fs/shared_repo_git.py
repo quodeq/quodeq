@@ -10,6 +10,7 @@ from pathlib import Path
 
 from quodeq.data.git_cli import git_env_floor
 from quodeq.shared.constants import GIT_BIN
+from quodeq.shared.win_launch import program_argv
 from quodeq.shared.env_paths import home_state_dir
 from quodeq.shared.env_resolve import resolve_env
 
@@ -49,7 +50,7 @@ def run_git(
     """
     try:
         proc = subprocess.run(
-            [GIT_BIN, *args],
+            program_argv([GIT_BIN, *args]),
             cwd=str(cwd) if cwd else None,
             env=git_env(env),
             stdin=subprocess.DEVNULL,

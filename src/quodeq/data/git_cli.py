@@ -16,6 +16,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
 from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
+from quodeq.shared.win_launch import program_argv
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.repo import normalize_remote_url
 
@@ -60,8 +61,7 @@ def run_git(
     """Run ``git *args`` and return stdout, or None on any failure."""
     try:
         result = subprocess.run(
-            [GIT_BIN, *args],
-            cwd=str(cwd) if cwd is not None else None,
+            program_argv([GIT_BIN, *args]), cwd=str(cwd) if cwd is not None else None,
             env=git_env_floor(), stdin=subprocess.DEVNULL,
             capture_output=True, text=True, encoding="utf-8", timeout=timeout,
         )
@@ -220,7 +220,7 @@ def stream_log_names(
     """
     try:
         proc = subprocess.Popen(
-            ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
+            program_argv([GIT_BIN, "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"]),
             cwd=str(repo_dir), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding="utf-8", env=git_env_floor(), stdin=subprocess.DEVNULL,
         )

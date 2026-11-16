@@ -1,5 +1,51 @@
 # Changelog
 
+## [1.16.0] - 2026-11-16
+
+### Before you upgrade
+- **Restart after upgrading**: run `quodeq restart` (or quit and reopen the app). A 1.15 server that is still running would be reused by the new window, and the two do not agree on the new session check.
+- **The local API only answers Quodeq's own window**: every request needs the session Quodeq creates at launch. A bookmarked `localhost` address now shows a page explaining how to get in. In browser mode, Quodeq opens a single-use link; with `--no-open`, and when the API is started on its own in a terminal (`python -m quodeq.api.app`), it prints a link valid for two minutes. An open browser tab stops working when the server restarts. A script that calls the API must send the `X-Quodeq-Session` header with the value from `~/.quodeq/run/api-<port>.session`. An API started on its own without a terminal (Docker without `-t`, systemd) prints no link, so use `QUODEQ_API_KEY` there; that mode is unchanged.
+- **Code snippets are no longer published to a shared repository unless you opt in**: the next publish also replaces the snippets of runs you already published with placeholders (the shared repository's git history keeps the old ones). To keep sharing code, turn on Settings › Shared repository › **Share code snippets** before you publish. Publisher folder paths are no longer published either. Upgrade a team together: a 1.15 reader shows the placeholder text as the snippet, and dismissals matched by snippet will not line up between versions.
+- **`~/.quodeq` becomes private to your user**: the folder is set to owner-only and its databases to owner read and write on every start. A data folder shared through group permissions, or mounted into a container under another user, loses that access.
+- **Agent CLIs run confined during scans**:
+  - Claude Code reads only the repository, loads only your user settings (a repository's `.claude/settings.json` no longer applies to a scan), and cannot read files named like credentials (`.env`, keys, `.npmrc` and similar; `.env.example` too).
+  - Codex runs from its own Quodeq home (`~/.quodeq/codex`) with your login and your model and provider settings. Your profiles, MCP servers, plugins, skills and web search do not apply to scans. Codex older than 0.162.0 cannot use its read-only sandbox this way and runs under the operating system sandbox instead, or without one, with a warning. On macOS the sandbox blocks local network addresses, so a Codex provider served from `localhost` stops working in scans.
+  - Gemini CLI and Antigravity run inside an operating system sandbox on macOS and Linux.
+  - Only the environment variables an agent needs are passed to it. Proxy settings (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`) and certificate settings (`SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`) are passed. If your setup relies on another variable (`NODE_OPTIONS` or `REQUESTS_CA_BUNDLE`, for example), the agent will not see it.
+- **Where there is no sandbox**: Windows has no operating system sandbox, and neither does a container or a Linux machine without bubblewrap or firejail. There, Gemini CLI runs unconfined with a warning, and Codex uses its own read-only sandbox when it can. Set `QUODEQ_REQUIRE_SANDBOX=1` to make such a scan fail instead of running unconfined. Claude Code and Copilot are confined by their own permission rules, not by an operating system sandbox.
+- **Secrets are redacted going forward, not backwards**: findings evaluated from now on store a redacted snippet when the line holds a secret. Findings from earlier runs keep what they stored, and files that have not changed are not evaluated again. A dismissal matched by snippet can resurface once on such a line.
+- **The Security dimension can report more with no code change**: Quodeq now reports committed credential files and hardcoded secrets itself, without a model, across the whole project. The next Security evaluation can add critical findings and lower the grade.
+- **`quodeq evaluate` without `-d` covers ten dimensions**: the new AI Integration Security standard is off in the app until you enable it, but the command line's default is every dimension, as it already was for Clean Architecture.
+- **Symlinked source files are no longer evaluated**, so file counts can drop.
+- **One score rebuild on first launch**: the new dimension's weight changes the cache version, so the first start rebuilds every project's scores once, in the background.
+
+### Features
+- **Agent CLIs sandboxed in scans and the assistant**: each CLI runs with the least it needs (read the repository, report findings), with no automatic approval of commands or writes, inside the macOS or Linux sandbox where the CLI has no rules of its own. The run log says when a scan runs without one.
+- **Antigravity CLI (`agy`) as a provider**: Google's replacement for the Gemini CLI on individual accounts works for scans and the assistant, with its own Quodeq home and no access to commands, writes or the browser. The Gemini CLI entry stays for API keys and Workspace accounts.
+- **AI Integration Security standard**: 34 rules in 8 sections for code that calls models or runs agents (untrusted content, model output, agent privileges, configuration and supply chain, human control, resource bounds, MCP servers, memory and audit). Off by default; enable it on the Standards page.
+- **Local API session check**: the API refuses requests that do not come from the Quodeq window or a link Quodeq issued, so another program or web page on the machine cannot read results or start jobs.
+- **Secrets kept from models and stored findings**: secrets are redacted before source reaches a model through the API path, source files are marked as untrusted data in prompts, credential files are withheld from the agent CLIs, and Quodeq reports committed credential files locally.
+- **Sharing is private by default**: snippets are published only with **Share code snippets** on, including those of dismissed findings; publisher paths are removed; project exports no longer carry run logs, agent transcripts or the local folder path.
+- **Nothing loaded from other hosts**: the dashboard's fonts ship with the app instead of coming from Google Fonts, so the window makes no request outside your machine and works the same offline.
+- **`quodeq --version`** prints the installed version.
+
+### Improvements
+- **Desktop apps run CLI scans and the assistant's tools**: the macOS and Windows apps could not start the helper servers a CLI provider and the assistant need, so those scans and tools failed from the apps. They also carry the Help pages the assistant answers from.
+- **Windows**: the window shows the Quodeq icon; the Help-only menu bar is gone (Linux too); on Windows on Arm, where Python cannot open the native window, the dashboard opens in the browser; npm-installed agent CLIs start as node scripts and never through `cmd.exe`; agent CLIs and helper programs such as `git` are taken from PATH only, never from the folder being scanned; the first start waits longer for the API and never leaves it running alone.
+- **Linux**: Quodeq has its own icon in the dock (it writes a `quodeq.desktop` entry and icon on launch, never over one you edited), and the window stays on screen at startup.
+- **One Quodeq dropdown everywhere**: native select boxes are replaced by a shared dropdown that looks the same on every system.
+- **Relaunch messages**: starting Quodeq while it is running says the window was asked to come forward and what to do if it does not; the port warning shows only on a real start.
+- **Release integrity**: releases now carry `SHA256SUMS`, build attestations and SBOMs; CI actions and build tools are pinned, and the lockfile is enforced.
+- **Help**: updated for the session check, sandboxing, sharing and the new provider.
+- **Dependencies**: openai 3.42.1, pydantic 2.14.2, pywinpty 3.1.2, TanStack Virtual 3.14.23, pretext 1.0.0.
+
+### Fixes
+- **Windows app did not start from Explorer or the Start menu** (1.14.0 to 1.15.2): the app crashed at launch when it had no console. It starts again, closing the window now stops its server, and a failed start is written to `launcher.log` in `~/.quodeq/run`.
+- **Sandbox gaps**: an empty first file in a repository could switch Codex out of its sandbox; the firejail fallback now hides credential stores and Quodeq's session files and says it confines less than bubblewrap; addresses in `100.64.0.0/10` (Tailscale and similar) count as internal for URL checks.
+- **URL fetches** connect to the address that was checked, so a name cannot resolve to an internal address after passing the check.
+- **Gemini CLI**: Quodeq removes its findings server registration when a run ends.
+- **Deleting a project** removes its leftover files.
+
 ## [1.15.2] - 2026-10-28
 
 ### Fixes

@@ -17,6 +17,7 @@ from quodeq.analysis._config import (
     AnalysisConfig,
     AgentParams,
     MCP_TOOL_GET_NEXT_FILES,
+    MCP_TOOL_GET_STANDARDS,
     MCP_TOOL_MARK_FILE_DONE,
     MCP_TOOL_REPORT_FINDING,
 )
@@ -28,7 +29,14 @@ from quodeq.core.constants import (
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.secret_files import SECRET_FILE_GLOBS
 from quodeq.shared.models import normalize_model_id
+
+_READ_REPO_RULE = "Read(./**)"  # permission rule: reads under the CLI's cwd only
+# Deny rules win over the allow above: the repo's credential files stay
+# unread at any depth. Templates (.env.example) are denied with them, since
+# a rule cannot make exceptions.
+_DENY_SECRET_FILE_RULES = ",".join(f"Read(./**/{glob})" for glob in SECRET_FILE_GLOBS)
 
 
 def get_ai_tools(env: Mapping[str, str] | None = None) -> str:
@@ -104,9 +112,11 @@ def _build_config_file_mcp_args(
     mcp_prefix = provider_cfg.get("mcp_config_prefix", "")
     args: list[str] = [mcp_flag, f"{mcp_prefix}{mcp_config_path}"]
     # Restrict the subprocess to the findings server only. Without this the
-    # CLI also loads the user's own MCP servers (user/project scope), and
-    # bypassPermissions would let the model call them.
-    args.extend(provider_cfg.get("mcp_strict_args", ["--strict-mcp-config"]))
+    # CLI also loads the user's own MCP servers (user/project scope). Only
+    # the user's settings load: the analysed repo's .claude/settings.json
+    # can define hooks, which run shell commands no permission mode stops.
+    args.extend(provider_cfg.get(
+        "mcp_strict_args", ["--strict-mcp-config", "--setting-sources", "user"]))
 
     if provider_cfg.get("supports_tools", True):
         allowed = MCP_TOOL_REPORT_FINDING
@@ -114,16 +124,20 @@ def _build_config_file_mcp_args(
             allowed += f",{MCP_TOOL_GET_NEXT_FILES}"
         # mark_file_done is always exposed by the findings server (see
         # handlers.handle_tools_list) and drives cache writes, so allow it
-        # unconditionally rather than leaving it to bypassPermissions.
+        # unconditionally: dontAsk denies anything left off this list.
         allowed += f",{MCP_TOOL_MARK_FILE_DONE}"
-        args.extend(["--allowedTools", allowed])
-    # bypassPermissions is intentional: the CLI analysis tool runs in a
-    # sandboxed, non-interactive subprocess where MCP tool calls (e.g.
-    # report_finding) must succeed without user confirmation prompts.
-    # The subprocess has no access to credentials or network beyond
-    # what the parent process explicitly provides via env filtering.
+        # The checklist sits next to the evidence, outside the repo: served
+        # by the findings server, so no read outside the cwd is approved.
+        allowed += f",{MCP_TOOL_GET_STANDARDS}"
+        # Reads are pre-approved only under the cwd, the analysed repo (Read
+        # rules also govern Glob and Grep).
+        allowed += f",{_READ_REPO_RULE}"
+        args.extend(["--allowedTools", allowed, "--disallowedTools", _DENY_SECRET_FILE_RULES])
+    # dontAsk denies every call not pre-approved above instead of prompting,
+    # so the non-interactive run cannot read outside the repo, run commands
+    # or reach other tools. Never bypassPermissions: that approves any path.
     args.extend(
-        provider_cfg.get("mcp_permission_args", ["--permission-mode", "bypassPermissions"])
+        provider_cfg.get("mcp_permission_args", ["--permission-mode", "dontAsk"])
     )
     return args, mcp_config_path
 

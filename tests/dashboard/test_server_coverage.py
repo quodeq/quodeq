@@ -30,30 +30,21 @@ class TestEnsureActionApi:
         assert url == "http://127.0.0.1:8000"
         assert proc is None
 
-    def test_reuse_warns_about_the_webview_token_mismatch(self, caplog):
-        """QUODEQ_WEBVIEW_TOKEN is only set on the spawn branch, so a reused
-        API keeps its own launch token while the webview we open next gets a
-        fresh one. _is_trusted_webview then fails closed (correct) and the
-        native shell's JS bridge silently stops working — that needs a
-        diagnostic, or it is impossible to explain.
-        """
-        from quodeq.dashboard import _server
-        probes = ApiProbes(
-            local_hosts=lambda *a, **k: {"127.0.0.1", "localhost"},
-            api_healthy=lambda *_a: True,
-            is_port_open=lambda *_a: True,
-        )
-        with patch.object(_server, "warn_reused_api_token_mismatch") as warn:
-            _server.ensure_action_api("127.0.0.1", 8000, probes=probes)
-        warn.assert_called_once_with("http://127.0.0.1:8000")
-
-    def test_reuse_warning_names_the_csp_relaxation(self, caplog):
+    def test_the_window_token_is_the_reused_apis_published_secret(self, tmp_path, monkeypatch):
+        """The API mints its own secret and publishes it, so a reused API pairs
+        with a fresh window exactly like a newly spawned one."""
         from quodeq.dashboard import _webview_token
+        from quodeq.shared.api_session import write_session_file
+        monkeypatch.setenv("QUODEQ_RUN_DIR", str(tmp_path))
+        write_session_file(8000, "published-secret")
+        assert _webview_token.window_token("http://127.0.0.1:8000") == "published-secret"
+
+    def test_an_api_without_a_session_file_gets_a_diagnostic(self, tmp_path, monkeypatch, caplog):
+        from quodeq.dashboard import _webview_token
+        monkeypatch.setenv("QUODEQ_RUN_DIR", str(tmp_path))
         with caplog.at_level("WARNING", logger="quodeq.dashboard._webview_token"):
-            _webview_token.warn_reused_api_token_mismatch("http://127.0.0.1:8000")
-        message = " ".join(r.getMessage() for r in caplog.records)
-        assert "http://127.0.0.1:8000" in message
-        assert "unsafe-eval" in message
+            assert _webview_token.window_token("http://127.0.0.1:8000") == ""
+        assert "http://127.0.0.1:8000" in " ".join(r.getMessage() for r in caplog.records)
 
     def test_spawns_new_api(self):
         from quodeq.dashboard._server import ensure_action_api

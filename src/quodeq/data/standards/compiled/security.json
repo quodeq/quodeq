@@ -20,6 +20,7 @@
           "id": "S-CON-1",
           "source": "iso25010",
           "text": "Credentials and secrets MUST NOT be hardcoded in source files",
+          "check": "hardcoded-secrets",
           "severity": "critical",
           "scope": null,
           "refs": [

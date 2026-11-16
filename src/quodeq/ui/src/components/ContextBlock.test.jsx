@@ -133,3 +133,12 @@ describe('ContextBlock code height', () => {
     expect(pre.style.height).toBe('');
   });
 });
+
+describe('ContextBlock with a withheld snippet', () => {
+  it('says the code was not shared and shows no token', () => {
+    const token = `quodeq:snippet-withheld:${'b'.repeat(64)}`;
+    render(<ContextBlock snippet={token} file="app/models/user.rb" line={12} />);
+    expect(screen.getByText('Code not shared by the publisher')).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(token))).toBeNull();
+  });
+});

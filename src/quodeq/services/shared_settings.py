@@ -7,7 +7,7 @@ following the update/state.py pattern: dataclass, atomic replace, fail-soft read
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
@@ -22,6 +22,9 @@ class SharedSettings:
     """Contents of shared.json. ``url`` is the shared results repo, None when unconfigured."""
 
     url: str | None = None
+    # Publish code snippets with findings. Off unless the user opts in for this
+    # repository; a reconnect starts from off again.
+    with_snippets: bool = False
 
 
 def shared_settings_path(env: Mapping[str, str] | None = None) -> Path:
@@ -44,6 +47,7 @@ def read_settings(env: Mapping[str, str] | None = None) -> SharedSettings:
     # string or nothing, callers never see other types (or "").
     if not isinstance(settings.url, str) or not settings.url:
         settings.url = None
+    settings.with_snippets = settings.with_snippets is True
     return settings
 
 
@@ -60,3 +64,17 @@ def write_settings(
         # not silent, status reads come from this file, so the UI shows
         # whatever was actually persisted.
         log.debug(f"shared settings write failed (fail-soft): {exc}")
+
+
+def set_publish_snippets(
+    enabled: bool, env: Mapping[str, str] | None = None, *, log: LogSink = NULL_LOG,
+) -> bool:
+    """Opt the connected shared repository in to (or out of) receiving code snippets.
+
+    False when no shared repository is connected: the choice belongs to one.
+    """
+    settings = read_settings(env=env)
+    if settings.url is None:
+        return False
+    write_settings(replace(settings, with_snippets=enabled), env=env, log=log)
+    return True

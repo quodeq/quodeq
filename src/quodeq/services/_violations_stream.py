@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from quodeq.core.types import Finding, ViolationResponse
-from quodeq.core.stream.events import TEXT_EXTRACTORS, extract_files_from_event
+from quodeq.core.stream.events import TEXT_EXTRACTORS, extract_files_from_event, parse_stream_event
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services._violations_shared import (
     build_finding_entry,
@@ -73,10 +73,7 @@ class _StreamAccumulator:
 
 def _parse_stream_line(stripped: str, acc: _StreamAccumulator) -> None:
     """Parse one non-empty stream line, appending findings to *acc*."""
-    try:
-        event = json.loads(stripped)
-    except json.JSONDecodeError:
-        return
+    event = parse_stream_event(stripped)
     if not isinstance(event, dict):
         return
     etype = event.get("type")

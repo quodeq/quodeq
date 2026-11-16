@@ -131,13 +131,14 @@ def _commit_and_push(repo: Path, project_id: str, staged: StagedProject, env: di
 
 def publish_project(
     project_id: str, url: str, *, evaluations_root: Path, env: dict | None = None,
-    on_skipped: Callable[[list[str]], None] | None = None,
+    on_skipped: Callable[[list[str]], None] | None = None, with_snippets: bool = False,
 ) -> int:
     """Stage a project's completed runs into the shared results repo and push them.
 
     The custom standards those runs scored ride in the same commit; ids whose
     shared copy is newer are left alone and handed to *on_skipped* after the
-    push. Returns the number of runs staged. Raises ``PublishError`` for anything a
+    push. Code snippets are published only *with_snippets* (the shared
+    repository's opt-in). Returns the number of runs staged. Raises ``PublishError`` for anything a
     user can act on (bad project id, missing project, git add/commit/push
     failure). The whole clone-stage-push sequence runs under one process-wide
     clone lock, so concurrent publishes serialise instead of racing on the
@@ -152,7 +153,7 @@ def publish_project(
                                f"{out.strip()[:GIT_ERROR_SNIPPET_MAX_CHARS]}")
         _refuse_links(repo, project_id)
         try:
-            staged = stage_project(project_dir, repo / "evaluations" / project_id)
+            staged = stage_project(project_dir, repo / "evaluations" / project_id, with_snippets=with_snippets)
             activity = stage_activity(project_dir, repo / "evaluations" / project_id,
                                       local_repo_root(evaluations_root, project_id), log=LoggerSink(logger))
             if activity is not None:
@@ -217,12 +218,12 @@ def get_publish_status(status: PublishStatus | None = None) -> dict:
 
 def _do_publish(
     project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
-    env: dict | None = None,
+    env: dict | None = None, with_snippets: bool = False,
 ) -> None:
     try:
         skipped: list[str] = []
         count = publish_project(project_id, url, evaluations_root=evaluations_root, env=env,
-                                on_skipped=skipped.extend)
+                                on_skipped=skipped.extend, with_snippets=with_snippets)
         status.set(state=PublishState.DONE, runs=count, error=None, finished_at=time.time(),
                    skipped_standards=skipped)
     except PublishError as exc:
@@ -232,10 +233,10 @@ def _do_publish(
 
 def _run_publish(
     project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
-    env: dict | None = None,
+    env: dict | None = None, with_snippets: bool = False,
 ) -> None:
     run_isolated(
-        lambda: _do_publish(project_id, url, evaluations_root, status, env),
+        lambda: _do_publish(project_id, url, evaluations_root, status, env, with_snippets),
         label="publish", log=logger,
         on_error=lambda _exc: status.set(
             state=PublishState.ERROR,
@@ -258,6 +259,7 @@ def start_publish(
     evaluations_root: Path,
     status: PublishStatus | None = None,
     env: dict | None = None,
+    with_snippets: bool = False,
 ) -> str:
     """Kick off a background publish.
 
@@ -271,7 +273,7 @@ def start_publish(
         return PublishStartResult.ALREADY_RUNNING
     try:
         thread = threading.Thread(
-            target=_run_publish, args=(project_id, url, evaluations_root, status, env),
+            target=_run_publish, args=(project_id, url, evaluations_root, status, env, with_snippets),
             daemon=True,
         )
         thread.start()

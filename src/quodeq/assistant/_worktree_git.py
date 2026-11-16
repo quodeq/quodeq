@@ -15,6 +15,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from quodeq.shared.constants import GIT_BIN, GIT_FLAG_C
+from quodeq.shared.win_launch import program_argv
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.utils import TEXT_ENCODING
 
@@ -67,7 +68,7 @@ def run_git_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
         argv = [GIT_BIN, "-c", "core.autocrlf=false", *argv[1:]]
     try:
         proc = subprocess.run(  # noqa: S603 - argv list, no shell
-            argv, cwd=str(cwd) if cwd else None,
+            program_argv(argv), cwd=str(cwd) if cwd else None,
             capture_output=True, timeout=_GIT_TIMEOUT_S, check=False)
     except FileNotFoundError as exc:
         raise WorktreeError(f"{argv[0]} is not installed") from exc

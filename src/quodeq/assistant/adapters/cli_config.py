@@ -13,6 +13,7 @@ from quodeq.core.constants import MCP_STYLE_CONFIG_FILE, PROMPT_FLAG_DEFAULT, PR
 RESUME_STYLE_FLAG_RESUME = "flag-resume"  # --resume <id> (claude, copilot); the default when unset
 RESUME_STYLE_EXEC = "exec-resume"  # `exec resume <id>` after the subcommand (codex)
 RESUME_STYLE_GEMINI = "gemini-resume"  # -r <id>
+RESUME_STYLE_CONVERSATION_FLAG = "conversation-flag"  # --conversation <id> (agy, id parsed from the stream)
 SESSION_ID_SOURCE_PREASSIGN = "preassign"  # --session-id <new-id> on turn 1
 SESSION_ID_SOURCE_PARSE_JSONL = "parse-jsonl"  # id parsed from the stream (codex)
 SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX = "message-prefix"  # prepended to the first user message
@@ -42,6 +43,7 @@ class CliChatConfig:
     mcp_config_flag: str = MCP_CONFIG_FLAG_DEFAULT
     mcp_config_prefix: str = MCP_CONFIG_PREFIX_DEFAULT
     mcp_server_tools: tuple[str, ...] | None = None
+    session_settings: dict | None = None
 
 
 def load_cli_chat_config(provider_id: str) -> CliChatConfig:
@@ -73,4 +75,5 @@ def load_cli_chat_config(provider_id: str) -> CliChatConfig:
         mcp_config_flag=cfg.get("mcp_config_flag", MCP_CONFIG_FLAG_DEFAULT),
         mcp_config_prefix=cfg.get("mcp_config_prefix", MCP_CONFIG_PREFIX_DEFAULT),
         mcp_server_tools=tuple(cfg["mcp_server_tools"]) if "mcp_server_tools" in cfg else None,
+        session_settings=assistant.get("session_settings"),
     )

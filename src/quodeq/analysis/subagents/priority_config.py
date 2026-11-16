@@ -9,6 +9,7 @@ from functools import lru_cache
 
 from quodeq.config.paths import default_paths
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.types.provider import Provider
 
 _logger = logging.getLogger(__name__)
 
@@ -46,6 +47,10 @@ _DEFAULT_PRIORITY_CONFIG: dict = {
         "performance": ["cache", "query", "database", "pool", "batch", "stream", "index", "optimize", "buffer"],
         "flexibility": ["config", "plugin", "adapter", "factory", "interface", "abstract", "registry", "provider"],
         "usability": ["accessibility", "a11y", "i18n", "locale", "input", "form", "validation", "aria"],
+        "ai-integration-security": [
+            "llm", "agent", "prompt", "mcp", "openai", "anthropic", Provider.CLAUDE, Provider.GEMINI,
+            Provider.CODEX, Provider.OLLAMA, "embedding", "sandbox", "spawn",
+        ],
     },
     "dimension_keyword_boost": 5,
     "maintainability_size_divisor": 2000,

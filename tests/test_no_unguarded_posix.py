@@ -25,18 +25,18 @@ _ALLOWLIST: set[str] = {
     # kill_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Used by services/ to terminate
     # background job process trees.
-    "shared/process_kill.py:39",
+    "shared/process_kill.py:40",
     # kill_proc_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Used by terminal/ PTY sessions and the
     # assistant CLI provider adapters to terminate subprocess trees.
-    "shared/process_kill.py:75",
+    "shared/process_kill.py:76",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
     "shared/resource_sampler.py:61",
     # _command_line_cmd: the else of `if _on_windows()` (win32 asks CIM through PowerShell).
-    "shared/process.py:70",
+    "shared/process.py:71",
     # _ps_start_time: process_started_at returns None before it on win32.
-    "shared/process.py:125",
+    "shared/process.py:126",
     "shared/resource_sampler.py:78",
     # child_cwd's macOS branch: only reached when `platform == "darwin"` and
     # wrapped in `except (..., subprocess.SubprocessError)`, so Windows never
@@ -57,13 +57,13 @@ _ALLOWLIST: set[str] = {
     # before this line, and the call is wrapped in `except OSError`. Kills the
     # streaming git process group (git plus any ssh/credential helper that
     # holds stderr) at the deadline.
-    "data/fs/git_stream.py:65",
+    "data/fs/git_stream.py:66",
     # kill_external_tree / _descendants: reached only after the
     # `if sys.platform == PLATFORM_WIN32` return (win32 delegates to
     # kill_tree's taskkill /T); ps is wrapped in `except (OSError, ...)`.
     # Stops an external run without signalling its launcher's group.
-    "shared/process_kill.py:104",
-    "shared/process_kill.py:136",
+    "shared/process_kill.py:105",
+    "shared/process_kill.py:137",
 }
 
 

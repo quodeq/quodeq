@@ -172,23 +172,11 @@ def test_create_app_hands_the_injected_env_to_the_ollama_log_route(monkeypatch, 
     assert seen == [log_file], "the empty mapping must not resurrect the process value"
 
 
-def test_create_app_hands_the_injected_env_to_the_security_hooks(monkeypatch):
-    from quodeq.api import security
+def test_create_app_keys_the_session_cookie_by_the_injected_port():
     from quodeq.api.app import create_app
 
-    token = "tok-injected"  # noqa: S105 — test fixture, not a credential
-    ua = f"QuodeqDesktop/1.0 {security._WEBVIEW_TOKEN_UA_PREFIX}{token}"
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, token)
-
-    empty = create_app(env=_quodeq_env(security._ENV_WEBVIEW_TOKEN))
-    with empty.test_client() as c:
-        csp = c.get("/api/health", headers={"User-Agent": ua}).headers["Content-Security-Policy"]
-    assert "'unsafe-eval'" not in csp
-
-    injected = create_app(env={**_quodeq_env(), security._ENV_WEBVIEW_TOKEN: token})
-    with injected.test_client() as c:
-        csp = c.get("/api/health", headers={"User-Agent": ua}).headers["Content-Security-Policy"]
-    assert "'unsafe-eval'" in csp
+    app = create_app(env={**_quodeq_env(), "QUODEQ_ACTION_API_PORT": "7871"})
+    assert app.extensions["session_auth"].cookie_name == "quodeq_session_7871"
 
 
 def test_create_app_hands_the_injected_env_to_the_rate_limit_factory(tmp_path: Path):

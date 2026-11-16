@@ -26,6 +26,7 @@ from quodeq.data.fs.git_stream import run_git_streaming
 from quodeq.data.git_cli import git_env_floor
 from quodeq.data.fs.repo_validation import validate_remote_url as _validate_remote_url
 from quodeq.config.clone_env import git_clone_timeout_s
+from quodeq.shared.win_launch import program_argv
 
 _logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ class GitCloneClient:
         user-facing clone errors.
         """
         subprocess.run(
-            ["git", *_clone_args(url, dest, extra_args, git_config)],
+            program_argv(["git", *_clone_args(url, dest, extra_args, git_config)]),
             check=True,
             env=git_env_floor(self._env),
             stdin=subprocess.DEVNULL,
@@ -99,7 +100,7 @@ class GitCloneClient:
         """
         env = git_env_floor(self._env)
         subprocess.run(
-            ["git", "clone", "--progress", "--", repo_input, str(dest)],
+            program_argv(["git", "clone", "--progress", "--", repo_input, str(dest)]),
             check=True, env=env, stdin=subprocess.DEVNULL, timeout=timeout_s,
         )
 

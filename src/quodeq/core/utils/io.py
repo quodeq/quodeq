@@ -143,6 +143,17 @@ def is_within(candidate: str | Path, root: str | Path) -> bool:
     return real == root_real or real.startswith(root_real + os.sep)
 
 
+def is_within_not_link(candidate: str | Path, root: str | Path) -> bool:
+    """True when *candidate* is not itself a symlink and resolves inside *root*.
+
+    For content that leaves the machine (file text inlined into a model
+    prompt): :func:`is_within` alone accepts a link whose target is also in
+    the tree, which is harmless, but refusing every link means a repo cannot
+    smuggle a file in under a source-looking name at all. Never raises.
+    """
+    return not os.path.islink(str(candidate)) and is_within(candidate, root)
+
+
 def contained_path(candidate: str | Path, root: str | Path) -> str:
     """Return *candidate* resolved, guaranteed to sit inside *root*.
 

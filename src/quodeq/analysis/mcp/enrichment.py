@@ -1,14 +1,27 @@
 """Code enrichment: reads source files and fills snippet/context on findings.
 
 Extracted from FindingsRouter to keep module sizes small.
+
+Every text field that leaves here is secret-masked: the snippet and context
+end up in evaluation.db, evidence JSONL, reports, shared publish and SARIF,
+and a credential in the source must reach none of them.
+
+A credential file (``core.secret_files``) is never read here at all. The
+model names the file a finding is about, and text planted in a repository can
+make it name ``.env``; such a finding keeps its file, line and reason and
+gets a placeholder for its code.
 """
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Callable
+
+from quodeq.core.secret_files import secret_file_kind
+from quodeq.core.secret_scan import placeholder, redact
 
 CONTEXT_LINES = 5
 _MAX_SNIPPET_LINES = 40  # cap for scope-level snippets
+SECRET_FILE_SNIPPET = placeholder("secret_file")  # stands in for the code of a credential file
 
 
 def _extract_window(source: str, line: int, end_line: int, context: int) -> list[str]:
@@ -67,25 +80,66 @@ def _enrich_line_level(
     finding["context"] = "\n".join(context_parts)
 
 
+# Fields a model or the source can put a credential into.
+_MASKED_FIELDS = ("snippet", "context", "reason", "w", "title")
+
+
+def mask_secrets(finding: dict) -> None:
+    """Replace any secret in *finding*'s text fields with its typed placeholder."""
+    for key in _MASKED_FIELDS:
+        value = finding.get(key)
+        if isinstance(value, str) and value:
+            finding[key] = redact(value)
+
+
 def enrich_code(
     finding: dict,
     work_dir: Path | None,
     read_file: Callable[[Path], str],
 ) -> None:
-    """Fill snippet and context by reading the source file from *work_dir*."""
-    if work_dir is None:
-        return
+    """Fill snippet and context by reading the source file from *work_dir*,
+    then mask any secret in them (and in the model's own text)."""
+    _fill_code(finding, work_dir, read_file)
+    mask_secrets(finding)
+
+
+def _is_secret_file(path: str) -> bool:
+    """True when *path* (either separator) names a credential file."""
+    return secret_file_kind(PureWindowsPath(path).name) is not None
+
+
+def _withhold_code(finding: dict) -> None:
+    finding["snippet"] = SECRET_FILE_SNIPPET
+    finding["context"] = ""
+
+
+def _fill_code(
+    finding: dict,
+    work_dir: Path | None,
+    read_file: Callable[[Path], str],
+) -> None:
     file_path = finding.get("file")
     if not file_path:
         return
+    if _is_secret_file(str(file_path)):  # whatever the model quoted from it goes too
+        _withhold_code(finding)
+        return
+    if work_dir is None:
+        return
     try:
         full_path = work_dir / file_path
+        resolved = full_path.resolve()
         # Path containment check: prevent traversal outside the work directory.
-        if not full_path.resolve().is_relative_to(work_dir.resolve()):
+        if not resolved.is_relative_to(work_dir.resolve()):
             finding.setdefault("snippet", "")
             finding.setdefault("context", "")
             return
-        source = read_file(full_path)
+        if _is_secret_file(resolved.name):  # a link to one under another name
+            _withhold_code(finding)
+            return
+        # Redact the whole file before windowing: a window that starts inside
+        # a PEM body has no header left to recognise it by.
+        source = redact(read_file(full_path))
     except (OSError, UnicodeDecodeError):
         finding.setdefault("snippet", "")
         finding.setdefault("context", "")

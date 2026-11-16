@@ -12,6 +12,7 @@ import AccessPanel from '../../github-access/components/AccessPanel.jsx';
 import { accessFailureFrom } from '../../github-access/accessFailure.js';
 import { runExclusive } from '../settingsHelpers.js';
 import { ErrorRow, UrlRow, UrlInputRow, DisconnectConfirmRow } from './sharedRepoRows.jsx';
+import SharedSnippetsRow from './SharedSnippetsRow.jsx';
 
 // Groups the section's own useState/useRef declarations so the outer
 // component's body stays under the function-length cap; still called
@@ -126,6 +127,7 @@ function SharedRepoRows({ fields, sync, isSaving, isDisconnecting, handleSave, h
         onChange={() => setEditing(true)}
         onDisconnect={editing ? null : () => setConfirming(true)}
       />
+      <SharedSnippetsRow status={status} hidden={!configured || editing} />
       {(!configured || editing) && (
         <UrlInputRow
           newUrl={newUrl} setNewUrl={setNewUrl} isSaving={isSaving} isDisconnecting={isDisconnecting} handleSave={handleSave}

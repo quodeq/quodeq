@@ -21,6 +21,7 @@ import { measureWidth, cssFontFromElement } from '../utils/pretext.js';
 import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js';
 import { copyToClipboard } from '../utils/clipboard.js';
 import { parseFileRef } from '../utils/textFormatting.js';
+import { isWithheldSnippet } from '../utils/withheldSnippet.js';
 import { t } from '../strings/index.js';
 
 const CONTEXT_PADDING = 5;
@@ -138,7 +139,7 @@ function CopyPathBtn({ text }) {
   );
 }
 
-function CodeTab({ label, file, line, firstLine, lineCount, expanded, onToggle, children }) {
+function CodeTab({ label, file, line, firstLine, lineCount, expanded, onToggle, note, children }) {
   const hasCode = lineCount > 0;
   const open = expanded && hasCode;
   // `file` may carry its own ":line" suffix (parseFileRef); the line prop wins.
@@ -160,6 +161,7 @@ function CodeTab({ label, file, line, firstLine, lineCount, expanded, onToggle, 
           {hasCode && (
             <span className="code-tab-meta">{range} · {lineCount === 1 ? t('context.lineCountOne') : t('context.lineCount', { count: lineCount })}</span>
           )}
+          {!hasCode && note && <span className="code-tab-meta">{note}</span>}
         </button>
         {filePath && <CopyPathBtn text={fileLine != null ? `${filePath}:${fileLine}` : filePath} />}
       </div>
@@ -207,7 +209,18 @@ function renderContextLines(ctxLines, line) {
   ];
 }
 
-export default function ContextBlock({ context, snippet, scope, line, file }) {
+/** A finding whose publisher kept the code: where it is, and that its code was not shared. */
+function WithheldCode({ scope, line, file }) {
+  const label = scope ? t('context.seeScope', { scope }) : t('context.seeCode');
+  return <CodeTab label={label} file={file} line={line} firstLine={line || 1} lineCount={0} expanded={false} onToggle={() => {}} note={t('context.codeNotShared')} />;
+}
+
+export default function ContextBlock(props) {
+  if (!props.context && isWithheldSnippet(props.snippet)) return <WithheldCode {...props} />;
+  return <CodeContext {...props} />;
+}
+
+function CodeContext({ context, snippet, scope, line, file }) {
   const [expanded, setExpanded] = useState(useContext(CodeOpenByDefault));
   const toggle = () => setExpanded((e) => !e);
 

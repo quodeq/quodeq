@@ -10,11 +10,12 @@ writes already skip a cache opened read-only.
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import ExitStack, contextmanager
 
 from quodeq.core.types import DimensionResult
 from quodeq.data.sqlite.score_cache_db import open_score_cache
+from quodeq.data.sqlite.score_cache_forget import forget_projects
 from quodeq.data.sqlite.score_cache_store import (
     load_run_changes,
     load_run_key_sets,
@@ -83,6 +84,12 @@ def save_run_change(project: str, run_id: str, key: str, payload: dict) -> None:
     """Cache one run's History change data under *key* (best-effort)."""
     with _cache() as conn:
         store_run_change(conn, project, run_id, key, payload)
+
+
+def forget_project_scores(projects: Iterable[str]) -> None:
+    """Drop every cached row of *projects* (deleted projects, best-effort)."""
+    with _cache() as conn:
+        forget_projects(conn, projects)
 
 
 def save_run_keys(project: str, run_id: str, dismiss_keys: set[tuple], class_keys: set[tuple]) -> None:

@@ -13,6 +13,7 @@ from quodeq.shared.logging import log_info
 
 from quodeq.dashboard._build_hash import SYNC_ITEMS
 from quodeq.shared.quiet_run import run_quiet
+from quodeq.shared.win_launch import find_program
 
 _UI_DIRNAME = "ui"  # bundled UI source directory name, both inside the package and in the repo
 
@@ -103,7 +104,7 @@ def run_npm_build(
     *env* is the mapping the build's timeouts are read from and the base of
     the child process's environment; it defaults to ``os.environ``.
     """
-    npm = shutil.which("npm")
+    npm = find_program("npm")
     if npm is None:
         raise FileNotFoundError(
             "npm not found on PATH. Install Node.js from https://nodejs.org/ or via your package manager."

@@ -3,6 +3,7 @@ tool-result details, session id)."""
 from __future__ import annotations
 
 import json
+from quodeq.core.stream.agy_events import normalize_event
 from quodeq.core.stream.events import (
     BLOCK_TYPE_OUTPUT_TEXT, BLOCK_TYPE_TEXT, BLOCK_TYPE_TOOL_USE, ITEM_TYPE_AGENT_MESSAGE,
     EVENT_TYPE_ASSISTANT, EVENT_TYPE_ASSISTANT_MESSAGE, EVENT_TYPE_ERROR, EVENT_TYPE_ITEM_COMPLETED,
@@ -40,7 +41,7 @@ def parse_line(line: str) -> dict | None:
     if not line:
         return None
     try:
-        obj = json.loads(line)
+        obj = normalize_event(json.loads(line))
     except json.JSONDecodeError:
         return None
     return obj if isinstance(obj, dict) else None
