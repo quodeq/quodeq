@@ -54,8 +54,32 @@ def test_windows_probe_runs_each_command_inside_the_sandbox(monkeypatch, tmp_pat
     monkeypatch.setattr(codex_sandbox.subprocess, "run", lambda argv, **kw: calls.append(argv) or run(argv))
     assert codex_sandbox.native_sandbox_works("codex", ["-c", "w=1"], tmp_path, tmp_path / "f", {})
     probes = [argv[argv.index("--") + 1:] for argv in calls if "--" in argv]
-    assert [p[2] for p in probes] == ["dir", "type"]
+    assert [p[2] for p in probes[:2]] == ["dir", "type"]
     assert not any("&&" in p for p in probes)
+
+
+def test_windows_probe_starts_the_shell_codex_runs_commands_in(monkeypatch, tmp_path, installed_cli, windows_system_tools):
+    # Codex wraps the agent's commands in PowerShell, which cannot start inside
+    # the sandbox from a session with no desktop (SSH, a service): cmd.exe alone
+    # passes there and every command of the scan then fails.
+    monkeypatch.setattr(codex_sandbox.platform, "system", lambda: "Windows")
+    calls: list = []
+    run = _fake_run("0.162.1", 0)
+    monkeypatch.setattr(codex_sandbox.subprocess, "run", lambda argv, **kw: calls.append(argv) or run(argv))
+    assert codex_sandbox.native_sandbox_works("codex", ["-c", "w=2"], tmp_path, tmp_path / "f", {})
+    probes = [argv[argv.index("--") + 1:] for argv in calls if "--" in argv]
+    assert any(Path(p[0]).name.lower() == "powershell.exe" for p in probes)
+
+
+@pytest.mark.parametrize("system, expected", [("Windows", True), ("Linux", False), ("Darwin", False)])
+def test_every_profile_turns_on_the_windows_sandbox_only_on_windows(monkeypatch, tmp_path, system, expected):
+    # Without it Codex on Windows has no sandbox to run a command in, and with
+    # approvals off it refuses every command ("blocked by policy").
+    monkeypatch.setattr(codex_sandbox.platform, "system", lambda: system)
+    secret = tmp_path / ".env"
+    for profile in (codex_sandbox.plain_read_only_args(), codex_sandbox.plain_read_only_args([secret]),
+                    codex_sandbox.profile_args(tmp_path, [tmp_path / "repo"])):
+        assert ('windows.sandbox="unelevated"' in profile) is expected
 
 
 def _scan(tmp_path, monkeypatch, works: bool):

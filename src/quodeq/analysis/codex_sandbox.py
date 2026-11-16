@@ -10,8 +10,10 @@ this project's evaluations (the standards checklist sits in its evidence).
 Codex enforces this on macOS, Linux and Windows, so it covers machines where
 Quodeq has no OS sandbox of its own. A probe runs one read under the same
 profile first; where it fails (an older Codex, a Linux kernel or container
-that refuses the sandbox, an unconfigured Windows sandbox), the scan keeps
-the bypass-plus-OS-sandbox path. What the repo holds must not decide that:
+that refuses the sandbox, a Windows session with no desktop), the scan keeps
+the bypass-plus-OS-sandbox path. On Windows every profile also turns Codex's
+sandbox on (``windows.sandbox``): left unset, Codex has nothing to run a
+command in and, with approvals off, refuses each one. What the repo holds must not decide that:
 see :func:`probe_sample`.
 """
 from __future__ import annotations
@@ -35,6 +37,8 @@ from quodeq.shared.win_launch import launch_argv, program_argv
 _BYPASS_FLAG = "--dangerously-bypass-approvals-and-sandbox"
 _CONFIG_FLAG = "-c"
 _PROFILE = "quodeq_scan"
+_APPROVAL_NEVER = 'approval_policy="never"'
+_WINDOWS_SANDBOX = 'windows.sandbox="unelevated"'  # the backend that needs no admin setup
 _MIN_VERSION = Version("0.162.0")  # first version tested with approved MCP tools in read-only
 _PROBE_TIMEOUT_S = 20
 _VERSION_RE = re.compile(r"(\d+\.\d+\.\d+)")
@@ -56,7 +60,7 @@ def plain_read_only_args(unreadable: Sequence[Path] = ()) -> list[str]:
     reads unless its elevated sandbox backend is installed, but runs this
     when there is nothing to deny; a probe decides."""
     if not unreadable:
-        return [_CONFIG_FLAG, 'approval_policy="never"']
+        return _config_args([_APPROVAL_NEVER])
     return _profile(_unreadable_entries(unreadable))
 
 
@@ -74,12 +78,18 @@ def profile_args(home: Path, readable: list[Path], unreadable: Sequence[Path] = 
 
 
 def _profile(entries: list[str]) -> list[str]:
-    overrides = [
-        'approval_policy="never"',
+    return _config_args([
+        _APPROVAL_NEVER,
         f'default_permissions="{_PROFILE}"',
         f'permissions.{_PROFILE}.extends=":read-only"',
         f"permissions.{_PROFILE}.filesystem={{{', '.join(entries)}}}",
-    ]
+    ])
+
+
+def _config_args(overrides: list[str]) -> list[str]:
+    """*overrides* as ``-c`` arguments, with Codex's sandbox turned on where it is opt-in."""
+    if platform.system() == SYSTEM_WINDOWS:
+        overrides = [*overrides, _WINDOWS_SANDBOX]
     return [arg for override in overrides for arg in (_CONFIG_FLAG, override)]
 
 
@@ -110,12 +120,15 @@ def _version(binary: str, env: Mapping[str, str]) -> Version | None:
 
 def _probe_commands(listed: Path, sample: Path) -> list[list[str]]:
     """List *listed* and read *sample*, as the agent's shell would. On
-    Windows they are two runs, each part its own argument: npm's ``codex.cmd``
+    Windows they are separate runs, each part its own argument: npm's ``codex.cmd``
     goes through cmd.exe, which would run anything after ``&&`` outside the
-    sandbox, and embedded quotes reach cmd.exe escaped (\\"), which it rejects."""
+    sandbox, and embedded quotes reach cmd.exe escaped (\\"), which it rejects.
+    The last one starts PowerShell, which Codex wraps the agent's commands in
+    and which cannot start in the sandbox from a session with no desktop."""
     if platform.system() == SYSTEM_WINDOWS:
         return [program_argv(["cmd.exe", "/c", "dir", str(listed)]),
-                program_argv(["cmd.exe", "/c", "type", str(sample)])]
+                program_argv(["cmd.exe", "/c", "type", str(sample)]),
+                program_argv(["powershell.exe", "-NoProfile", "-Command", "echo", "ok"])]
     return [["/bin/sh", "-c", 'ls "$1" >/dev/null && cat "$2"', "sh", str(listed), str(sample)]]
 
 
